@@ -59,7 +59,11 @@ need a model run in parallel with the foundation.
 4. **Edits** — every inspector, table and diagram edit through the
    toolkit's transform operations (rename, set value, insert, remove,
    retarget), composed where it has no single operation.
-5. **Diagrams** — the seven diagram graphs in TypeScript over the model.
+5. ✅ **Diagrams** (done; see `docs/engine.md`) — the seven diagram graphs in TypeScript over
+   the model, in the toolkit worker: interconnection views with inherited
+   ports, flows and bindings; general views with usages, typing and
+   specialization, and view usages drawn from what they expose; every
+   transition and decision branch.
 6. **The rest** — state machine emulator, `.kpar` read/write, library
    browser. *Done:* the emulator (`src/lib/sim/emulator.ts` runs any
    `StateMachine` in TypeScript; `parity.test.ts` checks it against the old

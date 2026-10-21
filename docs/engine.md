@@ -121,6 +121,45 @@ target transition's source (`accept Go then b;` after `state a;`: the state
 before it) and ends that don't resolve (a placeholder state and a warning).
 It costs about 3 ms on the demo, once per analysis.
 
+## Diagrams
+
+`EngineApi.diagram(view, files, scope)` is answered in the toolkit worker by
+`toolkit/diagrams/` (`buildDiagram`), over the session the analysis built:
+
+- **general** (`general.ts`) — from the model adapter's records: a package's
+  definitions, usages (as part trees, three levels) and packages, plus the
+  project definitions they specialize or are built from; a definition with
+  its parts as usages; a usage's part tree; a **view usage** from what it
+  exposes, filters applied (`viewInfo`, kept to elements owned under an
+  `expose`d name, since exposure follows `isImportAll`); no scope: every
+  definition. Edges: specialization and composition, typing ("defined by")
+  from usages to drawn definitions, and connections written with `end`
+  features between drawn elements (a `#derivation connection` as «derive»).
+- **interconnection**, **states**, **actions** (`interconnection.ts`,
+  `behavior.ts`) — from the toolkit's own graphs (`toGraph`, `tkgraph.ts`),
+  which resolve connector ends through feature chains, render ports a part
+  inherits from its definition and its supertypes, and label transitions.
+  Two gaps are filled from the model: a connector the toolkit cannot place
+  (a binding to the scope's own inherited port) is drawn from its ends as
+  written, and a decision's branches (`if c then a; else b;`, transitions
+  the action graph leaves out) take the node declared before them as
+  source. A change trigger's label (`accept when …`) is read from the text.
+- **requirements**, **trace**, **packages** (`trace.ts`) — from the records
+  and the satisfy/verify ends the adapter resolved (`ExtractedModel.traces`).
+
+Node ids are names as written, because `layout/diagrams.json` keys positions
+by them: a definition `Battery`, a usage its path `drone.battery`, a state or
+action its path in the machine, `__initial__`/`__final__`, unnamed control
+nodes `fork#1`, `decide#1`; a clash takes the qualified name. Each node also
+carries `element` (file and declaration byte), which the canvas uses to find
+the element instead of matching names. A general view is opened with the
+view usage's qualified name as scope (`workbench/views.ts`), so its layout key
+is `general:Views::name`.
+
+Cost on the demo in Node, after analysis: 0.4–16 ms per view. The one
+expensive read (a connector's resolved ends, a whole-model pass of ~300 ms
+the first time) is only made when an end's name matches nothing drawn.
+
 ## Language services
 
 The editor's completion, hover, go to definition, references, rename,
