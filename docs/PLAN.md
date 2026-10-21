@@ -1,12 +1,12 @@
 # SysML Web — Implementation Plan
 
-A beautiful, fast, standards-conformant **web app for systems engineering on
-SysML v2**, where the SysML text in a git repository is the single source of
-truth. People work with requirements, components, interfaces, tests and failure
-modes through spreadsheets, forms and diagrams — no SysML knowledge needed —
-while MBSE experts get the full language, a text editor and the standard views
-over the same files. Every change lands as a minimal, reviewable diff to
-`.sysml` files that any other conformant tool can read.
+A beautiful, fast, standards-conformant **web workbench for SysML v2** that
+makes the language approachable. Build models in **text or diagrams** — both
+edit the same SysML, live — with guidance and plain-language explanations that
+let engineers new to MBSE work productively, and the depth experts expect. The
+SysML text in a git repository is the single source of truth; every change is a
+minimal, reviewable diff that any other conformant tool can read. It runs well
+on desktop and mobile.
 
 Status: **Phase 0 in progress** (see [Decision log](#decision-log)).
 - Engine → WebAssembly: done ([docs/spikes/wasm-engine.md](spikes/wasm-engine.md));
@@ -52,9 +52,11 @@ Status: **Phase 0 in progress** (see [Decision log](#decision-log)).
 6. **Your data stays yours.** No backend stores models. Static app + git
    provider + an optional stateless proxy, exactly like my-celium.org.
 7. **Beautiful by default, keyboard-first, accessible.** WCAG 2.1 AA in CI.
-8. **Usable without knowing SysML.** Object-first screens in plain language
-   for the person coming from Excel; full SysML depth one click away for the
-   expert (see §7).
+8. **SysML made approachable, not hidden.** Text and diagrams are equal ways
+   to build the model; the language explains itself in context so newcomers
+   learn by doing (see §7).
+9. **Fast everywhere.** Mobile and desktop are both first-class; Lighthouse
+   ≥ 90 in every category is enforced in CI.
 
 ---
 
@@ -241,9 +243,9 @@ not standardised until SysML v2.1.
 | View | Delivery | Notes |
 | --- | --- | --- |
 | Browser View | Phase 2 | Explorer tree; membership, filters, library toggle |
-| General View | Phase 2 read · Phase 3 edit | defs (square) vs usages (rounded), `«kind»` name compartment, textual compartments, composite/referential diamonds, specialization, satisfy/verify/allocate edges |
-| Interconnection View | Phase 2 read · Phase 3 edit | nested parts, ports on borders, connections, interfaces, bindings (`=`), item flows; replaces IBD & parametric |
-| Grid View | Phase 6 | requirements table, trace/allocation/DSM matrices, `@TableRendering` views |
+| General View | Phase 2 (read and visual editing) | defs (square) vs usages (rounded), `«kind»` name compartment, textual compartments, composite/referential diamonds, specialization, satisfy/verify/allocate edges |
+| Interconnection View | Phase 2 (read and visual editing) | nested parts, ports on borders, connections, interfaces, bindings (`=`), item flows; replaces IBD & parametric |
+| Grid View | Phase 3 | requirements table, trace/allocation/DSM matrices, `@TableRendering` views |
 | Action Flow View | Phase 5 | start/done, decide/merge diamonds, fork/join bars, successions, flows, pins, send/accept, swimlanes via allocation |
 | State Transition View | Phase 5 | states, regions, `trigger [guard] / effect`, entry/do/exit compartments |
 | Sequence View | Phase 5 | lifelines, messages, event occurrences |
@@ -303,203 +305,159 @@ how we earn trust as an interchangeable tool.
 
 ---
 
-## 7. Experience design — object-first, SysML underneath
+## 7. Experience design — SysML, made approachable
 
-**Design target:** an engineer who has been managing requirements in Excel and
-has never heard of SysML is productive in the first ten minutes, and never has
-to see SysML unless they want to. An MBSE expert gets full-fidelity SysML text,
-the standard diagrams and every metamodel concept, in the same app, over the
-same files.
+**Design target.** SysML v2 is the product, not an implementation detail. The
+app brings engineers who today keep requirements in documents, interfaces in
+spreadsheets and architecture in slide decks into real model-based work — by
+making the language itself easy to read, write and draw, rather than hiding it
+behind forms. Someone new to MBSE should build a small, correct model in their
+first session and understand what they built; an MBSE expert should find a
+fast, standards-faithful workbench that never gets in the way.
 
 ### 7.1 Principles
 
-1. **Things, not notation.** People work with *requirements, components,
-   interfaces, functions, tests, failure modes* — plain words, plain forms.
-   SysML vocabulary (`part def`, usage, redefinition) appears only in the
-   advanced views and in an opt-in "Show SysML" panel.
-2. **Spreadsheets where people expect spreadsheets.** Requirements, FMEA,
-   interfaces and test matrices are grids with keyboard navigation, inline
-   editing, fill-down, multi-select, copy/paste to and from Excel, sorting,
-   filtering, grouping and saved column layouts.
-3. **Every object has a page.** One canonical page per item: its fields, its
-   relationships ("Satisfied by", "Verified by", "Derived from", "Allocated
-   to", "Failure modes"), its discussion of issues, its history, and where it
-   appears in diagrams. Everything links.
-4. **Relationships are made by picking, not typing.** Pickers search the whole
-   model by ID, name and text; drag a row onto a component to link it; bulk-link
-   from a grid selection.
-5. **Guided creation.** "+ New" offers plain templates (Requirement, Component,
-   Interface, Function, Test case, Failure mode, Hazard). Each form asks only
-   what is needed and generates conformant SysML; the live preview teaches the
-   notation to those who look.
-6. **Plain-language feedback.** "REQ-012 has no verification yet" and "Battery
-   is used but never defined", with one-click fixes — not `W004`.
-7. **Nothing is lost, everything is reviewable.** Autosave locally; "Save
-   version" commits; "Share" pushes; "Propose change" opens a branch/PR. History
-   is shown as what changed in engineering terms.
-8. **Expert depth on demand.** The Model area exposes the browser tree, text
-   editor, all standard views, specialization/redefinition, raw metadata and
-   validation codes. Experts and newcomers edit the same objects.
+1. **Two equal ways to build a model: text and diagrams.** Write SysML in the
+   editor or draw it on a diagram; both edit the same text and update each
+   other live. Neither is a second-class view of the other.
+2. **The language is visible and explained.** Every keyword, element and
+   relationship can explain itself in plain words (hover, inspector, "What is
+   this?"), with a short example. Newcomers learn SysML by using it, not by
+   reading the specification first.
+3. **Guidance in the flow of work.** Context-aware "add" actions (in text,
+   on diagrams and in the explorer) offer the elements that make sense where
+   you are — a port on a part, a transition from a state, `satisfy` on a
+   requirement — and write idiomatic SysML for you. Templates and starter
+   models show good structure.
+4. **Problems explained, with a fix.** "`Battery` is used here but never
+   defined — create it?" rather than an error code; one click applies the fix.
+5. **Standard views, not bespoke screens.** Requirements lists, trace
+   matrices, interface tables and FMEA worksheets are SysML Grid views over the
+   model (§5), useful for reading and reviewing; authoring happens in text,
+   diagrams and the inspector.
+6. **Modern tooling for everyday practice.** Documents become model views and
+   generated reports; spreadsheets become typed, linked elements; email review
+   becomes branches, diffs and comments; "which version is current?" disappears
+   because the model lives in git.
+7. **Works everywhere.** Full authoring on desktop; reading, reviewing,
+   navigating and light editing on phones and tablets. Fast first load,
+   installable, offline-capable; Lighthouse ≥ 90 on every category, mobile and
+   desktop (§7.6).
 
-### 7.2 Information architecture
+### 7.2 The workbench
 
 ```
-┌ ◆ Drone UAV ▾ ─────────── ⌘K Search or create… ─────────── ● 3 unsaved · Save version ─ ◐ ─ ☺ ┐
-│ ▸ Overview          │                                                                            │
-│ ▸ Requirements  128 │   Requirements  ▾ All  ▾ Group: Parent   ⚲ Filter   ⊞ Columns   ⇩ Export   │
-│ ▸ System            │ ┌──────┬──────────────────────┬──────────────────┬──────┬────────┬───────┐ │
-│ ▸ Interfaces        │ │ ID   │ Requirement          │ Text             │ Prio │ Status │ Verif │ │
-│ ▸ Behaviour         │ ├──────┼──────────────────────┼──────────────────┼──────┼────────┼───────┤ │
-│ ▸ Verification      │ │REQ-1 │ Flight time          │ The UAV shall fly│ High │ ● Appr │ Test ✓│ │
-│ ▸ Risk              │ │REQ-2 │ Max take-off mass    │ The MTOW shall…  │ High │ ○ Draft│ —  ⚠  │ │
-│ ─────────────────── │ │ …    │                      │                  │      │        │       │ │
-│ ▸ Diagrams          │ └──────┴──────────────────────┴──────────────────┴──────┴────────┴───────┘ │
-│ ▸ Model (advanced)  │                                            ┌ REQ-2 Max take-off mass ─────┐ │
-│                     │                                            │ Text / Rationale / Status    │ │
-│                     │                                            │ Satisfied by: + Airframe     │ │
-│                     │                                            │ Verified by:  + Add test…    │ │
-│                     │                                            │ ▸ Show SysML                 │ │
-└─────────────────────┴────────────────────────────────────────────┴──────────────────────────────┘
+┌ ◆ Drone UAV ▾  main ▾ ● 2 unsaved ──────── ⌘K  Search, go to or create… ──────────── ◐  ☺ ┐
+├──────────────┬───────────────────────────────────────────┬────────────────────────────────┤
+│ EXPLORER     │ Structure.sysml ×  ◇ Drone structure ×    │ INSPECTOR                      │
+│ ▾ Drone      │┌─────────────────────┬───────────────────┐│ «part» airframe : Airframe     │
+│  ▾ Structure ││ part def Drone {    │  ┌─────────────┐  ││ A part is one component used   │
+│    ◇ Drone   ││   part airframe :   │  │ «part def»  │  ││ in the system. ▸ Learn more    │
+│    ◇ Battery ││     Airframe;       │  │   Drone     │  ││ ─────────────────────────────  │
+│  ▸ Behaviour ││   part battery :    │  ├─────────────┤  ││ Name      airframe             │
+│  ▸ Require…  ││     Battery;        │  │ airframe    │  ││ Type      Airframe ▾           │
+│ VIEWS        ││   …                 │  │ battery     │  ││ Multiplicity  1                │
+│  ◇ Structure ││                     │  └──────┬──────┘  ││ Satisfies  SYS-003 ✓           │
+│  ◇ Delivery  ││  + Add part  port … │      ◆──┴──◆      ││ + Add attribute · port · …     │
+│  ▦ Reqs      │└─────────────────────┴───────────────────┘│                                │
+├──────────────┴───────────────────────────────────────────┴────────────────────────────────┤
+│ PROBLEMS 2 · `Battery` has no `mass` attribute — add one?                     REFERENCES   │
+└───────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-| Area | For | What it shows | SysML underneath |
-| --- | --- | --- | --- |
-| **Overview** | everyone | Health: requirements coverage (satisfied/verified), open issues, risk heatmap, recent changes, quality gates | queries over the model; `QualityGate` constraints |
-| **Requirements** | systems, quality | Requirements grid + tree (derivation hierarchy), object pages, Excel import/export | `requirement` usages, short-name IDs, `doc`, `@StatusInfo`, `@Rationale`, `derive`/`satisfy`/`verify` |
-| **System** | systems, development | **Catalog** (component types) and **Structure** (the assembled system tree, BOM view), component pages, diagrams | `part def` = catalog entry, `part` usage = placed in structure |
-| **Interfaces** | systems, development | Ports and interfaces table, connection matrix (N²), ICD export | `port def`, `interface def`, `connect`, `flow` |
-| **Behaviour** | systems | Functions list, function flow, states | `action`, `state`, successions, transitions |
-| **Verification** | test, quality | Test cases, verification matrix (requirement × test), coverage | `verification` cases with `verify`, method metadata |
-| **Risk** | quality, safety | FMEA worksheet, risk matrix, hazard log, mitigations | `RiskAnalysis` `@Fmea`, `HazardAnalysis` occurrences, `satisfy`/`verify` for mitigations |
-| **Diagrams** | everyone | Saved diagrams (General, Interconnection, Action Flow, State, Sequence, Grid) | `view` usages with `expose`/`filter` |
-| **Model** | MBSE experts | Browser tree, text editor (split with diagram), all elements, validation codes, libraries | everything |
+- **Explorer** — the model as a tree (packages, definitions, usages) with an
+  optional *Files* mode; **Views** lists the model's saved views plus built-in
+  ones. Every node has "Add…" for the elements that fit there.
+- **Editor area** — tabs for SysML files and diagrams; any tab can split
+  side by side. *Text + diagram split* is the signature layout: selecting in one
+  selects in the other; typing redraws the diagram; drawing writes the text.
+- **Inspector** — the selected element's kind explained in one sentence, its
+  properties as an editable form (name, type, multiplicity, value, doc,
+  metadata), its relationships (specializes, satisfies, verified by, allocated
+  to, connected to) with "Add relationship…", and where it appears.
+- **Problems / References** panel; **⌘K** command palette for go to, create
+  anything, run a view, switch project.
+- **Mobile** — one pane at a time with a bottom bar (Explorer · Text · Diagram ·
+  Inspector); diagrams pan and pinch-zoom; the inspector becomes a bottom sheet.
+  Optimised for reading, reviewing and small edits.
 
-The **Catalog / Structure** split is how definition vs usage is taught without
-saying it: like a CAD part library vs an assembly. Creating "Battery" adds a
-catalog entry (`part def Battery`); placing it in the drone adds
-`part battery : Battery` to the structure. The same pattern applies to
-interfaces (types vs connections) and functions (definitions vs steps).
+### 7.3 Building in text
 
-### 7.3 How plain objects map to SysML
+CodeMirror 6 driven by the engine (Web Worker):
+- Highlighting from the grammar's `highlights.scm`; folding; outline.
+- Completion for keywords, names in scope and standard-library types
+  (`ISQ::mass`, `SI::kg`), with snippets that teach structure
+  (`part def … { }`, `requirement … { doc /* */ subject …; }`).
+- Hover: what the element is, its definition, its doc, and a plain-language
+  explanation of the keyword.
+- Go to definition, find references, rename everywhere, code actions for
+  quick fixes, format document.
+- "Add…" lenses above definitions (add port, add attribute, add requirement).
 
-House conventions keep the generated text idiomatic, readable and portable.
-Standard-library metadata is used wherever it exists, so other tools understand
-it; a small `EngineeringBasics` library (Apache-2.0, plain SysML, added to a
-project on creation) fills the gaps, following the book's `CommonRequirement`
-pattern.
+### 7.4 Building in diagrams
 
-```sysml
-requirement <'REQ-002'> 'Max take-off mass' : EngineeringRequirement {
-    doc /* The maximum take-off mass shall not exceed 2 kg. */
-    :>> kind = RequirementKind::performance;
-    :>> priority = Priority::high;
-    :>> verificationMethod = VerificationMethod::test;
-    @ModelingMetadata::StatusInfo { status = StatusKind::open; owner = "J. Hale"; }
-    @ModelingMetadata::Rationale { text = "Regulatory class C1 limit."; }
-}
-satisfy 'Max take-off mass' by droneSystem.airframe;
-```
+Svelte Flow canvas with SysML notation (§5.2), laid out by ELK:
+- **Palette** filtered to the view type (General: part def, part, port,
+  requirement, connection, satisfy…; Interconnection: part, port, connection,
+  flow, interface; later Action Flow and State).
+- Drop to create; drag between ports to connect; double-click to rename; edit
+  multiplicity and type inline; delete with an impact preview.
+- Every gesture is an engine `EditOp` that becomes a minimal text patch, shown
+  as a highlighted change in the split text view — so drawing teaches the text.
+- Views are saved as SysML `view` usages; positions in a layout sidecar (§5.1).
 
-| Field in the UI | Stored as |
-| --- | --- |
-| ID (`REQ-002`, auto-numbered, configurable prefix) | short name `<'REQ-002'>` |
-| Title | name, quoted when it is not a plain identifier so titles survive exactly (project setting: keep titles, or derive `camelCase` identifiers) |
-| Text | `doc` comment |
-| Kind / priority / verification method | attributes redefined from `EngineeringRequirement` |
-| Status / owner / originator | `ModelingMetadata::StatusInfo` |
-| Rationale | `ModelingMetadata::Rationale` |
-| Open question / issue | `ModelingMetadata::Issue` |
-| Parent requirement | `#derivation connection` (`RequirementDerivation` library) |
-| Satisfied by / verified by | `satisfy … by …`, `verify` in a verification case |
-| Custom columns | project-defined metadata (`metadata def`) created from the UI |
+### 7.5 Learning SysML in the app
 
-The project keeps a predictable file layout managed by the app (users never
-have to see it): `requirements/`, `system/`, `interfaces/`, `behaviour/`,
-`verification/`, `risk/`, `views/`, `libraries/`, plus `.sysml-web/` for app
-settings and diagram layout. Files written by hand or other tools anywhere in
-the repository are read and edited in place.
+- **Guided tour** of the demo model (stops defined in the demo's `TOUR.md`).
+- **Concept cards**: one-sentence explanations and minimal examples for every
+  element kind, shown in hover, inspector and the "+ Add" menus.
+- **Starter templates**: blank, product architecture, requirements-first,
+  safety-critical; each a small, well-structured model.
+- **"Show me in SysML"** wherever a table or diagram shows something, so
+  nothing is magic.
 
-### 7.4 Excel on-ramp
+### 7.6 Quality bar: fast, accessible, everywhere
 
-- **Start from a spreadsheet**: drop an `.xlsx`/`.csv`, pick the sheet, map
-  columns to fields (auto-suggested from headers such as "ID", "Requirement",
-  "Shall statement", "Priority", "Parent"), preview, import. Unmapped columns
-  become custom fields. A project with real requirements exists in under a
-  minute.
-- **Paste** rows from Excel straight into the grid; **copy** rows back out.
-- **Export** any grid (requirements, FMEA, verification matrix, BOM, ICD) to
-  `.xlsx`/`.csv` with the same columns as on screen.
-- **Round-trip re-import** matches rows by ID and shows a change preview before
-  applying, so teams can keep using a spreadsheet during the transition.
+- Lighthouse CI on landing and workbench pages, mobile and desktop presets:
+  performance ≥ 0.9, accessibility = 1.0, best practices ≥ 0.95, SEO ≥ 0.9.
+- Engine (WASM) and editor load lazily after first paint; diagrams and
+  CodeMirror are code-split; fonts self-hosted and subset.
+- WCAG 2.1 AA (axe in e2e); keyboard-operable diagrams; touch targets ≥ 44 px.
+- Responsive from 360 px phones to wide desktops; installable PWA, offline.
 
-### 7.5 Getting started
+### 7.7 Visual language
 
-Landing → **Try the demo** (drone project, no sign-in) · **Start from a
-spreadsheet** · **Open a repository** (GitHub/GitLab/Bitbucket) · **Open a
-folder** · **New project** (choose a template: blank, product, safety-critical).
-A three-step tour explains Requirements → System → Verification on the demo.
+Calm, typographic and dense without clutter. Inter for UI, JetBrains Mono for
+SysML. A neutral palette with one accent; colour encodes element kind and
+status consistently across text, diagrams and inspector, always paired with a
+label or shape. Light, dark and high-contrast themes; reduced motion respected.
 
-### 7.6 Visual language
+## 8. Engineering practice on the model
 
-Calm, typographic, information-dense without clutter. Inter for UI, JetBrains
-Mono for IDs and SysML. A neutral palette with one accent; colour encodes
-*status* (approved / draft / gap) and *kind* consistently across grids,
-pages and diagrams, always paired with a shape or label (never colour alone).
-Light, dark and high-contrast themes; 44 px touch targets; reduced motion
-respected; every grid and diagram fully keyboard-operable; WCAG 2.1 AA checked
-in CI.
+The app supports the practices systems and quality engineers already have by
+expressing them in SysML and providing views over the model. Semantics live in
+SysML libraries so they travel with the model to other tools.
 
-## 8. Engineering workflows
+| Practice today | In the model | Views and tools |
+| --- | --- | --- |
+| Requirements documents | `requirement` elements with IDs, text, rationale, status (`ModelingMetadata`), derivation (`RequirementDerivation`) | requirements Grid view, derivation tree, "Generate specification" report |
+| Traceability spreadsheets | `satisfy`, `verify`, `allocate`, derivation connections | trace matrix, coverage, gaps with fixes, impact analysis |
+| Block diagrams and ICDs in slides | parts, ports, interfaces, items, connections | General and Interconnection views, interface Grid view, ICD report |
+| Functional flows | actions, successions, flows, `perform`, allocation | Action Flow view (Phase 5) |
+| Modes and states | state machines | State Transition view, simulation (Phase 5) |
+| Test plans | verification cases with objectives and `verify` | verification matrix, coverage |
+| FMEA and hazard logs | `RiskAnalysis` / `HazardAnalysis` libraries | FMEA and risk-matrix Grid views (`@TableRendering`), RPN calc |
+| Budgets (mass, power) | attributes with units, calcs, constraints | roll-ups, constraint checks |
+| Design reviews | git branches, commits | semantic diff, review mode (Phase 4) |
 
-Use cases the first releases must make easy, by role. Each is a set of views
-over the same model; the semantics live in SysML libraries so they travel with
-the model.
-
-### Systems engineers
-- Capture, refine and baseline requirements; derive child requirements and see
-  the derivation tree.
-- Build the system breakdown (catalog + structure), allocate requirements and
-  functions to components.
-- Trace: requirement ↔ component ↔ test, with gaps highlighted; impact analysis
-  ("what is affected if Battery changes?").
-- Interfaces: define ports/interfaces, connect components, N² matrix, ICD
-  export.
-- Budgets: mass/power/cost roll-ups with units; trade studies (later phase).
-- Review: semantic diff between versions ("3 requirements changed, 1 component
-  added") and propose changes for review.
-
-### Quality engineers
-- FMEA worksheet (design/process): item/function, failure mode, effect,
-  severity, cause, occurrence, controls, detection, RPN (computed, never
-  stored), actions, owner, status — with AIAG/VDA 1–10 scales and validation.
-- Risk matrix (severity × likelihood) and action-priority view; hazard log with
-  causal chains (failure mode → hazard → harm).
-- Mitigations linked to risks (`satisfy`) and to their verification (`verify`):
-  "which high-RPN risks lack a verified mitigation?" is one click.
-- Requirement quality checks: missing verification method, ambiguous words
-  ("should", "TBD", "as appropriate"), missing rationale, duplicates.
-- Quality gates and completeness dashboard, enforceable in CI.
-
-### Test / verification engineers
-- Test cases (verification cases) with objective, method and the requirements
-  they verify; verification matrix and coverage.
-- Live evaluation of constraints and calculations as executable checks.
-- Recording executions/verdicts is deferred with other operational records.
-
-### Development engineers
-- Component pages with interfaces, parameters, allocated requirements and
-  functions; BOM export; tolerance stack-ups via the `Tolerancing` library
-  (later phase).
+On-ramps for existing material (later phases): import a requirements
+spreadsheet or document outline into `requirement` elements with a preview of
+the generated SysML; export any Grid view to CSV/XLSX and reports to
+Markdown/PDF for people outside the tool.
 
 ### Deferred: operational records
-Test executions and verdicts, NCRs, CAPAs and inspection results are **out of
-scope for now**. The model holds definitions and plans (verification cases,
-FMEA, quality gates); recording what happened against them comes later.
-
-### Reports
-Model-defined `view def` + `@TableRendering` views render as live tables and
-export to CSV/XLSX/Markdown/PDF: requirements specification, verification
-matrix, ICD, FMEA, BOM.
+Test executions and verdicts, NCRs, CAPAs and inspection results are out of
+scope for now.
 
 ---
 
@@ -625,7 +583,7 @@ Each phase ends in something usable and demoable; vertical slices over breadth.
   relicensing, wasm CI — `sysml-cli` PR #1; grammar PR #1.
 - ~~SvelteKit app scaffold~~, CI, Pages deploy. ~~Design system, app shell and
   engine worker integration with the demo project~~ — landing page, project
-  shell with the §7.2 areas, Overview, read-only Requirements grid with detail
+  shell (first iteration, since replaced by the §7.2 workbench), Overview, read-only Requirements grid with detail
   panel ("Show SysML"), Model browser; engine built from the pinned
   `sysml-cli` revision (`engine.json`, `scripts/build-engine.sh`) and run in a
   Web Worker; e2e + axe tests pass with zero violations.
@@ -642,42 +600,44 @@ Found in Phase 0, to address in Phases 1–2:
 - W013 (camelCase) flags quoted titles; it should respect the project's name
   style (§7.3).
 
-**Phase 1 — Semantic engine core**
-- Lowering, element graph, resolution, imports, implied specializations,
-  prebuilt stdlib index, diagnostics, JSON export.
+**Phase 1 — Semantic engine core and editor services**
+- Lowering, element graph, resolution, imports, implied relationships,
+  prebuilt stdlib index, project-wide diagnostics, JSON export.
+- Editor services from the engine: highlight tokens, outline, hover (with
+  concept explanations), completion, go to definition, references, rename,
+  quick fixes, formatting; diagram graphs for General and Interconnection
+  views; `EditOp`s → minimal text edits.
 - _Exit_: official corpus resolves with zero errors; drone JSON matches the
   pilot on the compared properties; < 30 ms incremental re-check.
 
-**Phase 2 — Requirements, end to end (first user-facing release)**
-- Requirements grid and object pages with full editing (`EditOp`s → minimal
-  text patches, unified undo, fidelity suite); `EngineeringBasics` library;
-  derivation tree; plain-language checks; Excel/CSV import with column mapping,
-  paste, export and round-trip re-import; open demo / local folder / download;
-  ⌘K; Overview with coverage.
-- _Exit_: someone with a requirements spreadsheet imports it, edits and links
-  requirements, and gets clean, conformant SysML in a folder — without
-  learning SysML.
+**Phase 2 — Build a model two ways (first user-facing release)**
+- Workbench (§7.2): explorer, CodeMirror editor with full language support,
+  live General and Interconnection diagrams, linked selection, inspector with
+  editable properties, problems with fixes, ⌘K, unified undo; visual editing
+  on both diagram types (create from palette, connect ports, rename, retype,
+  delete); saved views as SysML with layout sidecar; open demo / local folder /
+  download; mobile layout; guided tour of the demo; Lighthouse budgets met.
+- _Exit_: someone new to MBSE follows the tour, then builds a small system —
+  requirements, parts, ports, connections, satisfy links — by drawing and by
+  typing, and the result is clean, conformant SysML.
 
-**Phase 3 — System and diagrams**
-- Catalog / Structure, component pages, allocation and satisfy links;
-  Interfaces table and N² matrix; General + Interconnection views (read, then
-  visual create/connect/rename/delete) with ELK layout and saved views as
-  SysML; Model area with text editor (highlighting, diagnostics, completion,
-  go-to, rename) split with diagrams.
-- _Exit_: build the drone architecture without typing; experts see clean text.
+**Phase 3 — Requirements, traceability and views**
+- Requirement concept cards and templates, derivation tree, Grid views
+  (requirements, trace matrix, interfaces) defined as SysML views, coverage and
+  impact analysis, generated reports (specification, ICD).
 
 **Phase 4 — Git & collaboration**
 - OAuth sign-in, Save version / Share / Propose change (commit, push, branch,
   PR), conflict resolver, semantic diff and review mode.
 
-**Phase 5 — Verification and Risk**
-- Test cases, verification matrix and coverage; FMEA worksheet, risk matrix,
-  hazard log, mitigations; requirement quality checks; quality gates; reports
-  and XLSX exports.
+**Phase 5 — Behaviour**
+- Action Flow, State Transition and Sequence views (read, then visual
+  editing); state/action simulation; roll-ups and trade studies.
 
-**Phase 6 — Behaviour**
-- Functions, Action Flow, State Transition and Sequence views (read then edit);
-  state/action simulation; roll-ups and trade studies.
+**Phase 6 — Verification, risk and on-ramps**
+- Verification cases and matrix; FMEA and hazard views over the risk
+  libraries; requirement quality checks; quality gates; spreadsheet/document
+  import to `requirement` elements; CSV/XLSX/PDF exports.
 
 **Phase 7 — Interchange**
 - JSON import, `.kpar` import/export, Systems Modeling API client (push/pull
@@ -711,7 +671,10 @@ Found in Phase 0, to address in Phases 1–2:
 | 3 | Static app + git only; no backend holds data; stateless proxy worker; optional Systems Modeling API client | 2026-10-21 |
 | 4 | Licence `Apache-2.0 OR MIT`; relicense own grammar/core code; OMG library bundled under EPL-2.0 | 2026-10-21 |
 | 5 | SvelteKit (static SPA) + Svelte 5; reuse mycelium-web's git/auth/worker code but **not** its structure or UI | 2026-10-21 |
-| 7 | Object-first UX in plain language, designed for Excel users; SysML depth on demand; Requirements is the first vertical slice | 2026-10-21 |
+| 7 | ~~Object-first, spreadsheet-like UX~~ — superseded by #9 | 2026-10-21 |
+| 9 | SysML is the product: a workbench where text and diagrams are equal ways to build the model, made approachable through in-context explanation and guidance; tables are SysML views, not the editing paradigm | 2026-10-21 |
+| 10 | Mobile and desktop are both first-class; Lighthouse ≥ 0.9 (a11y 1.0) enforced in CI | 2026-10-21 |
+| 11 | The demo model is authored and reviewed with the highest-capability model; it is the primary onboarding surface | 2026-10-21 |
 | 8 | Element ids use the normative KerML 9.1 scheme for library and user models alike (project URI as base) | 2026-10-21 |
 | 6 | Engine built in the `sysml-cli` workspace (new `sysml-semantic`, `sysml-interchange`, `sysml-wasm` crates); this app consumes its WASM release | 2026-10-21 |
 
