@@ -20,7 +20,8 @@ import type {
 	FileRange,
 	Highlights,
 	Hover,
-	OutlineItem
+	OutlineItem,
+	StateMachine
 } from '../types';
 import type {
 	TkFinding,
@@ -33,6 +34,7 @@ import type {
 } from './api';
 import { toProblems } from './diagnostics';
 import { LanguageServices, SyntaxServices } from './language';
+import { extractMachines } from './machines';
 import { detailsOf, extractModel, findElement, type ExtractedModel, type UnitInfo } from './model';
 import { TextIndexCache } from './offsets';
 import { RepairMap } from './repair';
@@ -43,6 +45,8 @@ interface Built {
 	units: Map<string, UnitInfo>;
 	analyses: Analysis[];
 	extracted: ExtractedModel | null;
+	/** The state machines, read on first ask. */
+	machines?: StateMachine[];
 }
 
 export class ToolkitHost {
@@ -160,6 +164,16 @@ export class ToolkitHost {
 		const record = extracted ? findElement(extracted.elements, path, line, element) : undefined;
 		if (!record) throw new Error(`element \`${element ?? `at line ${line}`}\` not found`);
 		return detailsOf(record, (s) => s);
+	}
+
+	/** The project's state machines (`machines.ts`), for the emulator. */
+	stateMachines(files: SourceFile[]): StateMachine[] {
+		const built = this.build(files);
+		built.machines ??=
+			built.session && built.extracted
+				? extractMachines(built.session, built.extracted, built.units)
+				: [];
+		return built.machines;
 	}
 
 	/** The current session, built for `files` (for language services). */

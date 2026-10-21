@@ -23,8 +23,8 @@
  * actions and effects update the variables; other actions are recorded in
  * the trace only.
  *
- * Action, trigger and guard texts are read as the classic engine writes
- * them: a trigger is a signal name, `when <condition>`, or `after …` /
+ * Action, trigger and guard texts are read as the extraction writes them
+ * (`engine/toolkit/machines.ts`): a trigger is a signal name, `when <condition>`, or `after …` /
  * `at …`; an action that updates variables is `assign x := e` statements
  * separated by `;`.
  */

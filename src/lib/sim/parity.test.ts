@@ -2,19 +2,23 @@
  * Parity with the Rust engine's `stateStep` (the emulator this one
  * replaces): both run the same machines through the same steps — scripted
  * sequences, and every event or Step reachable within a few moves — and
- * must give the same sessions. Where this emulator deliberately differs
+ * must give the same sessions. This emulator runs the machines as the
+ * toolkit extracts them (`toolkit/machines.ts`, what the app runs); the Rust
+ * one extracts its own, so the comparison covers extraction too. Where this emulator deliberately differs
  * (it follows the SysML v2 / UML state machine semantics where the Rust
  * one did not, or supports more of the expression language), the
  * `deliberate differences` tests pin both behaviours.
  */
-import { readFileSync, readdirSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
+import type { SourceFile } from '#lib/engine/protocol.ts';
+import { demoFiles, loadHost } from '#lib/engine/toolkit/testing.ts';
+import type { ToolkitHost } from '#lib/engine/toolkit/host.ts';
 import type { StateMachine, StateSession } from '#lib/engine/types.ts';
 import { start, step, type Variables } from './emulator.ts';
-import { flightModes, nestedMachine } from './fixtures.ts';
+import { COUNTER, DRONE, LAMP, MISSION, NESTED, flightModes, nestedMachine } from './fixtures.ts';
 
-const ROOT = join(import.meta.dirname, '../../demo/drone');
 const ENGINE = join(import.meta.dirname, '../../../static/engine');
 
 interface Wasm {
@@ -29,30 +33,21 @@ interface Wasm {
 	): string;
 }
 
-function walk(dir: string): string[] {
-	return readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
-		e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)]
-	);
-}
-
 let wasm: Wasm;
-let demo: string;
+let host: ToolkitHost;
+const demo = JSON.stringify(demoFiles());
 
 beforeAll(async () => {
 	wasm = (await import(/* @vite-ignore */ join(ENGINE, 'sysml_wasm.js'))) as Wasm;
 	wasm.initSync({ module: readFileSync(join(ENGINE, 'sysml_wasm_bg.wasm')) });
-	demo = JSON.stringify(
-		walk(ROOT)
-			.filter((f) => f.endsWith('.sysml'))
-			.map((f) => ({ path: relative(ROOT, f), text: readFileSync(f, 'utf8') }))
-	);
-});
+	host = await loadHost();
+}, 60_000);
 
 const files = (text: string, path = 'model.sysml') => JSON.stringify([{ path, text }]);
 
-/** The machine as the classic engine extracts it (the emulator's input). */
+/** The machine as the toolkit extracts it (the emulator's input in the app). */
 function machineOf(project: string, name: string): StateMachine {
-	const all = JSON.parse(wasm.stateMachines(project)) as StateMachine[];
+	const all = host.stateMachines(JSON.parse(project) as SourceFile[]);
 	const found = all.find((m) => m.name === name || m.qualifiedName === name);
 	if (!found) throw new Error(`no machine ${name}`);
 	return found;
@@ -141,122 +136,7 @@ function explore(
 	return compared;
 }
 
-const LAMP = `package Home {
-    item def Toggle;
-    state def Lamp {
-        attribute brightness : Real = 0.5;
-        attribute switches : Integer = 0;
-        entry; then off;
-        state off;
-        state on { entry assign switches := switches + 1; }
-        transition turnOn first off accept Toggle if brightness > 0 then on;
-        transition turnOff first on accept Toggle then off;
-        transition burnOut first on accept when switches > 1 then done;
-    }
-}`;
-
-const COUNTER = `state def Counter {
-    attribute count : Integer = 0;
-    attribute limit : Integer = 2;
-    entry; then idle;
-    state idle { entry assign count := count + 1; }
-    state busy;
-    transition start first idle accept Go if count < limit then busy;
-    transition finish first busy then idle;
-    transition overflow first idle accept when count >= limit then done;
-}`;
-
-const DRONE = `state def Drone {
-    attribute log : Integer = 0;
-    entry; then off;
-    state off;
-    state on parallel {
-        exit action { assign log := log + 100; }
-        state motors {
-            entry; then idle;
-            state idle;
-            state spinning { entry assign log := log + 1; }
-            transition first idle accept Spin then spinning;
-            transition first spinning accept Halt then idle;
-        }
-        state camera {
-            entry; then standby;
-            state standby;
-            state recording;
-            transition first standby accept Spin then recording;
-            transition first recording accept Snap then standby;
-        }
-    }
-    transition first off accept Start then on;
-    transition first on accept Stop then off;
-}`;
-
-/** The emulator fixture `nestedMachine` as SysML. */
-const NESTED = `package P {
-    state def Machine {
-        attribute count : Integer = 0;
-        attribute mode : String = "a";
-        entry; then off;
-
-        state off;
-        state on {
-            entry; then low;
-            entry action beep;
-            exit action boop;
-            state low;
-            state high;
-            transition up first low accept Go if count > 2 do action inc then high;
-            transition down first high accept Stop then low;
-        }
-        state par parallel {
-            state motors {
-                entry; then idle;
-                state idle; state spinning;
-                transition first idle accept Spin then spinning;
-            }
-            state lights {
-                entry; then dark;
-                state dark; state lit;
-                transition first dark accept Light then lit;
-            }
-        }
-        state done;
-        transition first off accept Power then on;
-        transition first on accept Par then par;
-        transition first par accept Finish then done;
-        transition first on accept Off then off;
-        transition first done then fin;
-    }
-}`;
-
-/** Composite states that finish (final states in regions) and effects that assign. */
-const MISSION = `package M {
-    item def Go; item def Abort;
-    state def Mission {
-        attribute fuel : Real = 10;
-        attribute legs : Integer = 0;
-        attribute ok : Boolean = true;
-        entry; then ground;
-        state ground;
-        state travel {
-            entry; then outbound;
-            exit action { assign legs := legs + 10; }
-            state outbound { do action { assign fuel := fuel - 2.5; } }
-            state inbound;
-            state holding;
-            transition first outbound accept Go do assign legs := legs + 1 then inbound;
-            transition first inbound if fuel > 4 then holding;
-            transition first inbound accept when fuel <= 4 then holding;
-            transition first holding accept Home then done;
-        }
-        transition launch first ground accept Go if ok and fuel >= 5 then travel;
-        transition landed first travel then ground;
-        transition abort first travel accept Abort do assign ok := false then ground;
-        transition retire first ground accept when not ok then done;
-    }
-}`;
-
-describe('the emulator fixtures are what the classic engine extracts', () => {
+describe('the emulator fixtures are what the toolkit extracts', () => {
 	/** Without file names and line numbers. */
 	const shape = (m: StateMachine) =>
 		JSON.parse(
@@ -454,18 +334,18 @@ describe('deliberate differences from the Rust emulator', () => {
             entry; then on;
             state on { entry; then low; state low; state high; transition up first low accept Go then high; }
             state off;
-            transition out first on accept Go then off;
+            transition leave first on accept Go then off;
         }`;
 		const p = new Pair(files(source), 'M').fire('Go');
 		expect(p.rust.current).toEqual(['off']);
-		expect(p.rust.trace.map((s) => s.transition_name)).toEqual([null, 'up', 'out']);
+		expect(p.rust.trace.map((s) => s.transition_name)).toEqual([null, 'up', 'leave']);
 		expect(p.ts.current).toEqual(['on.high']);
 		expect(p.ts.trace.map((s) => s.transition_name)).toEqual([null, 'up']);
 		// Before firing, the outer one shows as pre-empted rather than ready.
 		const before = new Pair(files(source), 'M');
-		const out = before.ts.enabled.find((e) => e.transition === 'out')!;
+		const out = before.ts.enabled.find((e) => e.transition === 'leave')!;
 		expect(out).toMatchObject({ ready: false, reason: '`up` fires first' });
-		expect(before.rust.enabled.find((e) => e.transition === 'out')!.ready).toBe(true);
+		expect(before.rust.enabled.find((e) => e.transition === 'leave')!.ready).toBe(true);
 	});
 
 	it('of two ready transitions from one state, the later one shows as pre-empted', () => {

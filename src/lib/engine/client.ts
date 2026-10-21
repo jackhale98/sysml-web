@@ -1,9 +1,20 @@
-import type { EngineApi, Init, Method, Request, Response } from './protocol';
+import type {
+	ClassicMethod,
+	EngineApi,
+	Init,
+	Method,
+	Request,
+	Response,
+	RetiredMethod
+} from './protocol';
 
 /** The engine, as seen from the UI: every call is asynchronous. */
 export type Engine = {
 	[M in Method]: (...params: Parameters<EngineApi[M]>) => Promise<ReturnType<EngineApi[M]>>;
 } & { terminate(): void };
+
+/** The classic engine: the methods it still serves. */
+export type ClassicEngine = Omit<Engine, RetiredMethod>;
 
 /**
  * The engine in a Web Worker, loading it from the given URLs. The worker
@@ -15,7 +26,7 @@ export type Engine = {
 export function startEngine(
 	urls: Init | (() => Init),
 	options: { onReady?: () => void } = {}
-): Engine {
+): ClassicEngine {
 	const pending = new Map<number, { resolve(value: unknown): void; reject(error: Error): void }>();
 	let nextId = 1;
 	let started: Worker | undefined;
@@ -45,7 +56,7 @@ export function startEngine(
 		return w;
 	}
 
-	function call<M extends Method>(method: M, ...params: Parameters<EngineApi[M]>) {
+	function call<M extends ClassicMethod>(method: M, ...params: Parameters<EngineApi[M]>) {
 		const id = nextId++;
 		return new Promise<ReturnType<EngineApi[M]>>((resolve, reject) => {
 			pending.set(id, { resolve: resolve as (value: unknown) => void, reject });
@@ -72,7 +83,6 @@ export function startEngine(
 		format: (...params) => call('format', ...params),
 		elementDetails: (...params) => call('elementDetails', ...params),
 		codeActions: (...params) => call('codeActions', ...params),
-		stateMachines: (...params) => call('stateMachines', ...params),
 		terminate: () => started?.terminate()
 	};
 }

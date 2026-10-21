@@ -59,6 +59,12 @@ export interface EngineApi {
 
 export type Method = keyof EngineApi;
 
+/** Methods deleted from the classic engine once the toolkit served them (composite.ts checks). */
+export type RetiredMethod = 'stateMachines';
+
+/** Methods the classic engine's worker still serves. */
+export type ClassicMethod = Exclude<Method, RetiredMethod>;
+
 export interface Request<M extends Method = Method> {
 	id: number;
 	method: M;
