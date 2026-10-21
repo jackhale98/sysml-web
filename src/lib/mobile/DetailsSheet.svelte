@@ -50,6 +50,14 @@
 	/** How much of the panel is below the fold, so the content can be scrolled into view. */
 	const hidden = $derived(snap === 'closed' ? 0 : rest);
 
+	// Floating buttons over the view rise above a peeking sheet.
+	$effect(() => {
+		const cover = snap === 'peek' ? peekHeight + GAP : 0;
+		const root = document.documentElement;
+		root.style.setProperty('--sheet-cover', `${cover}px`);
+		return () => root.style.removeProperty('--sheet-cover');
+	});
+
 	// Measure the peek from the content's marked header.
 	$effect(() => {
 		if (!panel || snap === 'closed') return;

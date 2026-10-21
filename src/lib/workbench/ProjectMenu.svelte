@@ -308,7 +308,7 @@
 </div>
 
 {#if !onopensourcecontrol}
-	<SourceControl {workspace} {session} {engine} bind:open={ownSourceControl} />
+	<SourceControl {session} {engine} bind:open={ownSourceControl} />
 {/if}
 {#if !onopensettings}
 	<Settings bind:open={ownSettings} {engine} />

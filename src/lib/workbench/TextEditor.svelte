@@ -334,8 +334,9 @@
 	.edit {
 		position: absolute;
 		right: max(var(--space-4), env(safe-area-inset-right));
-		bottom: var(--space-4);
+		bottom: calc(var(--space-4) + var(--sheet-cover, 0px));
 		z-index: 5;
+		transition: bottom 300ms cubic-bezier(0.2, 0.9, 0.25, 1);
 		display: inline-flex;
 		align-items: center;
 		gap: var(--space-2);

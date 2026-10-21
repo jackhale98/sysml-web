@@ -321,9 +321,9 @@
 						<pre
 							class="sample"
 							style:font-size="{settings.editorFontSize}px"
-							aria-hidden="true"><span class="k">part def</span> <span class="d">Drone</span> {'{'}
+							aria-hidden="true"><span class="k">part def</span> <span class="d">Drone</span> &#123;
     <span class="k">attribute</span> mass : <span class="t">MassValue</span>;
-{'}'}</pre>
+&#125;</pre>
 					</div>
 
 					<label class="switch">
@@ -526,13 +526,14 @@
 							<dt>Engine</dt>
 							<dd>
 								{engineVersion ?? '…'}
-								<span class="muted"
-									>(<a
-										href="{engineInfo.repository}/tree/{engineInfo.rev}"
-										target="_blank"
-										rel="noopener noreferrer">{engineInfo.rev.slice(0, 7)}</a
-									>)</span
+								<!-- eslint-disable svelte/no-navigation-without-resolve -- external link -->
+								<a
+									class="rev"
+									href="{engineInfo.repository}/tree/{engineInfo.rev}"
+									target="_blank"
+									rel="noopener noreferrer">({engineInfo.rev.slice(0, 7)})</a
 								>
+								<!-- eslint-enable svelte/no-navigation-without-resolve -->
 							</dd>
 						</dl>
 					</section>
@@ -572,9 +573,13 @@
 								{#if license}
 									<p class="muted">
 										{license.spdx}{#if license.source}
-											· <a href={license.source} target="_blank" rel="noopener noreferrer">source</a
+											·
+											<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external link -->
+											<a href={license.source} target="_blank" rel="noopener noreferrer">source</a
 											>{/if}{#if license.licenseUrl}
-											· <a href={license.licenseUrl} target="_blank" rel="noopener noreferrer"
+											·
+											<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external link -->
+											<a href={license.licenseUrl} target="_blank" rel="noopener noreferrer"
 												>licence text</a
 											>{/if}
 									</p>
@@ -916,6 +921,10 @@
 	.block p {
 		font-size: var(--text-sm);
 	}
+	.block p a {
+		text-decoration: underline;
+		text-underline-offset: 2px;
+	}
 	.facts {
 		display: grid;
 		gap: var(--space-2);
@@ -1070,6 +1079,10 @@
 	dd {
 		margin: 0;
 		font-family: var(--font-mono);
+	}
+	.rev {
+		margin-left: 4px;
+		color: var(--text-2);
 	}
 	.notice pre {
 		max-height: 14rem;

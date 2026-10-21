@@ -172,7 +172,7 @@
 						<input
 							type="search"
 							bind:value={query}
-							placeholder="Search your repositories, or paste a GitHub URL"
+							placeholder="Search, or paste a GitHub URL"
 							aria-label="Search your repositories, or paste a GitHub URL"
 							aria-controls="{uid}-repos"
 						/>
@@ -229,7 +229,7 @@
 								{#if !branches}<option value={branch}>{branch}</option>{/if}
 								{#each branches ?? [] as b (b.name)}
 									<option value={b.name}
-										>{b.name}{b.name === selected.defaultBranch ? ' (main line)' : ''}</option
+										>{b.name}{b.name === selected.defaultBranch ? ' (default)' : ''}</option
 									>
 								{/each}
 							</select>

@@ -22,7 +22,6 @@
 	} from '@lucide/svelte';
 	import type { Engine } from '#lib/engine/client.ts';
 	import type { ProjectSession } from '#lib/project/session.svelte.ts';
-	import type { Workspace } from '#lib/project/workspace.svelte.ts';
 	import { toasts } from '#lib/ui/toasts.svelte.ts';
 	import { accounts } from './account.svelte.ts';
 	import ConnectGitHub from './ConnectGitHub.svelte';
@@ -36,12 +35,10 @@
 	import type { BranchSummary, Progress, RepoChoice } from './types.ts';
 
 	let {
-		workspace,
 		session,
 		engine,
 		open = $bindable(false)
 	}: {
-		workspace: Workspace;
 		session: ProjectSession;
 		engine: Engine;
 		open?: boolean;
@@ -56,6 +53,7 @@
 	const webUrl = $derived(ref ? `https://github.com/${ref.owner}/${ref.repo}` : '');
 
 	let dialog = $state<HTMLDialogElement>();
+	let body = $state<HTMLDivElement>();
 	let expanded = $state<string | null>(null);
 	let confirmDiscard = $state<string | null>(null);
 	let message = $state('');
@@ -91,6 +89,11 @@
 			dialog.showModal();
 			void git.check();
 		} else if (!open && dialog.open) dialog.close();
+	});
+
+	// Bring news (success or failure) into view: it is shown at the top.
+	$effect(() => {
+		if (notice || error) body?.scrollTo({ top: 0, behavior: 'smooth' });
 	});
 
 	async function act(action: () => Promise<void>) {
@@ -146,13 +149,14 @@
 
 	const startBranch = (event: SubmitEvent) => {
 		event.preventDefault();
-		if (!newBranch) return;
+		const name = newBranch;
+		if (!name) return;
 		return act(async () => {
-			await git.createBranch(newBranch);
+			await git.createBranch(name);
 			branchInput = '';
 			branches = null;
 			notice = {
-				text: `You're now on the new branch “${newBranch}”. Save to GitHub to put your changes there.`
+				text: `You're now on the new branch “${name}”. Save to GitHub to put your changes there.`
 			};
 		});
 	};
@@ -243,6 +247,7 @@
 			<div class="title">
 				<h2 id="{uid}-title">{record ? record.repo : 'Save to GitHub'}</h2>
 				{#if record}
+					<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external link -->
 					<a href={webUrl} target="_blank" rel="noopener noreferrer">
 						{record.owner}/{record.repo}
 						<ExternalLink size={12} aria-hidden="true" /><span class="visually-hidden"
@@ -293,13 +298,14 @@
 			</div>
 		{/if}
 
-		<div class="body">
+		<div class="body" bind:this={body}>
 			{#if notice}
 				<p class="notice" role="status">
 					<Check size={16} aria-hidden="true" />
 					<span>
 						{notice.text}
 						{#if notice.href}
+							<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external link -->
 							<a href={notice.href} target="_blank" rel="noopener noreferrer"
 								>{notice.link ?? 'Open'}
 								<ExternalLink size={12} aria-hidden="true" /><span class="visually-hidden"
@@ -505,13 +511,13 @@
 												></span
 											>
 											<span class="path"><span class="dir">{p.dir}</span>{p.name}</span>
-											<span
-												class="stats"
-												aria-label="{stats.added} lines added, {stats.removed} removed"
-											>
+											<span class="stats" aria-hidden="true">
 												{#if stats.added}<span class="plus">+{stats.added}</span>{/if}
 												{#if stats.removed}<span class="minus">−{stats.removed}</span>{/if}
 											</span>
+											<span class="visually-hidden"
+												>, {stats.added} lines added, {stats.removed} removed</span
+											>
 										</button>
 										{#if confirmDiscard === change.path}
 											<span class="confirm">
@@ -640,6 +646,7 @@
 					{#if pr}
 						<p class="pr">
 							<GitPullRequest size={15} aria-hidden="true" />
+							<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external link -->
 							<a href={pr.url} target="_blank" rel="noopener noreferrer"
 								>#{pr.number}
 								{pr.title}
@@ -1356,7 +1363,7 @@
 		font-weight: 600;
 	}
 	fieldset details summary::after {
-		margin-left: var(--space-2);
+		display: none;
 	}
 	.legend {
 		margin-top: 4px;

@@ -186,8 +186,12 @@
 		});
 	});
 
+	/** The add button floats over the model and views, but not over text (that has "Edit text"). */
 	const showAdd = $derived(
-		phone && (section === 'model' || section === 'views') && !ui.editingText && !detailsOpen
+		phone &&
+			(section === 'model' || (section === 'views' && !(tab?.kind === 'file' && showText))) &&
+			!ui.editingText &&
+			!detailsOpen
 	);
 
 	const userElements = $derived(
@@ -1221,7 +1225,8 @@
 			z-index: 15;
 			width: 3.5rem;
 			height: 3.5rem;
-			margin: 0 max(var(--space-4), env(safe-area-inset-right)) var(--space-4) 0;
+			margin: 0 max(var(--space-4), env(safe-area-inset-right))
+				calc(var(--space-4) + var(--sheet-cover, 0px)) 0;
 			border: 0;
 			border-radius: 18px;
 			background: var(--accent);
@@ -1238,9 +1243,6 @@
 		.fab:active {
 			transform: scale(0.94);
 		}
-		.workbench[data-details='peek'] .fab {
-			margin-bottom: calc(var(--space-4) + 6.5rem);
-		}
 		@keyframes fab-in {
 			from {
 				opacity: 0;
@@ -1254,6 +1256,7 @@
 		}
 		.editing .bar,
 		.editing .phone-bar,
+		.editing .sheet-host,
 		.editing .fab {
 			display: none;
 		}

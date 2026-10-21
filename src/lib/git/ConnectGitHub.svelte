@@ -49,6 +49,7 @@
 					and write. Under <em>Repository access</em>, choose <em>Only select repositories</em> and pick
 					the ones with your models.
 				</p>
+				<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external link -->
 				<a class="button" href={tokenUrl()} target="_blank" rel="noopener noreferrer">
 					Create a token on GitHub <ExternalLink size={14} aria-hidden="true" />
 					<span class="visually-hidden">(opens in a new tab)</span>

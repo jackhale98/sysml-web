@@ -198,7 +198,16 @@
 			<label class="search">
 				<Search size={14} />
 				<span class="visually-hidden">Filter the model</span>
-				<input type="search" placeholder="Filter elements" bind:value={query} />
+				<input
+					type="search"
+					placeholder="Filter elements"
+					enterkeyhint="search"
+					bind:value={query}
+					onkeydown={(e) => {
+						// On a phone, the keyboard's search key puts the keyboard away.
+						if (e.key === 'Enter' && ui.phone) e.currentTarget.blur();
+					}}
+				/>
 			</label>
 		{/if}
 	</div>

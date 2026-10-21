@@ -21,7 +21,9 @@
 	const SAY = { add: 'Added', del: 'Removed', equal: 'Unchanged' } as const;
 </script>
 
-<div class="diff">
+<!-- Focusable so keyboard users can scroll long diffs. -->
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+<div class="diff" role="region" aria-label="Differences: {oldLabel} and {newLabel}" tabindex="0">
 	{#if !shown.length}
 		<p class="same">No differences.</p>
 	{:else}
@@ -100,6 +102,10 @@
 	}
 	.add {
 		background: color-mix(in oklab, var(--ok) 13%, var(--surface));
+	}
+	.add .num,
+	.del .num {
+		color: var(--text-2);
 	}
 	.add .sign {
 		color: var(--ok);
