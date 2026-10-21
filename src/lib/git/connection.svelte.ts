@@ -5,6 +5,7 @@
  */
 import type { Engine } from '#lib/engine/client.ts';
 import type { ProjectSession } from '#lib/project/session.svelte.ts';
+import { timestamp } from '#lib/project/store.ts';
 import type { Workspace } from '#lib/project/workspace.svelte.ts';
 import { accounts } from './account.svelte.ts';
 import { GitError } from './errors.ts';
@@ -130,7 +131,7 @@ export class GitConnection {
 				base: result.commit,
 				baseTree: result.tree,
 				files: baseAfterCommit(git.files, changes, result.blobs),
-				syncedAt: new Date().toISOString()
+				syncedAt: timestamp()
 			});
 			for (const change of changes) this.workspace.dirty.delete(change.path);
 			this.remote = { head: result.commit, behind: 0, checkedAt: Date.now() };
@@ -197,7 +198,7 @@ export class GitConnection {
 			base: plan.head.commit,
 			baseTree: plan.head.tree,
 			files: plan.base,
-			syncedAt: new Date().toISOString()
+			syncedAt: timestamp()
 		});
 		this.remote = { head: plan.head.commit, behind: 0, checkedAt: Date.now() };
 	}

@@ -55,8 +55,10 @@ export function parseSettings(raw: string | null): SettingsValues {
 			Number.isFinite(size) && size >= FONT_SIZES.min && size <= FONT_SIZES.max
 				? Math.round(size)
 				: DEFAULTS.editorFontSize,
-		lineWrapping: typeof stored.lineWrapping === 'boolean' ? stored.lineWrapping : DEFAULTS.lineWrapping,
-		lineNumbers: typeof stored.lineNumbers === 'boolean' ? stored.lineNumbers : DEFAULTS.lineNumbers,
+		lineWrapping:
+			typeof stored.lineWrapping === 'boolean' ? stored.lineWrapping : DEFAULTS.lineWrapping,
+		lineNumbers:
+			typeof stored.lineNumbers === 'boolean' ? stored.lineNumbers : DEFAULTS.lineNumbers,
 		phoneStart: pick(stored.phoneStart, ['diagram', 'text'] as const, DEFAULTS.phoneStart)
 	};
 }

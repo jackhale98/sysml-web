@@ -45,15 +45,16 @@
 		const all = repos ?? [];
 		const hits = q
 			? all.filter(
-					(r) =>
-						r.fullName.toLowerCase().includes(q) || r.description?.toLowerCase().includes(q)
+					(r) => r.fullName.toLowerCase().includes(q) || r.description?.toLowerCase().includes(q)
 				)
 			: all;
 		return hits.slice(0, 60);
 	});
 	const pastedIsListed = $derived(
 		!!pasted &&
-			results.some((r) => r.fullName.toLowerCase() === `${pasted.owner}/${pasted.repo}`.toLowerCase())
+			results.some(
+				(r) => r.fullName.toLowerCase() === `${pasted.owner}/${pasted.repo}`.toLowerCase()
+			)
 	);
 
 	$effect(() => {
@@ -143,8 +144,7 @@
 	}
 </script>
 
-<!-- The backdrop click is a pointer shortcut; Escape closes the dialog for everyone else. -->
-<!-- svelte-ignore a11y_click_events_have_key_events -->
+<!-- A backdrop click closes it; so does Escape. -->
 <dialog
 	bind:this={dialog}
 	aria-labelledby="{uid}-title"

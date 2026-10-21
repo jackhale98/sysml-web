@@ -37,7 +37,11 @@ describe('local changes', () => {
 	});
 
 	it('moves the base forward after a commit', () => {
-		const local = { ...texts(base), 'model/B.sysml': 'part def B2;\n', 'x.sysml': 'x' };
+		const local: Record<string, string> = {
+			...texts(base),
+			'model/B.sysml': 'part def B2;\n',
+			'x.sysml': 'x'
+		};
 		delete local['README.md'];
 		const changes = fileChanges(localChanges(base, local));
 		const next = baseAfterCommit(base, changes, { 'model/B.sysml': 'b2', 'x.sysml': 'x1' });

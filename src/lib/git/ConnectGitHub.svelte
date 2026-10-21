@@ -46,8 +46,8 @@
 				<strong>Create a token on GitHub</strong>
 				<p>
 					The permissions are filled in for you: <em>Contents</em> and <em>Pull requests</em>, read
-					and write. Under <em>Repository access</em>, choose <em>Only select repositories</em> and
-					pick the ones with your models.
+					and write. Under <em>Repository access</em>, choose <em>Only select repositories</em> and pick
+					the ones with your models.
 				</p>
 				<a class="button" href={tokenUrl()} target="_blank" rel="noopener noreferrer">
 					Create a token on GitHub <ExternalLink size={14} aria-hidden="true" />
@@ -85,7 +85,8 @@
 	</ol>
 	{#if error}<p class="error" role="alert">{error}</p>{/if}
 	<button type="submit" class="primary" disabled={busy || !token.trim()}>
-		{#if busy}<LoaderCircle size={16} class="spin" aria-hidden="true" /> Checking…{:else}Connect GitHub{/if}
+		{#if busy}<LoaderCircle size={16} class="spin" aria-hidden="true" /> Checking…{:else}Connect
+			GitHub{/if}
 	</button>
 	<p class="privacy" id="{uid}-privacy">
 		<Lock size={13} aria-hidden="true" />

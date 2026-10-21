@@ -508,13 +508,10 @@
 		top: 0;
 		z-index: 1;
 		margin-top: 0;
-		padding-top: var(--space-2);
-		padding-right: 3.25rem;
+		padding-top: var(--space-1);
 		border-top: 0;
-		background: color-mix(in oklab, var(--fam) 7%, var(--surface));
-		box-shadow:
-			inset 0 3px 0 var(--fam),
-			0 1px 0 var(--border);
+		background: var(--surface);
+		box-shadow: 0 1px 0 var(--border);
 		touch-action: none;
 		cursor: grab;
 	}

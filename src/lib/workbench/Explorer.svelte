@@ -185,21 +185,25 @@
 {/snippet}
 
 <nav class="explorer" class:phone={ui.phone} aria-label="Explorer">
-	<div class="tabs" role="tablist" aria-label="Explorer mode">
-		<button role="tab" aria-selected={mode === 'model'} onclick={() => (mode = 'model')}
-			>Model</button
-		>
-		<button role="tab" aria-selected={mode === 'files'} onclick={() => (mode = 'files')}
-			>Files</button
-		>
+	<div class="head">
+		<div class="tabs" role="tablist" aria-label="Explorer mode">
+			<button role="tab" aria-selected={mode === 'model'} onclick={() => (mode = 'model')}
+				>Model</button
+			>
+			<button role="tab" aria-selected={mode === 'files'} onclick={() => (mode = 'files')}
+				>Files</button
+			>
+		</div>
+		{#if mode === 'model'}
+			<label class="search">
+				<Search size={14} />
+				<span class="visually-hidden">Filter the model</span>
+				<input type="search" placeholder="Filter elements" bind:value={query} />
+			</label>
+		{/if}
 	</div>
 
 	{#if mode === 'model'}
-		<label class="search">
-			<Search size={14} />
-			<span class="visually-hidden">Filter the model</span>
-			<input type="search" placeholder="Filter elements" bind:value={query} />
-		</label>
 		{#if !ready}
 			<p class="empty">Reading the model…</p>
 		{:else if needle}
@@ -591,7 +595,21 @@
 			min-height: 2.75rem;
 		}
 	}
+	.head {
+		display: contents;
+	}
 	/* Phones: a full-screen browser of the model, sized for thumbs. */
+	.phone .head {
+		position: sticky;
+		top: 0;
+		z-index: 2;
+		display: grid;
+		gap: var(--space-2);
+		margin: calc(-1 * var(--space-3)) calc(-1 * var(--space-3)) 0;
+		padding: var(--space-3);
+		background: color-mix(in oklab, var(--surface) 94%, transparent);
+		backdrop-filter: blur(10px);
+	}
 	.phone {
 		gap: var(--space-3);
 		padding: var(--space-3) max(var(--space-3), env(safe-area-inset-right)) 6rem

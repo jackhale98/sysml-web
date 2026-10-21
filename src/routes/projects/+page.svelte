@@ -7,10 +7,19 @@
 		FileArchive,
 		FolderOpen,
 		FolderUp,
+		GitBranch,
 		Plus,
 		Rocket,
+		Settings as SettingsIcon,
 		Trash2
 	} from '@lucide/svelte';
+	import { accounts } from '#lib/git/account.svelte.ts';
+	import GitHubMark from '#lib/git/GitHubMark.svelte';
+	import OpenRepository from '#lib/git/OpenRepository.svelte';
+	import { keepRepository } from '#lib/git/project.ts';
+	import type { Progress, RepoChoice } from '#lib/git/types.ts';
+	import Settings from '#lib/settings/Settings.svelte';
+	import { settings } from '#lib/settings/settings.svelte.ts';
 	import { getEngine } from '#lib/engine/instance.ts';
 	import {
 		canOpenFolders,
@@ -41,12 +50,18 @@
 	let folderAccess = $state(false);
 	let nameField: HTMLInputElement | undefined = $state();
 	let confirmDelete = $state<string | null>(null);
+	let githubOpen = $state(false);
+	let settingsOpen = $state(false);
 
 	onMount(() => {
+		settings.init();
+		accounts.init();
 		folderAccess = canOpenFolders();
+		const params = new URLSearchParams(location.search);
+		if (params.has('github') || location.hash === '#github') githubOpen = true;
+		if (params.has('settings')) settingsOpen = true;
 		void refresh();
-		if (new URLSearchParams(location.search).has('new') || location.hash === '#new')
-			void tick().then(() => nameField?.focus());
+		if (params.has('new') || location.hash === '#new') void tick().then(() => nameField?.focus());
 	});
 
 	async function refresh() {
@@ -151,6 +166,11 @@
 		}
 	}
 
+	async function openFromGitHub(choice: RepoChoice, progress: Progress) {
+		const { id } = await keepRepository(choice, progress);
+		await goto(resolve('/p/[project]', { project: id }));
+	}
+
 	async function remove(id: string) {
 		await deleteProject(id);
 		confirmDelete = null;
@@ -161,7 +181,8 @@
 		new: 'Created here',
 		folder: 'Folder on this computer',
 		archive: 'Imported',
-		demo: 'Demo'
+		demo: 'Demo',
+		git: 'GitHub'
 	};
 
 	function ago(iso: string): string {
@@ -182,14 +203,26 @@
 <div class="page">
 	<header class="top">
 		<a class="brand" href={resolve('/')}><Logo size={26} /> <span>SysML Web</span></a>
-		<ThemeToggle />
+		<span class="tools">
+			<button
+				type="button"
+				class="icon-button"
+				aria-label="Settings"
+				title="Settings"
+				onclick={() => (settingsOpen = true)}
+			>
+				<SettingsIcon size={17} />
+			</button>
+			<ThemeToggle />
+		</span>
 	</header>
 
 	<main>
 		<h1>Your projects</h1>
 		<p class="lede">
-			Projects are standard SysML v2 files. They're kept in this browser as you work. Download them
-			as a <code>.kpar</code> to share or back up, or open a folder to work on files on your computer.
+			Projects are standard SysML v2 files. They're kept in this browser as you work. Open one from
+			GitHub to share it with your team, open a folder to work on files on your computer, or
+			download a <code>.kpar</code> to back it up.
 		</p>
 
 		{#if error}<p class="error" role="alert">{error}</p>{/if}
@@ -216,6 +249,17 @@
 					Create project <ArrowRight size={16} />
 				</button>
 			</form>
+
+			<div class="card github">
+				<h2><GitHubMark size={18} /> Open from GitHub</h2>
+				<p>
+					Work on a repository's models, then save back to it, start a branch or propose changes for
+					review. No git know-how needed.
+				</p>
+				<button type="button" class="dark" onclick={() => (githubOpen = true)} disabled={!!busy}>
+					{accounts.github ? 'Choose a repository…' : 'Connect GitHub…'}
+				</button>
+			</div>
 
 			<div class="card">
 				<h2><FolderOpen size={18} aria-hidden="true" /> Open a folder</h2>
@@ -266,7 +310,13 @@
 								<strong>{p.info.name}</strong>
 								{#if p.info.description}<span class="desc">{p.info.description}</span>{/if}
 								<span class="meta">
-									{ORIGIN[p.origin]} · {p.fileCount} files · edited {ago(p.updated)}
+									{#if p.git}
+										<span class="gh"
+											><GitHubMark size={12} />
+											{p.git.owner}/{p.git.repo}
+											<GitBranch size={12} aria-hidden="true" />{p.git.branch}</span
+										>
+									{:else}{ORIGIN[p.origin]}{/if} · {p.fileCount} files · edited {ago(p.updated)}
 								</span>
 							</a>
 							{#if confirmDelete === p.id}
@@ -293,6 +343,9 @@
 	</main>
 </div>
 
+<OpenRepository bind:open={githubOpen} run={openFromGitHub} />
+<Settings bind:open={settingsOpen} />
+
 <style>
 	.page {
 		min-height: 100dvh;
@@ -313,6 +366,44 @@
 		color: var(--text);
 		font-weight: 700;
 		text-decoration: none;
+	}
+	.tools {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-1);
+	}
+	.icon-button {
+		display: inline-grid;
+		place-items: center;
+		width: 2.125rem;
+		height: 2.125rem;
+		min-height: 0;
+		padding: 0;
+		border: 1px solid transparent;
+		border-radius: var(--radius-sm);
+		background: transparent;
+		color: var(--text-2);
+		cursor: pointer;
+	}
+	.icon-button:hover {
+		background: var(--surface-hover);
+		color: var(--text);
+	}
+	.github {
+		border-color: color-mix(in oklab, var(--text) 18%, var(--border));
+	}
+	.dark {
+		border: 0;
+		background: var(--text);
+		color: var(--surface);
+	}
+	.dark:hover {
+		opacity: 0.9;
+	}
+	.gh {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
 	}
 	main {
 		max-width: 72rem;

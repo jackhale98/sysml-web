@@ -110,7 +110,7 @@
 		class:dragging={drag !== null}
 		class:open={snap !== 'closed'}
 		data-snap={snap}
-		role="region"
+		role="group"
 		aria-label={label}
 		class:gone
 		bind:this={panel}
@@ -178,15 +178,15 @@
 		display: flex;
 		justify-content: center;
 		flex: none;
-		height: 1.75rem;
+		height: 2.5rem;
 		touch-action: none;
 		cursor: grab;
 	}
 	.grab {
 		display: grid;
 		place-items: center;
-		width: 6rem;
-		height: 1.75rem;
+		width: 7rem;
+		height: 2.5rem;
 		padding: 0;
 		border: 0;
 		background: transparent;
@@ -211,13 +211,13 @@
 	}
 	.close {
 		position: absolute;
-		top: 0.375rem;
-		right: 0.5rem;
+		top: 0.25rem;
+		right: 0.625rem;
 		z-index: 2;
 		display: grid;
 		place-items: center;
-		width: 2.25rem;
-		height: 2.25rem;
+		width: 2rem;
+		height: 2rem;
 		border: 0;
 		border-radius: 999px;
 		background: var(--surface-2);

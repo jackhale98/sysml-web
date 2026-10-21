@@ -75,7 +75,9 @@
 	const working = $derived(!!busy && busy !== 'checking');
 	const onDefault = $derived(!!record && record.branch === record.defaultBranch);
 	const newBranch = $derived(branchName(branchInput));
-	const unresolved = $derived(pending ? pending.conflicts.filter((c) => !choices[c.path]).length : 0);
+	const unresolved = $derived(
+		pending ? pending.conflicts.filter((c) => !choices[c.path]).length : 0
+	);
 	const updatedCount = $derived(pending ? Object.keys(pending.updates).length : 0);
 	const pr = $derived(
 		record?.pullRequest && record.pullRequest.branch === record.branch ? record.pullRequest : null
@@ -227,8 +229,7 @@
 
 {#snippet term(text: string)}<small class="term">{text}</small>{/snippet}
 
-<!-- The backdrop click is a pointer shortcut; Escape closes the sheet for everyone else. -->
-<!-- svelte-ignore a11y_click_events_have_key_events -->
+<!-- A backdrop click closes it; so does Escape. -->
 <dialog
 	bind:this={dialog}
 	class="sheet"
@@ -300,8 +301,9 @@
 						{notice.text}
 						{#if notice.href}
 							<a href={notice.href} target="_blank" rel="noopener noreferrer"
-								>{notice.link ?? 'Open'} <ExternalLink size={12} aria-hidden="true" /><span
-									class="visually-hidden">(opens in a new tab)</span
+								>{notice.link ?? 'Open'}
+								<ExternalLink size={12} aria-hidden="true" /><span class="visually-hidden"
+									>(opens in a new tab)</span
 								></a
 							>
 						{/if}
@@ -378,7 +380,10 @@
 													value="merged"
 													bind:group={choices[conflict.path]}
 												/>
-												<span><strong>Combine both</strong><small>changes touch different lines</small></span>
+												<span
+													><strong>Combine both</strong><small>changes touch different lines</small
+													></span
+												>
 											</label>
 										{/if}
 										<label class="choice">
@@ -403,7 +408,9 @@
 											/>
 											<span
 												><strong>Take GitHub's</strong><small
-													>{conflict.theirs === null ? 'deleted on GitHub' : 'the newer version there'}</small
+													>{conflict.theirs === null
+														? 'deleted on GitHub'
+														: 'the newer version there'}</small
 												></span
 											>
 										</label>
@@ -426,9 +433,20 @@
 						{/each}
 					</ul>
 					<div class="actions">
-						<button type="button" onclick={() => git.cancelPull()} disabled={working}>Not now</button>
-						<button type="button" class="primary" onclick={resolve} disabled={!!unresolved || working}>
-							{#if busy === 'pulling'}<LoaderCircle size={16} class="spin" aria-hidden="true" />{/if}
+						<button type="button" onclick={() => git.cancelPull()} disabled={working}
+							>Not now</button
+						>
+						<button
+							type="button"
+							class="primary"
+							onclick={resolve}
+							disabled={!!unresolved || working}
+						>
+							{#if busy === 'pulling'}<LoaderCircle
+									size={16}
+									class="spin"
+									aria-hidden="true"
+								/>{/if}
 							Finish getting latest
 						</button>
 					</div>
@@ -444,10 +462,11 @@
 							<p>Get them before saving, so nobody's work is lost.</p>
 						</div>
 						<button type="button" class="primary" onclick={pull} disabled={working || !connected}>
-							{#if busy === 'pulling'}<LoaderCircle size={16} class="spin" aria-hidden="true" />{:else}<ArrowDownToLine
+							{#if busy === 'pulling'}<LoaderCircle
 									size={16}
+									class="spin"
 									aria-hidden="true"
-								/>{/if}
+								/>{:else}<ArrowDownToLine size={16} aria-hidden="true" />{/if}
 							Get latest
 						</button>
 					</section>
@@ -486,7 +505,10 @@
 												></span
 											>
 											<span class="path"><span class="dir">{p.dir}</span>{p.name}</span>
-											<span class="stats" aria-label="{stats.added} lines added, {stats.removed} removed">
+											<span
+												class="stats"
+												aria-label="{stats.added} lines added, {stats.removed} removed"
+											>
 												{#if stats.added}<span class="plus">+{stats.added}</span>{/if}
 												{#if stats.removed}<span class="minus">−{stats.removed}</span>{/if}
 											</span>
@@ -513,7 +535,12 @@
 									</div>
 									{#if isOpen}
 										<div class="diff-wrap" id="{uid}-diff-{change.path}">
-											<DiffView before={change.before} after={change.after} oldLabel="GitHub" newLabel="Yours" />
+											<DiffView
+												before={change.before}
+												after={change.after}
+												oldLabel="GitHub"
+												newLabel="Yours"
+											/>
 										</div>
 									{/if}
 								</li>
@@ -537,8 +564,9 @@
 						id="{uid}-message"
 						bind:value={message}
 						rows="2"
-						placeholder={changes.length ? defaultMessage(changes) : 'e.g. Add the payload interface'}
-					></textarea>
+						placeholder={changes.length
+							? defaultMessage(changes)
+							: 'e.g. Add the payload interface'}></textarea>
 					<div class="save-row">
 						<button
 							type="submit"
@@ -558,10 +586,11 @@
 					</div>
 					{#if git.behind === 0 && connected}
 						<button type="button" class="link-button" onclick={pull} disabled={working}>
-							{#if busy === 'pulling'}<LoaderCircle size={14} class="spin" aria-hidden="true" />{:else}<ArrowDownToLine
+							{#if busy === 'pulling'}<LoaderCircle
 									size={14}
+									class="spin"
 									aria-hidden="true"
-								/>{/if}
+								/>{:else}<ArrowDownToLine size={14} aria-hidden="true" />{/if}
 							Get latest {@render term('pull')}
 							{#if progress?.total}<span class="muted">{progress.done}/{progress.total}</span>{/if}
 						</button>
@@ -588,14 +617,18 @@
 							aria-describedby="{uid}-branch-hint"
 						/>
 						<button type="submit" disabled={!newBranch || working || !connected}>
-							{#if busy === 'branching'}<LoaderCircle size={14} class="spin" aria-hidden="true" />{/if}
+							{#if busy === 'branching'}<LoaderCircle
+									size={14}
+									class="spin"
+									aria-hidden="true"
+								/>{/if}
 							Start branch
 						</button>
 					</form>
 					<p class="muted small" id="{uid}-branch-hint">
-						{#if newBranch}Will be named <code>{newBranch}</code>, starting from the version you have.
-							Your unsaved changes come along.{:else}Starts from the version you have; your unsaved changes come
-							along.{/if}
+						{#if newBranch}Will be named <code>{newBranch}</code>, starting from the version you
+							have. Your unsaved changes come along.{:else}Starts from the version you have; your
+							unsaved changes come along.{/if}
 					</p>
 				</details>
 
@@ -608,21 +641,25 @@
 						<p class="pr">
 							<GitPullRequest size={15} aria-hidden="true" />
 							<a href={pr.url} target="_blank" rel="noopener noreferrer"
-								>#{pr.number} {pr.title} <ExternalLink size={12} aria-hidden="true" /><span
-									class="visually-hidden">(opens in a new tab)</span
+								>#{pr.number}
+								{pr.title}
+								<ExternalLink size={12} aria-hidden="true" /><span class="visually-hidden"
+									>(opens in a new tab)</span
 								></a
 							>
 						</p>
 					{/if}
 					{#if onDefault}
 						<p class="muted">
-							Ask your team to review changes before they reach <strong>{record.defaultBranch}</strong>.
-							Start a separate branch first (above), save your changes there, then propose them here.
+							Ask your team to review changes before they reach <strong
+								>{record.defaultBranch}</strong
+							>. Start a separate branch first (above), save your changes there, then propose them
+							here.
 						</p>
 					{:else}
 						<p class="muted">
-							Ask your team to review the changes on <strong>{record.branch}</strong> and merge them
-							into another branch.
+							Ask your team to review the changes on <strong>{record.branch}</strong> and merge them into
+							another branch.
 						</p>
 						{#if changes.length}
 							<p class="warn-note">
@@ -637,7 +674,9 @@
 								<span>Title</span>
 								<input
 									bind:value={prTitle}
-									placeholder={changes.length ? defaultMessage(changes) : `Changes on ${record.branch}`}
+									placeholder={changes.length
+										? defaultMessage(changes)
+										: `Changes on ${record.branch}`}
 								/>
 							</label>
 							<label>
@@ -647,17 +686,19 @@
 							<label>
 								<span>Merge into</span>
 								<select bind:value={prInto}>
-									{#if !branches}<option value={record.defaultBranch}>{record.defaultBranch}</option>{/if}
+									{#if !branches}<option value={record.defaultBranch}>{record.defaultBranch}</option
+										>{/if}
 									{#each (branches ?? []).filter((b) => b.name !== record.branch) as b (b.name)}
 										<option value={b.name}>{b.name}</option>
 									{/each}
 								</select>
 							</label>
 							<button type="submit" class="primary" disabled={working || !connected}>
-								{#if busy === 'proposing'}<LoaderCircle size={16} class="spin" aria-hidden="true" />{:else}<GitPullRequest
+								{#if busy === 'proposing'}<LoaderCircle
 										size={16}
+										class="spin"
 										aria-hidden="true"
-									/>{/if}
+									/>{:else}<GitPullRequest size={16} aria-hidden="true" />{/if}
 								Propose changes
 							</button>
 						</form>
@@ -669,7 +710,12 @@
 						Based on version <code title={record.base}>{record.base.slice(0, 7)}</code>
 						{@render term('commit')}
 					</span>
-					<button type="button" class="link-button" onclick={() => void git.unlink()} disabled={working}>
+					<button
+						type="button"
+						class="link-button"
+						onclick={() => void git.unlink()}
+						disabled={working}
+					>
 						Disconnect
 					</button>
 				</footer>

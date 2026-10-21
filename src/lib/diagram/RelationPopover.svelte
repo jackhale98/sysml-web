@@ -130,7 +130,7 @@
 		</p>
 
 		<fieldset class="choices">
-			<legend class="sr-only">Relationship</legend>
+			<legend class="visually-hidden">Relationship</legend>
 			{#each options as o, i (i)}
 				<label class="choice" class:active={i === index}>
 					<input type="radio" name="relationship" value={i} bind:group={index} />
@@ -278,6 +278,10 @@
 		font-size: var(--text-xs);
 		text-overflow: ellipsis;
 		white-space: nowrap;
+	}
+	/* On a phone sheet the verbs say enough; keep Create in reach. */
+	.sheet .sentence {
+		display: none;
 	}
 	.row {
 		display: grid;

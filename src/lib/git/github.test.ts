@@ -17,7 +17,7 @@ function mockFetch(
 	>
 ) {
 	const calls: Call[] = [];
-	const fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+	const mock = (async (input: string | URL | Request, init?: RequestInit) => {
 		const url = String(input).replace('https://api.github.com', '');
 		const method = init?.method ?? 'GET';
 		const headers = new Headers(init?.headers);
@@ -38,7 +38,7 @@ function mockFetch(
 			headers: { 'content-type': 'application/json', ...result.headers }
 		});
 	}) as typeof fetch;
-	return { fetch, calls };
+	return { fetch: mock, calls };
 }
 
 const ref = { owner: 'acme', repo: 'drone' };
