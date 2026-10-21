@@ -22,6 +22,8 @@ export const TOOLKIT_METHODS = [
 	'renameSymbol',
 	'outline',
 	'codeActions',
+	// Phase 6: state machines for the emulator.
+	'stateMachines',
 	// Phase 4: model edits.
 	'edit'
 ] as const satisfies readonly (keyof EngineApi)[];
