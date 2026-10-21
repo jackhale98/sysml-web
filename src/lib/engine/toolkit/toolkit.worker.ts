@@ -153,7 +153,10 @@ const handlers: { [M in ToolkitMethod]: Handler } = {
 		host.renameSymbol(files, path, offset, newName),
 	outline: (host, files: SourceFile[], path: string) => host.outline(files, path),
 	codeActions: (host, files: SourceFile[], path: string, from: number, to: number) =>
-		host.codeActions(files, path, from, to)
+		host.codeActions(files, path, from, to),
+	listViews: (host, files: SourceFile[]) => host.listViews(files),
+	renderView: (host, files: SourceFile[], name: string) => host.renderView(files, name),
+	viewLibraries: (host) => host.viewLibraries()
 };
 
 /** A trap or a failed memory grow leaves the instance unusable: the page restarts the worker. */

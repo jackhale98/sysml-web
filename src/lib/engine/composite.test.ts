@@ -24,7 +24,7 @@ describe('composeEngine', () => {
 	it('routes ported methods to the toolkit and the rest to the classic engine', async () => {
 		const classic = {
 			...Object.fromEntries(
-				['version', 'analyzeProject', 'listViews', 'diagram', 'terminate'].map((m) => [
+				['version', 'analyzeProject', 'diagram', 'terminate'].map((m) => [
 					m,
 					vi.fn(async () => `classic:${m}`)
 				])
@@ -33,7 +33,7 @@ describe('composeEngine', () => {
 		const toolkit = fakeToolkit();
 		const engine = composeEngine(classic, toolkit);
 		await expect(engine.analyzeProject([])).resolves.toBe('toolkit:analyzeProject');
-		await expect(engine.listViews([])).resolves.toBe('classic:listViews');
+		await expect(engine.diagram('general', [], null)).resolves.toBe('classic:diagram');
 		await engine.version();
 		expect(classic.version).not.toHaveBeenCalled();
 		expect(toolkit.call).toHaveBeenCalledWith('version');

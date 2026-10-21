@@ -20,7 +20,9 @@ import type {
 	FileRange,
 	Highlights,
 	Hover,
-	OutlineItem
+	OutlineItem,
+	RenderedTable,
+	ViewInfo
 } from '../types';
 import type {
 	TkFinding,
@@ -36,6 +38,7 @@ import { LanguageServices, SyntaxServices } from './language';
 import { detailsOf, extractModel, findElement, type ExtractedModel, type UnitInfo } from './model';
 import { TextIndexCache } from './offsets';
 import { RepairMap } from './repair';
+import * as views from './views';
 
 interface Built {
 	files: SourceFile[];
@@ -43,6 +46,8 @@ interface Built {
 	units: Map<string, UnitInfo>;
 	analyses: Analysis[];
 	extracted: ExtractedModel | null;
+	/** The tables' index of the model, made on the first view call. */
+	views?: views.ViewContext;
 }
 
 export class ToolkitHost {
@@ -138,7 +143,7 @@ export class ToolkitHost {
 		this.built = null;
 		this.settled = undefined;
 		try {
-			const single = this.build([{ path, text: source }]);
+			const single = this.build([{ path, text: source }], false);
 			single.session?.free();
 			return single.analyses[0]!;
 		} finally {
@@ -162,16 +167,44 @@ export class ToolkitHost {
 		return detailsOf(record, (s) => s);
 	}
 
+	/** The project's views and the bundled libraries' (phase 3). */
+	listViews(files: SourceFile[]): ViewInfo[] {
+		return views.listViews(this.viewContext(files));
+	}
+
+	/** A view rendered as a table by its `@TableRendering`. */
+	renderView(files: SourceFile[], name: string): RenderedTable {
+		return views.renderView(this.viewContext(files), name);
+	}
+
+	/** The view libraries every project has (`Reporting`, `ModelViews`). */
+	viewLibraries(): SourceFile[] {
+		return views.viewLibraries();
+	}
+
+	private viewContext(files: SourceFile[]): views.ViewContext {
+		const built = this.build(files);
+		built.views ??= new views.ViewContext({
+			session: built.session,
+			extracted: built.extracted,
+			content: new Set(files.map((f) => f.path)),
+			texts: new Map([...built.units.values()].map((u) => [u.path, u.original.text]))
+		});
+		return built.views;
+	}
+
 	/** The current session, built for `files` (for language services). */
 	session(files: SourceFile[]): { session: TkSession | null; units: Map<string, UnitInfo> } {
 		const built = this.build(files);
 		return { session: built.session, units: built.units };
 	}
 
-	private build(files: SourceFile[]): Built {
+	private build(files: SourceFile[], withViewLibraries = true): Built {
 		if (this.built && sameFiles(this.built.files, files)) return this.built;
 		const started = performance.now();
-		const sources: TkSource[] = files.map((f) => ({ name: f.path, text: f.text }));
+		// The view libraries a project lacks are resolution context, like the standard library.
+		const all = withViewLibraries ? [...files, ...views.missingViewLibraries(files)] : files;
+		const sources: TkSource[] = all.map((f) => ({ name: f.path, text: f.text }));
 		const json = JSON.stringify(sources);
 
 		// Units that don't parse are repaired first: a session can't be built over them.
@@ -187,7 +220,7 @@ export class ToolkitHost {
 		}
 
 		const units = new Map<string, UnitInfo>();
-		for (const file of files) {
+		for (const file of all) {
 			const original = this.texts.get(file.path, file.text);
 			const fixed = repaired.find((s) => s.name === file.path);
 			const unit: UnitInfo = { path: file.path, original, repaired: original };
@@ -201,7 +234,7 @@ export class ToolkitHost {
 			}
 			units.set(file.path, unit);
 		}
-		this.texts.retain([...files.map((f) => f.path), ...files.map((f) => `repaired:${f.path}`)]);
+		this.texts.retain([...all.map((f) => f.path), ...all.map((f) => `repaired:${f.path}`)]);
 
 		const previous = this.built;
 		this.built = null;

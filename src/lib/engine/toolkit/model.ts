@@ -74,6 +74,12 @@ export interface ElementRecord {
 	derived: boolean;
 	end: boolean;
 	membership: string | null;
+	/** The resolved type (`: T`; for `~T`, the port def `T`), when it is typed explicitly. */
+	typeId: string | null;
+	/** Resolved specializations the tree graph draws (definitions and part-like usages). */
+	generalIds: string[];
+	/** The feature this one redefines, through its redefinitions (`redefinitionRoot`). */
+	rootId: string | null;
 }
 
 export interface ExtractedModel {
@@ -293,7 +299,10 @@ export function extractModel(
 			readonly: row['property:isReadOnly'] === true,
 			derived: row['property:isDerived'] === true,
 			end: row['property:isEnd'] === true,
-			membership
+			membership,
+			typeId: typeTarget ?? null,
+			generalIds: generals ?? [],
+			rootId: rootOf.get(id) ?? null
 		};
 		records.push(record);
 		byId.set(id, record);

@@ -1,0 +1,879 @@
+/**
+ * Views and tables over the toolkit's model, in Node against the real
+ * toolkit: the classic engine's table tests (`view_render.rs`) ported, and
+ * every standard table of the demo compared with what the classic engine
+ * rendered (row and column counts, spot cells), with the deliberate
+ * differences asserted.
+ */
+import { beforeAll, describe, expect, it } from 'vitest';
+import type { SourceFile } from '../../protocol';
+import type { RenderedTable } from '../../types';
+import type { ToolkitHost } from '../host';
+import { demoFiles, loadHost } from '../testing';
+import { collapseWhitespace, displayValue } from './text';
+
+let host: ToolkitHost;
+beforeAll(async () => {
+	host = await loadHost();
+});
+
+const one = (text: string, path = 'p.sysml'): SourceFile[] => [{ path, text }];
+const render = (files: SourceFile[], name: string) => host.renderView(files, name);
+const col = (t: RenderedTable, name: string) => {
+	const i = t.columns.indexOf(name);
+	if (i < 0) throw new Error(`no column ${name} in ${t.columns.join(', ')}`);
+	return t.rows.map((r) => r[i]!);
+};
+const record = (t: RenderedTable, row: number) =>
+	Object.fromEntries(t.columns.map((c, i) => [c, t.rows[row]![i]!]));
+
+describe('table rendering (the classic engine’s tests)', () => {
+	const FMEA = `package P {
+		metadata def Fmea {
+			attribute failureMode : ScalarValues::String;
+			attribute severity : ScalarValues::Integer;
+			attribute likelihood : ScalarValues::Integer;
+			attribute detection : ScalarValues::Integer;
+		}
+		metadata def TableRendering;
+		view def Worksheet {
+			@TableRendering {
+				rows = "@Fmea";
+				columns = "element; failureMode; severity; likelihood; detection; rpn = severity*likelihood*detection";
+				sortBy = "-rpn";
+			}
+		}
+		view def Matrix { @TableRendering { rows = "@Fmea"; pivot = "severity; likelihood"; } }
+		view def HighRisk {
+			@TableRendering {
+				rows = "@Fmea";
+				columns = "element; rpn = severity*likelihood*detection";
+				where = "severity >= 8";
+			}
+		}
+		part def Battery;
+		part battery : Battery {
+			@Fmea { failureMode = "Thermal runaway"; severity = 9; likelihood = 3; detection = 4; }
+			@Fmea { failureMode = "Capacity fade"; severity = 5; likelihood = 6; detection = 3; }
+		}
+	}`;
+
+	it('computes and sorts columns', () => {
+		const t = render(one(FMEA), 'Worksheet');
+		expect(t.columns).toEqual([
+			'element',
+			'failureMode',
+			'severity',
+			'likelihood',
+			'detection',
+			'rpn'
+		]);
+		expect(col(t, 'rpn')).toEqual(['108', '90']);
+		expect(t.rows[0]![1]).toBe('Thermal runaway');
+		// The row is the annotation, written on line 26, about the battery.
+		expect(t.sources[0]).toEqual({ element: 'P::battery', file: 'p.sysml', line: 26 });
+	});
+
+	it('filters rows with `where`', () => {
+		expect(render(one(FMEA), 'HighRisk').rows).toEqual([['battery', '108']]);
+	});
+
+	it('counts a pivot grid, rows descending', () => {
+		const t = render(one(FMEA), 'Matrix');
+		expect(t.columns).toEqual(['severity\\likelihood', '3', '6']);
+		expect(t.rows).toEqual([
+			['9', '1', ''],
+			['5', '', '1']
+		]);
+		expect(t.sources).toEqual([]);
+		expect(t.editable).toEqual([null, null, null]);
+	});
+
+	it('says how columns are edited', () => {
+		const src = `package P {
+			private import ScalarValues::*;
+			metadata def Fmea {
+				attribute failureMode : String;
+				attribute severity : Integer;
+				ref target : Part[0..1];
+			}
+			metadata def TableRendering;
+			occurrence def Hazard { attribute description : String[0..1]; }
+			occurrence fire : Hazard { :>> description = "Fire"; }
+			view def Log { @TableRendering { rows = "type:Hazard"; columns = "element; description; type; line"; } }
+			view def Sheet {
+				@TableRendering { rows = "@Fmea"; columns = "element; failureMode; severity; target; rpn = severity * 2"; }
+			}
+			part p { @Fmea { failureMode = "x"; severity = 3; } }
+		}`;
+		const log = render(one(src), 'Log');
+		expect(log.rows).toEqual([['fire', 'Fire', 'Hazard', '10']]);
+		expect(log.editable).toEqual([
+			{ field: 'name', kind: 'text' },
+			{ field: 'feature:description', kind: 'text' },
+			null,
+			null
+		]);
+		expect(log.availableFields).toContain('parent');
+		const sheet = render(one(src), 'Sheet');
+		expect(sheet.editable).toEqual([
+			null,
+			{ field: 'metadata:Fmea.failureMode', kind: 'text' },
+			{ field: 'metadata:Fmea.severity', kind: 'number' },
+			null,
+			null
+		]);
+	});
+
+	it('compares strings in `where` by the name a person writes', () => {
+		const src = `package P {
+			metadata def TableRendering;
+			enum def RiskCategory { enum software; enum design; }
+			metadata def Line { attribute failureMode : ScalarValues::String; attribute category : RiskCategory; }
+			part w {
+				@Line { failureMode = "A"; category = RiskCategory::software; }
+				@Line { failureMode = "B"; category = RiskCategory::design; }
+			}
+			view def SW {
+				@TableRendering { rows = "@Line"; columns = "failureMode; category"; where = "category == \\"software\\""; }
+			}
+		}`;
+		const t = render(one(src), 'SW');
+		expect(t.rows).toEqual([['A', 'RiskCategory::software']]);
+		expect(t.editable?.[1]).toEqual({
+			field: 'metadata:Line.category',
+			kind: 'enum',
+			options: ['software', 'design']
+		});
+	});
+
+	it('keeps connections of a type and its specializations', () => {
+		const src = `package P {
+			metadata def TableRendering;
+			connection def Mate; connection def Causation; connection def Bolted :> Mate;
+			part a; part b; part c; part d; part e; part f;
+			connection m1 : Mate connect a to b;
+			connection m2 : Bolted connect c to d;
+			connection k1 : Causation connect e to f;
+			view def Fits {
+				@TableRendering { rows = "relation:connection:Mate"; columns = "connection; source; target"; sortBy = "connection"; }
+			}
+		}`;
+		const t = render(one(src), 'Fits');
+		expect(t.rows).toEqual([
+			['m1', 'a', 'b'],
+			['m2', 'c', 'd']
+		]);
+		expect(t.sources[0]!.element).toBe('P::m1');
+	});
+
+	it('lists successions with their names and ends', () => {
+		const src = `package P {
+			metadata def TableRendering;
+			action def Prog {
+				action a { action inner; } action b { action inner; } action c; action d;
+				succession s1 first a then b;
+				first b then c;
+				succession s2 first c then d;
+				first a.inner then b.inner;
+			}
+			view def Links { @TableRendering { rows = "relation:succession"; columns = "succession; source; target; parent"; } }
+		}`;
+		expect(render(one(src), 'Links').rows).toEqual([
+			['s1', 'a', 'b', 'Prog'],
+			['', 'b', 'c', 'Prog'],
+			['s2', 'c', 'd', 'Prog'],
+			['', 'a.inner', 'b.inner', 'Prog']
+		]);
+	});
+
+	it('is a bill of materials: parts and items, quantities multiplied down the tree', () => {
+		const src = `package P {
+			metadata def TableRendering;
+			part def Wheel;
+			part def Axle { part wheel : Wheel[2]; }
+			part def Car { part axle : Axle[2]; connection j connect axle to axle; }
+			view def Bom { @TableRendering { rows = "composition:Car"; columns = "path; quantity; extended"; sortBy = "path"; } }
+		}`;
+		expect(render(one(src), 'Bom').rows).toEqual([
+			['axle', '2', '2'],
+			['axle.wheel', '2', '4']
+		]);
+	});
+
+	it('explains a view without a table', () => {
+		expect(() => render(one('package P { view def Empty; }'), 'Empty')).toThrow(/@TableRendering/);
+		const src = 'package P { view def GeneralView; view v : GeneralView { expose P::*; } }';
+		const v = host.listViews(one(src)).find((x) => x.name === 'v')!;
+		expect(v).toMatchObject({ isUsage: true, hasTable: false, definition: 'GeneralView' });
+		expect(() => render(one(src), 'v')).toThrow(/typed by `GeneralView`/);
+		expect(() => render(one(src), 'Nope')).toThrow(
+			/not found\. Available views: .*RequirementGaps/
+		);
+	});
+
+	it('counts kinds', () => {
+		const src = `package P {
+			metadata def TableRendering;
+			view def Stats { @TableRendering { rows = "kindcounts"; columns = "kind; definitions; usages"; } }
+			part def A; part def B; part a : A;
+		}`;
+		const t = render(one(src), 'Stats');
+		expect(t.rows.find((r) => r[0] === 'part def')).toEqual(['part def', '2', '0']);
+		expect(t.rows.find((r) => r[0] === 'part')).toEqual(['part', '0', '1']);
+	});
+
+	it('reads body values of typed usages', () => {
+		const src = `package P {
+			metadata def TableRendering;
+			occurrence def Hazard { attribute description : ScalarValues::String[0..1]; }
+			occurrence def Fire :> Hazard;
+			view def Log { @TableRendering { rows = "type:Hazard"; columns = "element; description"; } }
+			occurrence fire : Fire { :>> description = "Lithium cell fire"; }
+		}`;
+		expect(render(one(src), 'Log').rows).toEqual([['fire', 'Lithium cell fire']]);
+	});
+});
+
+describe('view usages: expose, filter and inherited tables', () => {
+	const SCOPED = `package Lib {
+		metadata def TableRendering;
+		metadata def Fmea;
+		view def Worksheet {
+			@TableRendering { rows = "@Fmea"; columns = "element; failureMode; severity"; sortBy = "-severity"; }
+		}
+	}
+	package Power {
+		part def Battery { @Lib::Fmea { failureMode = "Thermal runaway"; severity = 9; } }
+		package Cells { part def Cell { @Lib::Fmea { failureMode = "Short"; severity = 7; } } }
+	}
+	package Motion {
+		part def Motor { @Lib::Fmea { failureMode = "Seizure"; severity = 8; } }
+	}
+	package Views {
+		view power : Lib::Worksheet { expose Power::*; }
+		view powerDeep : Lib::Worksheet { expose Power::**; }
+		view highOnly : Lib::Worksheet {
+			doc /* Only the worst. */
+			@Lib::TableRendering { where = "severity >= 9"; }
+		}
+		view motorOnly : Lib::Worksheet { expose Motion::Motor; }
+	}`;
+
+	it('inherit the def’s table; `::*` keeps members, `::**` everything nested, a name the element', () => {
+		const files = one(SCOPED);
+		expect(render(files, 'Worksheet').rows).toHaveLength(3);
+		const power = render(files, 'power');
+		expect(power.view).toBe('power');
+		expect(col(power, 'failureMode')).toEqual(['Thermal runaway']);
+		expect(power.warnings).toEqual([]);
+		expect(col(render(files, 'powerDeep'), 'failureMode')).toEqual(['Thermal runaway', 'Short']);
+		expect(col(render(files, 'motorOnly'), 'failureMode')).toEqual(['Seizure']);
+		expect(render(files, 'Views::power').rows).toHaveLength(1);
+	});
+
+	it('override single fields with their own @TableRendering', () => {
+		const t = render(one(SCOPED), 'highOnly');
+		expect(t.columns).toEqual(['element', 'failureMode', 'severity']);
+		expect(col(t, 'failureMode')).toEqual(['Thermal runaway']);
+	});
+
+	it('are listed with their def, doc and qualified name', () => {
+		const views = host.listViews(one(SCOPED));
+		expect(views.find((v) => v.name === 'Worksheet')).toMatchObject({
+			isUsage: false,
+			hasTable: true,
+			qualifiedName: 'Lib::Worksheet',
+			builtin: false
+		});
+		expect(views.find((v) => v.name === 'highOnly')).toMatchObject({
+			isUsage: true,
+			hasTable: true,
+			definition: 'Worksheet',
+			doc: 'Only the worst.',
+			qualifiedName: 'Views::highOnly'
+		});
+		expect(views.find((v) => v.name === 'power')?.exposes).toEqual(['Power::*']);
+	});
+
+	it('do not expose what a namespace only imports', () => {
+		// `expose A::*` per the letter of the spec takes in A's private imports too
+		// (an expose imports everything, whatever its visibility); a table lists A's own.
+		const src = `package Lib {
+			metadata def TableRendering;
+			view def Ports { @TableRendering { rows = "kind:port"; columns = "owner; element"; } }
+		}
+		package B { port def P; part def Pump { port inlet : P; } }
+		package A { private import B::*; part def Valve { port outlet : B::P; } }
+		package Views { view a : Lib::Ports { expose A::**; } }`;
+		expect(render(one(src), 'a').rows).toEqual([['Valve', 'outlet']]);
+		expect(render(one(src), 'Ports').rows).toHaveLength(2);
+	});
+
+	it('expose what a usage inherits from its type', () => {
+		const src = `package Lib {
+			metadata def TableRendering;
+			view def Ports { @TableRendering { rows = "kind:port"; columns = "owner; element"; } }
+		}
+		package Arch {
+			port def P;
+			part def Pump { port inlet : P; }
+			part def Tank { port outlet : P; }
+			part plant { part pump : Pump; }
+			view plantPorts : Lib::Ports { expose Arch::plant::**; }
+		}`;
+		expect(render(one(src), 'plantPorts').rows).toEqual([['Pump', 'inlet']]);
+	});
+
+	it('walk a usage’s body and type from package roots, and narrow by path', () => {
+		const src = `package Arch {
+			metadata def TableRendering;
+			part def Rotor { part motor : Motor; }
+			part def Motor;
+			part def Drone;
+			part drone : Drone { part rotors : Rotor[4]; part battery : Battery; }
+			part def Battery;
+			part spare : Rotor;
+			view def Bom { @TableRendering { rows = "composition"; columns = "path; quantity; extended"; sortBy = "path"; } }
+			view rotorsOnly : Bom { expose Arch::drone::rotors::*; }
+			view droneOnly : Bom { expose Arch::drone::**; }
+		}`;
+		expect(render(one(src), 'Bom').rows).toEqual([
+			['drone', '1', '1'],
+			['drone.battery', '1', '1'],
+			['drone.rotors', '4', '4'],
+			['drone.rotors.motor', '1', '4'],
+			['spare', '1', '1'],
+			['spare.motor', '1', '1']
+		]);
+		expect(col(render(one(src), 'rotorsOnly'), 'path')).toEqual(['drone.rotors.motor']);
+		// `X::**` exposes X itself too (SysML v2 7.25.3); the other motor stays out.
+		expect(col(render(one(src), 'droneOnly'), 'path')).toEqual([
+			'drone',
+			'drone.battery',
+			'drone.rotors',
+			'drone.rotors.motor'
+		]);
+	});
+
+	it('filter by metaclass and by metadata', () => {
+		const src = `package P {
+			metadata def TableRendering;
+			metadata def Critical { attribute level : ScalarValues::Integer; }
+			part def Box { part a : A; item b : B; part c : A { @Critical { level = 1; } } }
+			part def A; item def B;
+			view def Bom { @TableRendering { rows = "composition:Box"; columns = "element"; } }
+			view items : Bom { filter @SysML::ItemUsage; }
+			view parts : Bom { filter @SysML::PartUsage; }
+			view critical : Bom { filter @Critical; }
+			view either : Bom { filter @SysML::PartUsage or @Critical; }
+			view exposedParts : Bom { expose P::Box::**; filter @SysML::PartUsage; }
+			view odd : Bom { filter a.b > 3; }
+		}`;
+		const get = (v: string) => {
+			const t = render(one(src), v);
+			return { rows: t.rows.map((r) => r[0]), warnings: t.warnings };
+		};
+		// A part is an item (PartUsage specializes ItemUsage); the classic engine
+		// compared metaclass names and kept only `b`.
+		expect(get('items')).toEqual({ rows: ['a', 'b', 'c'], warnings: [] });
+		expect(get('parts')).toEqual({ rows: ['a', 'c'], warnings: [] });
+		expect(get('critical')).toEqual({ rows: ['c'], warnings: [] });
+		expect(get('either')).toEqual({ rows: ['a', 'c'], warnings: [] });
+		expect(get('exposedParts')).toEqual({ rows: ['a', 'c'], warnings: [] });
+		expect(get('odd')).toEqual({
+			rows: ['a', 'b', 'c'],
+			warnings: ['filter `a.b > 3` is not supported for tables; ignored']
+		});
+	});
+});
+
+describe('requirements, trace and ports', () => {
+	const REQUIREMENTS = `package Reqs {
+		private import ModelingMetadata::*;
+		enum def RequirementKind { enum performance; enum safety; }
+		enum def VerificationMethod { enum test; enum 'analysis'; }
+		requirement def Base {
+			attribute kind : RequirementKind[0..1];
+			attribute verificationMethod : VerificationMethod[0..*];
+		}
+		requirement <'R-1'> 'Flight endurance' : Base {
+			doc /* The drone shall fly for 25 minutes
+			     * with a 1 kg payload. */
+			:>> kind = RequirementKind::performance;
+			:>> verificationMethod = (VerificationMethod::'analysis', VerificationMethod::test);
+			@StatusInfo { status = StatusKind::done; owner = "J. Hale"; }
+			@Rationale { text = "A delivery takes 10 minutes."; }
+			@Issue { text = "Headwind not modelled."; }
+		}
+		requirement <'R-2'> 'Geofencing' : Base {
+			doc /* The drone shall stay inside the geofence. */
+			:>> kind = RequirementKind::safety;
+		}
+		requirement <'R-3'> 'Noise' : Base { doc /* Quiet in hover. */ }
+		metadata def TableRendering;
+		view def Gaps {
+			@TableRendering { rows = "requirements"; columns = "id; title; satisfied; verified"; where = "satisfied == 0 or verified == 0"; sortBy = "id"; }
+		}
+		view def All {
+			@TableRendering {
+				rows = "requirements";
+				columns = "id; title; text; kind; verificationMethod; status; owner; rationale; issues; satisfiedBy; verifiedBy; satisfied; verified; type; line";
+				sortBy = "id";
+			}
+		}
+		view def Rtm { @TableRendering { rows = "trace"; columns = "requirement; id; satisfied; verified"; } }
+		view def Tm { @TableRendering { rows = "relation:satisfy"; pivot = "requirement; by"; sortBy = "requirement"; } }
+	}`;
+	// Trace links resolve by the language's rules: names are imported, not matched.
+	const DESIGN = `package Design {
+		private import Reqs::*;
+		part drone { part controller; }
+		satisfy Reqs::'Flight endurance' by drone;
+		satisfy 'R-2' by drone.controller;
+		verification flightTest { objective { verify 'Flight endurance'; } }
+	}`;
+	const files = [
+		{ path: 'reqs.sysml', text: REQUIREMENTS },
+		{ path: 'design.sysml', text: DESIGN }
+	];
+
+	it('carry attributes, status and resolved trace links', () => {
+		const t = render(files, 'All');
+		expect(t.warnings).toEqual([]);
+		expect(col(t, 'id')).toEqual(['R-1', 'R-2', 'R-3']);
+		expect(record(t, 0)).toEqual({
+			id: 'R-1',
+			title: 'Flight endurance',
+			text: 'The drone shall fly for 25 minutes with a 1 kg payload.',
+			kind: 'performance',
+			verificationMethod: 'analysis, test',
+			status: 'done',
+			owner: 'J. Hale',
+			rationale: 'A delivery takes 10 minutes.',
+			issues: 'Headwind not modelled.',
+			satisfiedBy: 'drone',
+			verifiedBy: 'flightTest',
+			satisfied: '1',
+			verified: '1',
+			type: 'Base',
+			line: '9'
+		});
+		expect(col(t, 'satisfiedBy')[1]).toBe('drone.controller');
+		expect(col(t, 'kind')[2]).toBe('');
+		expect(t.sources[0]).toEqual({
+			element: "Reqs::'Flight endurance'",
+			file: 'reqs.sysml',
+			line: 9
+		});
+		expect(t.editable?.slice(0, 8)).toEqual([
+			{ field: 'shortName', kind: 'text' },
+			{ field: 'name', kind: 'text' },
+			{ field: 'doc', kind: 'longText' },
+			{ field: 'feature:kind', kind: 'enum', options: ['performance', 'safety'] },
+			{ field: 'feature:verificationMethod', kind: 'enumList', options: ['test', 'analysis'] },
+			{
+				field: 'metadata:StatusInfo.status',
+				kind: 'enum',
+				options: ['open', 'tbd', 'tbr', 'tbc', 'done', 'closed']
+			},
+			{ field: 'metadata:StatusInfo.owner', kind: 'text' },
+			{ field: 'metadata:Rationale.text', kind: 'longText' }
+		]);
+	});
+
+	it('select gaps with `where`', () => {
+		const t = render(files, 'Gaps');
+		expect(col(t, 'id')).toEqual(['R-2', 'R-3']);
+		expect(col(t, 'satisfied')).toEqual(['1', '0']);
+		expect(col(t, 'verified')).toEqual(['0', '0']);
+	});
+
+	it('trace coverage says yes and no', () => {
+		expect(render(files, 'Rtm').rows).toEqual([
+			['Flight endurance', 'R-1', 'yes', 'yes'],
+			['Geofencing', 'R-2', 'yes', 'no'],
+			['Noise', 'R-3', 'no', 'no']
+		]);
+	});
+
+	it('pivot satisfy links by requirement', () => {
+		const t = render(files, 'Tm');
+		expect(t.columns).toEqual(['requirement\\by', 'drone', 'drone.controller']);
+		expect(t.rows).toEqual([
+			['R-1 Flight endurance', '1', ''],
+			['R-2 Geofencing', '', '1']
+		]);
+	});
+
+	it('don’t count a link whose requirement doesn’t resolve', () => {
+		// The classic engine matched `'R-3'` by name across packages; it isn't visible here.
+		const loose = [
+			files[0]!,
+			{ path: 'design.sysml', text: `package Design { part d; satisfy 'R-3' by d; }` }
+		];
+		expect(render(loose, 'Rtm').rows[2]).toEqual(['Noise', 'R-3', 'no', 'no']);
+	});
+
+	it('ports show owner, direction from their def and what they connect to', () => {
+		const src = `package P {
+			metadata def TableRendering;
+			item def Power;
+			port def PowerPort { out item power : Power; }
+			part def Battery { port powerOut : PowerPort; }
+			part def Load { port powerIn : ~PowerPort; port spare : PowerPort; }
+			interface def Cable { end port a : PowerPort; end port b : ~PowerPort; }
+			part system {
+				part battery : Battery;
+				part load : Load;
+				interface cable : Cable connect battery.powerOut to load.powerIn;
+			}
+			view def Ports { @TableRendering { rows = "kind:port"; columns = "owner; element; type; direction; connectedTo; via"; } }
+		}`;
+		const t = render(one(src), 'Ports');
+		expect(t.rows).toEqual([
+			['Battery', 'powerOut', 'PowerPort', 'out', 'load.powerIn', 'cable'],
+			['Load', 'powerIn', '~PowerPort', 'in', 'battery.powerOut', 'cable'],
+			['Load', 'spare', 'PowerPort', 'out', '', '']
+		]);
+		expect(t.editable).toEqual([null, { field: 'name', kind: 'text' }, null, null, null, null]);
+	});
+});
+
+describe('text helpers', () => {
+	it('read values and docs as people do', () => {
+		expect(collapseWhitespace('one\n * two\n *  three')).toBe('one two three');
+		expect(displayValue('(K::a, K::b)')).toBe('a, b');
+		expect(displayValue('"x"')).toBe('x');
+		expect(displayValue('25 [min]')).toBe('25 [min]');
+		expect(displayValue("Kind::'use'")).toBe('use');
+	});
+});
+
+describe('the bundled view libraries', () => {
+	const project = one(
+		`package Reqs { requirement <'R-1'> 'Mass' { doc /* At most 4 kg. */ }
+			requirement <'R-2'> 'Range' { doc /* At least 5 km. */ }
+			view massOnly : ModelViews::RequirementsTable { expose Reqs::'Mass'; } }`,
+		'reqs.sysml'
+	);
+
+	it('are added to a project that lacks them, and listed as built in', () => {
+		const views = host.listViews(project);
+		expect(views.find((v) => v.name === 'RequirementGaps')).toMatchObject({
+			builtin: true,
+			hasTable: true,
+			isUsage: false,
+			qualifiedName: 'ModelViews::RequirementGaps',
+			file: 'libraries/ModelViews.sysml'
+		});
+		expect(views.find((v) => v.name === 'massOnly')).toMatchObject({
+			builtin: false,
+			isUsage: true,
+			hasTable: true,
+			definition: 'RequirementsTable',
+			qualifiedName: 'Reqs::massOnly',
+			file: 'reqs.sysml'
+		});
+		// Their contents are no rows, and they make no problems in the project.
+		const gaps = render(project, 'RequirementGaps');
+		expect(gaps.rows.map((r) => r.slice(0, 4))).toEqual([
+			['R-1', 'Mass', '0', '0'],
+			['R-2', 'Range', '0', '0']
+		]);
+		expect(render(project, 'massOnly').rows.map((r) => r[0])).toEqual(['R-1']);
+		const analyses = host.analyzeProject(project);
+		expect(analyses).toHaveLength(1);
+		expect(analyses[0]!.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+	});
+
+	it('give way to a project’s own copy', () => {
+		const own = [
+			...project,
+			{
+				path: 'lib/ModelViews.sysml',
+				text: 'library package ModelViews { view def RequirementsTable; }'
+			}
+		];
+		expect(host.listViews(own).some((v) => v.name === 'RequirementGaps')).toBe(false);
+		expect(() => render(own, 'RequirementsTable')).toThrow(/@TableRendering/);
+	});
+
+	it('are the demo’s copies', () => {
+		const libraries = host.viewLibraries();
+		expect(libraries.map((l) => l.path)).toEqual([
+			'libraries/Reporting.sysml',
+			'libraries/ModelViews.sysml'
+		]);
+		const demo = demoFiles();
+		for (const l of libraries) expect(l.text).toBe(demo.find((f) => f.path === l.path)?.text);
+	});
+});
+
+/**
+ * The demo's tables against what the classic engine rendered (its row and
+ * column counts and cells, recorded before it went), with the deliberate
+ * differences asserted.
+ */
+describe('the demo’s tables', () => {
+	const demo = demoFiles();
+	const table = (name: string) => render(demo, name);
+	const shape = (t: RenderedTable) => [t.rows.length, t.columns.length];
+
+	it('lists the views the classic engine listed', () => {
+		const views = host.listViews(demo);
+		expect(views).toHaveLength(41);
+		expect(views.filter((v) => v.hasTable)).toHaveLength(26);
+		expect(views.every((v) => !v.builtin)).toBe(true);
+		expect(views.find((v) => v.name === 'droneBreakdown')).toEqual({
+			name: 'droneBreakdown',
+			qualifiedName: 'DroneViews::droneBreakdown',
+			file: 'views/Views.sysml',
+			isUsage: true,
+			hasTable: false,
+			definition: 'GeneralView',
+			doc: 'The parts tree of our drone design: what it is made of, and how many.',
+			renderAs: 'asTreeDiagram',
+			exposes: ['DroneArchitecture::drone::**'],
+			builtin: false
+		});
+		expect(views.find((v) => v.name === 'SpecificationDocument')?.renderAs).toBe('asDocument');
+		expect(views.find((v) => v.name === 'droneInterfaceControl')?.exposes).toEqual([
+			'DroneArchitecture::drone::*',
+			'DroneInterfaces::*'
+		]);
+	});
+
+	it('requirements: the same rows, cells, sources and editing', () => {
+		const t = table('ModelViews::RequirementsTable');
+		expect(shape(t)).toEqual([20, 10]);
+		expect(col(t, 'id').slice(0, 4)).toEqual(['RC-001', 'RC-002', 'RC-003', 'STK-001']);
+		expect(record(t, 9)).toEqual({
+			id: 'SYS-001',
+			title: 'Flight endurance',
+			text: 'The drone shall fly for at least 25 minutes with a 1 kg payload in still air before it reaches its landing reserve.',
+			kind: 'performance',
+			priority: 'high',
+			verificationMethod: 'analysis, test',
+			status: 'done',
+			owner: 'J. Hale',
+			satisfiedBy: 'drone',
+			verifiedBy: 'enduranceFlightTest'
+		});
+		expect(record(t, 0)).toMatchObject({
+			satisfiedBy: 'batteryManagementSystem',
+			verifiedBy: 'batteryAbuseTest'
+		});
+		expect(t.sources[15]).toEqual({
+			element: 'SystemRequirements::Geofencing',
+			file: 'requirements/SystemRequirements.sysml',
+			line: 85
+		});
+		expect(t.editable?.map((e) => e?.field ?? null)).toEqual([
+			'shortName',
+			'name',
+			'doc',
+			'feature:kind',
+			'feature:priority',
+			'feature:verificationMethod',
+			'metadata:StatusInfo.status',
+			'metadata:StatusInfo.owner',
+			null,
+			null
+		]);
+		expect(t.editable?.[5]).toEqual({
+			field: 'feature:verificationMethod',
+			kind: 'enumList',
+			options: ['test', 'analysis', 'inspection', 'demonstration']
+		});
+		expect(t.availableFields?.slice(-3)).toEqual(['verificationMethod', 'hierarchy', 'hazard']);
+	});
+
+	it('gaps, coverage and the trace and verification matrices', () => {
+		expect(shape(table('RequirementGaps'))).toEqual([11, 8]);
+		const gaps = table('designGaps');
+		expect(col(gaps, 'id')).toEqual(['SYS-005', 'SYS-006', 'SYS-011']);
+		expect(gaps.rows[2]).toEqual([
+			'SYS-011',
+			'Controlled parcel release',
+			'1',
+			'0',
+			'drone.payloadRelease',
+			'',
+			'open',
+			'K. Novak'
+		]);
+		const coverage = table('requirementCoverage');
+		expect(shape(coverage)).toEqual([20, 4]);
+		expect(coverage.rows[0]).toEqual(['Acoustic noise', 'SYS-006', 'no', 'no']);
+		expect(coverage.rows[11]).toEqual(['Navigation integrity monitoring', 'RC-003', 'yes', 'no']);
+		const trace = table('TraceMatrix');
+		expect(shape(trace)).toEqual([12, 9]);
+		expect(trace.columns.slice(1)).toEqual([
+			'batteryManagementSystem',
+			'drone',
+			'drone.battery',
+			'drone.flightController',
+			'drone.payloadRelease',
+			'drone.radio',
+			'navigationIntegrityMonitor',
+			'rotorHealthMonitor'
+		]);
+		expect(trace.rows[4]).toEqual(['SYS-002 Payload capacity', '', '', '', '', '1', '', '', '']);
+		const verification = table('VerificationMatrix');
+		expect(shape(verification)).toEqual([9, 7]);
+		expect(verification.rows[8]).toEqual([
+			'SYS-010 Command and telemetry link',
+			'',
+			'',
+			'',
+			'1',
+			'',
+			''
+		]);
+	});
+
+	it('ports, resolved through the toolkit’s connection ends', () => {
+		const t = table('InterfaceTable');
+		expect(shape(t)).toEqual([21, 6]);
+		expect(t.rows[2]).toEqual([
+			'DeliveryDrone',
+			'commandLink',
+			'~CommandLinkPort',
+			'inout',
+			'groundStation.commandLink',
+			'radioLink'
+		]);
+		expect(t.rows[12]).toEqual([
+			'PowerDistributionBoard',
+			'powerIn',
+			'~PowerPort',
+			'in',
+			'battery.powerOut',
+			'batteryPower'
+		]);
+		expect(shape(table('droneInterfaces'))).toEqual([19, 6]);
+		expect(shape(table('PortTable'))).toEqual([21, 4]);
+	});
+
+	it('connections, allocations and the FMEA', () => {
+		const connections = table('ConnectionTable');
+		expect(shape(connections)).toEqual([11, 2]);
+		expect(connections.rows[0]).toEqual(['battery.powerOut', 'powerDistribution.powerIn']);
+		// A named connection is the element behind its row (the classic engine gave none).
+		expect(connections.sources[0]!.element).toBe('DroneArchitecture::drone::batteryPower');
+		const allocations = table('AllocationMatrix');
+		expect(shape(allocations)).toEqual([8, 2]);
+		expect(allocations.rows[0]).toEqual(['drone.deliveryFlight.checkDropZone', 'drone.camera']);
+		const fmea = table('fmeaWorksheet');
+		expect(shape(fmea)).toEqual([6, 8]);
+		expect(fmea.rows[0]).toEqual([
+			'drone::battery',
+			'Thermal runaway',
+			'Internal cell short, overcharge or crash damage',
+			'RiskCategory::design',
+			'8',
+			'3',
+			'6',
+			'144'
+		]);
+		expect(col(fmea, 'rpn')).toEqual(['144', '96', '96', '80', '72', '60']);
+		// `about drone::rotors::motor` is the motor feature of Rotor, which the rotors inherit.
+		expect(fmea.sources[1]).toEqual({
+			element: 'DroneComponents::Rotor::motor',
+			file: 'risk/DesignFmea.sysml',
+			line: 110
+		});
+		expect(fmea.editable?.[3]).toEqual({
+			field: 'metadata:Fmea.category',
+			kind: 'enum',
+			options: ['design', 'process', 'use', 'software']
+		});
+		expect(fmea.editable?.[4]).toEqual({ field: 'metadata:Fmea.severity', kind: 'number' });
+		expect(table('RiskMatrix').rows).toEqual([
+			['8', '1', '2', '1', ''],
+			['6', '', '', '1', '1']
+		]);
+		const hazards = table('HazardLog');
+		expect(col(hazards, 'element')).toEqual([
+			'batteryFire',
+			'flyAway',
+			'hazard',
+			'hazard',
+			'uncontrolledDescent'
+		]);
+	});
+
+	it('the bill of materials follows the toolkit’s types and SysML’s `::**`', () => {
+		const bom = table('BillOfMaterials');
+		expect(shape(bom)).toEqual([32, 5]);
+		// `part drone :> DroneArchitecture::drone` is a DeliveryDrone (the classic engine said `drone`).
+		expect(bom.rows[1]!.slice(0, 2)).toEqual(['deliveryService.drone', 'DeliveryDrone']);
+		expect(bom.rows[13]).toEqual([
+			'deliveryService.drone.rotors.motor',
+			'Motor',
+			'1',
+			'4',
+			'Brushless outrunner motor.'
+		]);
+		// A row's element is the model element, not a path through the tree.
+		expect(bom.sources[13]).toEqual({
+			element: 'DroneComponents::Rotor::motor',
+			file: 'system/Components.sysml',
+			line: 54
+		});
+		const drone = table('droneBillOfMaterials');
+		// `expose DroneArchitecture::drone::**` exposes the drone too (13 rows before).
+		expect(shape(drone)).toEqual([14, 5]);
+		expect(drone.rows[0]!.slice(0, 4)).toEqual(['drone', 'DeliveryDrone', '1', '1']);
+		expect(col(drone, 'path')).not.toContain('deliveryService.drone.battery');
+	});
+
+	it('model stats count what the toolkit resolved', () => {
+		const stats = table('ModelStats');
+		expect(stats.rows.slice(0, 17).map((r) => r[0])).toEqual([
+			'action def',
+			'attribute def',
+			'calc def',
+			'connection def',
+			'enum def',
+			'interface def',
+			'item def',
+			'metadata def',
+			'occurrence def',
+			'package',
+			'part def',
+			'port def',
+			'rendering def',
+			'requirement def',
+			'state def',
+			'use case def',
+			'view def'
+		]);
+		const row = (kind: string) => stats.rows.find((r) => r[0] === kind);
+		expect(row('part def')).toEqual(['part def', '19', '0']);
+		expect(row('requirement')).toEqual(['requirement', '0', '20']);
+		expect(row('attribute')).toEqual(['attribute', '0', '159']);
+		// Enum literals count as usages, metadata annotations are anonymous.
+		expect(row('enum')).toEqual(['enum', '0', '31']);
+		expect(row('metadata')).toBeUndefined();
+	});
+
+	it('report chapters render from the library’s subviews', () => {
+		expect(shape(table('ModelViews::SpecificationDocument::requirementsChapter'))).toEqual([
+			20, 10
+		]);
+		expect(shape(table('ModelViews::InterfaceControlDocument::connectionsChapter'))).toEqual([
+			11, 2
+		]);
+		expect(() => table('ModelViews::SpecificationDocument')).toThrow(/no @TableRendering/);
+	});
+
+	it('render in a few milliseconds once the model is read', () => {
+		table('RequirementsTable');
+		const started = performance.now();
+		for (const name of ['RequirementsTable', 'BillOfMaterials', 'InterfaceTable', 'fmeaWorksheet'])
+			table(name);
+		expect(performance.now() - started).toBeLessThan(200);
+	});
+});

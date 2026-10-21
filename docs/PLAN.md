@@ -54,8 +54,11 @@ need a model run in parallel with the foundation.
 2. ✅ **Editor** (done; see `docs/engine.md`) — completion, hover, definition, references, rename,
    format, code actions and highlighting from the toolkit's language
    server.
-3. **Views and tables** — view listing and table rendering in TypeScript
-   (`expose`, `@TableRendering`, editable columns); reports follow.
+3. ✅ **Views and tables** (done; see `docs/engine.md`) — view listing and
+   table rendering in TypeScript over the toolkit's model in its worker
+   (`expose` by ownership and inheritance, `@TableRendering`, editable
+   columns); the view libraries are bundled into sessions that lack them;
+   reports render their table chapters from it.
 4. **Edits** — every inspector, table and diagram edit through the
    toolkit's transform operations (rename, set value, insert, remove,
    retarget), composed where it has no single operation.

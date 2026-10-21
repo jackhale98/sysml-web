@@ -21,7 +21,11 @@ export const TOOLKIT_METHODS = [
 	'references',
 	'renameSymbol',
 	'outline',
-	'codeActions'
+	'codeActions',
+	// Phase 3: views and tables.
+	'listViews',
+	'renderView',
+	'viewLibraries'
 ] as const satisfies readonly (keyof EngineApi)[];
 
 export type ToolkitMethod = (typeof TOOLKIT_METHODS)[number];

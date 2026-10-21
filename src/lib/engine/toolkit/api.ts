@@ -48,6 +48,10 @@ export interface TkSession {
 	toGraph(optionsJson?: string | null): string;
 	referenceSpelling(e: TkElement): string | undefined;
 	unresolvedCount(): number;
+	/** Whether `e` reaches `ancestor` through the explicit specialization closure. */
+	conforms(e: TkElement, ancestor: TkElement): boolean;
+	/** A view usage's rendering, exposed elements (filters applied), subviews and metadata, JSON. */
+	viewInfo(qualifiedName: string): string;
 }
 
 export interface TkLspServer {

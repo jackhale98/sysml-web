@@ -36,7 +36,7 @@ export function getEngine(): Engine {
 		}),
 		{
 			// On a slow network the toolkit's download comes first (analysis waits for it);
-			// the classic engine (tables, diagrams, edits) downloads while the library loads.
+			// the classic engine (diagrams, edits) downloads while the library loads.
 			onLoaded: () => void classic.version().catch(() => undefined),
 			onReady: (stats) => {
 				performance.mark('sysml:toolkit-ready', { detail: stats });
