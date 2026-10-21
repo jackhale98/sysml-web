@@ -357,8 +357,9 @@
 			case 'tree':
 				return 'tree';
 			case 'check':
-				// A `check` column beside others says it with an icon; a checks list in words.
-				return isVerdict(value) ? (c === 'check' ? 'verdictIcon' : 'verdict') : 'text';
+				// A `check` column beside others says it with an icon; a checks list in words
+				// (empty cells too, so the column stays as narrow as its icons).
+				return c === 'check' ? 'verdictIcon' : 'verdict';
 		}
 		if (c === 'id' || c === 'shortname') return 'id';
 		if ((c === 'satisfied' || c === 'verified') && (value === '0' || value === '1')) return 'flag';
@@ -404,6 +405,10 @@
 				><span style:width="{Math.round(shareOf(value) * 100)}%"></span></span
 			>{value}</span
 		>
+	{:else if kind === 'quantity' && / \(.+\)$/.test(value)}
+		<!-- `0.23 kg (5.8 %)`: the part in brackets moves under the value when the table is narrow. -->
+		{@const at = value.lastIndexOf(' (')}
+		{value.slice(0, at)}<span class="aside">{value.slice(at)}</span>
 	{:else if kind === 'list' && value}
 		{#each value.split(/,\s*/) as item, i (i)}<span class="ref">{item}</span>{/each}
 	{:else if (kind === 'long' || kind === 'text') && value.includes('`')}
@@ -1001,6 +1006,7 @@
 		flex: 1;
 		min-height: 0;
 		overflow: auto;
+		container-type: inline-size;
 		margin: 0 var(--space-5) var(--space-5);
 		border: 1px solid var(--border);
 		border-radius: var(--radius-md);
@@ -1231,6 +1237,23 @@
 		border-radius: var(--radius-pill);
 		background: var(--surface-2);
 		overflow: hidden;
+	}
+	/* A narrow pane (the inspector open beside it): tighter cells, the share as a figure only,
+	   and a margin's percentage under it, so wide tables fit without scrolling sideways. */
+	@container (max-width: 64rem) {
+		td,
+		th button,
+		.th {
+			padding-inline: var(--space-2);
+		}
+		.share .bar {
+			display: none;
+		}
+		.aside {
+			display: block;
+			color: var(--text-2);
+			font-size: var(--text-xs);
+		}
 	}
 	.share .bar span {
 		display: block;

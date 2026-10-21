@@ -141,7 +141,13 @@ export function notationOf(node: DiagramNode, view: 'general' | 'interconnection
 		// A state's entry, do and exit actions read as `entry / alertOperator`.
 		if (STATE_ACTIONS.has(rowBase)) row = `${rowBase} / ${text}`;
 		if (rowBase === 'port' && view === 'interconnection') {
-			ports.push({ label: row, side: direction === 'out' ? 'right' : 'left' });
+			const side =
+				direction === 'out'
+					? 'right'
+					: direction
+						? 'left'
+						: (node.port_sides?.[text] ?? (text.includes(': ~') ? 'left' : 'right'));
+			ports.push({ label: row, side });
 			continue;
 		}
 		const title = PLURAL[rowBase] ?? (rowBase.endsWith('s') ? rowBase : `${rowBase}s`);

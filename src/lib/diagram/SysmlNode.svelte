@@ -302,8 +302,9 @@
 	/* Ports on the boundary (interconnection view). */
 	.ports {
 		display: flex;
+		flex-wrap: wrap;
 		justify-content: space-between;
-		gap: 8px;
+		gap: 0 8px;
 		padding: 6px 0;
 		border-top: 1px solid var(--line);
 	}
@@ -316,6 +317,9 @@
 	}
 	.side.left li {
 		padding-left: 12px;
+	}
+	.side.right {
+		margin-left: auto;
 	}
 	.side.right li {
 		padding-right: 12px;

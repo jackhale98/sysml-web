@@ -522,6 +522,11 @@ export interface DiagramNode {
 	is_definition: boolean;
 	/** Where the element the node draws is declared (absent for pseudo states and control nodes). */
 	element?: { file: string; start_byte: number };
+	/**
+	 * Interconnection views: the border side of a port without a direction,
+	 * by its row text, from how its connections run.
+	 */
+	port_sides?: Record<string, 'left' | 'right'>;
 }
 
 export interface DiagramEdge {

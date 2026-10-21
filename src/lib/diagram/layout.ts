@@ -46,7 +46,9 @@ export const METRICS = {
 	docLine: 17,
 	docLines: 3,
 	minWidth: 150,
-	maxWidth: 320
+	maxWidth: 320,
+	/** A part with ports on both borders may be wider, to keep them on one row. */
+	maxPortsWidth: 480
 };
 const NAME_CHAR = 7.7;
 const MONO_CHAR = 6.95;
@@ -68,14 +70,25 @@ export function nodeSize(node: DiagramNode, view = 'general'): { width: number; 
 	}
 	const m = METRICS;
 	const rows = n.compartments.flatMap((c) => c.rows);
-	const portRows = n.ports.map((p) => p.label);
+	// Ports on both borders sit side by side on a row, when that fits; else the right ones go below.
+	const sideWidth = (side: 'left' | 'right') =>
+		Math.max(
+			0,
+			...n.ports.filter((p) => p.side === side).map((p) => p.label.length * MONO_CHAR + 14)
+		);
+	const [leftPorts, rightPorts] = [sideWidth('left'), sideWidth('right')];
+	const sideBySide = leftPorts + rightPorts + 36 <= m.maxPortsWidth;
+	const portsWidth = sideBySide
+		? leftPorts + rightPorts + 36
+		: Math.max(leftPorts, rightPorts) + 28;
 	const longest = Math.max(
 		node.label.length * NAME_CHAR + 52,
 		n.keyword.length * 6.4 + 52,
 		...rows.map((r) => r.length * MONO_CHAR + 28),
-		...portRows.map((r) => r.length * MONO_CHAR + 40)
+		n.ports.length ? portsWidth : 0
 	);
-	let width = Math.min(m.maxWidth, Math.max(m.minWidth, longest));
+	const widest = n.ports.length ? m.maxPortsWidth : m.maxWidth;
+	let width = Math.min(widest, Math.max(m.minWidth, longest));
 	if (n.doc) width = Math.max(width, Math.min(m.maxWidth, 240));
 	width = Math.round(width);
 
@@ -93,7 +106,7 @@ export function nodeSize(node: DiagramNode, view = 'general'): { width: number; 
 	if (n.ports.length) {
 		const left = n.ports.filter((p) => p.side === 'left').length;
 		const right = n.ports.length - left;
-		height += m.compartmentPad + Math.max(left, right) * m.row;
+		height += m.compartmentPad + (sideBySide ? Math.max(left, right) : left + right) * m.row;
 	}
 	return { width, height: Math.round(height) };
 }

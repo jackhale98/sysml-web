@@ -43,6 +43,19 @@ async function select(page: Page, name: string, kind: string, nth = 0) {
 	return page.getByRole('complementary', { name: 'Inspector' });
 }
 
+test('the mass budget fits beside the inspector without scrolling sideways', async ({ page }) => {
+	await page.setViewportSize({ width: 1440, height: 900 });
+	await openDemo(page);
+	const table = await openView(page, 'Drone mass budget');
+	await expect(table.getByText('28 rows')).toBeVisible({ timeout: 15_000 });
+	await expect(page.getByRole('complementary', { name: 'Inspector' })).toBeVisible();
+	const overflow = await table.locator('.scroll').evaluate((el) => el.scrollWidth - el.clientWidth);
+	expect(overflow).toBeLessThanOrEqual(1);
+	// The margin's percentage moves under it; the verdict is an icon, named for screen readers.
+	await expect(table.locator('tbody tr').last()).toContainText('0.23 kg (5.8 %)');
+	await expect(table.locator('tbody tr').last().getByText('Satisfied')).toBeAttached();
+});
+
 test('the mass budget adds up the parts tree, with units and the limit a requirement sets', async ({
 	page
 }) => {

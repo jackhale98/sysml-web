@@ -275,6 +275,12 @@ describe('interconnection view', () => {
 			camera: ['imageOut : ImagePort'],
 			payloadRelease: ['releaseControl : ~ReleaseControlPort']
 		};
+		// Ports without a direction sit where their connections run.
+		expect(node(tk, 'powerDistribution').port_sides).toEqual({
+			'powerIn : ~PowerPort': 'left',
+			'rotorPower : PowerPort': 'right',
+			'avionicsPower : PowerPort': 'right'
+		});
 		expect(parts.map((n) => n.id).sort()).toEqual(Object.keys(ports).sort());
 		for (const n of parts) {
 			expect(n.attributes.every(([kind]) => kind === 'port')).toBe(true);

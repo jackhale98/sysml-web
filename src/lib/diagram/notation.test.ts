@@ -79,17 +79,25 @@ describe('notationOf', () => {
 			node({
 				attributes: [
 					['out port', 'thrust : Thrust'],
-					['port', 'data : Bus']
-				]
+					['in port', 'fuel : Fuel'],
+					['port', 'data : Bus'],
+					['port', 'power : ~Power'],
+					['port', 'link : Link']
+				],
+				port_sides: { 'link : Link': 'left' }
 			}),
 			'interconnection'
 		);
 		expect(n.keyword).toBe('part');
 		expect(n.isDefinition).toBe(false);
 		expect(n.compartments).toEqual([]);
+		// Without a direction: where its connections run, else conjugated (receiving) on the left.
 		expect(n.ports).toEqual([
 			{ label: 'out thrust : Thrust', side: 'right' },
-			{ label: 'data : Bus', side: 'left' }
+			{ label: 'in fuel : Fuel', side: 'left' },
+			{ label: 'data : Bus', side: 'right' },
+			{ label: 'power : ~Power', side: 'left' },
+			{ label: 'link : Link', side: 'left' }
 		]);
 	});
 

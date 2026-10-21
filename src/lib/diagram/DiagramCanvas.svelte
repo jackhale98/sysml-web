@@ -91,6 +91,11 @@
 	let flow: FlowApi | null = null;
 	let host: HTMLDivElement;
 	let hostWidth = $state(800);
+	let toolbarWidth = $state(0);
+	let toolbarHeight = $state(0);
+	/** Room beside the toolbar for the diagram frame's name; when too little, it goes below. */
+	const frameRoom = $derived(hostWidth - toolbarWidth - 44);
+	const frameBelow = $derived(frameRoom < 112);
 
 	/** Where the person last clicked on the empty canvas (flow coordinates). */
 	let lastClick = $state<XY | null>(null);
@@ -1019,12 +1024,24 @@
 			</ViewportPortal>
 		{/if}
 		{#if frameTitle}
-			<Panel position="top-left">
-				<p class="frame" title="Diagram frame">{frameTitle}</p>
+			<Panel position="top-left" style={frameBelow ? `top: ${toolbarHeight + 10}px` : undefined}>
+				<p
+					class="frame"
+					title="Diagram frame: {frameTitle}"
+					style:max-width="{frameBelow ? hostWidth - 32 : frameRoom}px"
+				>
+					{frameTitle}
+				</p>
 			</Panel>
 		{/if}
 		<Panel position="top-right">
-			<div class="toolbar" role="toolbar" aria-label="Diagram tools">
+			<div
+				class="toolbar"
+				role="toolbar"
+				aria-label="Diagram tools"
+				bind:clientWidth={toolbarWidth}
+				bind:clientHeight={toolbarHeight}
+			>
 				{#if runnable}
 					<button
 						type="button"
@@ -1376,6 +1393,9 @@
 		color: var(--text-2);
 		font-family: var(--font-mono);
 		font-size: 12px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 	.popover.small {
 		display: grid;

@@ -35,6 +35,9 @@ export function interconnectionView(ctx: DiagramContext, scope: string): Diagram
 
 	// Toolkit node id → where it lands.
 	const ends = new Map<string, End>();
+	// Per node: its undirected ports' rows by port path, and how often each starts or ends a connection.
+	const undirected = new Map<string, Map<string, string>>();
+	const uses = new Map<string, { from: number; to: number }>();
 	// An inherited port's node is `usage~port`: its name is the port's.
 	const recordOf = (n: TkGraphNode) => ctx.byId.get(n.id.split('~').pop()!);
 	const nameOf = (n: TkGraphNode) => recordOf(n)?.written ?? labelName(n.label);
@@ -78,8 +81,14 @@ export function interconnectionView(ctx: DiagramContext, scope: string): Diagram
 			for (const c of children) {
 				if (c.kind !== 'port') continue;
 				const portPath = [...path, nameOf(c)].join('.');
-				rows.push([`${c.direction ? `${c.direction} ` : ''}port`, [...path, labelOf(c)].join('.')]);
+				const text = [...path, labelOf(c)].join('.');
+				rows.push([`${c.direction ? `${c.direction} ` : ''}port`, text]);
 				ends.set(c.id, { node: id, port: portPath });
+				if (!c.direction) {
+					const rowsByPort = undirected.get(id) ?? new Map<string, string>();
+					rowsByPort.set(portPath, text);
+					undirected.set(id, rowsByPort);
+				}
 			}
 			for (const c of children) {
 				if (c.kind !== 'block') continue;
@@ -101,6 +110,37 @@ export function interconnectionView(ctx: DiagramContext, scope: string): Diagram
 		const target = ends.get(e.target);
 		if (!source || !target || source.node === target.node) continue;
 		g.edge(source.node, target.node, kind, edgeLabel(e.kind, e.label, source, target));
+		if (kind === 'binding') continue;
+		for (const [end, key] of [
+			[source, 'from'],
+			[target, 'to']
+		] as const) {
+			if (!end.port) continue;
+			const use = uses.get(`${end.node}\u0000${end.port}`) ?? { from: 0, to: 0 };
+			use[key]++;
+			uses.set(`${end.node}\u0000${end.port}`, use);
+		}
+	}
+
+	// A port without a direction sits where its connections run: on the right
+	// when it only starts them, on the left when it only ends them; otherwise a
+	// conjugated port (`~P`, which receives P's outputs) on the left.
+	for (const node of g.graph().nodes) {
+		const rowsByPort = undirected.get(node.id);
+		if (!rowsByPort) continue;
+		const sides: Record<string, 'left' | 'right'> = {};
+		for (const [port, text] of rowsByPort) {
+			const use = uses.get(`${node.id}\u0000${port}`);
+			sides[text] =
+				use && use.from && !use.to
+					? 'right'
+					: use && use.to && !use.from
+						? 'left'
+						: text.includes(': ~')
+							? 'left'
+							: 'right';
+		}
+		node.port_sides = sides;
 	}
 
 	// Connectors the toolkit could not place (a binding to the scope's own
