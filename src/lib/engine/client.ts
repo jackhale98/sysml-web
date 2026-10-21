@@ -37,6 +37,10 @@ export function startEngine(urls: Init): Engine {
 	return {
 		version: (...params) => call('version', ...params),
 		analyze: (...params) => call('analyze', ...params),
+		analyzeProject: (...params) => call('analyzeProject', ...params),
+		highlight: (...params) => call('highlight', ...params),
+		diagram: (...params) => call('diagram', ...params),
+		edit: (...params) => call('edit', ...params),
 		terminate: () => worker.terminate()
 	};
 }

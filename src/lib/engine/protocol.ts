@@ -1,9 +1,25 @@
-import type { Analysis } from './types';
+import type {
+	Analysis,
+	DiagramGraph,
+	DiagramView,
+	EditRequest,
+	EditResult,
+	Highlights
+} from './types';
+
+export interface SourceFile {
+	path: string;
+	text: string;
+}
 
 /** Calls the UI can make into the engine worker, with their results. */
 export interface EngineApi {
 	version(): string;
 	analyze(path: string, source: string): Analysis;
+	analyzeProject(files: SourceFile[]): Analysis[];
+	highlight(source: string): Highlights;
+	diagram(view: DiagramView, files: SourceFile[], scope: string | null): DiagramGraph;
+	edit(request: EditRequest): EditResult;
 }
 
 export type Method = keyof EngineApi;

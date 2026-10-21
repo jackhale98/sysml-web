@@ -8,11 +8,19 @@ SysML text in a git repository is the single source of truth; every change is a
 minimal, reviewable diff that any other conformant tool can read. It runs well
 on desktop and mobile.
 
-Status: **Phase 0 in progress** (see [Decision log](#decision-log)).
-- Engine → WebAssembly: done ([docs/spikes/wasm-engine.md](spikes/wasm-engine.md));
-  `sysml-wasm` builds in `sysml-cli` CI.
-- Element identity: verified against all 404,686 OMG library element ids.
-- Interchange reference: [docs/reference/interchange.md](reference/interchange.md).
+Status: **Phase 0 complete; Phase 2 workbench started on the current engine.**
+- Engine → WebAssembly, element identity (all 404,686 OMG library ids), `.kpar`
+  interchange: merged in `sysml-cli`.
+- Editor services (highlighting, diagram graphs, source edits, project-wide
+  analysis): `sysml-cli` PR #2.
+- Workbench (§7.2): explorer, CodeMirror editor coloured by the engine, live
+  General View beside the text, Add / Rename / Delete on diagrams and in the
+  inspector writing minimal SysML edits, inspector with concept explanations,
+  requirements view, problems, phone layout. Lighthouse: landing 0.98–1 and
+  workbench 0.94 (mobile) / 1.0 (desktop) performance; 1.0 accessibility,
+  best practices and SEO everywhere.
+- Demo model authored for teaching (`src/demo/drone`, guided tour in
+  `TOUR.md`).
 
 ---
 
@@ -599,6 +607,18 @@ Found in Phase 0, to address in Phases 1–2:
   fire on library `requirement def`s.
 - W013 (camelCase) flags quoted titles; it should respect the project's name
   style (§7.3).
+
+Engine gaps found while authoring the demo (inputs to Phase 1):
+- Name resolution does not follow features of imported usages' types
+  (`drone.deliveryFlight.takeOff`, W005); W016 port checks are single-file;
+  W001 ignores references through calc calls, `perform`, `exhibit`, `accept`.
+- Requirement checks fire on library `requirement def`s whose usages are
+  traced; W013 flags quoted titles; trace ignores `#derivation`.
+- The guarded `then decide; if … then a; else b;` form is mis-parsed as an
+  if-action, so flows after the merge are dropped.
+- Interconnection diagrams omit flows, bindings and inherited ports; General
+  View shows only definitions and compositions; view usages are not rendered.
+- `analyze`/`rollup` cannot evaluate subject attributes or usages.
 
 **Phase 1 — Semantic engine core and editor services**
 - Lowering, element graph, resolution, imports, implied relationships,

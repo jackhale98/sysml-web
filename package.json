@@ -17,13 +17,17 @@
 		"format": "prettier --write .",
 		"format:check": "prettier --check .",
 		"test": "vitest run",
-		"test:e2e": "playwright test"
+		"test:e2e": "playwright test",
+		"lighthouse": "npm run lighthouse:mobile && npm run lighthouse:desktop",
+		"lighthouse:mobile": "LH_PRESET=mobile lhci autorun",
+		"lighthouse:desktop": "LH_PRESET=desktop lhci autorun"
 	},
 	"devDependencies": {
 		"@axe-core/playwright": "^4.14.0",
 		"@eslint/js": "^10.0.1",
 		"@fontsource-variable/inter": "^5.3.0",
 		"@fontsource-variable/jetbrains-mono": "^5.3.0",
+		"@lhci/cli": "^0.15.1",
 		"@lucide/svelte": "^1.60.0",
 		"@playwright/test": "^1.64.1",
 		"@sveltejs/adapter-static": "^4.0.0",
@@ -44,5 +48,16 @@
 	},
 	"imports": {
 		"#lib/*": "./src/lib/*"
+	},
+	"dependencies": {
+		"@codemirror/autocomplete": "^6.20.4",
+		"@codemirror/commands": "^6.11.1",
+		"@codemirror/language": "^6.13.1",
+		"@codemirror/lint": "^6.9.7",
+		"@codemirror/search": "^6.7.2",
+		"@codemirror/state": "^6.7.6",
+		"@codemirror/view": "^6.43.15",
+		"@xyflow/svelte": "^1.7.0",
+		"elkjs": "^0.12.0"
 	}
 }

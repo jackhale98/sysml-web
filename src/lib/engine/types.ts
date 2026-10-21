@@ -86,3 +86,85 @@ export interface Analysis {
 	model: Model;
 	diagnostics: Diagnostic[];
 }
+
+/** Result of `highlight(source)`. */
+export interface Highlights {
+	/** Capture names, e.g. `keyword`, `type.definition`. */
+	names: string[];
+	/** Flat `[from, to, nameIndex, …]` in UTF-16 offsets. */
+	spans: number[];
+}
+
+export type DiagramView =
+	'general' | 'interconnection' | 'requirements' | 'states' | 'packages' | 'trace';
+
+export type NodeKind =
+	| 'block'
+	| 'port'
+	| 'state'
+	| 'action'
+	| 'decision'
+	| 'fork'
+	| 'join'
+	| 'requirement'
+	| 'constraint'
+	| 'package'
+	| 'initial_state'
+	| 'final_state'
+	| 'note'
+	| 'use_case'
+	| 'actor'
+	| 'lifeline';
+
+export type EdgeKind =
+	| 'composition'
+	| 'specialization'
+	| 'connection'
+	| 'flow'
+	| 'transition'
+	| 'satisfy'
+	| 'verify'
+	| 'allocate'
+	| 'dependency'
+	| 'containment'
+	| 'constraint_binding'
+	| 'message';
+
+export interface DiagramNode {
+	id: string;
+	label: string;
+	kind: NodeKind;
+	stereotype: string | null;
+	/** Compartment rows: `[keyword, text]`. */
+	attributes: [string, string][];
+	is_definition: boolean;
+}
+
+export interface DiagramEdge {
+	source: string;
+	target: string;
+	label: string | null;
+	kind: EdgeKind;
+}
+
+export interface DiagramGraph {
+	title: string;
+	nodes: DiagramNode[];
+	edges: DiagramEdge[];
+	subgraphs: { id: string; label: string; node_ids: string[] }[];
+	direction: string;
+}
+
+/** A source edit, computed by the engine against the current text. */
+export type EditRequest =
+	| { op: 'insertMember'; path: string; source: string; parent: string; text: string }
+	| { op: 'insertTopLevel'; source: string; text: string }
+	| { op: 'remove'; path: string; source: string; name: string }
+	| { op: 'rename'; path: string; source: string; from: string; to: string };
+
+export interface EditResult {
+	/** Changes in UTF-16 offsets against the source in the request. */
+	changes: { from: number; to: number; insert: string }[];
+	/** Syntax errors the edit would introduce. */
+	syntaxErrors: string[];
+}

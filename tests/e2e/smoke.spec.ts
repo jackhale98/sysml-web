@@ -9,69 +9,100 @@ async function expectAccessible(page: Page) {
 	expect(violations).toEqual([]);
 }
 
-/** The demo is analysed by the WebAssembly engine in a worker. */
-async function waitForAnalysis(page: Page) {
-	await expect(page.getByRole('status')).toContainText('Analysed in', { timeout: 30_000 });
+/** Open the demo and wait for the engine (WebAssembly, in a worker) to read it. */
+async function openDemo(page: Page) {
+	await page.goto('/p/demo');
+	await expect(page.getByRole('status')).toContainText('Model ready', { timeout: 30_000 });
+}
+
+async function openFile(page: Page, name: RegExp) {
+	await page.getByRole('tab', { name: 'Files' }).click();
+	await page.getByRole('button', { name }).click();
+	await expect(page.locator('.cm-content')).toBeVisible();
 }
 
 test('landing page introduces the product and opens the demo', async ({ page }) => {
 	await page.goto('/');
 	await expect(page.getByRole('heading', { level: 1 })).toContainText('Systems engineering');
 	await expectAccessible(page);
-
 	await page.getByRole('link', { name: 'Try the demo' }).click();
 	await expect(page).toHaveURL(/\/p\/demo$/);
 });
 
-test('overview summarises the analysed demo project', async ({ page }) => {
-	await page.goto('/p/demo');
-	await waitForAnalysis(page);
-	await expect(page.getByRole('heading', { level: 1, name: 'Drone UAV' })).toBeVisible();
+test('the workbench shows the model, its health and an explorer', async ({ page }) => {
+	await openDemo(page);
+	await expect(page.getByRole('heading', { name: 'Drone UAV' }).first()).toBeVisible();
 	await expect(page.getByRole('meter', { name: 'Covered by a test' })).toBeVisible();
-	await expect(page.getByRole('heading', { name: 'Needs attention' })).toBeVisible();
+	await expect(page.getByRole('tree', { name: 'Model' })).toContainText('DroneArchitecture');
 	await expectAccessible(page);
 });
 
-test('requirements grid lists, filters and explains requirements', async ({ page }) => {
-	await page.goto('/p/demo/requirements');
-	await waitForAnalysis(page);
+test('text edits redraw the live diagram', async ({ page }) => {
+	await openDemo(page);
+	await openFile(page, /DroneArchitecture/);
+	const diagram = page.getByRole('region', { name: /DroneArchitecture diagram/ });
+	await expect(diagram.locator('.svelte-flow__node').first()).toBeVisible();
 
+	// Type a new part definition inside the package, after its imports.
+	await page.locator('.cm-content').getByText('private import ISQ::*;').click();
+	await page.keyboard.press('End');
+	await page.keyboard.type('\n    part def CargoHook;');
+	await expect(diagram.getByText('CargoHook')).toBeVisible({ timeout: 10_000 });
+});
+
+test('diagram edits write SysML text', async ({ page }) => {
+	await openDemo(page);
+	await openFile(page, /DroneArchitecture/);
+	const diagram = page.getByRole('region', { name: /DroneArchitecture diagram/ });
+	await expect(diagram.locator('.svelte-flow__node').first()).toBeVisible();
+
+	await diagram.getByRole('button', { name: /Add/ }).click();
+	const form = page.getByRole('form', { name: /Add to DroneArchitecture/ });
+	await form.getByLabel('Kind').selectOption('part def');
+	await form.getByLabel('Name').fill('Parachute');
+	await expect(form.getByLabel('SysML that will be added')).toContainText('part def Parachute');
+	await form.getByRole('button', { name: 'Add' }).click();
+
+	await expect(page.locator('.cm-content')).toContainText('part def Parachute', {
+		timeout: 10_000
+	});
+	await expect(diagram.getByText('Parachute')).toBeVisible({ timeout: 10_000 });
+});
+
+test('selecting an element explains it in the inspector', async ({ page }) => {
+	await openDemo(page);
+	await openFile(page, /DroneArchitecture/);
+	await page
+		.getByRole('region', { name: /DroneArchitecture diagram/ })
+		.getByText('DeliveryDrone', { exact: true })
+		.first()
+		.click();
+	const inspector = page.getByRole('complementary', { name: 'Inspector' });
+	await expect(inspector).toContainText('Part definition');
+	await expect(inspector.getByRole('heading', { level: 2 })).toContainText('DeliveryDrone');
+	await expectAccessible(page);
+});
+
+test('requirements view lists requirements with their trace status', async ({ page }) => {
+	await openDemo(page);
+	await page.getByRole('button', { name: /^Requirements/ }).click();
 	const rows = page.locator('tbody tr');
 	await expect(rows.first()).toContainText(/STK|SYS|RC/);
-	const total = await rows.count();
-	expect(total).toBeGreaterThanOrEqual(15);
-
-	await page.getByRole('button', { name: /With gaps/ }).click();
-	expect(await rows.count()).toBeLessThan(total);
-
-	await page.getByRole('button', { name: /^All/ }).click();
+	expect(await rows.count()).toBeGreaterThanOrEqual(15);
 	await page.getByRole('searchbox', { name: 'Search requirements' }).fill('SYS-001');
 	await expect(rows).toHaveCount(1);
-
-	const title = (await rows.first().locator('.title').textContent()) ?? '';
 	await rows.first().getByRole('button').click();
-	const panel = page.getByRole('complementary', { name: title });
-	await expect(panel.getByRole('heading', { level: 2 })).toBeVisible();
-	await panel.getByText('Show SysML').click();
-	await expect(panel.locator('pre')).toContainText("requirement <'SYS-001'>");
-	await expectAccessible(page);
-
-	await page.keyboard.press('Escape');
-	await expect(panel).toBeHidden();
-});
-
-test('model area shows the SysML files and their problems', async ({ page }) => {
-	await page.goto('/p/demo/model');
-	await waitForAnalysis(page);
-	await expect(page.getByRole('navigation', { name: 'Files' })).toContainText('Catalog.sysml');
-	await page.getByRole('button', { name: /System Requirements/ }).click();
-	await expect(page.locator('pre.code')).toContainText('requirement');
+	await expect(page.getByRole('complementary', { name: 'Inspector' })).toContainText('Requirement');
 	await expectAccessible(page);
 });
 
-test('planned areas explain what is coming', async ({ page }) => {
-	await page.goto('/p/demo/risk');
-	await expect(page.getByRole('heading', { level: 1, name: 'Risk' })).toBeVisible();
-	await expect(page.getByText(/Planned for phase/)).toBeVisible();
+test('on a phone, one pane shows at a time', async ({ page }) => {
+	await page.setViewportSize({ width: 390, height: 844 });
+	await openDemo(page);
+	const panes = page.getByRole('navigation', { name: 'Panes' });
+	await panes.getByRole('button', { name: 'Model' }).click();
+	await expect(page.getByRole('tree', { name: 'Model' })).toBeVisible();
+	await panes.getByRole('button', { name: 'Inspector' }).click();
+	await expect(page.getByRole('complementary', { name: 'Inspector' })).toBeVisible();
 	await expectAccessible(page);
 });

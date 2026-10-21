@@ -1,0 +1,453 @@
+<script lang="ts">
+	import { BookOpen, CircleAlert, FileCode, Link2, Plus, Trash2 } from '@lucide/svelte';
+	import { conceptFor } from '#lib/learn/concepts.ts';
+	import type { ModelElement, TreeNode } from '#lib/project/elements.ts';
+	import { displayReference } from '#lib/project/names.ts';
+	import { humanize, statusLabel } from '#lib/project/status.ts';
+	import type { Workspace } from '#lib/project/workspace.svelte.ts';
+	import Pill from '#lib/ui/Pill.svelte';
+	import { addElement, deleteElement, renameElement } from './actions.ts';
+	import AddForm from './AddForm.svelte';
+	import { canOwnMembers } from './templates.ts';
+	import type { WorkbenchUi } from './ui.svelte.ts';
+
+	let { workspace, ui }: { workspace: Workspace; ui: WorkbenchUi } = $props();
+
+	const element: ModelElement | undefined = $derived(
+		workspace.elements.find((e) => e.key === ui.selection?.key)
+	);
+	const concept = $derived(element ? conceptFor(element.kind, element.isDefinition) : undefined);
+	const requirement = $derived(
+		element ? workspace.requirements.find((r) => r.key === element.key) : undefined
+	);
+	const children = $derived.by(() => {
+		if (!element) return [];
+		const find = (nodes: TreeNode[]): TreeNode | undefined => {
+			for (const n of nodes) {
+				if (n.element.key === element.key) return n;
+				const inner = find(n.children);
+				if (inner) return inner;
+			}
+		};
+		return find(workspace.tree)?.children.map((c) => c.element) ?? [];
+	});
+	/** Requirements this element satisfies (matched by name in `satisfy … by`). */
+	const satisfies = $derived(
+		element && !element.isDefinition
+			? workspace.requirements.filter((r) =>
+					r.satisfiedBy.some((by) => by.split('.').pop() === element.label)
+				)
+			: []
+	);
+
+	let name = $state('');
+	let adding = $state(false);
+	let confirmDelete = $state(false);
+	let message = $state<string | null>(null);
+	let learnMore = $state(false);
+
+	$effect(() => {
+		name = element?.label ?? '';
+		adding = false;
+		confirmDelete = false;
+		message = null;
+	});
+
+	async function rename() {
+		if (!element || name.trim() === element.label) return;
+		message = await renameElement(workspace, element, name);
+	}
+
+	function showInText(e: ModelElement) {
+		ui.open({ kind: 'file', path: e.file });
+		ui.select(e.key, 'inspector');
+	}
+</script>
+
+<aside class="inspector" aria-label="Inspector">
+	{#if !element}
+		<div class="empty">
+			<BookOpen size={22} />
+			<p>
+				Select an element in the text, a diagram or the explorer to see what it is and change it.
+			</p>
+		</div>
+	{:else}
+		<header>
+			<span class="kind"
+				>{concept?.title ??
+					humanize(element.isDefinition ? `${element.kind} definition` : element.kind)}</span
+			>
+			<h2>
+				{#if element.shortName}<span class="id">{element.shortName}</span>{/if}
+				{element.label}
+			</h2>
+		</header>
+
+		{#if concept}
+			<section class="concept">
+				<p>{concept.summary}</p>
+				<button
+					type="button"
+					class="link"
+					aria-expanded={learnMore}
+					onclick={() => (learnMore = !learnMore)}
+				>
+					{learnMore ? 'Less' : `What is a ${concept.title.toLowerCase()}?`}
+				</button>
+				{#if learnMore}
+					<p class="explanation">{concept.explanation}</p>
+					{#if concept.analogy}<p class="analogy">{concept.analogy}</p>{/if}
+					<pre aria-label="Example">{concept.example}</pre>
+				{/if}
+			</section>
+		{/if}
+
+		<section>
+			<h3>Properties</h3>
+			<form
+				class="field"
+				onsubmit={(e) => {
+					e.preventDefault();
+					void rename();
+				}}
+			>
+				<label for="inspector-name">Name</label>
+				<div class="inline">
+					<input id="inspector-name" bind:value={name} onblur={rename} />
+				</div>
+			</form>
+			<dl>
+				{#if element.typeRef}
+					<dt>{element.isDefinition ? 'Specializes' : 'Type'}</dt>
+					<dd class="mono">{displayReference(element.typeRef)}</dd>
+				{/if}
+				{#if element.multiplicity}
+					<dt>Multiplicity</dt>
+					<dd class="mono">{element.multiplicity}</dd>
+				{/if}
+				{#if element.value}
+					<dt>Value</dt>
+					<dd class="mono">{element.value}</dd>
+				{/if}
+				<dt>Defined in</dt>
+				<dd>
+					<button type="button" class="link" onclick={() => showInText(element)}>
+						<FileCode size={13} />
+						{element.file}:{element.span.start_row}
+					</button>
+				</dd>
+			</dl>
+			{#if element.doc}<p class="doc">{element.doc}</p>{/if}
+		</section>
+
+		{#if requirement}
+			<section>
+				<h3>Requirement</h3>
+				<p class="status">
+					<Pill tone={statusLabel(requirement.status).tone}
+						>{statusLabel(requirement.status).label}</Pill
+					>
+					{#if requirement.priority}<span>{humanize(requirement.priority)} priority</span>{/if}
+				</p>
+				{#if requirement.rationale}<p class="doc">
+						<strong>Rationale:</strong>
+						{requirement.rationale}
+					</p>{/if}
+				{#each requirement.issues as issue, i (i)}
+					<p class="issue"><CircleAlert size={14} /> {issue}</p>
+				{/each}
+				<h4>Satisfied by</h4>
+				{#if requirement.satisfiedBy.length}
+					<ul class="links">
+						{#each requirement.satisfiedBy as by (by)}<li><Link2 size={13} /> {by}</li>{/each}
+					</ul>
+				{:else}
+					<p class="gap">
+						Nothing in the design satisfies this yet. Add <code>satisfy</code> to link a part.
+					</p>
+				{/if}
+				<h4>Verified by</h4>
+				{#if requirement.verifiedBy.length}
+					<ul class="links">
+						{#each requirement.verifiedBy as by (by)}<li><Link2 size={13} /> {by}</li>{/each}
+					</ul>
+				{:else}
+					<p class="gap">No verification case covers this yet.</p>
+				{/if}
+			</section>
+		{/if}
+
+		{#if satisfies.length}
+			<section>
+				<h3>Satisfies</h3>
+				<ul class="links">
+					{#each satisfies as r (r.key)}
+						<li>
+							<button type="button" class="link" onclick={() => ui.select(r.key, 'inspector')}>
+								{r.id ?? ''}
+								{r.title}
+							</button>
+						</li>
+					{/each}
+				</ul>
+			</section>
+		{/if}
+
+		{#if children.length}
+			<section>
+				<h3>Contains</h3>
+				<ul class="links">
+					{#each children as child (child.key)}
+						<li>
+							<button type="button" class="link" onclick={() => ui.select(child.key, 'inspector')}>
+								<span class="child-kind"
+									>{child.isDefinition ? `${child.kind} def` : child.kind}</span
+								>
+								{child.label}
+							</button>
+						</li>
+					{/each}
+				</ul>
+			</section>
+		{/if}
+
+		<section class="actions">
+			{#if canOwnMembers(element.kind, element.isDefinition)}
+				{#if adding}
+					<AddForm
+						ownerLabel={element.label}
+						kinds={element.kind === 'package'
+							? [
+									'part def',
+									'port def',
+									'item def',
+									'requirement',
+									'action def',
+									'state def',
+									'package'
+								]
+							: ['part', 'port', 'attribute', 'action', 'requirement']}
+						onadd={async (kind, n, type) => {
+							const error = await addElement(workspace, element, kind, n, type);
+							if (!error) adding = false;
+							return error;
+						}}
+						oncancel={() => (adding = false)}
+					/>
+				{:else}
+					<button type="button" class="button" onclick={() => (adding = true)}>
+						<Plus size={15} /> Add to {element.label}
+					</button>
+				{/if}
+			{/if}
+			{#if confirmDelete}
+				<div class="confirm" role="alert">
+					<p>Delete <strong>{element.label}</strong>? References to it will show as problems.</p>
+					<button
+						type="button"
+						class="button danger"
+						onclick={async () => (message = await deleteElement(workspace, element))}
+					>
+						Delete
+					</button>
+					<button type="button" class="button" onclick={() => (confirmDelete = false)}>Keep</button>
+				</div>
+			{:else}
+				<button type="button" class="button quiet" onclick={() => (confirmDelete = true)}>
+					<Trash2 size={15} /> Delete
+				</button>
+			{/if}
+			{#if message}<p class="error" role="alert">{message}</p>{/if}
+		</section>
+	{/if}
+</aside>
+
+<style>
+	.inspector {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-4);
+		height: 100%;
+		overflow-y: auto;
+		padding: var(--space-4);
+		font-size: var(--text-sm);
+	}
+	.empty {
+		display: grid;
+		justify-items: center;
+		gap: var(--space-3);
+		margin-top: 20vh;
+		text-align: center;
+		color: var(--text-3);
+	}
+	.kind {
+		color: var(--accent);
+		font-size: var(--text-xs);
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+	}
+	h2 {
+		margin-top: 2px;
+		font-size: var(--text-lg);
+		word-break: break-word;
+	}
+	.id {
+		margin-right: var(--space-1);
+		color: var(--text-3);
+		font-family: var(--font-mono);
+		font-size: var(--text-sm);
+		font-weight: 500;
+	}
+	h3 {
+		margin-bottom: var(--space-2);
+		font-size: var(--text-xs);
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		color: var(--text-3);
+	}
+	h4 {
+		margin: var(--space-3) 0 var(--space-1);
+		font-size: var(--text-sm);
+		color: var(--text-2);
+	}
+	.concept {
+		padding: var(--space-3);
+		border-radius: var(--radius-md);
+		background: var(--accent-weak);
+		color: var(--text);
+	}
+	.explanation,
+	.analogy {
+		margin-top: var(--space-2);
+		color: var(--text-2);
+	}
+	.analogy {
+		font-style: italic;
+	}
+	pre {
+		margin: var(--space-2) 0 0;
+		padding: var(--space-2) var(--space-3);
+		border-radius: var(--radius-sm);
+		background: var(--surface);
+		font-size: 12px;
+		white-space: pre-wrap;
+	}
+	.link {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		padding: 0;
+		border: 0;
+		background: transparent;
+		color: var(--accent);
+		text-align: left;
+		cursor: pointer;
+	}
+	.field {
+		display: grid;
+		gap: var(--space-1);
+		margin-bottom: var(--space-3);
+	}
+	.field label {
+		color: var(--text-3);
+	}
+	.field input {
+		width: 100%;
+		height: 2.125rem;
+		padding: 0 var(--space-2);
+		border: 1px solid var(--border-strong);
+		border-radius: var(--radius-sm);
+		background: var(--surface);
+		color: var(--text);
+		font-weight: 560;
+	}
+	dl {
+		display: grid;
+		grid-template-columns: max-content 1fr;
+		gap: var(--space-2) var(--space-3);
+		margin: 0;
+	}
+	dt {
+		color: var(--text-3);
+	}
+	dd {
+		margin: 0;
+		min-width: 0;
+		overflow-wrap: anywhere;
+	}
+	.doc {
+		margin-top: var(--space-3);
+		color: var(--text-2);
+		line-height: 1.55;
+	}
+	.status {
+		display: flex;
+		align-items: center;
+		gap: var(--space-2);
+		color: var(--text-2);
+	}
+	.issue,
+	.gap {
+		display: flex;
+		gap: var(--space-1);
+		color: var(--warn);
+	}
+	ul {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: grid;
+		gap: var(--space-1);
+	}
+	.links li {
+		display: flex;
+		align-items: center;
+		gap: var(--space-1);
+		color: var(--text-2);
+	}
+	.child-kind {
+		color: var(--text-3);
+		font-size: var(--text-xs);
+	}
+	.actions {
+		display: grid;
+		gap: var(--space-2);
+		margin-top: auto;
+		padding-top: var(--space-3);
+		border-top: 1px solid var(--border);
+	}
+	.button {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: var(--space-2);
+		height: 2.25rem;
+		padding: 0 var(--space-3);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-sm);
+		background: var(--surface);
+		color: var(--text);
+		font-weight: 550;
+		cursor: pointer;
+	}
+	.button:hover {
+		border-color: var(--border-strong);
+	}
+	.quiet {
+		color: var(--text-2);
+	}
+	.danger {
+		border-color: var(--danger);
+		background: var(--danger);
+		color: #fff;
+	}
+	.confirm {
+		display: grid;
+		gap: var(--space-2);
+	}
+	.error {
+		color: var(--danger);
+	}
+</style>

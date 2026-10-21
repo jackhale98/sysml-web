@@ -1,9 +1,16 @@
 /**
- * The open project: its files, the engine's analysis of each, and the
- * plain-language views derived from them.
+ * The open project: its files (editable), the engine's analysis of each, and
+ * the views derived from them.
+ *
+ * Text is the source of truth. Every change — typed in an editor or made on
+ * a diagram — updates a file's text; the file is then re-analysed. Changes
+ * computed by the engine are routed through the file's open editor when
+ * there is one, so they join its undo history.
  */
+import { SvelteSet } from 'svelte/reactivity';
 import type { Engine } from '#lib/engine/client.ts';
-import type { Analysis, Diagnostic } from '#lib/engine/types.ts';
+import type { Analysis, Diagnostic, EditRequest, EditResult } from '#lib/engine/types.ts';
+import { buildTree, collectElements, type ModelElement, type TreeNode } from './elements';
 import { collectRequirements, type RequirementRow } from './requirements';
 
 export interface ProjectFile {
@@ -37,16 +44,40 @@ export interface Coverage {
 	verified: number;
 }
 
+export type Change = EditResult['changes'][number];
+
+/** An open editor that can apply engine changes to its document. */
+export interface EditorHandle {
+	apply(changes: Change[]): void;
+}
+
 /** Files the engine analyses. */
 export function isModelFile(path: string): boolean {
 	return path.endsWith('.sysml') || path.endsWith('.kerml');
 }
 
+/** Folders whose packages are libraries rather than the user's model. */
+export function isLibraryFile(path: string): boolean {
+	return path.startsWith('libraries/');
+}
+
+const ANALYSIS_DELAY_MS = 250;
+
 export class Workspace {
-	source = $state.raw<ProjectSource | null>(null);
+	info = $state.raw<ProjectInfo | null>(null);
+	/** File texts by path. */
+	files = $state.raw<Record<string, string>>({});
 	analyses = $state.raw<Record<string, Analysis>>({});
 	state = $state.raw<LoadState>({ phase: 'idle' });
 	engineVersion = $state<string | null>(null);
+	/** Paths edited since the project was opened. */
+	readonly dirty = new SvelteSet<string>();
+
+	paths: string[] = $derived(Object.keys(this.files).sort());
+	modelPaths: string[] = $derived(this.paths.filter(isModelFile));
+
+	elements: ModelElement[] = $derived(collectElements(Object.values(this.analyses)));
+	tree: TreeNode[] = $derived(buildTree(this.elements));
 
 	requirements: RequirementRow[] = $derived(collectRequirements(Object.values(this.analyses)));
 
@@ -72,34 +103,100 @@ export class Workspace {
 			.sort((a, b) => severityRank(a.severity) - severityRank(b.severity))
 	);
 
-	modelFiles: ProjectFile[] = $derived(
-		(this.source?.files ?? []).filter((f) => isModelFile(f.path))
-	);
-
-	file(path: string): ProjectFile | undefined {
-		return this.source?.files.find((f) => f.path === path);
-	}
+	private engine: Engine | null = null;
+	// Bookkeeping, deliberately not reactive.
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity
+	private editors = new Map<string, EditorHandle>();
+	private timer: ReturnType<typeof setTimeout> | undefined;
+	private generation = 0;
 
 	async open(source: ProjectSource, engine: Engine) {
-		this.source = source;
+		const generation = ++this.generation;
+		this.engine = engine;
+		this.info = source.info;
+		this.files = Object.fromEntries(source.files.map((f) => [f.path, f.text]));
 		this.analyses = {};
-		const files = source.files.filter((f) => isModelFile(f.path));
-		this.state = { phase: 'loading', done: 0, total: files.length };
+		this.dirty.clear();
+		this.state = { phase: 'loading', done: 0, total: this.modelPaths.length };
 		const started = performance.now();
 		try {
 			this.engineVersion = await engine.version();
-			const analyses: Record<string, Analysis> = {};
-			for (const [index, file] of files.entries()) {
-				analyses[file.path] = await engine.analyze(file.path, file.text);
-				this.state = { phase: 'loading', done: index + 1, total: files.length };
-			}
-			if (this.source !== source) return; // another project was opened meanwhile
-			this.analyses = analyses;
+			await this.analyse();
+			if (generation !== this.generation) return;
 			this.state = { phase: 'ready', millis: performance.now() - started };
 		} catch (error) {
 			this.state = { phase: 'error', message: String(error) };
 		}
 	}
+
+	/** Analyse every model file together, so references resolve across files. */
+	private async analyse() {
+		const engine = this.engine;
+		if (!engine) return;
+		const files = this.sourceFiles();
+		const results = await engine.analyzeProject(files);
+		// Drop the result if any file changed while the engine was working.
+		if (files.some((f) => this.files[f.path] !== f.text)) return;
+		this.analyses = Object.fromEntries(files.map((f, i) => [f.path, results[i]!]));
+	}
+
+	text(path: string): string | undefined {
+		return this.files[path];
+	}
+
+	/** Record new text for a file (typed or applied) and re-analyse shortly. */
+	setText(path: string, text: string) {
+		if (this.files[path] === text) return;
+		this.files = { ...this.files, [path]: text };
+		this.dirty.add(path);
+		if (!isModelFile(path)) return;
+		clearTimeout(this.timer);
+		this.timer = setTimeout(() => void this.analyse(), ANALYSIS_DELAY_MS);
+	}
+
+	/** Editors register while open so engine edits go through their history. */
+	attachEditor(path: string, handle: EditorHandle): () => void {
+		this.editors.set(path, handle);
+		return () => {
+			if (this.editors.get(path) === handle) this.editors.delete(path);
+		};
+	}
+
+	/**
+	 * Ask the engine for an edit and apply it. Returns an error message when
+	 * the engine refuses or the edit would introduce syntax errors.
+	 */
+	async edit(path: string, request: EditRequest): Promise<string | null> {
+		if (!this.engine) return 'The engine is not ready yet.';
+		let result: EditResult;
+		try {
+			result = await this.engine.edit(request);
+		} catch (error) {
+			return error instanceof Error ? error.message : String(error);
+		}
+		if (result.syntaxErrors.length) {
+			return `That change would make the SysML invalid: ${result.syntaxErrors[0]}`;
+		}
+		if (this.files[path] !== request.source) return 'The file changed meanwhile; try again.';
+		const editor = this.editors.get(path);
+		if (editor) editor.apply(result.changes);
+		else this.setText(path, applyChanges(request.source, result.changes));
+		return null;
+	}
+
+	/** Every model file, for project-wide engine calls such as diagrams. */
+	sourceFiles(): ProjectFile[] {
+		return this.modelPaths.map((path) => ({ path, text: this.files[path] ?? '' }));
+	}
+}
+
+/** Apply non-overlapping changes (UTF-16 offsets) to a string. */
+export function applyChanges(text: string, changes: Change[]): string {
+	let result = text;
+	for (const change of [...changes].sort((a, b) => b.from - a.from)) {
+		result = result.slice(0, change.from) + change.insert + result.slice(change.to);
+	}
+	return result;
 }
 
 function severityRank(severity: Diagnostic['severity']): number {
