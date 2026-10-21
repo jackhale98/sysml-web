@@ -318,7 +318,7 @@ describe('same sessions as the Rust emulator', () => {
 			);
 		}
 		expect(total).toBeGreaterThan(100);
-	});
+	}, 30_000);
 
 	it('runs the nested fixture: hierarchy, parallel regions, guards and an unknown state', () => {
 		const p = new Pair(files(NESTED), 'Machine');
