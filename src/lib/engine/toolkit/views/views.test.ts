@@ -719,7 +719,7 @@ describe('the demo’s tables', () => {
 			'navigationIntegrityMonitor',
 			'rotorHealthMonitor'
 		]);
-		expect(trace.rows[4]).toEqual(['SYS-002 Payload capacity', '', '', '', '', '1', '', '', '']);
+		expect(trace.rows[4]).toEqual(['SYS-002 Payload capacity', '', '1', '', '', '', '', '', '']);
 		const verification = table('VerificationMatrix');
 		expect(shape(verification)).toEqual([9, 7]);
 		expect(verification.rows[8]).toEqual([
@@ -820,7 +820,7 @@ describe('the demo’s tables', () => {
 		expect(bom.sources[13]).toEqual({
 			element: 'DroneComponents::Rotor::motor',
 			file: 'system/Components.sysml',
-			line: 54
+			line: 60
 		});
 		const drone = table('droneBillOfMaterials');
 		// `expose DroneArchitecture::drone::**` exposes the drone too (13 rows before).
@@ -853,7 +853,7 @@ describe('the demo’s tables', () => {
 		const row = (kind: string) => stats.rows.find((r) => r[0] === kind);
 		expect(row('part def')).toEqual(['part def', '19', '0']);
 		expect(row('requirement')).toEqual(['requirement', '0', '20']);
-		expect(row('attribute')).toEqual(['attribute', '0', '159']);
+		expect(row('attribute')).toEqual(['attribute', '0', '169']);
 		// Enum literals count as usages, metadata annotations are anonymous.
 		expect(row('enum')).toEqual(['enum', '0', '31']);
 		expect(row('metadata')).toBeUndefined();

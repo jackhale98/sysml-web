@@ -410,12 +410,12 @@ describe('requirement views', () => {
 			"batteryManagementSystem -satisfy-> 'Battery thermal protection' (<<satisfy>>)",
 			"drone -satisfy-> 'Flight endurance' (<<satisfy>>)",
 			"drone -satisfy-> 'Maximum take-off mass' (<<satisfy>>)",
+			"drone -satisfy-> 'Payload capacity' (<<satisfy>>)",
 			"flightController -satisfy-> 'Geofencing' (<<satisfy>>)",
 			"flightController -satisfy-> 'Return to home' (<<satisfy>>)",
 			"flightController -satisfy-> 'Wind tolerance' (<<satisfy>>)",
 			"navigationIntegrityMonitor -satisfy-> 'Navigation integrity monitoring' (<<satisfy>>)",
 			"payloadRelease -satisfy-> 'Controlled parcel release' (<<satisfy>>)",
-			"payloadRelease -satisfy-> 'Payload capacity' (<<satisfy>>)",
 			"radio -satisfy-> 'Command and telemetry link' (<<satisfy>>)",
 			"rotorHealthMonitor -satisfy-> 'Rotor health monitoring' (<<satisfy>>)"
 		]);

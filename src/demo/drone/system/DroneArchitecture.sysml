@@ -62,7 +62,10 @@ package DroneArchitecture {
         attribute :>> emptyMass = airframe.mass + battery.mass + powerDistribution.mass
             + sum(rotors.mass) + flightController.mass + gnss.mass + radio.mass
             + camera.mass + payloadRelease.mass;
-        attribute :>> hoverPower = 400 [W] { doc /* Measured on the thrust stand at full take-off mass. */ }
+        attribute :>> hoverPower = 400 [W] {
+            doc /* Measured on the thrust stand at full take-off mass. The power budget
+                 * (DroneViews::dronePowerBudget) adds up 397 W from the components. */
+        }
         attribute :>> endurance = HoverEndurance(battery.usableEnergy, hoverPower);
     }
 }

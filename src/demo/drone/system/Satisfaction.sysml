@@ -10,7 +10,7 @@ package RequirementSatisfaction {
     private import DroneArchitecture::drone;
 
     satisfy 'Flight endurance' by drone;
-    satisfy 'Payload capacity' by drone.payloadRelease;
+    satisfy 'Payload capacity' by drone;
     satisfy 'Maximum take-off mass' by drone;
     satisfy 'Wind tolerance' by drone.flightController;
     satisfy 'Geofencing' by drone.flightController;

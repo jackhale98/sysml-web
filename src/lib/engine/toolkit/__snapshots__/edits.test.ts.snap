@@ -91,7 +91,7 @@ exports[`edits > keeps the unit of a number 1`] = `
 
 exports[`edits > lays out a doc comment like the one it replaces 1`] = `
 "-         doc /* One propulsion unit: speed controller, motor and propeller, replaced as one unit.
--              * Its mass is the sum of its own parts. */
+-              * Its mass and its power draw add up those of its own parts. */
 +         doc /* One unit.
 +              * Two lines. */"
 `;
@@ -154,6 +154,7 @@ exports[`edits > renames a definition in its file 1`] = `
 -     part def SpeedController :> Component {
 -         doc /* Turns battery power into motor current at the commanded speed. */
 -         attribute :>> mass = 35 [g];
+-         attribute :>> powerDraw = 3 [W] { doc /* Switching losses at hover throttle. */ }
 -         port powerIn : ~PowerPort;
 -         port control : ~MotorControlPort;
 -     }
@@ -161,6 +162,7 @@ exports[`edits > renames a definition in its file 1`] = `
 -     part def Motor :> Component {
 -         doc /* Brushless outrunner motor. */
 -         attribute :>> mass = 120 [g];
+-         attribute :>> powerDraw = 92 [W] { doc /* At hover thrust with the full take-off mass. */ }
 -         attribute maxPower :> power = 450 [W];
 -     }
 - 
@@ -176,6 +178,7 @@ exports[`edits > renames a definition in its file 1`] = `
 +     part def SpeedController :> Component {
 +         doc /* Turns battery power into motor current at the commanded speed. */
 +         attribute :>> mass = 35 [g];
++         attribute :>> powerDraw = 3 [W] { doc /* Switching losses at hover throttle. */ }
 +         port powerIn : ~PowerPort;
 +         port control : ~MotorControlPort;
 +     }
@@ -183,6 +186,7 @@ exports[`edits > renames a definition in its file 1`] = `
 +     part def Motor :> Component {
 +         doc /* Brushless outrunner motor. */
 +         attribute :>> mass = 120 [g];
++         attribute :>> powerDraw = 92 [W] { doc /* At hover thrust with the full take-off mass. */ }
 +         attribute maxPower :> power = 450 [W];
 +     }
 + 

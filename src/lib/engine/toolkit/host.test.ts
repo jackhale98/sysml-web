@@ -32,25 +32,37 @@ describe('the demo, analysed by the toolkit', () => {
 		expect(analyses.map((a) => a.model.file)).toEqual(files.map((f) => f.path));
 	});
 
-	it('finds exactly the two real problems', () => {
+	it('finds no problems', () => {
+		// The demo had two genuine ones, `estimate.takeOffMass` and `estimate.endurance` in
+		// `DronePerformance`: the analyses' `subject estimate = drone;` had no type, so its
+		// features didn't resolve. The subject is typed (`: DeliveryDrone`) now, which the
+		// budgets need anyway; problems on broken text are tested below.
 		const problems = analyses.flatMap((a) => [...a.model.syntax_errors, ...a.diagnostics]);
-		expect(problems).toHaveLength(2);
-		const [first, second] = analyses.find(
-			(a) => a.model.file === 'analysis/Performance.sysml'
-		)!.diagnostics;
-		// `subject estimate = drone;` has no type, so `estimate.takeOffMass` can't resolve.
+		expect(problems).toEqual([]);
+	});
+
+	it('reports an unresolved reference at its UTF-16 and byte range', () => {
+		const path = 'analysis/Performance.sysml';
+		const source = text(path).replaceAll(
+			'subject estimate : DeliveryDrone = drone;',
+			'subject estimate = drone;'
+		);
+		const result = host.analyzeProject(
+			files.map((f) => (f.path === path ? { ...f, text: source } : f))
+		);
+		const [first, second] = result.find((a) => a.model.file === path)!.diagnostics;
 		expect(first).toMatchObject({
 			severity: 'warning',
 			code: 'referential',
 			message: 'unresolved reference `takeOffMass`',
-			span: { start_row: 29 }
+			span: { start_row: 30 }
 		});
 		expect(second?.message).toBe('unresolved reference `endurance`');
-		const source = text('analysis/Performance.sysml');
 		expect(source.slice(first!.span.from, first!.span.to)).toBe('takeOffMass');
 		expect(new TextIndex(source).sliceBytes(first!.span.start_byte, first!.span.end_byte)).toBe(
 			'takeOffMass'
 		);
+		host.analyzeProject(files);
 	});
 
 	it('does not report connected ports as unconnected (the earlier engine: 19 false W016)', () => {
@@ -139,7 +151,8 @@ describe('the demo, analysed by the toolkit', () => {
 			verifiedBy: ['enduranceFlightTest']
 		});
 		expect(endurance.rationale).toMatch(/^A 3 km delivery/);
-		expect(requirements.find((r) => r.id === 'SYS-002')?.satisfiedBy).toEqual([
+		expect(requirements.find((r) => r.id === 'SYS-002')?.satisfiedBy).toEqual(['drone']);
+		expect(requirements.find((r) => r.id === 'SYS-011')?.satisfiedBy).toEqual([
 			'drone.payloadRelease'
 		]);
 		// The two open gaps the demo describes.
@@ -238,10 +251,7 @@ describe('broken text', () => {
 		);
 		expect(syntax).toHaveLength(1);
 		expect(syntax[0]!.message).toMatch(/expected `}`.*\(\d+ follow-on problems are hidden/);
-		expect(diagnostics.map((d) => d.message).sort()).toEqual([
-			'unresolved reference `endurance`',
-			'unresolved reference `takeOffMass`'
-		]);
+		expect(diagnostics).toEqual([]);
 	});
 
 	it('shows only the first of a burst of parse errors, at the right place', () => {
@@ -267,9 +277,9 @@ describe('broken text', () => {
 			analyse(original.replace('port powerOut : PowerPort;', 'port powerOut : PowerPort'))
 		);
 		expect(syntax).toHaveLength(1);
-		expect(syntax[0]!.span.start_row).toBe(35);
+		expect(syntax[0]!.span.start_row).toBe(39);
 		// `powerOut` (dropped by the repair) no longer resolving elsewhere is hidden too.
-		expect(diagnostics).toHaveLength(2);
+		expect(diagnostics).toEqual([]);
 	});
 
 	it('reports positions in UTF-16 for text with multi-byte characters', () => {

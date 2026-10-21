@@ -134,7 +134,8 @@ function followsFromRepair(f: TkFinding, unit: UnitInfo, brokenWords: Set<string
 /** Identifiers and quoted names in a text. */
 function words(text: string): Set<string> {
 	const out = new Set<string>();
-	for (const m of text.matchAll(/'((?:[^'\\]|\\.)*)'|[A-Za-z_][A-Za-z0-9_]*/g))
+	// A quoted name ends on its line: an apostrophe in a comment doesn't open one.
+	for (const m of text.matchAll(/'((?:[^'\\\n]|\\.)*)'|[A-Za-z_][A-Za-z0-9_]*/g))
 		out.add(m[1] ?? m[0]);
 	return out;
 }

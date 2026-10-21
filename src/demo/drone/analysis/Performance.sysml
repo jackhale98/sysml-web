@@ -8,6 +8,7 @@ package DronePerformance {
 
     private import ISQ::*;
     private import SI::*;
+    private import DroneArchitecture::DeliveryDrone;
     private import DroneArchitecture::drone;
 
     calc def HoverEndurance {
@@ -21,7 +22,7 @@ package DronePerformance {
     analysis massBudget {
         doc /* Adds up the component masses and compares the take-off mass with its limit.
              * Expected result: 2.77 kg empty + 1 kg payload = 3.77 kg, a margin of 0.23 kg. */
-        subject estimate = drone;
+        subject estimate : DeliveryDrone = drone;
         objective {
             doc /* Show that 'Maximum take-off mass' (SYS-003) is met, and how much margin is left. */
         }
@@ -32,7 +33,7 @@ package DronePerformance {
     analysis enduranceBudget {
         doc /* Estimates the endurance before the first flight test.
              * Expected result: 216 W*h x 0.85 / 400 W = 27.5 min, a margin of 2.5 min. */
-        subject estimate = drone;
+        subject estimate : DeliveryDrone = drone;
         objective {
             doc /* Show that 'Flight endurance' (SYS-001) can be met, and how much margin is left. */
         }

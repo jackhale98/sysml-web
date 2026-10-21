@@ -384,7 +384,8 @@ describe('edits the app makes although references break', () => {
 		const { text, result } = ours({ op: 'remove', path: C, name: 'Motor' });
 		expect(text).not.toContain('part def Motor');
 		expect(result.warning).toBe(
-			'2 references to Motor no longer resolve (DroneComponents::Rotor::motor).'
+			// `part motor : Motor`, and `motor.mass` and `motor.powerDraw` through it.
+			'3 references to Motor no longer resolve (DroneComponents::Rotor::motor).'
 		);
 	});
 
@@ -484,15 +485,15 @@ describe('addressing', () => {
 	});
 
 	it('picks the element declared on the given line among same-named ones', () => {
-		// Several components declare `powerIn`; line 41 is the distribution board's.
+		// Several components declare `powerIn`; line 46 is the distribution board's.
 		const { text } = ours({
 			op: 'setDeclaration',
 			path: C,
 			element: 'powerIn',
-			line: 41,
+			line: 46,
 			set: { direction: 'in' }
 		});
-		expect(text.split('\n')[40]).toBe('        in port powerIn : ~PowerPort;');
+		expect(text.split('\n')[45]).toBe('        in port powerIn : ~PowerPort;');
 	});
 });
 
