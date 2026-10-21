@@ -5,13 +5,7 @@
  * `scripts/build-engine.sh`, so it is not part of the app bundle.
  */
 import type { ClassicMethod, Init, Request, Response, SourceFile } from './protocol';
-import type {
-	Analysis,
-	DiagramGraph,
-	Highlights,
-	RenderedTable,
-	ViewInfo
-} from './types';
+import type { Analysis, DiagramGraph, Highlights, RenderedTable, ViewInfo } from './types';
 
 interface Wasm {
 	default(options: { module_or_path: string }): Promise<unknown>;
