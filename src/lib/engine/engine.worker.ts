@@ -4,15 +4,8 @@
  * wasm-bindgen glue is loaded at runtime from `static/engine/`, built by
  * `scripts/build-engine.sh`, so it is not part of the app bundle.
  */
-import type { Init, Method, Request, Response, SourceFile } from './protocol';
-import type {
-	Analysis,
-	EditResult,
-	Highlights,
-	RenderedTable,
-	StateMachine,
-	ViewInfo
-} from './types';
+import type { ClassicMethod, Init, Request, Response, SourceFile } from './protocol';
+import type { Analysis, EditResult, Highlights, RenderedTable, ViewInfo } from './types';
 
 interface Wasm {
 	default(options: { module_or_path: string }): Promise<unknown>;
@@ -33,7 +26,6 @@ interface Wasm {
 	outline(files: string, path: string): string;
 	format(source: string): string;
 	codeActions(files: string, path: string, from: number, to: number): string;
-	stateMachines(files: string): string;
 }
 
 const scope = self as unknown as DedicatedWorkerGlobalScope;
@@ -54,10 +46,7 @@ function cachedFiles(files: unknown): string {
 	return lastFiles.json;
 }
 
-/** Methods the toolkit answers instead (`TOOLKIT_METHODS`) whose classic route is gone. */
-type Moved = 'diagram';
-
-const handlers: { [M in Exclude<Method, Moved>]: (wasm: Wasm, ...params: never[]) => unknown } = {
+const handlers: { [M in ClassicMethod]: (wasm: Wasm, ...params: never[]) => unknown } = {
 	version: (wasm) => wasm.version(),
 	analyze: (wasm, path: string, source: string): Analysis =>
 		JSON.parse(wasm.analyze(path, source)) as Analysis,
@@ -87,9 +76,7 @@ const handlers: { [M in Exclude<Method, Moved>]: (wasm: Wasm, ...params: never[]
 	elementDetails: (wasm, files: unknown, path: string, line: number, element: string | null) =>
 		JSON.parse(wasm.elementDetails(cachedFiles(files), path, line, element)) as unknown,
 	codeActions: (wasm, files: unknown, path: string, from: number, to: number) =>
-		JSON.parse(wasm.codeActions(cachedFiles(files), path, from, to)) as unknown,
-	stateMachines: (wasm, files: unknown): StateMachine[] =>
-		JSON.parse(wasm.stateMachines(JSON.stringify(files))) as StateMachine[]
+		JSON.parse(wasm.codeActions(cachedFiles(files), path, from, to)) as unknown
 };
 
 scope.onmessage = async (event: MessageEvent<Init | Request>) => {
@@ -102,9 +89,9 @@ scope.onmessage = async (event: MessageEvent<Init | Request>) => {
 	try {
 		if (!engine) throw new Error('engine not initialised');
 		const wasm = await engine;
-		const handler = handlers[message.method as Exclude<Method, Moved>] as
+		const handler = handlers[message.method as ClassicMethod] as
 			((wasm: Wasm, ...params: unknown[]) => unknown) | undefined;
-		if (!handler) throw new Error(`${message.method} is answered by the toolkit`);
+		if (!handler) throw new Error(`the classic engine no longer serves ${message.method}`);
 		response = { id: message.id, ok: true, result: handler(wasm, ...message.params) };
 	} catch (error) {
 		response = { id: message.id, ok: false, error: String(error) };

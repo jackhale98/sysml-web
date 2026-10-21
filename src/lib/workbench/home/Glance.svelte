@@ -26,7 +26,8 @@
 		<h3 id="glance-heading">Model at a glance</h3>
 		<p class="hint">Choose a family to see what is in it.</p>
 	</div>
-	<ul class="strip">
+	<!-- A swipeable row of cards: the one place on a phone meant to scroll sideways. -->
+	<ul class="strip" data-scroll-x>
 		{#each families as f (f.family)}
 			<li>
 				<button

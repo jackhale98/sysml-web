@@ -1,4 +1,4 @@
-/** Machines as the engine returns them, for tests. */
+/** Machines as the engine extracts them, and SysML sources of machines, for tests. */
 import type { StateMachine } from '#lib/engine/types.ts';
 
 export const flightModes: StateMachine = {
@@ -12,7 +12,7 @@ export const flightModes: StateMachine = {
 			name: 'entry',
 			label: 'entry',
 			kind: 'initial',
-			line: 19
+			line: 25
 		},
 		{
 			name: 'idle',
@@ -63,7 +63,7 @@ export const flightModes: StateMachine = {
 		{
 			from: 'entry',
 			to: 'idle',
-			line: 19
+			line: 25
 		},
 		{
 			name: 'arm',
@@ -382,3 +382,123 @@ export const nestedMachine: StateMachine = {
 	],
 	warnings: ['transition: unknown state `fin`']
 };
+
+// ---------------------------------------------------------------- SysML sources
+
+/** Change triggers, assignments in entry actions, a final state. */
+export const LAMP = `package Home {
+    item def Toggle;
+    state def Lamp {
+        attribute brightness : Real = 0.5;
+        attribute switches : Integer = 0;
+        entry; then off;
+        state off;
+        state on { entry assign switches := switches + 1; }
+        transition turnOn first off accept Toggle if brightness > 0 then on;
+        transition turnOff first on accept Toggle then off;
+        transition burnOut first on accept when switches > 1 then done;
+    }
+}`;
+
+/** Completion transitions and guards that read assigned values. */
+export const COUNTER = `state def Counter {
+    attribute count : Integer = 0;
+    attribute limit : Integer = 2;
+    entry; then idle;
+    state idle { entry assign count := count + 1; }
+    state busy;
+    transition start first idle accept Go if count < limit then busy;
+    transition finish first busy then idle;
+    transition overflow first idle accept when count >= limit then done;
+}`;
+
+/** A parallel state whose regions take the same event. */
+export const DRONE = `state def Drone {
+    attribute log : Integer = 0;
+    entry; then off;
+    state off;
+    state on parallel {
+        exit action { assign log := log + 100; }
+        state motors {
+            entry; then idle;
+            state idle;
+            state spinning { entry assign log := log + 1; }
+            transition first idle accept Spin then spinning;
+            transition first spinning accept Halt then idle;
+        }
+        state camera {
+            entry; then standby;
+            state standby;
+            state recording;
+            transition first standby accept Spin then recording;
+            transition first recording accept Snap then standby;
+        }
+    }
+    transition first off accept Start then on;
+    transition first on accept Stop then off;
+}`;
+
+/** The emulator fixture `nestedMachine` as SysML. */
+export const NESTED = `package P {
+    state def Machine {
+        attribute count : Integer = 0;
+        attribute mode : String = "a";
+        entry; then off;
+
+        state off;
+        state on {
+            entry; then low;
+            entry action beep;
+            exit action boop;
+            state low;
+            state high;
+            transition up first low accept Go if count > 2 do action inc then high;
+            transition down first high accept Stop then low;
+        }
+        state par parallel {
+            state motors {
+                entry; then idle;
+                state idle; state spinning;
+                transition first idle accept Spin then spinning;
+            }
+            state lights {
+                entry; then dark;
+                state dark; state lit;
+                transition first dark accept Light then lit;
+            }
+        }
+        state done;
+        transition first off accept Power then on;
+        transition first on accept Par then par;
+        transition first par accept Finish then done;
+        transition first on accept Off then off;
+        transition first done then fin;
+    }
+}`;
+
+/** Composite states that finish (final states in regions) and effects that assign. */
+export const MISSION = `package M {
+    item def Go; item def Abort;
+    state def Mission {
+        attribute fuel : Real = 10;
+        attribute legs : Integer = 0;
+        attribute ok : Boolean = true;
+        entry; then ground;
+        state ground;
+        state travel {
+            entry; then outbound;
+            exit action { assign legs := legs + 10; }
+            state outbound { do action { assign fuel := fuel - 2.5; } }
+            state inbound;
+            state holding;
+            transition first outbound accept Go do assign legs := legs + 1 then inbound;
+            transition first inbound if fuel > 4 then holding;
+            transition first inbound accept when fuel <= 4 then holding;
+            transition first holding accept Home then done;
+        }
+        transition launch first ground accept Go if ok and fuel >= 5 then travel;
+        transition landed first travel then ground;
+        transition abort first travel accept Abort do assign ok := false then ground;
+        transition retire first ground accept when not ok then done;
+    }
+}`;

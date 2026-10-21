@@ -23,7 +23,9 @@ export const TOOLKIT_METHODS = [
 	'outline',
 	'codeActions',
 	// Phase 5: diagrams.
-	'diagram'
+	'diagram',
+	// Phase 6: state machines for the emulator.
+	'stateMachines'
 ] as const satisfies readonly (keyof EngineApi)[];
 
 export type ToolkitMethod = (typeof TOOLKIT_METHODS)[number];
