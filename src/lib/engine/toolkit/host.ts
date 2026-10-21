@@ -11,6 +11,7 @@
 import type { SourceFile } from '../protocol';
 import type {
 	Analysis,
+	CheckReport,
 	CodeAction,
 	Completion,
 	DefinitionTarget,
@@ -20,6 +21,7 @@ import type {
 	EditRequest,
 	EditResult,
 	ElementDetails,
+	Evaluated,
 	FileChange,
 	FileRange,
 	Highlights,
@@ -41,6 +43,7 @@ import type {
 import { toProblems } from './diagnostics';
 import { buildDiagram } from './diagrams';
 import { ModelEditing } from './edits';
+import { Evaluation } from './evaluation';
 import { LanguageServices, SyntaxServices } from './language';
 import { extractMachines } from './machines';
 import { detailsOf, extractModel, findElement, type ExtractedModel, type UnitInfo } from './model';
@@ -70,6 +73,8 @@ interface Built {
 	views?: views.ViewContext;
 	/** The state machines, read on first ask. */
 	machines?: StateMachine[];
+	/** Values and verdicts (`evaluation.ts`), on first ask. */
+	evaluation?: Evaluation;
 }
 
 export class ToolkitHost {
@@ -174,6 +179,7 @@ export class ToolkitHost {
 		this.pending = null;
 		try {
 			const single = this.build([{ path, text: source }], false);
+			single.evaluation?.free();
 			single.session?.free();
 			return single.analyses[0]!;
 		} finally {
@@ -234,7 +240,10 @@ export class ToolkitHost {
 				// Nothing changed the session: keep it for these texts.
 				if (!built) this.keepPending(start);
 			} else {
-				if (built && this.built === built) this.built = null;
+				if (built && this.built === built) {
+					built.evaluation?.free();
+					this.built = null;
+				}
 				if (session !== start.session) start.session.free();
 				const repaired = [...start.units.values()].some((u) => u.repair);
 				if (editing.inSync && !repaired) {
@@ -281,9 +290,38 @@ export class ToolkitHost {
 			session: built.session,
 			extracted: built.extracted,
 			content: new Set(files.map((f) => f.path)),
-			texts: new Map([...built.units.values()].map((u) => [u.path, u.original.text]))
+			texts: new Map([...built.units.values()].map((u) => [u.path, u.original.text])),
+			evaluation: () => this.evaluationOf(built)
 		});
 		return built.views;
+	}
+
+	/**
+	 * Every constraint and `satisfy` claim of the project, decided by the
+	 * toolkit's `verify` (`evaluation.ts`); cached per analysis.
+	 */
+	checks(files: SourceFile[]): CheckReport {
+		const evaluation = this.evaluationOf(this.build(files));
+		return evaluation
+			? evaluation.checks()
+			: { checks: [], summary: { satisfied: 0, violated: 0, undecided: 0 }, ms: 0 };
+	}
+
+	/** Elements' bound values, evaluated, by element id; cached per analysis. */
+	evaluate(files: SourceFile[], ids: string[]): Record<string, Evaluated> {
+		return this.evaluationOf(this.build(files))?.evaluate(ids) ?? {};
+	}
+
+	private evaluationOf(built: Built): Evaluation | null {
+		if (!built.session || !built.extracted) return null;
+		built.evaluation ??= new Evaluation({
+			tk: this.tk,
+			library: this.library,
+			session: built.session,
+			units: built.units,
+			extracted: built.extracted
+		});
+		return built.evaluation;
 	}
 
 	/** A standard view of the project as a diagram graph (`diagrams/`). */
@@ -320,6 +358,7 @@ export class ToolkitHost {
 		const started = performance.now();
 		const previous = this.built;
 		this.built = null;
+		previous?.evaluation?.free();
 		previous?.session?.free();
 		const { session, units, parse, lenient } = this.prepare(files, withViewLibraries);
 		const findings = session ? (JSON.parse(session.check()) as TkFinding[]) : [];

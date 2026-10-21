@@ -154,7 +154,9 @@ const handlers: { [M in Method]: Handler } = {
 		host.diagram(view, files, scope),
 	listViews: (host, files: SourceFile[]) => host.listViews(files),
 	renderView: (host, files: SourceFile[], name: string) => host.renderView(files, name),
-	viewLibraries: (host) => host.viewLibraries()
+	viewLibraries: (host) => host.viewLibraries(),
+	checks: (host, files: SourceFile[]) => host.checks(files),
+	evaluate: (host, files: SourceFile[], ids: string[]) => host.evaluate(files, ids)
 };
 
 /** A trap or a failed memory grow leaves the instance unusable: the page restarts the worker. */

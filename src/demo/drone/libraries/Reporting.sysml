@@ -41,9 +41,36 @@ package Reporting {
      *                           satisfied, verified)
      *   "kindcounts"            model statistics (kind, definitions,
      *                           usages)
+     *   "budget:mass"           a budget of one attribute (here `mass`)
+     *                           over the parts tree: the composition rows
+     *                           (path, type, quantity, extended) with
+     *                           each = the attribute's evaluated value for
+     *                           one of the part, or the sum of its parts'
+     *                           when it has none; total = each x extended;
+     *                           share = total / the root's total. After a
+     *                           root's parts come its own attributes of
+     *                           the same quantity (`emptyMass :> mass`).
+     *                           limit, margin, check and requirement come
+     *                           from a requirement whose constraint
+     *                           compares the row's value with a limit
+     *                           (`satisfy R by drone` with R's constraint
+     *                           `drone.takeOffMass <= 4 [kg]`).
+     *   "checks"                every constraint check: each `satisfy`
+     *                           claim with its requirement's constraints
+     *                           evaluated against what satisfies it, each
+     *                           requirement constraint nothing satisfies
+     *                           yet, each `assert constraint` (status =
+     *                           satisfied, violated or undecided; id,
+     *                           requirement, by, constraint, values,
+     *                           limit, margin, detail; checkable = 0 for a
+     *                           requirement stated in words only)
      *   "uncertainty"           evaluated uncertainty analyses (case,
      *                           critical, target limits, worst-case
      *                           range, margin, cp, cpk, result)
+     *
+     * Values are evaluated with their units by the tool's evaluator, as
+     * the model binds them; a value it cannot evaluate is left empty with
+     * the reason.
      *
      * Column syntax: `name` copies a row field; `name = expression`
      * computes a value from the row's numeric fields with the standard

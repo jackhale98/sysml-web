@@ -2,7 +2,8 @@ library package ModelViews {
     doc
     /*
      * Standard tables over any SysML v2 model: requirements, coverage gaps,
-     * traceability, interfaces and the bill of materials.
+     * traceability, interfaces, the bill of materials, budgets (mass and
+     * power) and constraint checks.
      *
      * Each table is an ordinary `view def` whose @TableRendering (from the
      * Reporting library) says which rows to collect and which columns to
@@ -77,6 +78,39 @@ library package ModelViews {
             rows = "composition";
             columns = "path; type; quantity; extended; description = doc";
             sortBy = "path";
+        }
+    }
+
+    view def MassBudget {
+        doc /* What each part weighs, how many there are, and what each assembly and the whole add up to. */
+        @TableRendering {
+            rows = "budget:mass";
+            columns = "path; type; quantity; each; total; share; limit; margin; check";
+        }
+    }
+
+    view def PowerBudget {
+        doc /* The electrical power each part draws, how many there are, and what each assembly and the whole draw. */
+        @TableRendering {
+            rows = "budget:powerDraw";
+            columns = "path; type; quantity; each; total; share; limit; margin; check";
+        }
+    }
+
+    view def ConstraintChecks {
+        doc
+        /*
+         * Does the design meet its requirements? Every requirement constraint,
+         * evaluated against the values of the design element that satisfies
+         * it (`satisfy R by x`), and every `assert constraint`: satisfied,
+         * violated, or undecided with the reason. Requirements stated only in
+         * words are left out: they have nothing to evaluate.
+         */
+        @TableRendering {
+            rows = "checks";
+            columns = "status; id; requirement; by; values; margin; detail";
+            where = "checkable == 1";
+            sortBy = "-status";
         }
     }
 

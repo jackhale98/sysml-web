@@ -154,13 +154,117 @@ export interface RenderedTable {
 	columns: string[];
 	rows: string[][];
 	warnings: string[];
-	/** Parallel to `rows` (empty for a pivot): the element behind each row. */
-	sources: { element: string; file: string; line: number }[];
+	/**
+	 * Parallel to `rows` (empty for a pivot): the element behind each row,
+	 * and (`byte`) where in its file the row's subject is written, when that
+	 * is a statement rather than an element (a `satisfy`, a constraint).
+	 */
+	sources: { element: string; file: string; line: number; byte?: number }[];
 	/** Per column: how its cells can be edited, or null when derived. */
 	editable?: (ColumnEdit | null)[];
 	/** Fields the view's row provider offers, for choosing columns. */
 	availableFields?: string[];
+	/** Per column, how its values read, when the row provider says (else guessed from the values). */
+	columnKinds?: (ColumnKind | null)[];
+	/** Parallel to `rows`, when the provider says more about them (a tree's depth, a total). */
+	rowInfo?: RowInfo[];
+	/** Opening a row shows where it is written in the text (rather than selecting its element). */
+	opensText?: boolean;
 }
+
+/**
+ * How a column's values read: `quantity` (a number with its unit, right
+ * aligned), `number`, `percent`, `check` (a verdict: satisfied, violated or
+ * undecided), `tree` (a path, indented by the row's depth), `text`.
+ */
+export type ColumnKind = 'quantity' | 'number' | 'percent' | 'check' | 'tree' | 'text';
+
+export interface RowInfo {
+	/** Depth in a tree (0 for a root). */
+	depth?: number;
+	/**
+	 * `rollup`: the row's value is the sum of the rows under it (it has none
+	 * of its own); `total`: a total of the table; `attribute`: a value of the
+	 * root that the parts don't add up to (a limit, a payload).
+	 */
+	role?: 'rollup' | 'total' | 'attribute';
+	/** Why a cell is empty or undecided, by column index. */
+	notes?: Record<number, string>;
+}
+
+// ---- Constraint checks and evaluated values ----------------------------------
+
+export type CheckStatus = 'satisfied' | 'violated' | 'undecided';
+
+/** A value a check depends on, as the engine evaluated it. */
+export interface CheckValue {
+	/** The feature as written in the constraint (`drone.endurance`). */
+	feature: string;
+	/** Its value, when known. */
+	value: Evaluated;
+}
+
+/**
+ * One claim the model makes that can be checked: a `satisfy R by x` (R's
+ * constraints, with R's subject bound to x), a requirement's constraint
+ * that nothing claims to satisfy yet, or an `assert constraint`.
+ */
+export interface Check {
+	kind: 'satisfy' | 'require' | 'assert';
+	status: CheckStatus;
+	/** Whether there is anything to evaluate (a requirement in words only has not). */
+	checkable: boolean;
+	/** The engine's verdict line, as it words it. */
+	detail: string;
+	/** What the verdict means, in plain language. */
+	explanation: string;
+	/** The requirement, for `satisfy` and `require`. */
+	requirement: {
+		name: string;
+		qualifiedName: string;
+		/** Its short name (`SYS-001`). */
+		id: string | null;
+		elementId: string | null;
+	} | null;
+	/** What claims to satisfy it, as written (`drone`, `drone.battery`). */
+	by: string | null;
+	/** The constraint expressions, as written (several joined by `; `). */
+	constraint: string;
+	/** For an `assert constraint`, its name (if any) and owner. */
+	name: string | null;
+	values: CheckValue[];
+	/**
+	 * For a constraint that compares one value with a limit (`x <= 4 [kg]`):
+	 * the limit, and how far the value is inside it (negative: outside), in
+	 * the limit's unit, with `ratio` = margin / limit.
+	 */
+	limit?: { feature: string; operator: string; value: number; unit: string | null };
+	margin?: { value: number; unit: string | null; ratio: number | null };
+	/** Where the claim is written: the `satisfy` statement, or the constraint. */
+	file: string;
+	span: Span;
+	/** Where the constraint is written, when that is elsewhere (a `satisfy`'s requirement). */
+	constraintAt?: { file: string; span: Span };
+}
+
+export interface CheckReport {
+	checks: Check[];
+	summary: { satisfied: number; violated: number; undecided: number };
+	/** How long verifying took in the worker, ms. */
+	ms: number;
+}
+
+/**
+ * An element's bound value as the engine evaluated it: a number (with its
+ * unit, or null for a plain number), something else as text (a boolean, a
+ * string, an enum literal's name, a list), nothing (`none`: no value bound)
+ * or why it could not (`undecided`).
+ */
+export type Evaluated =
+	| { kind: 'number'; value: number; unit: string | null }
+	| { kind: 'text'; text: string }
+	| { kind: 'none' }
+	| { kind: 'undecided'; reason: string };
 
 /** Editor language services (all offsets are UTF-16 into the given file). */
 export interface Completion {

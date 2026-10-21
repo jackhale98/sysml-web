@@ -7,6 +7,7 @@
  */
 import type { MetadataAnnotation, TraceLink } from '../../types';
 import type { TkSession } from '../api';
+import type { Evaluation } from '../evaluation';
 import type { ElementRecord, ExtractedModel } from '../model';
 import { unquoteName } from './text';
 
@@ -29,6 +30,8 @@ export interface ViewSource {
 	content: ReadonlySet<string>;
 	/** The text of every unit (project files and bundled libraries), by path. */
 	texts: ReadonlyMap<string, string>;
+	/** Values and verdicts of the analysis (budgets and checks), made on first ask. */
+	evaluation?: () => Evaluation | null;
 }
 
 const NO_RECORDS: ElementRecord[] = [];
@@ -39,6 +42,7 @@ export class ViewContext {
 	readonly byId: ReadonlyMap<string, ElementRecord>;
 	readonly content: ReadonlySet<string>;
 	readonly texts: ReadonlyMap<string, string>;
+	private readonly evaluationOf: () => Evaluation | null;
 	readonly annotations: Annotation[] = [];
 	readonly satisfactions: Link[] = [];
 	readonly verifications: Link[] = [];
@@ -56,6 +60,7 @@ export class ViewContext {
 		this.byId = source.extracted?.byId ?? new Map();
 		this.content = source.content;
 		this.texts = source.texts;
+		this.evaluationOf = source.evaluation ?? (() => null);
 		const at = new Map<string, ElementRecord>();
 		for (const record of this.records) {
 			if (record.ownerId) push(this.owned, record.ownerId, record);
@@ -77,6 +82,11 @@ export class ViewContext {
 			for (const v of model.verifications)
 				this.verifications.push({ ...v, record: at.get(`${path}@${v.span.start_byte}`), path });
 		}
+	}
+
+	/** Values and verdicts (null without a model). */
+	get evaluation(): Evaluation | null {
+		return this.evaluationOf();
 	}
 
 	isContent(record: ElementRecord): boolean {

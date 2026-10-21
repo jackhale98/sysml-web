@@ -59,8 +59,12 @@ export interface TkSession {
 	references(selectorJson: string): string;
 	/** The abstract-syntax property `name` of `e`, as JSON. */
 	property(e: TkElement, name: string): string;
-	/** `e`'s bound value, evaluated, as JSON. */
+	/** `e`'s bound value, evaluated, as JSON (`{unit, value}`, `{"@indeterminate": true}`, …); throws what it can't evaluate. */
 	evaluate(e: TkElement): string;
+	/** Evaluate every user constraint and `satisfy` claim; JSON `TkVerifyReport` (`checks.ts`). */
+	verify(optionsJson?: string | null): string;
+	/** Evaluate an expression at the root namespace, as JSON like `evaluate`. */
+	query(expression: string): string;
 	/** Whether `e` reaches `ancestor` through the explicit specialization closure. */
 	conforms(e: TkElement, ancestor: TkElement): boolean;
 	/** JSON `{qualifiedName, id, rendering, exposed: [{id, qualifiedName, metaclass}], …}` of a view usage (its filters applied to `exposed`). */

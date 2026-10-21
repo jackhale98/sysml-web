@@ -8,6 +8,7 @@
  */
 import type { ElementRecord } from '../model';
 import { connectionEnds, multiplicityOf } from '../model';
+import { budgetRows, checkRows } from './budget';
 import type { Annotation, Link, ViewContext } from './context';
 import {
 	collapseWhitespace,
@@ -28,6 +29,14 @@ export interface Row {
 	element: string;
 	/** The type of the row's element, for finding which features a column edits. */
 	typeId?: string | null;
+	/** What the provider says about the row: tree depth, role, why cells are empty (by field). */
+	info?: {
+		depth?: number;
+		role?: 'rollup' | 'total' | 'attribute';
+		notes?: Record<string, string>;
+	};
+	/** Where the row's subject is written, when it is a statement (a `satisfy`, a constraint). */
+	byte?: number;
 }
 
 const row = (fields: [string, string][], anchors: string[], element = ''): Row => ({
@@ -50,6 +59,7 @@ export function provideRows(ctx: ViewContext, spec: string, warnings: string[]):
 	if (spec.startsWith('kind:')) return kindRows(ctx, spec.slice(5).trim());
 	if (spec.startsWith('relation:')) return relationRows(ctx, spec.slice(9).trim());
 	if (spec.startsWith('composition:')) return compositionRows(ctx, spec.slice(12).trim());
+	if (spec.startsWith('budget:')) return budgetRows(ctx, spec.slice(7).trim());
 	switch (spec) {
 		case 'composition':
 			return compositionRows(ctx, null);
@@ -59,6 +69,8 @@ export function provideRows(ctx: ViewContext, spec: string, warnings: string[]):
 			return traceRows(ctx);
 		case 'kindcounts':
 			return kindCountRows(ctx);
+		case 'checks':
+			return checkRows(ctx);
 		case 'uncertainty':
 			warnings.push(
 				'uncertainty analyses are not evaluated by this engine yet; the table is empty'
@@ -66,7 +78,7 @@ export function provideRows(ctx: ViewContext, spec: string, warnings: string[]):
 			return [];
 		default:
 			throw new Error(
-				`unknown row provider \`${spec}\` (expected @Metadata, type:, kind:, relation:, composition, requirements, trace, kindcounts, or uncertainty)`
+				`unknown row provider \`${spec}\` (expected @Metadata, type:, kind:, relation:, composition, budget:, requirements, trace, checks, kindcounts, or uncertainty)`
 			);
 	}
 }
@@ -519,7 +531,7 @@ function kindCountRows(ctx: ViewContext): Row[] {
 
 // --- composition (bill of materials) ------------------------------------------------
 
-const isContentUsage = (r: ElementRecord) =>
+export const isContentUsage = (r: ElementRecord) =>
 	!r.isDefinition && (r.kind === 'part' || r.kind === 'item') && !!r.name;
 
 /**
@@ -531,7 +543,7 @@ const isContentUsage = (r: ElementRecord) =>
  * multiplies it down the tree; attribute values of the usage, then of its
  * type, become fields (mass, cost, …).
  */
-function compositionRows(ctx: ViewContext, root: string | null): Row[] {
+export function compositionRows(ctx: ViewContext, root: string | null): Row[] {
 	const rows: Row[] = [];
 	const walk = (
 		node: ElementRecord,

@@ -22,7 +22,8 @@ import {
 	parseExpr
 } from '#lib/sim/expr.ts';
 import type { Value } from '#lib/sim/expr.ts';
-import type { ColumnEdit, RenderedTable } from '../../types';
+import type { ColumnEdit, RenderedTable, RowInfo } from '../../types';
+import { fieldKinds } from './budget';
 import type { ElementRecord } from '../model';
 import { findView, listViews, tableSpec, viewChain, viewClauses } from './catalog';
 import type { ViewContext } from './context';
@@ -127,8 +128,10 @@ export function renderView(ctx: ViewContext, name: string): RenderedTable {
 		source: {
 			element: r.element,
 			file: r.fields.get('file') ?? '',
-			line: parseNumber(r.fields.get('line') ?? '') ?? 0
-		}
+			line: parseNumber(r.fields.get('line') ?? '') ?? 0,
+			...(r.byte !== undefined ? { byte: r.byte } : {})
+		},
+		info: rowInfoOf(r, columns)
 	}));
 
 	const sortBy = spec.get('sortBy');
@@ -148,6 +151,12 @@ export function renderView(ctx: ViewContext, name: string): RenderedTable {
 	const editable: (ColumnEdit | null)[] = columns.map(([column, expr]) =>
 		edits.column(rowsSpec, probe, column, expr)
 	);
+	const kinds = fieldKinds(rowsSpec.trim());
+	// A column copied from a field reads like the field; `name = expression` columns are numbers.
+	const columnKinds = columns.map(([column, expr]) =>
+		expr === null ? (kinds[column] ?? null) : (kinds[expr] ?? null)
+	);
+	const described = table.some((t) => t.info);
 	return {
 		view: shown,
 		columns: columns.map(([c]) => c),
@@ -155,8 +164,27 @@ export function renderView(ctx: ViewContext, name: string): RenderedTable {
 		warnings,
 		sources: table.map((t) => t.source),
 		editable,
-		availableFields: probe.fields
+		availableFields: probe.fields,
+		...(columnKinds.some((k) => k) ? { columnKinds } : {}),
+		...(described ? { rowInfo: table.map((t) => t.info ?? {}) } : {}),
+		...(rowsSpec.trim() === 'checks' ? { opensText: true } : {})
 	};
+}
+
+/** What the provider said about a row, with its notes by column. */
+function rowInfoOf(r: Row, columns: [string, string | null][]): RowInfo | undefined {
+	if (!r.info) return undefined;
+	const { notes, ...rest } = r.info;
+	const info: RowInfo = { ...rest };
+	if (notes) {
+		const byColumn: Record<number, string> = {};
+		columns.forEach(([column, expr], i) => {
+			const note = notes[expr ?? column] ?? notes[column];
+			if (note) byColumn[i] = note;
+		});
+		if (Object.keys(byColumn).length) info.notes = byColumn;
+	}
+	return info;
 }
 
 /** The provider's fields and row types, before `expose` and `where` narrow the rows. */

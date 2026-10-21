@@ -38,6 +38,20 @@ package DroneViews {
         expose DroneArchitecture::drone::**;
     }
 
+    view droneMassBudget : MassBudget {
+        doc /* What each part of the drone weighs, and how the masses add up. */
+        expose DroneArchitecture::drone::**;
+    }
+
+    view dronePowerBudget : PowerBudget {
+        doc /* The electrical power each part of the drone draws in hover, and the total. */
+        expose DroneArchitecture::drone::**;
+    }
+
+    view designChecks : ConstraintChecks {
+        doc /* Does the design meet its requirements? Each requirement's constraint, checked against the design's values. */
+    }
+
     // Diagrams.
 
     view serviceContext : InterconnectionView {

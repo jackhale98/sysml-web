@@ -1,0 +1,361 @@
+/**
+ * Values and verdicts on the demo and on small models, through the host the
+ * worker runs: `checks` (the toolkit's `verify`, mapped), `evaluate`, and the
+ * budget and checks tables.
+ */
+import { beforeAll, describe, expect, it } from 'vitest';
+import type { SourceFile } from '../protocol';
+import type { Check } from '../types';
+import { chainsIn, comparisonOf, referencesIn } from './evaluation';
+import type { ToolkitHost } from './host';
+import { demoFiles, loadHost } from './testing';
+
+let host: ToolkitHost;
+const files = demoFiles();
+const edit = (path: string, from: string, to: string): SourceFile[] =>
+	files.map((f) => {
+		if (f.path !== path) return f;
+		expect(f.text).toContain(from);
+		return { ...f, text: f.text.replace(from, to) };
+	});
+const byId = (checks: Check[], id: string) => checks.find((c) => c.requirement?.id === id)!;
+
+beforeAll(async () => {
+	host = await loadHost();
+	host.analyzeProject(files);
+}, 60_000);
+
+describe('the demo’s checks', () => {
+	it('decides the requirements stated as constraints', () => {
+		const report = host.checks(files);
+		const checkable = report.checks.filter((c) => c.checkable);
+		expect(checkable.map((c) => [c.requirement?.id, c.status])).toEqual([
+			['SYS-001', 'satisfied'],
+			['SYS-002', 'satisfied'],
+			['SYS-003', 'undecided']
+		]);
+		// Requirements in words only are listed, with nothing to check.
+		const words = report.checks.filter((c) => !c.checkable);
+		expect(words).toHaveLength(9);
+		expect(words.every((c) => c.status === 'undecided' && c.kind === 'satisfy')).toBe(true);
+		// The libraries' type invariants (`that >= 1 and that <= 10`) hold and are left out.
+		expect(report.checks.some((c) => c.kind === 'assert')).toBe(false);
+		expect(report.summary).toEqual({ satisfied: 2, violated: 0, undecided: 10 });
+	});
+
+	it('gives the values, the limit and the margin of a met requirement', () => {
+		const endurance = byId(host.checks(files).checks, 'SYS-001');
+		expect(endurance).toMatchObject({
+			kind: 'satisfy',
+			by: 'drone',
+			constraint: 'drone.endurance >= 25 [min]',
+			file: 'system/Satisfaction.sysml',
+			span: { start_row: 12 },
+			constraintAt: { file: 'requirements/SystemRequirements.sysml', span: { start_row: 32 } },
+			requirement: {
+				name: 'Flight endurance',
+				qualifiedName: "SystemRequirements::'Flight endurance'",
+				id: 'SYS-001'
+			},
+			limit: { feature: 'drone.endurance', operator: '>=', value: 25, unit: 'min' },
+			explanation: 'Met: drone.endurance = 27.54 min.'
+		});
+		// 216 W·h × 0.85 / 400 W = 0.459 h.
+		expect(endurance.values).toEqual([
+			{ feature: 'drone.endurance', value: { kind: 'number', value: 1652.4, unit: 's' } }
+		]);
+		expect(endurance.margin!.value).toBeCloseTo(2.54);
+		expect(endurance.margin!.unit).toBe('min');
+		expect(endurance.margin!.ratio).toBeCloseTo(0.1016);
+		const payload = byId(host.checks(files).checks, 'SYS-002');
+		expect(payload.margin).toEqual({ value: 0, unit: 'kg', ratio: 0 });
+	});
+
+	it('says why the take-off mass is undecided: the rotors are a collection', () => {
+		const mass = byId(host.checks(files).checks, 'SYS-003');
+		expect(mass.limit).toEqual({
+			feature: 'drone.takeOffMass',
+			operator: '<=',
+			value: 4,
+			unit: 'kg'
+		});
+		expect(mass.margin).toBeUndefined();
+		expect(mass.explanation).toBe(
+			'drone.takeOffMass cannot be worked out: `rotors` is a collection of 4 parts (`part rotors : Rotor[4]`), and the engine cannot yet evaluate a value over a collection (`rotors.mass`).'
+		);
+	});
+
+	it('reports a violation, with the values, when a value changes', () => {
+		const edited = edit(
+			'system/DroneArchitecture.sysml',
+			'attribute :>> hoverPower = 400 [W]',
+			'attribute :>> hoverPower = 450 [W]'
+		);
+		host.analyzeProject(edited);
+		const endurance = byId(host.checks(edited).checks, 'SYS-001');
+		expect(endurance.status).toBe('violated');
+		expect(endurance.margin!.value).toBeCloseTo(-0.52);
+		expect(endurance.explanation).toMatch(/^Not met: drone\.endurance = 24\.48 min\.$/);
+		host.analyzeProject(files);
+		expect(byId(host.checks(files).checks, 'SYS-001').status).toBe('satisfied');
+	});
+
+	it('lists a requirement constraint nothing claims to satisfy', () => {
+		const edited = edit(
+			'system/Satisfaction.sysml',
+			"satisfy 'Payload capacity' by drone;",
+			'// (removed)'
+		);
+		const payload = byId(host.checks(edited).checks, 'SYS-002');
+		expect(payload).toMatchObject({
+			kind: 'require',
+			status: 'undecided',
+			constraint: 'drone.payloadCapacity >= 1 [kg]',
+			file: 'requirements/SystemRequirements.sysml'
+		});
+		expect(payload.explanation).toMatch(/^Nothing in the design claims to satisfy/);
+		host.analyzeProject(files);
+	});
+
+	it('costs little, once per analysis', () => {
+		const edited = edit('system/Components.sysml', '650 [g]', '651 [g]');
+		host.analyzeProject(edited);
+		const started = performance.now();
+		host.checks(edited);
+		const first = performance.now() - started;
+		const again = performance.now();
+		host.checks(edited);
+		expect(performance.now() - again).toBeLessThan(1);
+		// About 50 ms in Node (a session without metadata, then `verify`); generous for CI.
+		expect(first).toBeLessThan(1500);
+		host.analyzeProject(files);
+	});
+});
+
+describe('evaluated values', () => {
+	const ids = (qualified: string[]) => {
+		const records = (
+			host as unknown as {
+				built: { extracted: { elements: { id: string; qualifiedName: string | null }[] } };
+			}
+		).built.extracted.elements;
+		return qualified.map((q) => records.find((r) => r.qualifiedName === q)!.id);
+	};
+
+	it('evaluates expressions, with units, in a batch', () => {
+		const [rotor, energy, endurance, fraction, kind] = ids([
+			'DroneComponents::Rotor::mass',
+			'DroneComponents::Battery::usableEnergy',
+			'DroneArchitecture::drone::endurance',
+			'DroneComponents::Battery::usableFraction',
+			"SystemRequirements::'Flight endurance'::kind"
+		]);
+		const values = host.evaluate(files, [rotor!, energy!, endurance!, fraction!, kind!, 'nope']);
+		expect(values[rotor!]).toEqual({ kind: 'number', value: 180, unit: 'g' });
+		expect(values[energy!]).toEqual({ kind: 'number', value: 183.6, unit: 'W*h' });
+		expect(values[endurance!]).toEqual({ kind: 'number', value: 1652.4, unit: 's' });
+		expect(values[fraction!]).toEqual({ kind: 'number', value: 0.85, unit: null });
+		expect(values[kind!]).toEqual({ kind: 'text', text: 'performance' });
+		expect(values.nope).toBeUndefined();
+	});
+
+	it('says why a value is undecided', () => {
+		const [takeOff, empty] = ids([
+			'DroneArchitecture::DeliveryDrone::takeOffMass',
+			'DroneArchitecture::drone::emptyMass'
+		]);
+		const values = host.evaluate(files, [takeOff!, empty!]);
+		// In the definition, nothing gives the empty mass a value.
+		expect(values[takeOff!]).toEqual({
+			kind: 'undecided',
+			reason: '`emptyMass` has no value in `DeliveryDrone`'
+		});
+		expect(values[empty!]).toMatchObject({
+			kind: 'undecided',
+			reason: expect.stringMatching(/^`rotors` is a collection of 4 parts/)
+		});
+	});
+
+	it('evaluates the values a part inherits although metadata annotates it', () => {
+		// The FMEA annotates `drone::battery`; the toolkit 0.10 refuses `battery.usableEnergy` then.
+		const [endurance] = ids(['DroneArchitecture::drone::endurance']);
+		const built = (host as unknown as { built: { session: import('./api').TkSession } }).built;
+		const handle = built.session.elementById(endurance!)!;
+		// The analysed session (with the annotations): refused. When this starts to pass, the
+		// toolkit is fixed and the evaluation session (evaluation.ts) can go.
+		expect(() => built.session.evaluate(handle)).toThrow(/receiver identity/);
+		handle.free();
+		expect(host.evaluate(files, [endurance!])[endurance!]).toMatchObject({ kind: 'number' });
+	});
+});
+
+describe('checks on small models', () => {
+	const model = (text: string) => [{ path: 'm.sysml', text }];
+
+	it('maps an assertion’s byte positions to UTF-16 after multi-byte text', () => {
+		const text =
+			"package P { private import SI::*; part def 'Wärmeöäü' { attribute x :> ISQ::mass = 1 [kg]; assert constraint light { x <= 0.5 [kg] } } }\n";
+		const files = model(text);
+		host.analyzeProject(files);
+		const [check] = host.checks(files).checks;
+		expect(check).toMatchObject({
+			kind: 'assert',
+			status: 'violated',
+			name: 'light',
+			by: 'Wärmeöäü',
+			constraint: 'x <= 0.5 [kg]',
+			values: [{ feature: 'x', value: { kind: 'number', value: 1, unit: 'kg' } }],
+			margin: { value: -0.5, unit: 'kg', ratio: -1 }
+		});
+		expect(text.slice(check!.span.from, check!.span.to)).toBe('x <= 0.5 [kg]');
+		expect(check!.explanation).toBe('Not met: x = 1 kg.');
+	});
+
+	it('blanks metadata without moving anything', () => {
+		const text = [
+			'package P {',
+			'    private import SI::*;',
+			'    metadata def Note { attribute text : ScalarValues::String; }',
+			'    part def Box { attribute mass :> ISQ::mass = 2 [kg]; @Note { text = "größer"; } }',
+			'    part shelf { part box : Box; attribute load :> ISQ::mass = box.mass; assert constraint { load <= 1.5 [kg] } }',
+			'    @Note about shelf::box { text = "für Bücher"; }',
+			'}',
+			''
+		].join('\n');
+		const files = model(text);
+		host.analyzeProject(files);
+		const [check] = host.checks(files).checks;
+		expect(check).toMatchObject({ status: 'violated', constraint: 'load <= 1.5 [kg]' });
+		expect(text.slice(check!.span.from, check!.span.to)).toBe('load <= 1.5 [kg]');
+		host.analyzeProject(demoFiles());
+	});
+});
+
+describe('the budget and checks tables', () => {
+	it('adds up the mass budget over the parts tree', () => {
+		const table = host.renderView(files, 'droneMassBudget');
+		expect(table.columns).toEqual([
+			'path',
+			'type',
+			'quantity',
+			'each',
+			'total',
+			'share',
+			'limit',
+			'margin',
+			'check'
+		]);
+		const row = (path: string) => table.rows.find((r) => r[0] === path)!;
+		expect(row('drone').slice(0, 6)).toEqual([
+			'drone',
+			'DeliveryDrone',
+			'1',
+			'2770 g',
+			'2770 g',
+			'100 %'
+		]);
+		expect(row('drone.rotors').slice(0, 6)).toEqual([
+			'drone.rotors',
+			'Rotor',
+			'4',
+			'180 g',
+			'720 g',
+			'26 %'
+		]);
+		expect(row('drone.rotors.motor').slice(2, 5)).toEqual(['1', '120 g', '480 g']);
+		expect(row('drone.payloadCapacity').slice(4)).toEqual([
+			'1 kg',
+			'',
+			'≥ 1 kg',
+			'0 kg (0 %)',
+			'satisfied'
+		]);
+		expect(row('drone.takeOffMass').slice(6)).toEqual(['≤ 4 kg', '', 'undecided']);
+		// The parts first, then the drone's own masses.
+		expect(table.rows.map((r) => r[0]).slice(-3)).toEqual([
+			'drone.emptyMass',
+			'drone.payloadCapacity',
+			'drone.takeOffMass'
+		]);
+		expect(table.columnKinds).toEqual([
+			'tree',
+			null,
+			'number',
+			'quantity',
+			'quantity',
+			'percent',
+			'quantity',
+			'quantity',
+			'check'
+		]);
+		const drone = table.rows.findIndex((r) => r[0] === 'drone');
+		expect(table.rowInfo![drone]).toEqual({
+			depth: 0,
+			role: 'rollup',
+			notes: { 3: 'the sum of its parts' }
+		});
+		const takeOff = table.rowInfo![table.rows.findIndex((r) => r[0] === 'drone.takeOffMass')]!;
+		expect(takeOff.role).toBe('attribute');
+		expect(takeOff.notes![4]).toMatch(/collection of 4 parts/);
+	});
+
+	it('leaves parts that draw no power out of the power budget', () => {
+		const table = host.renderView(files, 'dronePowerBudget');
+		const paths = table.rows.map((r) => r[0]);
+		expect(paths).not.toContain('drone.airframe');
+		expect(paths).not.toContain('drone.rotors.propeller');
+		const row = (path: string) => table.rows.find((r) => r[0] === path)!;
+		expect(row('drone').slice(3, 5)).toEqual(['397 W', '397 W']);
+		expect(row('drone.rotors').slice(2, 5)).toEqual(['4', '95 W', '380 W']);
+		expect(row('drone.hoverPower')[4]).toBe('400 W');
+	});
+
+	it('lists the checks that have something to check, violations first', () => {
+		const table = host.renderView(files, 'designChecks');
+		expect(table.opensText).toBe(true);
+		expect(table.rows.map((r) => [r[0], r[1]])).toEqual([
+			['undecided', 'SYS-003'],
+			['satisfied', 'SYS-001'],
+			['satisfied', 'SYS-002']
+		]);
+		expect(table.rows[1]).toEqual([
+			'satisfied',
+			'SYS-001',
+			'Flight endurance',
+			'drone',
+			'drone.endurance = 27.54 min',
+			'2.54 min (10 %)',
+			'Met: drone.endurance = 27.54 min.'
+		]);
+		expect(table.sources[1]).toMatchObject({ file: 'system/Satisfaction.sysml', line: 12 });
+		expect(typeof table.sources[1]!.byte).toBe('number');
+	});
+});
+
+describe('reading expressions', () => {
+	it('finds feature chains and references', () => {
+		expect(chainsIn('drone.endurance >= 25 [min] and x.y.z < "a.b"')).toEqual([
+			'drone.endurance',
+			'x.y.z'
+		]);
+		expect(referencesIn('HoverEndurance(battery.usableEnergy, hoverPower) * 2 [SI::h]')).toEqual([
+			'battery.usableEnergy',
+			'hoverPower'
+		]);
+		expect(referencesIn('if a then b else ISQ::mass')).toEqual(['a', 'b']);
+	});
+
+	it('reads a comparison with a limit either way round', () => {
+		expect(comparisonOf('drone.takeOffMass <= 4 [kg]')).toEqual({
+			feature: 'drone.takeOffMass',
+			operator: '<=',
+			limit: { value: 4, unit: 'kg' }
+		});
+		expect(comparisonOf('25 [min] <= drone.endurance')).toEqual({
+			feature: 'drone.endurance',
+			operator: '>=',
+			limit: { value: 25, unit: 'min' }
+		});
+		expect(comparisonOf('a + b <= 4')).toBeNull();
+	});
+});
