@@ -101,7 +101,7 @@ export async function readXlsx(bytes: Uint8Array): Promise<Sheet[]> {
 			'This is an older Excel file (.xls). Save it as .xlsx or .csv in Excel, then import that.'
 		);
 	}
-	const entries = await unzip(bytes);
+	const entries = await unzip(bytes, 'an .xlsx file is one');
 	const decoder = new TextDecoder();
 	const files = new Map(entries.map((e) => [e.path.replace(/^\//, ''), e.data]));
 	const read = (path: string) => {
