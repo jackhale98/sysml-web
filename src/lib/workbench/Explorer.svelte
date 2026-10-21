@@ -13,6 +13,7 @@
 	import { isLibraryFile, type Workspace } from '#lib/project/workspace.svelte.ts';
 	import KindGlyph from '#lib/ui/KindGlyph.svelte';
 	import type { WorkbenchUi } from './ui.svelte.ts';
+	import { elementItems, modelViewItems, rank, type PaletteItem } from './palette.ts';
 	import { presentationOf, viewTitle } from './views.ts';
 
 	let { workspace, ui }: { workspace: Workspace; ui: WorkbenchUi } = $props();
@@ -46,6 +47,31 @@
 	let packagesOpen = $state(false);
 
 	const needle = $derived(query.trim().toLowerCase());
+
+	/** While filtering: matching elements and views, best first, at the top. */
+	const RESULT_LIMIT = 60;
+	const searchResults = $derived.by(() => {
+		if (!needle) return [];
+		const own = workspace.elements.filter((e) => !isLibraryFile(e.file));
+		let hits = rank(elementItems(own, isLibraryFile), needle);
+		if (!hits.length) {
+			const library = workspace.elements.filter((e) => isLibraryFile(e.file));
+			hits = rank(elementItems(library, isLibraryFile), needle);
+		}
+		return [...rank(modelViewItems(workspace.views), needle), ...hits]
+			.sort((a, b) => (b.match?.score ?? 0) - (a.match?.score ?? 0))
+			.slice(0, RESULT_LIMIT);
+	});
+
+	function openResult(item: PaletteItem) {
+		const action = item.action;
+		if (action.type === 'element') {
+			ui.open({ kind: 'file', path: action.file });
+			ui.select(action.key, 'explorer');
+		} else if (action.type === 'open') {
+			ui.open(action.tab);
+		}
+	}
 	function matches(node: TreeNode): boolean {
 		if (!needle) return true;
 		const e = node.element;
@@ -135,6 +161,32 @@
 		</label>
 		{#if !ready}
 			<p class="empty">Reading the model…</p>
+		{:else if needle}
+			<section aria-labelledby="results-heading" class="results">
+				<h2 id="results-heading">
+					{searchResults.length
+						? `${searchResults.length}${searchResults.length === RESULT_LIMIT ? '+' : ''} results`
+						: 'No matches'}
+				</h2>
+				<ul class="flat">
+					{#each searchResults as { item } (item.id)}
+						<li>
+							<button
+								type="button"
+								class="item result"
+								class:selected={item.action.type === 'element' &&
+									ui.selection?.key === item.action.key}
+								onclick={() => openResult(item)}
+							>
+								<KindGlyph kind={item.kind ?? 'part'} isDefinition={!!item.isDefinition} />
+								{#if item.shortId}<span class="id">{item.shortId}</span>{/if}
+								<span class="label">{item.label}</span>
+								<span class="where">{item.keyword}</span>
+							</button>
+						</li>
+					{/each}
+				</ul>
+			</section>
 		{:else}
 			<section aria-labelledby="views-heading">
 				<h2 id="views-heading">Views</h2>
@@ -375,6 +427,13 @@
 	.empty {
 		padding: var(--space-2);
 		color: var(--text-3);
+	}
+	.result .where {
+		margin-left: auto;
+		padding-left: var(--space-2);
+		color: var(--text-3);
+		font-size: var(--text-xs);
+		white-space: nowrap;
 	}
 	h3 {
 		margin: var(--space-3) var(--space-2) var(--space-1);

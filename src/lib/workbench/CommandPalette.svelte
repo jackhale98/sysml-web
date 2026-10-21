@@ -9,6 +9,7 @@
 		commandItems,
 		elementItems,
 		fileItems,
+		modelViewItems,
 		search,
 		segments,
 		viewItems,
@@ -33,9 +34,12 @@
 	// Only evaluated while the palette is open: nothing below is read otherwise.
 	const sources = $derived({
 		elements: elementItems(workspace.elements, isLibraryFile),
-		views: viewItems(
-			workspace.tree.filter((n) => n.element.kind === 'package' && !isLibraryFile(n.element.file))
-		),
+		views: [
+			...modelViewItems(workspace.views),
+			...viewItems(
+				workspace.tree.filter((n) => n.element.kind === 'package' && !isLibraryFile(n.element.file))
+			)
+		],
 		files: fileItems(workspace.modelPaths),
 		commands: commandItems(theme.choice)
 	});

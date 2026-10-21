@@ -160,3 +160,20 @@ test('on a phone, a file switches between text and diagram instead of splitting'
 	await expect(page.getByRole('region', { name: /DroneArchitecture diagram/ })).toBeVisible();
 	await expect(page.locator('.cm-content')).toBeHidden();
 });
+
+test('on a phone, filtering the model shows matching elements at once', async ({ page }) => {
+	await page.setViewportSize({ width: 390, height: 844 });
+	await openDemo(page);
+	await page
+		.getByRole('navigation', { name: 'Panes' })
+		.getByRole('button', { name: 'Model' })
+		.click();
+	await page.getByPlaceholder('Filter elements').fill('batt');
+	const results = page.getByRole('region', { name: /results/ });
+	const first = results.getByRole('button').first();
+	await expect(first).toBeInViewport();
+	await expect(first).toContainText(/batt/i);
+	await expectAccessible(page);
+	await first.click();
+	await expect(page.locator('.cm-content')).toBeVisible();
+});

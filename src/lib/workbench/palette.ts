@@ -4,7 +4,9 @@
  */
 import type { ModelElement, TreeNode } from '#lib/project/elements.ts';
 import { keywordOf } from '#lib/ui/kinds.ts';
+import type { ViewInfo } from '#lib/engine/types.ts';
 import type { FileLayout, Tab } from './ui.svelte.ts';
+import { viewTitle } from './views.ts';
 
 /** A half-open `[start, end)` range of UTF-16 offsets into a string. */
 export type Range = readonly [start: number, end: number];
@@ -305,6 +307,25 @@ function descendants(node: TreeNode): number {
 	return node.children.reduce((sum, c) => sum + 1 + descendants(c), 0);
 }
 
+/** The model's own views (saved diagrams and tables) and the standard tables. */
+export function modelViewItems(views: readonly ViewInfo[]): PaletteItem[] {
+	return views
+		.filter((v) => (v.isUsage && !v.builtin) || (v.hasTable && !v.isUsage))
+		.map((v) => ({
+			id: `model-view:${v.qualifiedName ?? v.name}`,
+			group: 'views' as const,
+			label: viewTitle(v.name),
+			keyword: v.isUsage ? `view : ${v.definition ?? ''}` : 'standard table',
+			aliases: v.name,
+			kind: 'view',
+			isDefinition: !v.isUsage,
+			action: {
+				type: 'open' as const,
+				tab: { kind: 'view' as const, name: v.name, title: viewTitle(v.name) }
+			}
+		}));
+}
+
 /** A general view per package, the busiest packages first. */
 export function viewItems(packages: readonly TreeNode[]): PaletteItem[] {
 	return packages
@@ -395,7 +416,7 @@ export function commandItems(themeChoice: string): PaletteItem[] {
 // ---------------------------------------------------------------------------
 // Search
 
-function rank(items: readonly PaletteItem[], query: string): PaletteResult[] {
+export function rank(items: readonly PaletteItem[], query: string): PaletteResult[] {
 	const hits: PaletteResult[] = [];
 	for (const item of items) {
 		const match = matchItem(query, item);
