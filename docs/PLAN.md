@@ -56,9 +56,12 @@ need a model run in parallel with the foundation.
    server.
 3. **Views and tables** — view listing and table rendering in TypeScript
    (`expose`, `@TableRendering`, editable columns); reports follow.
-4. **Edits** — every inspector, table and diagram edit through the
-   toolkit's transform operations (rename, set value, insert, remove,
-   retarget), composed where it has no single operation.
+4. ✅ **Edits** (done; see `docs/engine.md`) — every inspector, table,
+   explorer, diagram, import and report edit through the toolkit's
+   transform operations (rename, set value/type/redefinition/comment,
+   insert, remove), composed with `replaceMember` where it has no single
+   operation; a removal or type change that breaks references is made
+   anyway and the toast says what no longer resolves.
 5. **Diagrams** — the seven diagram graphs in TypeScript over the model.
 6. **The rest** — state machine emulator, `.kpar` read/write, library
    browser. *Done:* the emulator (`src/lib/sim/emulator.ts` runs any

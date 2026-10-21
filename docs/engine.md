@@ -121,6 +121,46 @@ target transition's source (`accept Go then b;` after `state a;`: the state
 before it) and ends that don't resolve (a placeholder state and a warning).
 It costs about 3 ms on the demo, once per analysis.
 
+## Model edits
+
+`edit` (`toolkit/edits.ts`) answers every `EditRequest` with the toolkit's
+span-preserving transform operations: `insertMember`, `insertTopLevel`,
+`remove`, `rename` (every reference, in every file: the result's
+`otherFiles`), `setFeatureType`, `setFeatureValue`, `removeFeatureValue`,
+`setRedefinedFeature` and `setCommentBody`. The toolkit splices at the spans
+its resolver recorded, reparses, and refuses an edit that doesn't parse
+(the result's `syntaxErrors`) or that would silently rebind a reference.
+
+- **Composed edits.** What the toolkit has no operation for — modifiers
+  (`abstract`, `in`/`out`, `derived`, `constant`, `end`), short names,
+  multiplicities, specializations, how a value is given (`default`, `:=`),
+  where a new member goes in a body, how a doc comment is laid out — is
+  worked out as a text change by `toolkit/header.ts` (a declaration header
+  read as tokens, in the order the notation puts its parts) and checked by
+  the toolkit: the member is replaced by the changed text (`replaceMember`),
+  which must parse as one member and keep every reference resolving as
+  before. The change sent back is ours (minimal); the toolkit's re-indented
+  text only decides whether its session still holds the result.
+- **Refusals the app overrides.** Removing an element something refers to,
+  and changing a type whose features are referred to, are made anyway
+  (outside the toolkit); `EditResult.warning` says what no longer resolves
+  and the toast shows it next to Undo.
+- **Addressing.** Requests name elements by id (`ModelElement.id`, from the
+  analysis) when known, else by name as written (simple or qualified) and
+  the 1-based declaration line — what table rows carry.
+- **Table cells** (`setField`): `name`, `shortName`, `doc`, `feature:<x>`
+  and `metadata:<Type>.<field>`, as classic named them. A field's type comes
+  from the model (the feature's declaration in the element's types, its
+  enum literals, its multiplicity); enum and metadata types are written the
+  shortest way that resolves where they are written (`minimalSpelling`).
+- **Sessions.** An edit uses the analysed session when the texts match, and
+  leaves its edited session for the next analysis or edit of the edited
+  texts (`ToolkitHost.pending`), so a series of edits (an import) doesn't
+  rebuild the model each time. A file with a syntax error is not edited
+  (the session holds its repaired text); other files are.
+- Cost on the demo in Node: 40–75 ms per edit (classic: a few ms), then the
+  analysis of the edited text 90–130 ms. It runs in the worker.
+
 ## Language services
 
 The editor's completion, hover, go to definition, references, rename,
