@@ -16,6 +16,7 @@
 	import type { Workspace } from '#lib/project/workspace.svelte.ts';
 	import Pill from '#lib/ui/Pill.svelte';
 	import type { WorkbenchUi } from '#lib/workbench/ui.svelte.ts';
+	import { start as startMachine, step as stepMachine, withVariables } from './emulator.ts';
 	import EventPad from './EventPad.svelte';
 	import { recall, remember } from './memory.ts';
 	import { bestFit, layoutMachine, type MachineLayout } from './layout.ts';
@@ -26,7 +27,6 @@
 		autoMove,
 		eventOptions,
 		findMachine,
-		PREVIEW_EVENT,
 		record,
 		sessionAt,
 		statusText,
@@ -48,13 +48,14 @@
 	}: { machine: string; workspace: Workspace; ui: WorkbenchUi; engine: Engine } = $props();
 
 	const SPEEDS = [0.5, 1, 2, 4];
+	/** A run stops after this many steps, so auto-run cannot go on forever. */
+	const LIMITS = { maxSteps: 1000 };
 	const BASE_DELAY = 1100;
 
 	// The machine, kept current as the model is edited.
 	let fetched = $state.raw<StateMachine[] | null>(null);
 	const machines = $derived(workspace.machines.length ? workspace.machines : (fetched ?? []));
 	const def = $derived(findMachine(machines, machine) ?? null);
-	const qname = $derived(def ? (def.qualifiedName ?? def.name) : machine);
 	const ready = $derived(workspace.machines.length > 0 || fetched !== null);
 
 	onMount(() => {
@@ -99,7 +100,14 @@
 
 	// Variables changed since the last step, and the guards they would give.
 	let pending = $state.raw<Record<string, unknown>>(saved?.pending ?? {});
-	let preview = $state.raw<StateSession | null>(null);
+	const preview: StateSession | null = $derived.by(() => {
+		if (!def || !session || !Object.keys(pending).length) return null;
+		try {
+			return withVariables(def, session, pending, LIMITS);
+		} catch {
+			return null;
+		}
+	});
 
 	let auto = $state(false);
 	let speed = $state(saved?.speed ?? 1);
@@ -126,7 +134,6 @@
 	const wide = $derived(width === 0 || width >= 760);
 	let highlight = $state<number[]>([]);
 
-	const files = () => workspace.sourceFiles();
 	const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 	// Start once the machine is known.
@@ -268,26 +275,6 @@
 		noticeTimer = setTimeout(() => (notice = null), 6000);
 	}
 
-	// Preview the guards with changed variables: an event no model declares fires nothing.
-	$effect(() => {
-		const changes = pending;
-		const base = session;
-		const name = qname;
-		if (!base || !Object.keys(changes).length) {
-			preview = null;
-			return;
-		}
-		const timer = setTimeout(() => {
-			engine
-				.stateStep(files(), name, base, PREVIEW_EVENT, changes)
-				.then((result) => {
-					if (pending === changes && session === base) preview = result;
-				})
-				.catch(() => (preview = null));
-		}, 120);
-		return () => clearTimeout(timer);
-	});
-
 	function duration() {
 		return auto ? Math.min(420, (BASE_DELAY / speed) * 0.55) : 420;
 	}
@@ -325,10 +312,9 @@
 		stepError = null;
 		notice = null;
 		try {
-			const first = await engine.stateStep(files(), qname, null, null, null);
+			const first = startMachine(def, null, LIMITS);
 			startedKey = structureKey(def);
 			pending = {};
-			preview = null;
 			override = [];
 			history = { sessions: [first], cursor: 0 };
 			const steps = stepsSince(null, first);
@@ -361,9 +347,8 @@
 		stepError = null;
 		const changes = Object.keys(pending).length ? pending : null;
 		try {
-			const next = await engine.stateStep(files(), qname, before, event, changes);
+			const next = stepMachine(def, before, { event, variables: changes ?? undefined }, LIMITS);
 			pending = {};
-			preview = null;
 			const steps = stepsSince(before, next);
 			if (steps.length) override = [...before.current];
 			history = record(history, next);
@@ -593,7 +578,7 @@
 					<div class="callout danger" role="alert">
 						<CircleAlert size={16} aria-hidden="true" />
 						<p>
-							<strong>The engine could not take that step.</strong>
+							<strong>The emulator could not take that step.</strong>
 							{stepError}
 						</p>
 						<button type="button" class="callout-action" onclick={restart}>Restart</button>

@@ -2,18 +2,12 @@
  * Emulation helpers: what the controls offer from the current state, how a
  * blocked transition is explained, what each variable affects, and how the
  * trace and the session history fit together. Pure functions over the
- * engine's `StateMachine` and `StateSession`.
+ * `StateMachine` and the emulator's `StateSession`.
  */
 import type { SimStep, StateMachine, StateSession } from '#lib/engine/types.ts';
 
 export type Enabled = StateSession['enabled'][number];
 export type Variable = StateMachine['variables'][number];
-
-/**
- * An event name the model cannot declare: stepping with it fires nothing but
- * applies variables and re-evaluates guards, so the controls can preview them.
- */
-export const PREVIEW_EVENT = '⁠preview';
 
 /** `when …` (change), `after …` and `at …` (time) triggers fire on a Step, not as events. */
 export function isChangeTrigger(trigger: string | null | undefined): boolean {
