@@ -621,8 +621,8 @@
 	}
 	.phone {
 		gap: var(--space-3);
-		padding: var(--space-3) max(var(--space-3), env(safe-area-inset-right)) 6rem
-			max(var(--space-3), env(safe-area-inset-left));
+		padding: var(--space-3) max(var(--space-3), env(safe-area-inset-right))
+			calc(6rem + var(--sheet-cover, 0px)) max(var(--space-3), env(safe-area-inset-left));
 		overscroll-behavior: contain;
 		font-size: var(--text-md);
 	}

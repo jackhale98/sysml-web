@@ -33,10 +33,10 @@
 	import type { ProjectSession } from '#lib/project/session.svelte.ts';
 	import Explorer from './Explorer.svelte';
 	import ProjectMenu from './ProjectMenu.svelte';
+	import { settings } from '#lib/settings/settings.svelte.ts';
 	import HomeView from './HomeView.svelte';
 	import Inspector from './Inspector.svelte';
 	import DocumentView from '#lib/markdown/DocumentView.svelte';
-	import CommandPalette from './CommandPalette.svelte';
 	import ViewTable from './ViewTable.svelte';
 	import { presentationOf } from './views.ts';
 	import { tabId, tabTitle, type FileLayout, type WorkbenchUi } from './ui.svelte.ts';
@@ -61,6 +61,15 @@
 	// only when a file or diagram is first opened.
 	const loadTextEditor = () => import('./TextEditor.svelte').then((m) => m.default);
 	const loadDiagram = () => import('#lib/diagram/DiagramCanvas.svelte').then((m) => m.default);
+	// Dialogs mount on first use and then stay, so they keep their state.
+	let palettePrimed = $state(false);
+	let sourceControlPrimed = $state(false);
+	let settingsPrimed = $state(false);
+	$effect(() => {
+		if (ui.paletteOpen) palettePrimed = true;
+		if (ui.sourceControlOpen) sourceControlPrimed = true;
+		if (ui.settingsOpen) settingsPrimed = true;
+	});
 	const loadEmulator = () => import('#lib/sim/StateEmulator.svelte').then((m) => m.default);
 	const loadLibraryFile = () => import('./LibraryFile.svelte').then((m) => m.default);
 
@@ -113,7 +122,11 @@
 	 */
 	const phone = $derived(ui.phone);
 	const layout: FileLayout = $derived(
-		phone ? (tab?.kind === 'file' ? (ui.fileLayouts[tab.path] ?? 'diagram') : 'diagram') : ui.layout
+		phone
+			? tab?.kind === 'file'
+				? (ui.fileLayouts[tab.path] ?? settings.phoneStart)
+				: 'diagram'
+			: ui.layout
 	);
 	const layoutChoices = $derived(phone ? [layouts[2]!, layouts[0]!] : layouts);
 	function chooseLayout(id: FileLayout) {
@@ -189,7 +202,11 @@
 	/** The add button floats over the model and views, but not over text (that has "Edit text"). */
 	const showAdd = $derived(
 		phone &&
-			(section === 'model' || (section === 'views' && !(tab?.kind === 'file' && showText))) &&
+			(section === 'model' ||
+				(section === 'views' &&
+					tab?.kind !== 'emulator' &&
+					tab?.kind !== 'library' &&
+					!(tab?.kind === 'file' && showText))) &&
 			!ui.editingText &&
 			!detailsOpen
 	);
@@ -221,7 +238,13 @@
 	<header class="topbar">
 		<a class="brand" href={resolve('/')} aria-label="SysML Web home"><Logo size={24} /></a>
 		{#if session}
-			<ProjectMenu {workspace} {session} {engine} />
+			<ProjectMenu
+				{workspace}
+				{session}
+				{engine}
+				onopensettings={() => (ui.settingsOpen = true)}
+				onopensourcecontrol={() => (ui.sourceControlOpen = true)}
+			/>
 		{:else}
 			<div class="project"><strong>{workspace.info?.name ?? 'Project'}</strong></div>
 		{/if}
@@ -490,7 +513,7 @@
 		</section>
 
 		<div class="pane inspector-pane">
-			{#if !phone}<Inspector {workspace} {ui} />{/if}
+			{#if !phone}<Inspector {workspace} {ui} {engine} />{/if}
 		</div>
 
 		<section class="pane problems-pane" aria-label="Problems">
@@ -524,7 +547,7 @@
 		{#if phone}
 			<div class="sheet-host">
 				<DetailsSheet bind:snap={ui.details} label="Element details">
-					<Inspector {workspace} {ui} />
+					<Inspector {workspace} {ui} {engine} />
 				</DetailsSheet>
 			</div>
 			{#if showAdd}
@@ -575,7 +598,22 @@
 	</footer>
 
 	<Toaster />
-	<CommandPalette {workspace} {ui} />
+	<!-- Loaded the first time they are opened, to keep the first load small. -->
+	{#if palettePrimed}
+		{#await import('./CommandPalette.svelte') then { default: CommandPalette }}
+			<CommandPalette {workspace} {ui} />
+		{/await}
+	{/if}
+	{#if session && sourceControlPrimed}
+		{#await import('#lib/git/SourceControl.svelte') then { default: SourceControl }}
+			<SourceControl {session} {engine} bind:open={ui.sourceControlOpen} />
+		{/await}
+	{/if}
+	{#if settingsPrimed}
+		{#await import('#lib/settings/Settings.svelte') then { default: SettingsDialog }}
+			<SettingsDialog {engine} bind:open={ui.settingsOpen} />
+		{/await}
+	{/if}
 
 	{#if phone}
 		<div class="bar">
@@ -1028,7 +1066,8 @@
 			grid-template-rows: auto minmax(0, 1fr) auto;
 			grid-template-areas: 'top' 'main' 'bar';
 			height: var(--app-height, 100dvh);
-			transform: translateY(var(--app-top, 0px));
+			position: relative;
+			top: var(--app-top, 0px);
 			overflow: hidden;
 		}
 		.topbar {
@@ -1207,7 +1246,8 @@
 			overflow-y: auto;
 			overscroll-behavior: contain;
 			padding: var(--space-4) max(var(--space-3), env(safe-area-inset-right))
-				calc(var(--space-7) + 3rem) max(var(--space-3), env(safe-area-inset-left));
+				calc(var(--space-7) + 3rem + var(--sheet-cover, 0px))
+				max(var(--space-3), env(safe-area-inset-left));
 		}
 		.sheet-host {
 			display: block;
@@ -1259,6 +1299,10 @@
 		.editing .sheet-host,
 		.editing .fab {
 			display: none;
+		}
+		/* The project menu stays on screen on the narrowest phones. */
+		.workbench :global(.project-menu > :is(.menu, .popover)) {
+			width: min(20rem, calc(100vw - 4rem));
 		}
 		/* Toasts float above the bottom navigation. */
 		.workbench :global(.toaster) {

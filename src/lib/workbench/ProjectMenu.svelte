@@ -22,14 +22,11 @@
 	import { accounts } from '#lib/git/account.svelte.ts';
 	import { messageOf } from '#lib/git/errors.ts';
 	import GitHubMark from '#lib/git/GitHubMark.svelte';
-	import OpenRepository from '#lib/git/OpenRepository.svelte';
 	import { keepRepository } from '#lib/git/project.ts';
-	import SourceControl from '#lib/git/SourceControl.svelte';
 	import type { Progress, RepoChoice } from '#lib/git/types.ts';
 	import type { ProjectSession } from '#lib/project/session.svelte.ts';
 	import { deleteProject } from '#lib/project/store.ts';
 	import type { Workspace } from '#lib/project/workspace.svelte.ts';
-	import Settings from '#lib/settings/Settings.svelte';
 	import { settings } from '#lib/settings/settings.svelte.ts';
 	import { toasts } from '#lib/ui/toasts.svelte.ts';
 
@@ -307,13 +304,22 @@
 	{/if}
 </div>
 
-{#if !onopensourcecontrol}
-	<SourceControl {session} {engine} bind:open={ownSourceControl} />
+<!-- Loaded when first opened, to keep the first load small. -->
+{#if !onopensourcecontrol && ownSourceControl}
+	{#await import('#lib/git/SourceControl.svelte') then { default: SourceControl }}
+		<SourceControl {session} {engine} bind:open={ownSourceControl} />
+	{/await}
 {/if}
-{#if !onopensettings}
-	<Settings bind:open={ownSettings} {engine} />
+{#if !onopensettings && ownSettings}
+	{#await import('#lib/settings/Settings.svelte') then { default: Settings }}
+		<Settings bind:open={ownSettings} {engine} />
+	{/await}
 {/if}
-<OpenRepository bind:open={openRepo} run={openFromGitHub} />
+{#if openRepo}
+	{#await import('#lib/git/OpenRepository.svelte') then { default: OpenRepository }}
+		<OpenRepository bind:open={openRepo} run={openFromGitHub} />
+	{/await}
+{/if}
 
 <style>
 	.project-menu {

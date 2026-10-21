@@ -1,4 +1,6 @@
 <script lang="ts">
+	import type { Engine } from '#lib/engine/client.ts';
+	import PropertyForm from './PropertyForm.svelte';
 	import { BookOpen, CircleAlert, Code, FileCode, Link2, Plus, Trash2 } from '@lucide/svelte';
 	import { conceptFor } from '#lib/learn/concepts.ts';
 	import KindGlyph from '#lib/ui/KindGlyph.svelte';
@@ -13,7 +15,8 @@
 	import { canOwnMembers } from './templates.ts';
 	import type { WorkbenchUi } from './ui.svelte.ts';
 
-	let { workspace, ui }: { workspace: Workspace; ui: WorkbenchUi } = $props();
+	let { workspace, ui, engine }: { workspace: Workspace; ui: WorkbenchUi; engine?: Engine } =
+		$props();
 
 	const element: ModelElement | undefined = $derived(
 		workspace.elements.find((e) => e.key === ui.selection?.key)
@@ -131,18 +134,15 @@
 					<input id="inspector-name" bind:value={name} onblur={rename} />
 				</div>
 			</form>
+			{#if engine}
+				{#key element.key}
+					<PropertyForm {element} {workspace} {engine} />
+				{/key}
+			{/if}
 			<dl>
-				{#if element.typeRef}
+				{#if !engine && element.typeRef}
 					<dt>{element.isDefinition ? 'Specializes' : 'Type'}</dt>
 					<dd class="mono">{displayReference(element.typeRef)}</dd>
-				{/if}
-				{#if element.multiplicity}
-					<dt>Multiplicity</dt>
-					<dd class="mono">{element.multiplicity}</dd>
-				{/if}
-				{#if element.value}
-					<dt>Value</dt>
-					<dd class="mono">{element.value}</dd>
 				{/if}
 				<dt>Defined in</dt>
 				<dd>
@@ -152,7 +152,7 @@
 					</button>
 				</dd>
 			</dl>
-			{#if element.doc}<p class="doc">{element.doc}</p>{/if}
+			{#if !engine && element.doc}<p class="doc">{element.doc}</p>{/if}
 		</section>
 
 		{#if requirement}

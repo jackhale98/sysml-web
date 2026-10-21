@@ -100,17 +100,6 @@ test('requirements view lists requirements with their trace status', async ({ pa
 	await expectAccessible(page);
 });
 
-test('on a phone, one pane shows at a time', async ({ page }) => {
-	await page.setViewportSize({ width: 390, height: 844 });
-	await openDemo(page);
-	const panes = page.getByRole('navigation', { name: 'Panes' });
-	await panes.getByRole('button', { name: 'Model' }).click();
-	await expect(page.getByRole('tree', { name: 'Model' })).toBeVisible();
-	await panes.getByRole('button', { name: 'Inspector' }).click();
-	await expect(page.getByRole('complementary', { name: 'Inspector' })).toBeVisible();
-	await expectAccessible(page);
-});
-
 test('saved SysML views render as tables and diagrams', async ({ page }) => {
 	await openDemo(page);
 	const views = page.locator('section[aria-labelledby="views-heading"]');
@@ -143,41 +132,6 @@ test('the guided tour reads as a page whose references open the model', async ({
 	await expectAccessible(page);
 	await page.getByRole('button', { name: 'DroneViews::serviceContext' }).first().click();
 	await expect(page.getByRole('region', { name: /Service context diagram/ })).toBeVisible();
-});
-
-test('on a phone, a file switches between text and diagram instead of splitting', async ({
-	page
-}) => {
-	await page.setViewportSize({ width: 390, height: 844 });
-	await openDemo(page);
-	await page
-		.getByRole('navigation', { name: 'Panes' })
-		.getByRole('button', { name: 'Model' })
-		.click();
-	await openFile(page, /DroneArchitecture/);
-	const layouts = page.getByRole('group', { name: 'Show the model as' });
-	await expect(layouts.getByRole('button')).toHaveCount(2);
-	await expect(page.getByRole('region', { name: /DroneArchitecture diagram/ })).toHaveCount(0);
-	await layouts.getByRole('button', { name: /Diagram/ }).click();
-	await expect(page.getByRole('region', { name: /DroneArchitecture diagram/ })).toBeVisible();
-	await expect(page.locator('.cm-content')).toBeHidden();
-});
-
-test('on a phone, filtering the model shows matching elements at once', async ({ page }) => {
-	await page.setViewportSize({ width: 390, height: 844 });
-	await openDemo(page);
-	await page
-		.getByRole('navigation', { name: 'Panes' })
-		.getByRole('button', { name: 'Model' })
-		.click();
-	await page.getByPlaceholder('Filter elements').fill('batt');
-	const results = page.getByRole('region', { name: /results/ });
-	const first = results.getByRole('button').first();
-	await expect(first).toBeInViewport();
-	await expect(first).toContainText(/batt/i);
-	await expectAccessible(page);
-	await first.click();
-	await expect(page.locator('.cm-content')).toBeVisible();
 });
 
 test('table cells edit the SysML behind them', async ({ page }) => {
@@ -289,4 +243,137 @@ test('a state machine runs step by step in the emulator', async ({ page }) => {
 	await page.getByRole('button', { name: 'TakeOffCommand to flying' }).click();
 	await expect(page.getByText(/Now in flying/)).toBeVisible();
 	await expectAccessible(page);
+});
+
+/** Nothing on a phone screen is wider than the screen, so the page never pans sideways. */
+async function expectNoSidewaysScroll(page: Page) {
+	const widths = await page.evaluate(() => {
+		const d = document.documentElement;
+		return { scroll: d.scrollWidth, client: d.clientWidth, x: window.scrollX };
+	});
+	expect(widths.scroll).toBe(widths.client);
+	expect(widths.x).toBe(0);
+}
+
+test.describe('on a phone', () => {
+	test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+
+	test('on a phone, the bottom navigation switches sections and details open in a sheet', async ({
+		page
+	}) => {
+		await openDemo(page);
+		const nav = page.getByRole('navigation', { name: 'Sections' });
+		await expect(nav.getByRole('button', { name: 'Home' })).toHaveAttribute('aria-current', 'page');
+		await expectNoSidewaysScroll(page);
+
+		await nav.getByRole('button', { name: 'Model' }).click();
+		await expect(page.getByRole('tree', { name: 'Model' })).toBeVisible();
+		await page
+			.getByRole('tree', { name: 'Model' })
+			.getByRole('button', { name: 'DroneArchitecture', exact: true })
+			.click();
+		const sheet = page.getByRole('group', { name: 'Element details' });
+		await expect(sheet).toHaveAttribute('data-snap', 'half');
+		const inspector = sheet.getByRole('complementary', { name: 'Inspector' });
+		await expect(inspector.getByRole('heading', { level: 2 })).toContainText('DroneArchitecture');
+		await expectNoSidewaysScroll(page);
+		await expectAccessible(page);
+
+		// Going elsewhere lowers the sheet to a peek; Details brings it back up.
+		await nav.getByRole('button', { name: 'Views' }).click();
+		await expect(sheet).toHaveAttribute('data-snap', 'peek');
+		await nav.getByRole('button', { name: 'Details' }).click();
+		await expect(sheet).toHaveAttribute('data-snap', 'full');
+
+		// Everything the desktop top bar has is in the More menu.
+		await page.getByRole('button', { name: /^More/ }).click();
+		const more = page.getByRole('dialog', { name: 'More' });
+		await more.getByRole('button', { name: /Problems/ }).click();
+		await expect(page.getByRole('dialog', { name: 'Problems' })).toBeVisible();
+	});
+
+	test('on a phone, the views drawer switches views and tables show as cards', async ({ page }) => {
+		await openDemo(page);
+		await page.getByRole('button', { name: /Switch view$/ }).click();
+		const drawer = page.getByRole('dialog', { name: 'Views' });
+		await drawer.getByRole('button', { name: /System requirements/ }).click();
+		await expect(drawer).toBeHidden();
+		const card = page.locator('.cards .card').filter({ hasText: 'SYS-001' });
+		await expect(card).toBeVisible();
+		await expectNoSidewaysScroll(page);
+		await expectAccessible(page);
+		await card.getByRole('button', { name: /Edit Priority/ }).click();
+		await card.getByRole('combobox', { name: /Priority/ }).selectOption('low');
+		await expect(card).toContainText('low');
+
+		await page.getByRole('button', { name: /Switch view$/ }).click();
+		await expect(
+			drawer.getByRole('button', { name: 'System requirements', exact: true })
+		).toHaveAttribute('aria-current', 'true');
+		await drawer.getByRole('button', { name: 'Run FlightModes' }).click();
+		await expect(page.getByText(/(Started|Now) in idle/)).toBeVisible({ timeout: 15_000 });
+		await expectNoSidewaysScroll(page);
+	});
+
+	test('on a phone, a file opens as its diagram and its text is read-only until Edit text', async ({
+		page
+	}) => {
+		await openDemo(page);
+		await page
+			.getByRole('navigation', { name: 'Sections' })
+			.getByRole('button', { name: 'Model' })
+			.click();
+		await page.getByRole('tab', { name: 'Files' }).click();
+		await page.getByRole('button', { name: /^DroneArchitecture\.sysml/ }).click();
+		const layouts = page.getByRole('group', { name: 'Show the model as' });
+		await expect(layouts.getByRole('button')).toHaveCount(2);
+		await expect(page.getByRole('region', { name: /DroneArchitecture diagram/ })).toBeVisible();
+
+		await layouts.getByRole('button', { name: /Text/ }).click();
+		const text = page.locator('.cm-content');
+		await expect(text).toHaveAttribute('contenteditable', 'false');
+		await expect(page.getByRole('region', { name: /DroneArchitecture diagram/ })).toHaveCount(0);
+		await page.getByRole('button', { name: 'Edit text' }).click();
+		await expect(text).toHaveAttribute('contenteditable', 'true');
+		await expect(page.getByRole('navigation', { name: 'Sections' })).toBeHidden();
+		const typing = page.getByRole('toolbar', { name: 'Typing' });
+		await typing.getByRole('button', { name: 'Type {' }).click();
+		await typing.getByRole('button', { name: 'Undo' }).click();
+		await typing.getByRole('button', { name: 'Done' }).click();
+		await expect(text).toHaveAttribute('contenteditable', 'false');
+		await expect(page.getByRole('navigation', { name: 'Sections' })).toBeVisible();
+		await expectNoSidewaysScroll(page);
+	});
+
+	test('on a phone, filtering the model shows matching elements at once', async ({ page }) => {
+		await openDemo(page);
+		await page
+			.getByRole('navigation', { name: 'Sections' })
+			.getByRole('button', { name: 'Model' })
+			.click();
+		await page.getByPlaceholder('Filter elements').fill('batt');
+		const results = page.getByRole('region', { name: /results/ });
+		const first = results.getByRole('button').first();
+		await expect(first).toBeInViewport();
+		await expect(first).toContainText(/batt/i);
+		await expectAccessible(page);
+		await first.click();
+		await expect(
+			page.getByRole('group', { name: 'Element details' }).getByRole('heading', { level: 2 })
+		).toContainText(/batt/i);
+	});
+
+	test('on a phone, elements are added with a form', async ({ page }) => {
+		await openDemo(page);
+		await page
+			.getByRole('navigation', { name: 'Sections' })
+			.getByRole('button', { name: 'Model' })
+			.click();
+		await page.getByRole('button', { name: 'Add an element' }).click();
+		const sheet = page.getByRole('dialog', { name: 'Add an element' });
+		await sheet.getByLabel('Name').fill('Hangar');
+		await sheet.getByRole('button', { name: 'Add', exact: true }).click();
+		await expect(sheet).toBeHidden();
+		await expect(page.getByRole('tree', { name: 'Model' })).toContainText('Hangar');
+	});
 });

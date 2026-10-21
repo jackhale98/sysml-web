@@ -106,235 +106,241 @@
 {/snippet}
 
 <div class="home" data-home-scroll>
-	<div class="page" aria-busy={!ready}>
-		<Hero {workspace} {ui} {tourPath} {architecture} {showcase} {ownElements} />
+	<!-- Drawn once the project's files and description are known, so nothing moves when they arrive. -->
+	{#if workspace.info}
+		<div class="page" aria-busy={!ready}>
+			<Hero {workspace} {ui} {tourPath} {architecture} {showcase} {ownElements} />
 
-		<Glance {families} {ready} onpick={showElement} />
+			<Glance {families} {ready} onpick={showElement} />
 
-		<section class="card requirements" aria-labelledby="req-heading">
-			<header class="card-head">
-				<span class="badge" style:--fam="var(--kind-requirement)"><ListChecks size={16} /></span>
-				<div class="heading">
-					<h3 id="req-heading">Requirements</h3>
-					<p class="sub">
-						{#if ready}{coverage.total} in this project{:else}{@render skeleton('6rem')}{/if}
-					</p>
-				</div>
-				<button type="button" class="link" onclick={() => ui.open({ kind: 'requirements' })}>
-					Open table <ArrowRight size={14} aria-hidden="true" />
-				</button>
-			</header>
-
-			<div class="req-body">
-				<div class="rings-wrap">
-					<div class="rings">
-						<CoverageRing
-							label="Allocated to the design"
-							hint="A part of the design satisfies it."
-							value={coverage.satisfied}
-							total={coverage.total}
-							color="var(--info)"
-							{ready}
-						/>
-						<CoverageRing
-							label="Covered by a test"
-							hint="A verification case checks it."
-							value={coverage.verified}
-							total={coverage.total}
-							color="var(--ok)"
-							{ready}
-						/>
-						<CoverageRing
-							label="Fully traced"
-							hint="Both allocated and covered by a test."
-							value={traced}
-							total={coverage.total}
-							color="var(--kind-view)"
-							{ready}
-						/>
-					</div>
-				</div>
-
-				<div class="status">
-					<h4>By status</h4>
-					{#if !ready}
-						<span class="bar">{@render skeleton('100%', '0.75rem')}</span>
-						<ul class="legend">
-							{#each [0, 1, 2, 3] as i (i)}
-								<li>{@render skeleton('6.5rem', '1.25rem')}</li>
-							{/each}
-						</ul>
-					{:else if workspace.requirements.length === 0}
-						<p class="empty">No requirements yet. Add one in text or on a diagram.</p>
-					{:else}
-						<div class="bar" aria-hidden="true">
-							{#each byStatus as s (s.label)}
-								<span class="segment {s.tone}" style:flex-grow={s.count}></span>
-							{/each}
-						</div>
-						<ul class="legend">
-							{#each byStatus as s (s.label)}
-								<li>
-									<Pill tone={s.tone}>{s.label}</Pill>
-									<span class="n">{s.count}</span>
-								</li>
-							{/each}
-						</ul>
-					{/if}
-				</div>
-			</div>
-		</section>
-
-		<div class="columns">
-			<section class="card attention" aria-labelledby="attention-heading">
+			<section class="card requirements" aria-labelledby="req-heading">
 				<header class="card-head">
-					<span class="badge" style:--fam="var(--warn)"><Flag size={16} /></span>
+					<span class="badge" style:--fam="var(--kind-requirement)"><ListChecks size={16} /></span>
 					<div class="heading">
-						<h3 id="attention-heading">Needs attention</h3>
+						<h3 id="req-heading">Requirements</h3>
 						<p class="sub">
-							{#if !ready}{@render skeleton('9rem')}{:else if gaps.length}{gaps.length} requirements with
-								a gap{:else}Nothing to follow up{/if}
+							{#if ready}{coverage.total} in this project{:else}{@render skeleton('6rem')}{/if}
 						</p>
 					</div>
+					<button type="button" class="link" onclick={() => ui.open({ kind: 'requirements' })}>
+						Open table <ArrowRight size={14} aria-hidden="true" />
+					</button>
 				</header>
-				<div class="gap-list">
-					{#if !ready}
-						<ul class="rows">
-							{#each Array.from({ length: GAP_LIMIT }, (_, i) => i) as i (i)}
-								<li class="row-skeleton">
-									{@render skeleton('3.5rem')}{@render skeleton(`${50 + ((i * 17) % 35)}%`)}
-								</li>
-							{/each}
-						</ul>
-					{:else if gaps.length === 0}
-						<p class="all-good">
-							<CircleCheck size={18} aria-hidden="true" />
-							Every requirement is allocated and covered by a test.
-						</p>
-					{:else}
-						<ul class="rows">
-							{#each gaps.slice(0, GAP_LIMIT) as r (r.key)}
-								<li>
-									<button type="button" class="gap-row" onclick={() => showRequirement(r.key)}>
-										<span class="id mono">{r.id ?? '—'}</span>
-										<span class="title">{r.title}</span>
-										<span class="tags">
-											{#if r.satisfiedBy.length === 0}<Pill tone="warn">Not allocated</Pill>{/if}
-											{#if r.verifiedBy.length === 0}<Pill tone="warn">No test</Pill>{/if}
-										</span>
-									</button>
-								</li>
-							{/each}
-						</ul>
-						{#if gaps.length > GAP_LIMIT}
-							<button
-								type="button"
-								class="link more"
-								onclick={() => ui.open({ kind: 'requirements' })}
-							>
-								All {gaps.length} requirements with gaps <ArrowRight size={14} aria-hidden="true" />
-							</button>
+
+				<div class="req-body">
+					<div class="rings-wrap">
+						<div class="rings">
+							<CoverageRing
+								label="Allocated to the design"
+								hint="A part of the design satisfies it."
+								value={coverage.satisfied}
+								total={coverage.total}
+								color="var(--info)"
+								{ready}
+							/>
+							<CoverageRing
+								label="Covered by a test"
+								hint="A verification case checks it."
+								value={coverage.verified}
+								total={coverage.total}
+								color="var(--ok)"
+								{ready}
+							/>
+							<CoverageRing
+								label="Fully traced"
+								hint="Both allocated and covered by a test."
+								value={traced}
+								total={coverage.total}
+								color="var(--kind-view)"
+								{ready}
+							/>
+						</div>
+					</div>
+
+					<div class="status">
+						<h4>By status</h4>
+						{#if !ready}
+							<span class="bar">{@render skeleton('100%', '0.75rem')}</span>
+							<ul class="legend">
+								{#each [0, 1, 2, 3] as i (i)}
+									<li>{@render skeleton('6.5rem', '1.25rem')}</li>
+								{/each}
+							</ul>
+						{:else if workspace.requirements.length === 0}
+							<p class="empty">No requirements yet. Add one in text or on a diagram.</p>
+						{:else}
+							<div class="bar" aria-hidden="true">
+								{#each byStatus as s (s.label)}
+									<span class="segment {s.tone}" style:flex-grow={s.count}></span>
+								{/each}
+							</div>
+							<ul class="legend">
+								{#each byStatus as s (s.label)}
+									<li>
+										<Pill tone={s.tone}>{s.label}</Pill>
+										<span class="n">{s.count}</span>
+									</li>
+								{/each}
+							</ul>
 						{/if}
-					{/if}
+					</div>
 				</div>
 			</section>
 
-			<div class="side">
-				<section class="card problems" aria-labelledby="problems-heading">
+			<div class="columns">
+				<section class="card attention" aria-labelledby="attention-heading">
 					<header class="card-head">
-						<span class="badge" style:--fam={errors ? 'var(--danger)' : 'var(--ok)'}>
-							{#if errors}<CircleAlert size={16} />{:else}<CircleCheck size={16} />{/if}
-						</span>
+						<span class="badge" style:--fam="var(--warn)"><Flag size={16} /></span>
 						<div class="heading">
-							<h3 id="problems-heading">Problems</h3>
+							<h3 id="attention-heading">Needs attention</h3>
 							<p class="sub">
-								{#if !ready}{@render skeleton('7rem')}{:else if errors}Fix errors first{:else}No
-									errors{/if}
+								{#if !ready}{@render skeleton('9rem')}{:else if gaps.length}{gaps.length} requirements
+									with a gap{:else}Nothing to follow up{/if}
 							</p>
 						</div>
-						<button type="button" class="link" onclick={showProblems}>
-							Review <ArrowRight size={14} aria-hidden="true" />
-						</button>
 					</header>
-					<div class="tallies">
-						<div class="tally" class:bad={ready && errors > 0}>
-							<CircleAlert size={16} aria-hidden="true" />
-							<span class="tally-n"
-								>{#if ready}{errors}{:else}{@render skeleton('1.25rem', '1.25rem')}{/if}</span
-							>
-							<span class="tally-label">{errors === 1 ? 'error' : 'errors'}</span>
-						</div>
-						<div class="tally" class:warned={ready && warnings > 0}>
-							<TriangleAlert size={16} aria-hidden="true" />
-							<span class="tally-n"
-								>{#if ready}{warnings}{:else}{@render skeleton('1.25rem', '1.25rem')}{/if}</span
-							>
-							<span class="tally-label">{warnings === 1 ? 'warning' : 'warnings'}</span>
-						</div>
+					<div class="gap-list">
+						{#if !ready}
+							<ul class="rows">
+								{#each Array.from({ length: GAP_LIMIT }, (_, i) => i) as i (i)}
+									<li class="row-skeleton">
+										{@render skeleton('3.5rem')}{@render skeleton(`${50 + ((i * 17) % 35)}%`)}
+									</li>
+								{/each}
+							</ul>
+						{:else if gaps.length === 0}
+							<p class="all-good">
+								<CircleCheck size={18} aria-hidden="true" />
+								Every requirement is allocated and covered by a test.
+							</p>
+						{:else}
+							<ul class="rows">
+								{#each gaps.slice(0, GAP_LIMIT) as r (r.key)}
+									<li>
+										<button type="button" class="gap-row" onclick={() => showRequirement(r.key)}>
+											<span class="id mono">{r.id ?? '—'}</span>
+											<span class="title">{r.title}</span>
+											<span class="tags">
+												{#if r.satisfiedBy.length === 0}<Pill tone="warn">Not allocated</Pill>{/if}
+												{#if r.verifiedBy.length === 0}<Pill tone="warn">No test</Pill>{/if}
+											</span>
+										</button>
+									</li>
+								{/each}
+							</ul>
+							{#if gaps.length > GAP_LIMIT}
+								<button
+									type="button"
+									class="link more"
+									onclick={() => ui.open({ kind: 'requirements' })}
+								>
+									All {gaps.length} requirements with gaps <ArrowRight
+										size={14}
+										aria-hidden="true"
+									/>
+								</button>
+							{/if}
+						{/if}
 					</div>
-					{#if ready && problemGroups.length}
-						<ul class="groups">
-							{#each problemGroups.slice(0, 3) as g (g.severity + g.code)}
+				</section>
+
+				<div class="side">
+					<section class="card problems" aria-labelledby="problems-heading">
+						<header class="card-head">
+							<span class="badge" style:--fam={errors ? 'var(--danger)' : 'var(--ok)'}>
+								{#if errors}<CircleAlert size={16} />{:else}<CircleCheck size={16} />{/if}
+							</span>
+							<div class="heading">
+								<h3 id="problems-heading">Problems</h3>
+								<p class="sub">
+									{#if !ready}{@render skeleton('7rem')}{:else if errors}Fix errors first{:else}No
+										errors{/if}
+								</p>
+							</div>
+							<button type="button" class="link" onclick={showProblems}>
+								Review <ArrowRight size={14} aria-hidden="true" />
+							</button>
+						</header>
+						<div class="tallies">
+							<div class="tally" class:bad={ready && errors > 0}>
+								<CircleAlert size={16} aria-hidden="true" />
+								<span class="tally-n"
+									>{#if ready}{errors}{:else}{@render skeleton('1.25rem', '1.25rem')}{/if}</span
+								>
+								<span class="tally-label">{errors === 1 ? 'error' : 'errors'}</span>
+							</div>
+							<div class="tally" class:warned={ready && warnings > 0}>
+								<TriangleAlert size={16} aria-hidden="true" />
+								<span class="tally-n"
+									>{#if ready}{warnings}{:else}{@render skeleton('1.25rem', '1.25rem')}{/if}</span
+								>
+								<span class="tally-label">{warnings === 1 ? 'warning' : 'warnings'}</span>
+							</div>
+						</div>
+						{#if ready && problemGroups.length}
+							<ul class="groups">
+								{#each problemGroups.slice(0, 3) as g (g.severity + g.code)}
+									<li>
+										<button type="button" class="group {g.severity}" onclick={showProblems}>
+											<span class="group-text">
+												<span class="group-label">{g.label}</span>
+												<span class="group-example">{g.example}</span>
+											</span>
+											<span class="group-n">{g.count}</span>
+										</button>
+									</li>
+								{/each}
+							</ul>
+						{:else if ready}
+							<p class="all-good">
+								<CircleCheck size={18} aria-hidden="true" /> The model is consistent.
+							</p>
+						{/if}
+					</section>
+
+					<section class="card files" aria-labelledby="files-heading">
+						<header class="card-head">
+							<span class="badge" style:--fam="var(--kind-package)"><FileCode size={16} /></span>
+							<div class="heading">
+								<h3 id="files-heading">Files</h3>
+								<p class="sub">
+									{workspace.dirty.size
+										? 'Edited and recent first'
+										: opened.length
+											? 'Recently opened first'
+											: 'The largest first'}
+								</p>
+							</div>
+						</header>
+						<ul class="rows">
+							{#each files as path (path)}
 								<li>
-									<button type="button" class="group {g.severity}" onclick={showProblems}>
-										<span class="group-text">
-											<span class="group-label">{g.label}</span>
-											<span class="group-example">{g.example}</span>
+									<button
+										type="button"
+										class="file-row"
+										onclick={() => ui.open({ kind: 'file', path })}
+									>
+										<span class="file-icon" aria-hidden="true">
+											{#if workspace.dirty.has(path)}<PencilLine size={15} />{:else}<FileCode
+													size={15}
+												/>{/if}
 										</span>
-										<span class="group-n">{g.count}</span>
+										<span class="file-text">
+											<span class="file-name">{fileName(path)}</span>
+											<span class="file-meta">{fileMeta(path)}</span>
+										</span>
+										{#if workspace.dirty.has(path)}
+											<Pill tone="warn">Edited</Pill>
+										{/if}
 									</button>
 								</li>
 							{/each}
 						</ul>
-					{:else if ready}
-						<p class="all-good">
-							<CircleCheck size={18} aria-hidden="true" /> The model is consistent.
-						</p>
-					{/if}
-				</section>
-
-				<section class="card files" aria-labelledby="files-heading">
-					<header class="card-head">
-						<span class="badge" style:--fam="var(--kind-package)"><FileCode size={16} /></span>
-						<div class="heading">
-							<h3 id="files-heading">Files</h3>
-							<p class="sub">
-								{workspace.dirty.size
-									? 'Edited and recent first'
-									: opened.length
-										? 'Recently opened first'
-										: 'The largest first'}
-							</p>
-						</div>
-					</header>
-					<ul class="rows">
-						{#each files as path (path)}
-							<li>
-								<button
-									type="button"
-									class="file-row"
-									onclick={() => ui.open({ kind: 'file', path })}
-								>
-									<span class="file-icon" aria-hidden="true">
-										{#if workspace.dirty.has(path)}<PencilLine size={15} />{:else}<FileCode
-												size={15}
-											/>{/if}
-									</span>
-									<span class="file-text">
-										<span class="file-name">{fileName(path)}</span>
-										<span class="file-meta">{fileMeta(path)}</span>
-									</span>
-									{#if workspace.dirty.has(path)}
-										<Pill tone="warn">Edited</Pill>
-									{/if}
-								</button>
-							</li>
-						{/each}
-					</ul>
-				</section>
+					</section>
+				</div>
 			</div>
 		</div>
-	</div>
+	{/if}
 </div>
 
 <style>

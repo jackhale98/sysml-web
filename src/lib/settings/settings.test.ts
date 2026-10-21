@@ -16,14 +16,14 @@ describe('settings', () => {
 					editorFontSize: 99,
 					lineWrapping: true,
 					lineNumbers: 'yes',
-					phoneStart: 'diagram'
+					phoneStart: 'text'
 				})
 			)
 		).toEqual({
 			...DEFAULTS,
 			density: 'compact',
 			lineWrapping: true,
-			phoneStart: 'diagram'
+			phoneStart: 'text'
 		});
 		expect(parseSettings(JSON.stringify({ editorFontSize: 15.4 })).editorFontSize).toBe(15);
 	});

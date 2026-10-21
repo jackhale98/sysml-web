@@ -398,10 +398,7 @@
 												<button
 													type="button"
 													class="cell"
-													onclick={() => {
-														openRow(row.index);
-														editing = { row: row.index, column: c };
-													}}
+													onclick={() => (editing = { row: row.index, column: c })}
 													><span class="visually-hidden">Edit {heading(column)}:</span
 													>{@render display(kind, value)}{#if !value}<span class="empty">Add</span
 														>{/if}</button
@@ -942,7 +939,7 @@
 		/* Cards: the list scrolls down; nothing scrolls sideways or shrinks to fit. */
 		.cards-scroll {
 			margin: 0;
-			padding: var(--space-1) var(--space-3) 6rem;
+			padding: var(--space-1) var(--space-3) calc(6rem + var(--sheet-cover, 0px));
 			overflow-x: hidden;
 			overflow-y: auto;
 			overscroll-behavior: contain;

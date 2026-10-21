@@ -25,7 +25,10 @@
 	} from '@codemirror/view';
 	import { Check, PencilLine, Redo2, Undo2 } from '@lucide/svelte';
 	import type { Engine } from '#lib/engine/client.ts';
+	import type { DefinitionTarget } from '#lib/engine/types.ts';
+	import { sysmlLanguage } from '#lib/editor/language.ts';
 	import { editorTheme, highlightEffect, sysmlHighlighting } from '#lib/editor/sysml.ts';
+	import { settings } from '#lib/settings/settings.svelte.ts';
 	import { byteToUtf16, elementAt, utf16ToByte } from '#lib/project/elements.ts';
 	import type { Workspace } from '#lib/project/workspace.svelte.ts';
 	import type { WorkbenchUi } from './ui.svelte.ts';
@@ -53,6 +56,8 @@
 	const editing = new Compartment();
 	const look = new Compartment();
 	const gutter = new Compartment();
+	/** The person's editor settings: font size, wrapping, line numbers. */
+	const prefs = new Compartment();
 	let canUndo = $state(false);
 	let canRedo = $state(false);
 
@@ -69,6 +74,35 @@
 	function lookExtensions(small: boolean) {
 		return small ? [EditorView.lineWrapping, phoneTheme] : [];
 	}
+	function prefExtensions(small: boolean, size: number, wrap: boolean, numbers: boolean) {
+		return [
+			...(numbers ? [lineNumbers()] : []),
+			...(!small && wrap ? [EditorView.lineWrapping] : []),
+			...(small ? [] : [EditorView.theme({ '&': { fontSize: `${size}px` } })])
+		];
+	}
+	$effect(() => {
+		const extensions = prefExtensions(
+			phone,
+			settings.editorFontSize,
+			settings.lineWrapping,
+			settings.lineNumbers
+		);
+		view?.dispatch({ effects: prefs.reconfigure(extensions) });
+	});
+
+	/** Where a definition lives: open the file and select the element there. */
+	function goto(target: DefinitionTarget) {
+		if ('library' in target) {
+			ui.open({ kind: 'library', path: target.library.path, line: target.library.line });
+			return;
+		}
+		ui.open({ kind: 'file', path: target.path });
+		const text = workspace.text(target.path) ?? '';
+		const element = elementAt(workspace.elements, target.path, utf16ToByte(text, target.from));
+		if (element) ui.select(element.key, 'inspector');
+	}
+
 	function gutterExtensions(small: boolean) {
 		return small ? [] : [lintGutter()];
 	}
@@ -136,7 +170,21 @@
 				extensions: [
 					editing.of(editingExtensions(editable)),
 					look.of(lookExtensions(phone)),
-					lineNumbers(),
+					prefs.of(
+						prefExtensions(
+							phone,
+							settings.editorFontSize,
+							settings.lineWrapping,
+							settings.lineNumbers
+						)
+					),
+					sysmlLanguage({
+						engine,
+						path,
+						files: () => workspace.sourceFiles(),
+						goto,
+						applyChanges: (label, changes) => workspace.applyFileChanges(label, changes)
+					}),
 					highlightActiveLineGutter(),
 					highlightActiveLine(),
 					drawSelection(),

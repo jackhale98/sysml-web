@@ -30,7 +30,7 @@ export const DEFAULTS: SettingsValues = {
 	editorFontSize: 13,
 	lineWrapping: false,
 	lineNumbers: true,
-	phoneStart: 'text'
+	phoneStart: 'diagram'
 };
 
 export const FONT_SIZES = { min: 11, max: 20 };

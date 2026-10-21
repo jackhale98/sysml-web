@@ -5,32 +5,43 @@ export type Engine = {
 	[M in Method]: (...params: Parameters<EngineApi[M]>) => Promise<ReturnType<EngineApi[M]>>;
 } & { terminate(): void };
 
-/** Start the engine in a Web Worker, loading it from the given URLs. */
-export function startEngine(urls: Init): Engine {
-	const worker = new Worker(new URL('./engine.worker.ts', import.meta.url), { type: 'module' });
+/**
+ * The engine in a Web Worker, loading it from the given URLs. The worker
+ * (and its WebAssembly download) starts on the first call, so a page can
+ * paint before the engine competes for the network. The URLs may be given
+ * as a function, so they are only worked out then (not while prerendering).
+ */
+export function startEngine(urls: Init | (() => Init)): Engine {
 	const pending = new Map<number, { resolve(value: unknown): void; reject(error: Error): void }>();
 	let nextId = 1;
+	let started: Worker | undefined;
 
-	worker.onmessage = (event: MessageEvent<Response>) => {
-		const response = event.data;
-		const call = pending.get(response.id);
-		if (!call) return;
-		pending.delete(response.id);
-		if (response.ok) call.resolve(response.result);
-		else call.reject(new Error(response.error));
-	};
-	worker.onerror = (event) => {
-		const error = new Error(event.message || 'The SysML engine failed to start');
-		for (const call of pending.values()) call.reject(error);
-		pending.clear();
-	};
-	worker.postMessage(urls satisfies Init);
+	function worker(): Worker {
+		if (started) return started;
+		const w = new Worker(new URL('./engine.worker.ts', import.meta.url), { type: 'module' });
+		w.onmessage = (event: MessageEvent<Response>) => {
+			const response = event.data;
+			const call = pending.get(response.id);
+			if (!call) return;
+			pending.delete(response.id);
+			if (response.ok) call.resolve(response.result);
+			else call.reject(new Error(response.error));
+		};
+		w.onerror = (event) => {
+			const error = new Error(event.message || 'The SysML engine failed to start');
+			for (const call of pending.values()) call.reject(error);
+			pending.clear();
+		};
+		w.postMessage((typeof urls === 'function' ? urls() : urls) satisfies Init);
+		started = w;
+		return w;
+	}
 
 	function call<M extends Method>(method: M, ...params: Parameters<EngineApi[M]>) {
 		const id = nextId++;
 		return new Promise<ReturnType<EngineApi[M]>>((resolve, reject) => {
 			pending.set(id, { resolve: resolve as (value: unknown) => void, reject });
-			worker.postMessage({ id, method, params } satisfies Request<M>);
+			worker().postMessage({ id, method, params } satisfies Request<M>);
 		});
 	}
 
@@ -61,6 +72,6 @@ export function startEngine(urls: Init): Engine {
 		libraryLicense: (...params) => call('libraryLicense', ...params),
 		stateMachines: (...params) => call('stateMachines', ...params),
 		stateStep: (...params) => call('stateStep', ...params),
-		terminate: () => worker.terminate()
+		terminate: () => started?.terminate()
 	};
 }

@@ -7,9 +7,9 @@ let engine: Engine | undefined;
 export function getEngine(): Engine {
 	// Absolute URLs: the worker resolves relative ones against its own script.
 	const absolute = (path: string) => new URL(path, location.href).href;
-	engine ??= startEngine({
+	engine ??= startEngine(() => ({
 		glueUrl: absolute(asset('engine/sysml_wasm.js')),
 		wasmUrl: absolute(asset('engine/sysml_wasm_bg.wasm'))
-	});
+	}));
 	return engine;
 }

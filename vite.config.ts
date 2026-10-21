@@ -15,6 +15,8 @@ export default defineConfig({
 				precompress: false,
 				strict: true
 			}),
+			// Small stylesheets go inline, saving the first paint a round trip each.
+			inlineStyleThreshold: 4096,
 			paths: {
 				// Set BASE_PATH=/sysml-web when deploying to a GitHub Pages project site.
 				base: (process.env.BASE_PATH ?? '') as '' | `/${string}`

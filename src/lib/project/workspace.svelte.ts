@@ -130,6 +130,17 @@ export class Workspace {
 	private timer: ReturnType<typeof setTimeout> | undefined;
 	private generation = 0;
 
+	/**
+	 * Show a project's name, description and files before the engine reads
+	 * it, so the first paint is already the project (no layout shift when
+	 * analysis starts). `open` follows with the same or newer files.
+	 */
+	preview(source: ProjectSource) {
+		if (this.state.phase !== 'idle') return;
+		this.info = source.info;
+		this.files = Object.fromEntries(source.files.map((f) => [f.path, f.text]));
+	}
+
 	async open(source: ProjectSource, engine: Engine) {
 		const generation = ++this.generation;
 		this.engine = engine;
@@ -225,6 +236,28 @@ export class Workspace {
 			];
 		}
 		return error;
+	}
+
+	/**
+	 * Apply engine changes that may span several files (a rename, a quick
+	 * fix) as one undoable step, through open editors where there are any.
+	 */
+	async applyFileChanges(
+		label: string,
+		changes: { path: string; from: number; to: number; insert: string }[]
+	): Promise<void> {
+		await this.transact(label, async () => {
+			const byFile: Record<string, Change[]> = {};
+			for (const { path, ...change } of changes) (byFile[path] ??= []).push(change);
+			for (const [path, fileChanges] of Object.entries(byFile)) {
+				const before = this.files[path];
+				if (before === undefined) continue;
+				const editor = this.editors.get(path);
+				if (editor) editor.apply(fileChanges);
+				else this.setText(path, applyChanges(before, fileChanges));
+			}
+			return null;
+		});
 	}
 
 	/** Undo the latest model edit; returns its label, or null when there is none. */
