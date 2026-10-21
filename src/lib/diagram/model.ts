@@ -130,7 +130,13 @@ export function resolveNode(
 		(isDefinition === undefined || e.isDefinition === isDefinition ? 4 : 0) +
 		(scope && inScope(e, scope, owners) ? 2 : 0) +
 		(e.file.startsWith('libraries/') ? 0 : 1);
-	return candidates.sort((a, b) => score(b) - score(a))[0];
+	const depth = (e: ModelElement) => {
+		let d = 0;
+		for (let o = owners.get(e.key); o; o = owners.get(o.key)) d++;
+		return d;
+	};
+	// Best score first; among equals, the shallowest (a package's part over a subject).
+	return candidates.sort((a, b) => score(b) - score(a) || depth(a) - depth(b))[0];
 }
 
 function inScope(element: ModelElement, scope: string, owners: Owners): boolean {

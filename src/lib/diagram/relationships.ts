@@ -170,6 +170,7 @@ export function connectionOwner(
 /** A lower-camel name for a new part typed by `type`, unique among `taken`. */
 export function partName(type: string, taken: Iterable<string> = []): string {
 	const words = simpleName(type)
+		.replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
 		.replace(/([a-z0-9])([A-Z])/g, '$1 $2')
 		.split(/[^A-Za-z0-9]+/)
 		.filter(Boolean);
@@ -367,8 +368,13 @@ export function planRelation(
 	ctx: ModelContext
 ): Plan | string {
 	const { from, to } = option;
-	const step = (host: ModelElement, statement: string, label: string): Plan | string => {
-		const s = memberStep(host, statement, ctx);
+	const step = (
+		host: ModelElement,
+		statement: string,
+		label: string,
+		beside?: string
+	): Plan | string => {
+		const s = beside ? besideStep(host, beside, statement, ctx) : memberStep(host, statement, ctx);
 		return typeof s === 'string' ? s : { label, statement, steps: [s] };
 	};
 	switch (option.kind) {
