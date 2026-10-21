@@ -11,8 +11,12 @@ export type Tab =
 	| { kind: 'view'; name: string; title: string }
 	/** Run a state machine interactively. `machine` is its (qualified) name. */
 	| { kind: 'emulator'; machine: string; title: string }
-	/** A read-only file of the OMG standard library. */
-	| { kind: 'library'; path: string; line?: number };
+	/**
+	 * A read-only file of the OMG standard library, at a line. `name` is the
+	 * element looked for there: when the line is from another release of the
+	 * library, the nearest declaration of that name is shown instead.
+	 */
+	| { kind: 'library'; path: string; line?: number; name?: string };
 
 export type SelectionSource = 'text' | 'diagram' | 'explorer' | 'inspector' | 'table';
 
@@ -152,6 +156,8 @@ export class WorkbenchUi {
 		const id = tabId(tab);
 		const existing = this.tabs.findIndex((t) => tabId(t) === id);
 		if (existing >= 0) {
+			// The same library file at another line.
+			if (tab.kind === 'library') this.tabs[existing] = tab;
 			this.active = existing;
 		} else {
 			this.tabs.push(tab);

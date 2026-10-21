@@ -331,7 +331,7 @@
 	<main class="panes">
 		<h1 class="visually-hidden">{workspace.info?.name ?? 'Project'}</h1>
 		<div class="pane explorer-pane">
-			<Explorer {workspace} {ui} {engine} />
+			<Explorer {workspace} {ui} />
 		</div>
 
 		<section class="pane editor-pane" aria-label="Editor">
@@ -426,7 +426,7 @@
 				{:else if tab.kind === 'home'}
 					{#if showCatalog}
 						<div class="catalog-page">
-							<ViewsCatalog {workspace} {ui} {engine} />
+							<ViewsCatalog {workspace} {ui} />
 						</div>
 					{:else}
 						<HomeView {workspace} {ui} {engine} />
@@ -496,7 +496,7 @@
 						{#await loadLibraryFile()}
 							<p class="empty">Opening the library file…</p>
 						{:then LibraryFile}
-							<LibraryFile path={tab.path} line={tab.line} {engine} />
+							<LibraryFile path={tab.path} line={tab.line} name={tab.name} {engine} />
 						{/await}
 					{/key}
 				{:else if tab.path.endsWith('.md') && !tab.raw}
@@ -659,7 +659,7 @@
 				ondetails={toggleDetails}
 			/>
 		</div>
-		<ViewsDrawer {workspace} {ui} {engine} />
+		<ViewsDrawer {workspace} {ui} />
 		<MoreMenu bind:open={moreOpen} {ui} {errors} {warnings} />
 		<ProblemsSheet {workspace} {ui} />
 		<AddSheet {workspace} {ui} context={viewPackage} />

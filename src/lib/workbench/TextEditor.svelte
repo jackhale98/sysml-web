@@ -91,9 +91,9 @@
 	});
 
 	/** Where a definition lives: open the file and select the element there. */
-	function goto(target: DefinitionTarget) {
+	function goto(target: DefinitionTarget, name?: string) {
 		if ('library' in target) {
-			ui.open({ kind: 'library', path: target.library.path, line: target.library.line });
+			ui.open({ kind: 'library', path: target.library.path, line: target.library.line, name });
 			return;
 		}
 		ui.open({ kind: 'file', path: target.path });

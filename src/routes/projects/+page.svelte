@@ -150,7 +150,8 @@
 		if (!file) return;
 		busy = 'Reading the archive…';
 		try {
-			const archive = await getEngine().readProjectArchive(
+			const { readProjectArchive } = await import('#lib/interchange/kpar.ts');
+			const archive = await readProjectArchive(
 				new Uint8Array(await file.arrayBuffer()),
 				file.name.replace(/\.(kpar|zip)$/i, '')
 			);

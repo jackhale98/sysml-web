@@ -41,6 +41,7 @@
 	import { theme, type ThemeChoice } from '#lib/ui/theme.svelte.ts';
 	import { version } from '#lib/version.ts';
 	import engineInfo from '../../../engine.json';
+	import toolkitRelease from '../../../toolkit.json';
 	import {
 		editorFontSizeHere,
 		FONT_SIZES,
@@ -179,7 +180,7 @@
 
 	async function toggleNotice() {
 		showNotice = !showNotice;
-		if (showNotice && !license) license = await (await getEngine()).libraryLicense();
+		if (showNotice && !license) license = (await import('#lib/library/license.ts')).libraryLicense;
 	}
 </script>
 
@@ -538,14 +539,24 @@
 							<dd>{version}</dd>
 							<dt>Engine</dt>
 							<dd>
-								{engineVersion ?? '…'}
-								<!-- eslint-disable svelte/no-navigation-without-resolve -- external link -->
+								<!-- eslint-disable svelte/no-navigation-without-resolve -- external links -->
+								<a
+									href="https://github.com/Open-MBEE/sysml-toolkit/releases/tag/v{toolkitRelease.version}"
+									target="_blank"
+									rel="noopener noreferrer">sysml-toolkit {toolkitRelease.version}</a
+								>
+								<span class="muted">({engineVersion ?? '…'})</span>
+							</dd>
+							<dt>Classic engine</dt>
+							<dd>
+								sysml-cli
 								<a
 									class="rev"
 									href="{engineInfo.repository}/tree/{engineInfo.rev}"
 									target="_blank"
 									rel="noopener noreferrer">({engineInfo.rev.slice(0, 7)})</a
 								>
+								<span class="muted">· tables, diagrams and edits, until they move</span>
 								<!-- eslint-enable svelte/no-navigation-without-resolve -->
 							</dd>
 						</dl>
@@ -553,7 +564,7 @@
 					<section class="block">
 						<h3>Licences</h3>
 						<p>
-							SysML Web and its engine are free software, available under either the
+							SysML Web is free software, available under either the
 							<a
 								href="https://spdx.org/licenses/Apache-2.0.html"
 								target="_blank"
@@ -562,15 +573,27 @@
 							or the
 							<a href="https://spdx.org/licenses/MIT.html" target="_blank" rel="noopener noreferrer"
 								>MIT License</a
-							>, at your choice.
+							>, at your choice. Its engine, the Open-MBEE sysml-toolkit, is free software under the
+							<a
+								href="https://spdx.org/licenses/Apache-2.0.html"
+								target="_blank"
+								rel="noopener noreferrer">Apache License 2.0</a
+							>; the classic engine, sysml-cli, under Apache 2.0 or MIT.
 						</p>
 						<p>
-							The OMG SysML v2 and KerML standard library is included unmodified under the
+							The OMG SysML v2 and KerML standard library is included unmodified, as bundled by the
+							Open-MBEE sysml-toolkit, under the
+							<a
+								href="https://spdx.org/licenses/EPL-2.0.html"
+								target="_blank"
+								rel="noopener noreferrer">Eclipse Public License 2.0</a
+							>. Until the move to the toolkit is finished, the classic engine also carries an
+							earlier release of the library (February 2026) under the
 							<a
 								href="https://spdx.org/licenses/LGPL-3.0-only.html"
 								target="_blank"
 								rel="noopener noreferrer">GNU LGPL 3.0</a
-							>; you may replace it.
+							>.
 						</p>
 						<button
 							type="button"

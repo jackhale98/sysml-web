@@ -12,11 +12,7 @@ import type {
 	FileChange,
 	FileRange,
 	Hover,
-	LibraryEntry,
 	OutlineItem,
-	ProjectArchive,
-	LibraryHit,
-	LibraryLicense,
 	RenderedTable,
 	StateMachine,
 	ViewInfo
@@ -39,7 +35,6 @@ export interface EngineApi {
 	renderView(files: SourceFile[], name: string): RenderedTable;
 	/** The view libraries the engine bundles (`Reporting`, `ModelViews`). */
 	viewLibraries(): SourceFile[];
-	libraryIndex(): LibraryEntry[];
 	elementDetails(
 		files: SourceFile[],
 		path: string,
@@ -59,13 +54,6 @@ export interface EngineApi {
 	outline(files: SourceFile[], path: string): OutlineItem[];
 	format(source: string): { changes: { from: number; to: number; insert: string }[] };
 	codeActions(files: SourceFile[], path: string, from: number, to: number): CodeAction[];
-	/** A `.kpar` or any ZIP of a project, as text files. */
-	readProjectArchive(bytes: Uint8Array, fallbackName: string): ProjectArchive;
-	/** The project as a `.kpar`. `info` is its `.project.json` object. */
-	writeKpar(info: object, files: SourceFile[], created: string): Uint8Array;
-	libraryFile(path: string): SourceFile;
-	librarySearch(query: string, limit: number): LibraryHit[];
-	libraryLicense(): LibraryLicense;
 	stateMachines(files: SourceFile[]): StateMachine[];
 }
 

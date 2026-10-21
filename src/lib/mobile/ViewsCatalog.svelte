@@ -10,8 +10,8 @@
 		Play,
 		Table2
 	} from '@lucide/svelte';
-	import type { Engine } from '#lib/engine/client.ts';
 	import type { LibraryEntry } from '#lib/engine/types.ts';
+	import { libraryIndex } from '#lib/library/library.ts';
 	import { isLibraryFile, type Workspace } from '#lib/project/workspace.svelte.ts';
 	import type { Tab, WorkbenchUi } from '#lib/workbench/ui.svelte.ts';
 	import { presentationOf, viewTitle } from '#lib/workbench/views.ts';
@@ -25,9 +25,8 @@
 	let {
 		workspace,
 		ui,
-		engine,
 		headingLevel = 2
-	}: { workspace: Workspace; ui: WorkbenchUi; engine: Engine; headingLevel?: 2 | 3 } = $props();
+	}: { workspace: Workspace; ui: WorkbenchUi; headingLevel?: 2 | 3 } = $props();
 
 	const savedViews = $derived(
 		workspace.views
@@ -54,7 +53,7 @@
 	let library = $state.raw<LibraryEntry[]>([]);
 	$effect(() => {
 		if (libraryOpen && !library.length) {
-			void engine.libraryIndex().then((index) => (library = index));
+			void libraryIndex().then((index) => (library = index));
 		}
 	});
 

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Plus } from '@lucide/svelte';
-	import type { Engine } from '#lib/engine/client.ts';
+	import { librarySearch } from '#lib/library/library.ts';
 	import type { Workspace } from '#lib/project/workspace.svelte.ts';
 	import KindGlyph from '#lib/ui/KindGlyph.svelte';
 	import { segments } from './palette.ts';
@@ -25,7 +25,6 @@
 		kind,
 		file,
 		workspace,
-		engine,
 		placeholder = '',
 		label,
 		exclude = [],
@@ -41,7 +40,6 @@
 		/** Text of the element's file, to know what it imports. */
 		file: string;
 		workspace: Workspace;
-		engine: Engine;
 		placeholder?: string;
 		/** Accessible name, when no visible `<label for>` names the field. */
 		label?: string;
@@ -74,7 +72,7 @@
 		projectSuggestions(workspace.elements, kinds.project, query, exclude).slice(0, query ? 8 : 60)
 	);
 
-	// Library matches arrive from the engine shortly after typing pauses.
+	// Library matches arrive from the library worker shortly after typing pauses.
 	$effect(() => {
 		const q = query;
 		const wanted = kinds.library;
@@ -86,8 +84,7 @@
 			return;
 		}
 		timer = setTimeout(() => {
-			void engine
-				.librarySearch(q, 60)
+			void librarySearch(q, 60)
 				.then((hits) => {
 					if (current === request)
 						library = librarySuggestions(hits, wanted, q, source).slice(0, 8);

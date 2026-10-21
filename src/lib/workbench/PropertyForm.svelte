@@ -172,7 +172,6 @@
 					{kind}
 					file={fileText}
 					{workspace}
-					{engine}
 					placeholder="Choose or type a definition"
 					create={owningPackage
 						? {
@@ -256,7 +255,6 @@
 							{kind}
 							file={fileText}
 							{workspace}
-							{engine}
 							label="Add a more general definition"
 							placeholder="Add a more general definition"
 							exclude={[element.name, ...details.specializes]}

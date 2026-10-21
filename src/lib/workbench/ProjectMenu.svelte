@@ -134,7 +134,7 @@
 	async function exportKpar() {
 		open = false;
 		try {
-			await session.exportKpar(engine);
+			await session.exportKpar();
 		} catch (error) {
 			toasts.show(error instanceof Error ? error.message : String(error), { tone: 'error' });
 		}
