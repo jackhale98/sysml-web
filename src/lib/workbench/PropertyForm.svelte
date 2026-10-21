@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Engine } from '#lib/engine/client.ts';
-	import type { DeclarationSet, ElementDetails } from '#lib/engine/types.ts';
+	import type { DeclarationSet, ElementDetails, Evaluated } from '#lib/engine/types.ts';
+	import { computedText } from '#lib/project/checks.ts';
 	import type { ModelElement } from '#lib/project/elements.ts';
 	import type { Workspace } from '#lib/project/workspace.svelte.ts';
 	import { toasts } from '#lib/ui/toasts.svelte.ts';
@@ -15,12 +16,23 @@
 	let {
 		element,
 		workspace,
-		engine
-	}: { element: ModelElement; workspace: Workspace; engine: Engine } = $props();
+		engine,
+		computed
+	}: {
+		element: ModelElement;
+		workspace: Workspace;
+		engine: Engine;
+		/** The value as the engine evaluated it, when it is an expression. */
+		computed?: Evaluated;
+	} = $props();
 
 	let details = $state<ElementDetails | null>(null);
 	let error = $state<string | null>(null);
 	let generation = 0;
+
+	/** `= 27.54 min` beside an expression; nothing beside a plain number. */
+	const result = $derived(computed ? computedText(computed, details?.value ?? null) : null);
+	let why = $state(false);
 
 	$effect(() => {
 		const current = ++generation;
@@ -231,10 +243,25 @@
 						class="mono"
 						value={details.value ?? ''}
 						placeholder="e.g. 1.2 [kg]"
+						aria-describedby={result ? `${uid}-computed` : undefined}
 						onblur={(e) => commit('value', e.currentTarget.value, details?.value, 'the value')}
 						{onkeydown}
 					/>
 				</label>
+				{#if result && computed}
+					<div class="computed" id="{uid}-computed" aria-live="polite">
+						{#if computed.kind === 'undecided'}
+							<span class="result undecided">= ?</span>
+							<span class="note">Not computed.</span>
+							<button type="button" class="why" aria-expanded={why} onclick={() => (why = !why)}
+								>Why?</button
+							>
+							{#if why}<p class="reason">{computed.reason}.</p>{/if}
+						{:else}
+							<span class="result"><span class="visually-hidden">Comes to </span>= {result}</span>
+						{/if}
+					</div>
+				{/if}
 			{/if}
 		{:else if isDef}
 			<div class="field">
@@ -348,6 +375,47 @@
 	}
 	.mono {
 		font-family: var(--font-mono);
+	}
+	/* What the value's expression comes to: quiet, under the field it explains. */
+	.computed {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 2px var(--space-2);
+		margin-top: calc(-1 * var(--space-2));
+		padding-left: var(--space-3);
+		color: var(--text-2);
+		font-size: var(--text-sm);
+	}
+	.result {
+		font-family: var(--font-mono);
+		font-variant-numeric: tabular-nums;
+		color: var(--text);
+	}
+	.result.undecided {
+		color: var(--text-3);
+	}
+	.note {
+		color: var(--text-3);
+		font-size: var(--text-xs);
+	}
+	.why {
+		padding: 0;
+		border: 0;
+		background: transparent;
+		color: var(--accent);
+		font: inherit;
+		font-size: var(--text-xs);
+		text-decoration: underline;
+		text-underline-offset: 2px;
+		cursor: pointer;
+	}
+	.reason {
+		flex-basis: 100%;
+		margin: 2px 0 0;
+		color: var(--text-2);
+		font-size: var(--text-xs);
+		line-height: 1.45;
 	}
 	input:focus,
 	select:focus,

@@ -1,5 +1,7 @@
 <script lang="ts">
 	import type { Engine } from '#lib/engine/client.ts';
+	import type { Evaluated } from '#lib/engine/types.ts';
+	import { valueText } from '#lib/project/checks.ts';
 	import PropertyForm from './PropertyForm.svelte';
 	import { BookOpen, CircleAlert, Code, FileCode, Link2, Plus, Trash2 } from '@lucide/svelte';
 	import { conceptFor } from '#lib/learn/concepts.ts';
@@ -44,6 +46,33 @@
 				)
 			: []
 	);
+
+	/**
+	 * Evaluated values of the element and of the attributes it contains, in one
+	 * call (the engine caches them per analysis, so selecting stays instant).
+	 */
+	let values = $state.raw<Record<string, Evaluated>>({});
+	let valuesGeneration = 0;
+	$effect(() => {
+		const current = ++valuesGeneration;
+		const ids = [element, ...children]
+			.filter((e) => e && e.kind === 'attribute' && e.value !== null && e.id)
+			.map((e) => e!.id!);
+		void workspace.files;
+		if (!engine || !ids.length) {
+			values = {};
+			return;
+		}
+		void engine
+			.evaluate(workspace.sourceFiles(), ids)
+			.then((result) => {
+				if (current === valuesGeneration) values = result;
+			})
+			.catch(() => {
+				if (current === valuesGeneration) values = {};
+			});
+	});
+	const valueOf = (e: ModelElement) => (e.id ? values[e.id] : undefined);
 
 	let name = $state('');
 	let adding = $state(false);
@@ -136,7 +165,7 @@
 			</form>
 			{#if engine}
 				{#key element.key}
-					<PropertyForm {element} {workspace} {engine} />
+					<PropertyForm {element} {workspace} {engine} computed={valueOf(element)} />
 				{/key}
 			{/if}
 			<dl>
@@ -214,11 +243,33 @@
 				<ul class="links">
 					{#each children as child (child.key)}
 						<li>
-							<button type="button" class="link" onclick={() => ui.select(child.key, 'inspector')}>
+							<button
+								type="button"
+								class="link member"
+								onclick={() => ui.select(child.key, 'inspector')}
+							>
 								<span class="child-kind"
 									>{child.isDefinition ? `${child.kind} def` : child.kind}</span
 								>
 								{child.label}
+								{#if valueOf(child)}
+									{@const v = valueOf(child)!}
+									{@const shown =
+										v.kind === 'number'
+											? valueText(v)
+											: v.kind === 'text'
+												? v.text
+												: v.kind === 'undecided'
+													? '?'
+													: null}
+									{#if shown && v.kind === 'undecided'}
+										<span class="child-value undecided" title={v.reason}
+											>?<span class="visually-hidden">: not computed, {v.reason}</span></span
+										>
+									{:else if shown}
+										<span class="child-value">{shown}</span>
+									{/if}
+								{/if}
 							</button>
 						</li>
 					{/each}
@@ -454,6 +505,22 @@
 	.child-kind {
 		color: var(--text-3);
 		font-size: var(--text-xs);
+	}
+	.member {
+		display: flex;
+		width: 100%;
+	}
+	/* An attribute's value, as the engine evaluated it. */
+	.child-value {
+		margin-left: auto;
+		padding-left: var(--space-2);
+		color: var(--text-2);
+		font-size: var(--text-xs);
+		font-variant-numeric: tabular-nums;
+		white-space: nowrap;
+	}
+	.child-value.undecided {
+		color: var(--text-3);
 	}
 	.actions {
 		display: grid;
