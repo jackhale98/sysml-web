@@ -1,0 +1,104 @@
+# A guided tour of the delivery drone
+
+This project models a small quadcopter that delivers parcels of up to 1 kg from a
+depot to customers within 3 km, then flies home. It is written in SysML v2, a text
+language for describing systems. Every diagram in the app is drawn from this text,
+and editing a diagram edits the text.
+
+Follow the stops in order. Each one names the element to open (by its qualified
+name, `Package::element`) and what it teaches.
+
+## 1. Start with the world around the drone: `DeliveryContext::deliveryService`
+
+The operator, the ground station, the drone and the recipient, and how they are
+connected. This is the "big picture" before any detail.
+Diagram: **`DroneViews::serviceContext`** (Interconnection View).
+
+## 2. A stakeholder need: `StakeholderNeeds::'Parcel delivery'`
+
+Needs are written as requirements. The ID `STK-001` is the short name in `<'...'>`,
+the statement is the `doc` text, and `stakeholder` records who asked for it.
+Status, owner and rationale are metadata (`@StatusInfo`, `@Rationale`). The
+requirements table in the app reads exactly these fields.
+
+## 3. A measurable system requirement: `SystemRequirements::'Flight endurance'`
+
+`SYS-001` has a subject (the drone) and a `require constraint` that states the
+requirement as a check with units: `drone.endurance >= 25 [min]`. Its subject comes
+from `SystemRequirements::DroneRequirement`, a requirement kind that specializes
+`EngineeringRequirement`. At the bottom of the file, `#derivation` connections link
+each system requirement to the need it comes from.
+Diagram: **`DroneViews::requirementTree`**.
+
+## 4. A definition: `DroneComponents::Battery`
+
+A `part def` describes a kind of component, like a datasheet. `Battery`
+specializes (`:>`) the abstract `Component`, gives its inherited `mass` a value
+(`:>>` redefines it), and computes `usableEnergy` from other attributes, with units
+(`216 [W*h]`). Its `port powerOut` is where power leaves it.
+Diagram: **`DroneViews::componentCatalogue`**.
+
+## 5. A usage: `DroneArchitecture::drone`
+
+The design is built from usages of the catalogue definitions. `part rotors : Rotor[4]`
+says "four rotors". Compare it with `DroneArchitecture::DeliveryDrone`, the definition
+that says what any delivery drone must offer. At the end, `emptyMass` is a mass roll-up,
+like a spreadsheet formula that lives in the model.
+Diagram: **`DroneViews::droneBreakdown`**.
+
+## 6. Ports, interfaces and flows: `DroneInterfaces::CommandLinkPort`
+
+A port lists what goes out and what comes in. The drone uses `~CommandLinkPort`, the
+conjugate (mirror image), so commands that go out of the ground station come in to
+the drone. `DroneInterfaces::CommandLink` is a reusable connection that carries both
+flows. In `DroneArchitecture::drone`, see how power, commands and sensor signals are
+connected, and in `DroneComponents::Rotor` how `bind` passes a port through to a
+nested part.
+Diagram: **`DroneViews::droneInterconnection`**.
+
+## 7. The mission: `DeliveryMission::DeliverParcel` and `DeliveryMission::DeliveryFlight`
+
+The use case says who is involved and what success means (its `objective`). The
+delivery flight says how, step by step: `then` for the next step, `fork`/`join` for
+steps at the same time, and `decide`/`merge` for a choice (drop the parcel only if
+the drop zone is clear).
+Diagram: **`DroneViews::deliveryFlightFlow`** (Action Flow View).
+
+## 8. Who does what: `FunctionAllocation`
+
+`DeliveryDrone` performs the delivery flight (`perform`). `allocate` then assigns each
+step to the component responsible: the camera checks the drop zone, the latch
+releases the parcel, the flight controller does the rest.
+
+## 9. Flight modes: `FlightControl::FlightModes`
+
+A state machine: idle, armed, flying, returning home, landing and failsafe. Each
+transition says what triggers it (`accept LinkLost`), an optional guard
+(`if preflightChecksPassed`) and where it goes. `accept when stateOfCharge < ...`
+fires on its own when the battery runs low. The flight controller runs it
+(`exhibit state` in `DroneComponents::FlightController`).
+Diagram: **`DroneViews::flightModeStates`**.
+
+## 10. Meeting the requirements: `RequirementSatisfaction` and `DronePerformance`
+
+`satisfy 'Battery protection' by drone.battery` assigns each requirement to the part
+responsible. `DronePerformance::HoverEndurance` is a calculation with units, and the
+analyses `massBudget` and `enduranceBudget` show the margins: 0.23 kg below the mass
+limit and 2.5 minutes above the endurance target.
+
+## 11. Proving it: `DroneVerification::enduranceFlightTest`
+
+A verification case names what it tests (its subject), what it verifies (its
+objective), the method (`@VerificationMethod`) and how the verdict is decided.
+Diagram: **`DroneViews::requirementCoverage`**. This table shows the gaps left in on
+purpose: nothing satisfies or verifies `'Ingress protection'` (SYS-005) or
+`'Acoustic noise'` (SYS-006), and `'Controlled parcel release'` (SYS-011) is not
+verified yet.
+
+## 12. What could go wrong: `DroneFmea`
+
+A design FMEA. Hazards lead to harms (`Causation`). Risk controls are requirements
+on the design. Mitigations are the work that implements them (`satisfy`). Each
+`@Fmea` line rates one failure mode of one component. The risk priority number is
+calculated from the ratings, never typed in. Two risk controls are not verified yet.
+Diagram: **`DroneViews::fmeaWorksheet`**.

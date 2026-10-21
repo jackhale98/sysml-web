@@ -1,9 +1,17 @@
 {
 	"name": "Drone UAV",
-	"description": "Demo project: a small quadcopter delivery drone with requirements, structure, verification and a design FMEA.",
-	"version": "0.1.0",
+	"description": "Demo project: a quadcopter parcel-delivery drone. Stakeholder needs and system requirements, component catalogue and architecture, interfaces, mission and flight modes, performance analysis, verification plan, design FMEA and saved views. Start with TOUR.md.",
+	"version": "0.2.0",
 	"license": "Apache-2.0 OR MIT",
 	"usage": [
+		{
+			"resource": "https://www.omg.org/spec/KerML/20250201/Data-Type-Library.kpar",
+			"versionConstraint": "1.0.0"
+		},
+		{
+			"resource": "https://www.omg.org/spec/KerML/20250201/Function-Library.kpar",
+			"versionConstraint": "1.0.0"
+		},
 		{
 			"resource": "https://www.omg.org/spec/SysML/20250201/Systems-Library.kpar",
 			"versionConstraint": "2.0.0"
