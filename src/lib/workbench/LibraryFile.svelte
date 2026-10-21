@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { EditorState } from '@codemirror/state';
+	import { Compartment, EditorState } from '@codemirror/state';
 	import { EditorView, highlightActiveLine, lineNumbers } from '@codemirror/view';
 	import { BookLock } from '@lucide/svelte';
 	import type { Engine } from '#lib/engine/client.ts';
@@ -18,6 +18,8 @@
 		$props();
 
 	let host: HTMLDivElement;
+	/** Marks the line navigated to (none until a line is asked for). */
+	const mark = new Compartment();
 	let view = $state.raw<EditorView | undefined>();
 	let error = $state<string | null>(null);
 	const license = $derived(licenseFor(path));
@@ -36,8 +38,7 @@
 						doc: file.text,
 						extensions: [
 							lineNumbers(),
-							// Marks the line navigated to.
-							highlightActiveLine(),
+							mark.of([]),
 							EditorState.readOnly.of(true),
 							EditorView.editable.of(false),
 							sysmlHighlighting(),
@@ -71,7 +72,10 @@
 		if (target > doc.lines) return;
 		const at = doc.line(target).from;
 		view.dispatch({
-			effects: EditorView.scrollIntoView(at, { y: 'start', yMargin: 48 }),
+			effects: [
+				mark.reconfigure(highlightActiveLine()),
+				EditorView.scrollIntoView(at, { y: 'start', yMargin: 48 })
+			],
 			selection: { anchor: at }
 		});
 	});
