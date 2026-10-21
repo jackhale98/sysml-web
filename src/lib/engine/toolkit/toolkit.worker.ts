@@ -10,6 +10,7 @@
  * phone: 2.6 s to ready instead of 8.2 s, and 105 MB of memory instead of 160).
  */
 import type { SourceFile } from '../protocol';
+import type { EditRequest } from '../types';
 import type { Toolkit } from './api';
 import { ToolkitHost } from './host';
 import { SyntaxServices } from './language';
@@ -153,7 +154,8 @@ const handlers: { [M in ToolkitMethod]: Handler } = {
 		host.renameSymbol(files, path, offset, newName),
 	outline: (host, files: SourceFile[], path: string) => host.outline(files, path),
 	codeActions: (host, files: SourceFile[], path: string, from: number, to: number) =>
-		host.codeActions(files, path, from, to)
+		host.codeActions(files, path, from, to),
+	edit: (host, request: EditRequest) => host.edit(request)
 };
 
 /** A trap or a failed memory grow leaves the instance unusable: the page restarts the worker. */

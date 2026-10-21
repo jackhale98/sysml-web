@@ -239,10 +239,18 @@ export interface ElementDetails {
 
 /** Fields to change with `setDeclaration`; null, "", false or [] removes. */
 export type DeclarationSet = Partial<
-	Omit<ElementDetails, 'name' | 'kind' | 'isDefinition' | 'qualifiedName'>
+	Pick<
+		ElementDetails,
+		'conjugated' | 'specializes' | 'valueKind' | 'abstract' | 'readonly' | 'derived' | 'end'
+	>
 > & {
-	[K in 'type' | 'redefines' | 'multiplicity' | 'value' | 'direction' | 'shortName' | 'doc']?:
-		string | null;
+	type?: string | null;
+	redefines?: string | null;
+	multiplicity?: string | null;
+	value?: string | null;
+	direction?: 'in' | 'out' | 'inout' | null;
+	shortName?: string | null;
+	doc?: string | null;
 };
 
 /** A project read from a `.kpar` or ZIP. */
@@ -414,38 +422,51 @@ export interface DiagramGraph {
 	direction: string;
 }
 
-/** A source edit, computed by the engine against the current text. */
-export type EditRequest =
-	| { op: 'insertMember'; path: string; source: string; parent: string; text: string }
-	| { op: 'insertTopLevel'; source: string; text: string }
-	| { op: 'remove'; path: string; source: string; name: string }
-	| { op: 'rename'; path: string; source: string; from: string; to: string }
+/**
+ * A source edit, computed by the engine against the current text of `path`
+ * (`source`). Elements are named by their id from the analysis when it is
+ * known, else by their name as written (simple or qualified) and the 1-based
+ * line of their declaration.
+ */
+export type EditRequest = EditOperation & {
+	path: string;
+	source: string;
+	/** The whole project (the workspace adds it), so names resolve across files. */
+	files?: { path: string; text: string }[];
+};
+
+export type EditOperation =
+	| { op: 'insertMember'; parent: string; parentLine?: number; parentId?: string; text: string }
+	| { op: 'insertTopLevel'; text: string }
+	| { op: 'remove'; name: string; line?: number; id?: string }
+	/** Rename an element and every reference to it, in every file. */
+	| { op: 'rename'; from: string; to: string; line?: number; id?: string }
 	| {
 			op: 'setField';
-			path: string;
-			source: string;
 			/** Qualified name of the row's element, as in `RenderedTable.sources`. */
 			element: string;
 			line: number;
+			id?: string;
 			field: string;
 			value: string;
-			/** The whole project, so inserted values find their types in other files. */
-			files?: { path: string; text: string }[];
 	  }
-	| { op: 'setTableColumns'; path: string; source: string; view: string; columns: string[] }
+	| { op: 'setTableColumns'; view: string; columns: string[] }
 	| {
 			op: 'setDeclaration';
-			path: string;
-			source: string;
 			element: string;
 			/** 1-based line of the declaration. */
 			line: number;
+			id?: string;
 			set: DeclarationSet;
 	  };
 
 export interface EditResult {
 	/** Changes in UTF-16 offsets against the source in the request. */
 	changes: { from: number; to: number; insert: string }[];
-	/** Syntax errors the edit would introduce. */
+	/** Changes to other files (a rename's references), against their texts in the request's `files`. */
+	otherFiles?: FileChange[];
+	/** Syntax errors the edit would introduce (it is not made then). */
 	syntaxErrors: string[];
+	/** What the person should know about an edit that was made: references it left unresolved. */
+	warning?: string;
 }

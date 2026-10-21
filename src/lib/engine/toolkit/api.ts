@@ -48,6 +48,21 @@ export interface TkSession {
 	toGraph(optionsJson?: string | null): string;
 	referenceSpelling(e: TkElement): string | undefined;
 	unresolvedCount(): number;
+	// Edits (`edits.ts`): ops JSON `[{op, target, …}]`; splices are bytes per unit name.
+	/** Apply an edit batch; JSON `{idMap, findings, splices}`. Throws the refusal; the session is rebuilt. */
+	edit(opsJson: string): string;
+	/** Dry-run an edit batch: JSON `{wouldCommit, refusal?, idMap?, findings?, splices?}`. */
+	checkEdit(opsJson: string): string;
+	/** JSON `TkSite` of the whole member declaration, or undefined. */
+	memberExtent(e: TkElement): string | undefined;
+	/** JSON `{declaration, references: [{unit, line, col, kind, owner: {id, qualifiedName} | null}]}`. */
+	references(selectorJson: string): string;
+	/** The abstract-syntax property `name` of `e`, as JSON. */
+	property(e: TkElement, name: string): string;
+	/** `e`'s bound value, evaluated, as JSON. */
+	evaluate(e: TkElement): string;
+	/** Whether `e` reaches `general` through its specializations. */
+	conforms(e: TkElement, general: TkElement): boolean;
 }
 
 export interface TkLspServer {

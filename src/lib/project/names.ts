@@ -63,6 +63,11 @@ const KEYWORDS = new Set(
 	).split(' ')
 );
 
+/** Whether `word` is a SysML v2 / KerML reserved word. */
+export function isReservedWord(word: string): boolean {
+	return KEYWORDS.has(word);
+}
+
 /**
  * A name as SysML text: as-is when it is a basic name that is not a reserved
  * word, otherwise single-quoted

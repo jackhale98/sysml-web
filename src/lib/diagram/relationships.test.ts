@@ -1,7 +1,7 @@
-import { readFileSync, readdirSync } from 'node:fs';
-import { join, relative } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
-import type { Analysis } from '#lib/engine/types.ts';
+import { editFiles } from '#lib/engine/toolkit/edit-testing.ts';
+import type { ToolkitHost } from '#lib/engine/toolkit/host.ts';
+import { demoFiles, loadHost } from '#lib/engine/toolkit/testing.ts';
 import { buildTree, collectElements, type ModelElement } from '#lib/project/elements.ts';
 import type { EditStep } from '#lib/workbench/actions.ts';
 import { ownersOf, portsOf, resolveNode } from './model.ts';
@@ -15,28 +15,13 @@ import {
 	type Plan
 } from './relationships.ts';
 
-const ROOT = join(import.meta.dirname, '../../demo/drone');
-const ENGINE = join(import.meta.dirname, '../../../static/engine');
-
-interface Wasm {
-	initSync(options: { module: Buffer }): void;
-	analyzeProject(files: string): string;
-	edit(request: string): string;
-}
-
-function walk(dir: string): string[] {
-	return readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
-		e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)]
-	);
-}
-
-let wasm: Wasm;
+let host: ToolkitHost;
 let files: Record<string, string>;
 let ctx: ModelContext;
 
 function contextFor(texts: Record<string, string>): ModelContext {
 	const list = Object.entries(texts).map(([path, text]) => ({ path, text }));
-	const analyses = JSON.parse(wasm.analyzeProject(JSON.stringify(list))) as Analysis[];
+	const analyses = host.analyzeProject(list);
 	const elements = collectElements(analyses);
 	return {
 		elements,
@@ -46,9 +31,9 @@ function contextFor(texts: Record<string, string>): ModelContext {
 	};
 }
 
-/** Apply a plan's steps the way the workbench does (engine for members). */
+/** Apply a plan's steps the way the workbench does (the engine for members and declarations). */
 function apply(plan: Plan): Record<string, string> {
-	const next = { ...files };
+	let next = { ...files };
 	for (const step of plan.steps as EditStep[]) {
 		const source = next[step.path]!;
 		if (step.kind === 'patch') {
@@ -56,23 +41,29 @@ function apply(plan: Plan): Record<string, string> {
 			next[step.path] = step.after;
 			continue;
 		}
-		const result = JSON.parse(
-			wasm.edit(
-				JSON.stringify({
-					op: 'insertMember',
-					path: step.path,
-					source,
-					parent: step.parent,
-					text: step.text
-				})
-			)
-		) as { changes: { from: number; to: number; insert: string }[]; syntaxErrors: string[] };
-		expect(result.syntaxErrors).toEqual([]);
-		let text = source;
-		for (const c of [...result.changes].sort((a, b) => b.from - a.from)) {
-			text = text.slice(0, c.from) + c.insert + text.slice(c.to);
-		}
-		next[step.path] = text;
+		const edited = editFiles(
+			host,
+			next,
+			step.kind === 'member'
+				? {
+						op: 'insertMember',
+						path: step.path,
+						parent: step.parent.name,
+						parentLine: step.parent.span.start_row,
+						...(step.parent.id ? { parentId: step.parent.id } : {}),
+						text: step.text
+					}
+				: {
+						op: 'setDeclaration',
+						path: step.path,
+						element: step.element.name,
+						line: step.element.span.start_row,
+						...(step.element.id ? { id: step.element.id } : {}),
+						set: step.set
+					}
+		);
+		if ('error' in edited) throw new Error(edited.error);
+		next = edited.files;
 	}
 	return next;
 }
@@ -84,16 +75,10 @@ const el = (id: string, isDefinition?: boolean, scope: string | null = null): Mo
 };
 
 beforeAll(async () => {
-	const url = join(ENGINE, 'sysml_wasm.js');
-	wasm = (await import(/* @vite-ignore */ url)) as Wasm;
-	wasm.initSync({ module: readFileSync(join(ENGINE, 'sysml_wasm_bg.wasm')) });
-	files = Object.fromEntries(
-		walk(ROOT)
-			.filter((f) => f.endsWith('.sysml'))
-			.map((f) => [relative(ROOT, f), readFileSync(f, 'utf8')])
-	);
+	host = await loadHost();
+	files = Object.fromEntries(demoFiles().map((f) => [f.path, f.text]));
 	ctx = contextFor(files);
-});
+}, 60_000);
 
 describe('names', () => {
 	it('makes lower-camel, unique part names', () => {
@@ -183,10 +168,10 @@ describe('statements', () => {
 		);
 	});
 
-	it('"is made of" into a usage patches its body', () => {
+	it('"is made of" adds a part to a usage too', () => {
 		const p = plan(el('drone', false), el('Motor', true), 'is made of');
 		expect(p.statement).toBe('part motor : Motor;');
-		expect(p.steps[0]!.kind).toBe('patch');
+		expect(p.steps[0]!.kind).toBe('member');
 		const after = apply(p)['system/DroneArchitecture.sysml']!;
 		expect(after).toContain(
 			'attribute :>> endurance = HoverEndurance(battery.usableEnergy, hoverPower);\n        part motor : Motor;\n    }'

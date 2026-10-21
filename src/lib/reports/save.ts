@@ -124,6 +124,8 @@ export async function saveReport(
 					path: file,
 					source,
 					parent: owner.name,
+					parentLine: owner.span.start_row,
+					...(owner.id ? { parentId: owner.id } : {}),
 					text
 				});
 				if (failed) return failed;

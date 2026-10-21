@@ -222,33 +222,59 @@ export class Workspace {
 	}
 
 	/**
-	 * Ask the engine for an edit and apply it. Returns an error message when
-	 * the engine refuses or the edit would introduce syntax errors.
+	 * Ask the engine for an edit and apply it (with the changes it makes in
+	 * other files, such as a rename's references). Returns an error message
+	 * when the engine refuses or the edit would introduce syntax errors. A
+	 * warning the engine gives about an edit it made is kept for the toast of
+	 * the transaction it is part of (`warnings`).
 	 */
 	async edit(path: string, request: EditRequest): Promise<string | null> {
 		if (!this.engine) return 'The engine is not ready yet.';
+		const files = this.sourceFiles().map((f) =>
+			f.path === path ? { path, text: request.source } : f
+		);
 		let result: EditResult;
 		try {
-			result = await this.engine.edit(request);
+			result = await this.engine.edit({ ...request, files: request.files ?? files });
 		} catch (error) {
-			return error instanceof Error ? error.message : String(error);
+			return (error instanceof Error ? error.message : String(error)).replace(/^Error: /, '');
 		}
 		if (result.syntaxErrors.length) {
 			return `That change would make the SysML invalid: ${result.syntaxErrors[0]}`;
 		}
-		if (this.files[path] !== request.source) return 'The file changed meanwhile; try again.';
-		const editor = this.editors.get(path);
-		if (editor) editor.apply(result.changes);
-		else this.setText(path, applyChanges(request.source, result.changes));
+		const sent = request.files ?? files;
+		const others: Record<string, Change[]> = {};
+		for (const { path: other, ...change } of result.otherFiles ?? [])
+			(others[other] ??= []).push(change);
+		const unchanged = (p: string) =>
+			this.files[p] === (p === path ? request.source : sent.find((f) => f.path === p)?.text);
+		if (![path, ...Object.keys(others)].every(unchanged))
+			return 'The file changed meanwhile; try again.';
+		this.applyTo(path, request.source, result.changes);
+		for (const [other, changes] of Object.entries(others))
+			this.applyTo(other, this.files[other]!, changes);
+		if (result.warning) this.warnings.push(result.warning);
 		return null;
+	}
+
+	/** Warnings of the edits in the latest transaction (`transact`). */
+	warnings: string[] = [];
+
+	private applyTo(path: string, source: string, changes: Change[]) {
+		if (!changes.length) return;
+		const editor = this.editors.get(path);
+		if (editor) editor.apply(changes);
+		else this.setText(path, applyChanges(source, changes));
 	}
 
 	/**
 	 * Run a model edit (one or several engine edits) as one undoable step.
-	 * Files it changed are remembered so `undo` can put them back.
+	 * Files it changed are remembered so `undo` can put them back; the
+	 * engine's warnings about it are in `warnings` afterwards.
 	 */
 	async transact(label: string, run: () => Promise<string | null>): Promise<string | null> {
 		const before = { ...this.files };
+		this.warnings = [];
 		const error = await run();
 		const changed = Object.keys(this.files).filter((p) => this.files[p] !== before[p]);
 		if (changed.length) {

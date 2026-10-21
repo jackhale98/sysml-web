@@ -15,6 +15,8 @@ import type {
 	Completion,
 	DefinitionTarget,
 	Diagnostic,
+	EditRequest,
+	EditResult,
 	ElementDetails,
 	FileChange,
 	FileRange,
@@ -32,10 +34,21 @@ import type {
 	Toolkit
 } from './api';
 import { toProblems } from './diagnostics';
+import { ModelEditing } from './edits';
 import { LanguageServices, SyntaxServices } from './language';
 import { detailsOf, extractModel, findElement, type ExtractedModel, type UnitInfo } from './model';
 import { TextIndexCache } from './offsets';
 import { RepairMap } from './repair';
+
+/** A session over `files`, with how its units map to them; not analysed yet. */
+interface Prepared {
+	files: SourceFile[];
+	session: TkSession;
+	units: Map<string, UnitInfo>;
+	/** Parse errors (the session holds the repaired texts of the files that have them). */
+	parse: TkFinding[];
+	lenient: boolean;
+}
 
 interface Built {
 	files: SourceFile[];
@@ -49,6 +62,12 @@ export class ToolkitHost {
 	readonly tk: Toolkit;
 	readonly library: TkLibrary;
 	private built: Built | null = null;
+	/**
+	 * A session for `files` not analysed yet: the one an edit left, holding the
+	 * edited texts, or one opened for an edit. The next build or edit of those
+	 * texts starts from it.
+	 */
+	private pending: Prepared | null = null;
 	private settled: TkSettledOutcomes | undefined;
 	private readonly texts = new TextIndexCache();
 	/** Timings of the latest build, for the status line and measurements. */
@@ -135,8 +154,10 @@ export class ToolkitHost {
 		// A separate host state would cost a second session; this one is cheap and thrown away.
 		const previous = this.built;
 		const settled = this.settled;
+		const pending = this.pending;
 		this.built = null;
 		this.settled = undefined;
+		this.pending = null;
 		try {
 			const single = this.build([{ path, text: source }]);
 			single.session?.free();
@@ -147,6 +168,7 @@ export class ToolkitHost {
 			if (fresh !== settled) fresh?.free();
 			this.built = previous;
 			this.settled = settled;
+			this.pending = pending;
 		}
 	}
 
@@ -162,6 +184,59 @@ export class ToolkitHost {
 		return detailsOf(record, (s) => s);
 	}
 
+	/**
+	 * A model edit, computed on the toolkit (`edits.ts`) against the request's
+	 * texts. The edited session is kept for the build of the edited texts.
+	 */
+	edit(request: EditRequest): EditResult {
+		const files = (request.files ?? [{ path: request.path, text: request.source }]).map((f) =>
+			f.path === request.path ? { path: f.path, text: request.source } : f
+		);
+		if (!files.some((f) => f.path === request.path))
+			files.push({ path: request.path, text: request.source });
+		const built = this.built && sameFiles(this.built.files, files) ? this.built : null;
+		// An edit needs the session, not the analysis: an analysed build, or a session alone.
+		const start: Prepared = built?.session
+			? { files, session: built.session, units: built.units, parse: [], lenient: false }
+			: this.prepare(files);
+		const editing = new ModelEditing({
+			tk: this.tk,
+			session: start.session,
+			units: start.units,
+			reopen: (sources) => this.openSession(JSON.stringify(sources))
+		});
+		try {
+			return editing.run(request);
+		} finally {
+			const session = editing.session;
+			if (session === start.session && !editing.editedOriginal) {
+				// Nothing changed the session: keep it for these texts.
+				if (!built) this.keepPending(start);
+			} else {
+				if (built && this.built === built) this.built = null;
+				if (session !== start.session) start.session.free();
+				const repaired = [...start.units.values()].some((u) => u.repair);
+				if (editing.inSync && !repaired) {
+					// The session holds the edited texts: their analysis starts from it.
+					const changed = editing.changedTexts();
+					const edited = files.map((f) => ({ path: f.path, text: changed.get(f.path) ?? f.text }));
+					this.keepPending({
+						files: edited,
+						session,
+						units: this.unitsOf(edited, edited),
+						parse: [],
+						lenient: false
+					});
+				} else session.free();
+			}
+		}
+	}
+
+	private keepPending(next: Prepared | null) {
+		if (this.pending && this.pending.session !== next?.session) this.pending.session.free();
+		this.pending = next;
+	}
+
 	/** The current session, built for `files` (for language services). */
 	session(files: SourceFile[]): { session: TkSession | null; units: Map<string, UnitInfo> } {
 		const built = this.build(files);
@@ -171,42 +246,10 @@ export class ToolkitHost {
 	private build(files: SourceFile[]): Built {
 		if (this.built && sameFiles(this.built.files, files)) return this.built;
 		const started = performance.now();
-		const sources: TkSource[] = files.map((f) => ({ name: f.path, text: f.text }));
-		const json = JSON.stringify(sources);
-
-		// Units that don't parse are repaired first: a session can't be built over them.
-		const parse = (JSON.parse(this.tk.checkSyntax(json)) as TkFinding[]).filter(
-			(f) => f.stage === 'parse'
-		);
-		let repaired = sources;
-		let lenient: TkLenient | null = null;
-		if (parse.length) {
-			lenient = JSON.parse(this.tk.lenientSources(json)) as TkLenient;
-			const stillBroken = new Set(lenient.unrepaired.map((u) => u.unit));
-			repaired = lenient.sources.filter((s) => !stillBroken.has(s.name));
-		}
-
-		const units = new Map<string, UnitInfo>();
-		for (const file of files) {
-			const original = this.texts.get(file.path, file.text);
-			const fixed = repaired.find((s) => s.name === file.path);
-			const unit: UnitInfo = { path: file.path, original, repaired: original };
-			if (fixed && fixed.text !== file.text) {
-				unit.repaired = this.texts.get(`repaired:${file.path}`, fixed.text);
-				unit.repair = RepairMap.build(
-					file.text,
-					fixed.text,
-					lenient?.dropped.filter((d) => d.unit === file.path) ?? []
-				);
-			}
-			units.set(file.path, unit);
-		}
-		this.texts.retain([...files.map((f) => f.path), ...files.map((f) => `repaired:${f.path}`)]);
-
 		const previous = this.built;
 		this.built = null;
 		previous?.session?.free();
-		const session = this.openSession(JSON.stringify(repaired));
+		const { session, units, parse, lenient } = this.prepare(files);
 		const findings = session ? (JSON.parse(session.check()) as TkFinding[]) : [];
 
 		// The session numbers its units; map them to the app's files.
@@ -245,8 +288,68 @@ export class ToolkitHost {
 		return this.built;
 	}
 
+	/**
+	 * A session for `files`: the pending one when it holds them, else a new
+	 * one, over repaired texts where a file doesn't parse.
+	 */
+	private prepare(files: SourceFile[]): Prepared {
+		if (this.pending && sameFiles(this.pending.files, files)) {
+			const pending = this.pending;
+			this.pending = null;
+			this.settle(pending.session);
+			return pending;
+		}
+		this.keepPending(null);
+		const sources: TkSource[] = files.map((f) => ({ name: f.path, text: f.text }));
+		const json = JSON.stringify(sources);
+
+		// Units that don't parse are repaired first: a session can't be built over them.
+		const parse = (JSON.parse(this.tk.checkSyntax(json)) as TkFinding[]).filter(
+			(f) => f.stage === 'parse'
+		);
+		let repaired = sources;
+		let lenient: TkLenient | null = null;
+		if (parse.length) {
+			lenient = JSON.parse(this.tk.lenientSources(json)) as TkLenient;
+			const stillBroken = new Set(lenient.unrepaired.map((u) => u.unit));
+			repaired = lenient.sources.filter((s) => !stillBroken.has(s.name));
+		}
+		const units = this.unitsOf(
+			files,
+			repaired.map((r) => ({ path: r.name, text: r.text })),
+			lenient
+		);
+		const session = this.openSession(JSON.stringify(repaired));
+		return { files, session, units, parse, lenient: !!lenient };
+	}
+
+	/** How each file maps to the text its session parsed (`repaired`, the same when it parses). */
+	private unitsOf(
+		files: SourceFile[],
+		repaired: SourceFile[],
+		lenient: TkLenient | null = null
+	): Map<string, UnitInfo> {
+		const units = new Map<string, UnitInfo>();
+		for (const file of files) {
+			const original = this.texts.get(file.path, file.text);
+			const fixed = repaired.find((s) => s.path === file.path);
+			const unit: UnitInfo = { path: file.path, original, repaired: original };
+			if (fixed && fixed.text !== file.text) {
+				unit.repaired = this.texts.get(`repaired:${file.path}`, fixed.text);
+				unit.repair = RepairMap.build(
+					file.text,
+					fixed.text,
+					lenient?.dropped.filter((d) => d.unit === file.path) ?? []
+				);
+			}
+			units.set(file.path, unit);
+		}
+		this.texts.retain([...files.map((f) => f.path), ...files.map((f) => `repaired:${f.path}`)]);
+		return units;
+	}
+
 	/** A session over sources that parse, from the previous build's outcomes when there are any. */
-	private openSession(sourcesJson: string): TkSession | null {
+	private openSession(sourcesJson: string): TkSession {
 		const { Session } = this.tk;
 		let session: TkSession | null = null;
 		if (this.settled) {
@@ -257,6 +360,11 @@ export class ToolkitHost {
 			}
 		}
 		session ??= Session.fromSourcesWithPreparedLibrary(sourcesJson, this.library);
+		return this.settle(session);
+	}
+
+	/** Keep a session's settled outcomes for the next build to start from. */
+	private settle(session: TkSession): TkSession {
 		const next = session.settledOutcomes();
 		if (next) {
 			this.settled?.free();

@@ -26,6 +26,8 @@ export interface ModelElement {
 	value: string | null;
 	file: string;
 	span: Span;
+	/** The toolkit's element id, which edits address it by. */
+	id?: string;
 }
 
 export interface TreeNode {
@@ -52,7 +54,8 @@ export function collectElements(analyses: Iterable<Analysis>): ModelElement[] {
 				multiplicity: null,
 				value: null,
 				file: model.file,
-				span: d.span
+				span: d.span,
+				...(d.id ? { id: d.id } : {})
 			});
 		}
 		for (const u of model.usages) {
@@ -70,7 +73,8 @@ export function collectElements(analyses: Iterable<Analysis>): ModelElement[] {
 				multiplicity: u.multiplicity ?? null,
 				value: u.value_expr ?? null,
 				file: model.file,
-				span: u.span
+				span: u.span,
+				...(u.id ? { id: u.id } : {})
 			});
 		}
 	}

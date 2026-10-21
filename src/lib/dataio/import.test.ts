@@ -3,12 +3,12 @@
  * (WebAssembly in Node): the generated SysML parses, resolves and reads
  * back as the requirements in the sheet.
  */
-import { readFileSync, readdirSync } from 'node:fs';
-import { join, relative } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
-import type { Analysis, EditRequest, EditResult } from '#lib/engine/types.ts';
+import { editFiles } from '#lib/engine/toolkit/edit-testing.ts';
+import type { ToolkitHost } from '#lib/engine/toolkit/host.ts';
+import { demoFiles, loadHost } from '#lib/engine/toolkit/testing.ts';
+import type { Analysis, EditRequest } from '#lib/engine/types.ts';
 import { collectRequirements } from '#lib/project/requirements.ts';
-import { applyChanges } from '#lib/project/workspace.svelte.ts';
 import { parseDelimited } from './csv';
 import {
 	applyImport,
@@ -31,37 +31,16 @@ import {
 	type ImportOptions
 } from './import-plan';
 
-const ROOT = join(import.meta.dirname, '../../demo/drone');
-const ENGINE = join(import.meta.dirname, '../../../static/engine');
-
-interface Wasm {
-	initSync(options: { module: Buffer }): void;
-	analyzeProject(files: string): string;
-	edit(request: string): string;
-}
-
-function walk(dir: string): string[] {
-	return readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
-		e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)]
-	);
-}
-
-let wasm: Wasm;
+let host: ToolkitHost;
 let demo: Record<string, string>;
 
 beforeAll(async () => {
-	wasm = (await import(join(ENGINE, 'sysml_wasm.js'))) as Wasm;
-	wasm.initSync({ module: readFileSync(join(ENGINE, 'sysml_wasm_bg.wasm')) });
-	demo = Object.fromEntries(
-		walk(ROOT)
-			.filter((p) => p.endsWith('.sysml'))
-			.map((p) => [relative(ROOT, p), readFileSync(p, 'utf8')])
-	);
-});
+	host = await loadHost();
+	demo = Object.fromEntries(demoFiles().map((f) => [f.path, f.text]));
+}, 60_000);
 
 function analyse(files: Record<string, string>): Analysis[] {
-	const list = Object.entries(files).map(([path, text]) => ({ path, text }));
-	return JSON.parse(wasm.analyzeProject(JSON.stringify(list))) as Analysis[];
+	return host.analyzeProject(Object.entries(files).map(([path, text]) => ({ path, text })));
 }
 
 function contextFor(files: Record<string, string>): ImportContext {
@@ -69,7 +48,7 @@ function contextFor(files: Record<string, string>): ImportContext {
 	return buildContext(analyses, files, collectRequirements(analyses));
 }
 
-/** A workspace over plain texts, editing through the engine. */
+/** A workspace over plain texts, editing through the toolkit as the app does. */
 function fakeWorkspace(start: Record<string, string>): ImportWorkspace & {
 	files: Record<string, string>;
 } {
@@ -84,12 +63,9 @@ function fakeWorkspace(start: Record<string, string>): ImportWorkspace & {
 		},
 		sourceFiles: () => Object.entries(ws.files).map(([path, text]) => ({ path, text })),
 		async edit(path: string, request: EditRequest) {
-			const result = JSON.parse(wasm.edit(JSON.stringify(request))) as EditResult & {
-				error?: string;
-			};
-			if (result.error) return result.error;
-			if (result.syntaxErrors.length) return result.syntaxErrors[0]!;
-			ws.files[path] = applyChanges(ws.files[path]!, result.changes);
+			const edited = editFiles(host, ws.files, { ...request, path });
+			if ('error' in edited) return edited.error;
+			ws.files = edited.files;
 			return null;
 		}
 	};
@@ -415,7 +391,15 @@ describe('applying an import', () => {
 		expect(ws.files['requirements/SystemRequirements.sysml']).toContain(
 			"end #derive ::> 'Flight time';"
 		);
-		expect(Object.values(ws.files).join('\n')).not.toContain("'Flight endurance'");
+		// Every reference is renamed; prose that mentions the old name (a doc comment) is not.
+		expect(
+			Object.values(ws.files)
+				.join('\n')
+				.match(/'Flight endurance'/g)
+		).toHaveLength(1);
+		expect(ws.files['analysis/Performance.sysml']).toContain(
+			"Show that 'Flight endurance' (SYS-001)"
+		);
 	});
 
 	it('writes 500 rows in one engine edit, quickly', async () => {

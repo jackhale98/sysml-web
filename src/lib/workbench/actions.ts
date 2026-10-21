@@ -3,6 +3,7 @@
  * asks the engine for a minimal text edit and applies it to the workspace.
  * Results are `null` on success or a message to show.
  */
+import type { DeclarationSet } from '#lib/engine/types.ts';
 import type { ModelElement } from '#lib/project/elements.ts';
 import type { Workspace } from '#lib/project/workspace.svelte.ts';
 import { toasts } from '#lib/ui/toasts.svelte.ts';
@@ -20,8 +21,12 @@ async function undoable(
 	const before = workspace.undoStack.length;
 	const error = await workspace.transact(label, run);
 	if (!error && workspace.undoStack.length > before) {
-		toasts.show(label, {
-			tone: 'success',
+		// A deletion that leaves references unresolved says so (they show in Problems).
+		const warning = workspace.warnings.join(' ');
+		toasts.show(warning ? `${label}. ${warning}` : label, {
+			tone: warning ? 'info' : 'success',
+			// Long enough to read what no longer resolves.
+			...(warning ? { duration: 12_000 } : {}),
 			action: {
 				label: 'Undo',
 				run: () => {
@@ -49,7 +54,7 @@ export async function addElement(
 			op: 'insertMember',
 			path: owner.file,
 			source,
-			parent: owner.name,
+			...parentOf(owner),
 			text: elementText(kind, name, type)
 		})
 	);
@@ -64,22 +69,32 @@ export async function renameElement(
 	const to = formatName(newName);
 	if (!newName.trim()) return 'A name cannot be empty.';
 	if (to === element.name) return null;
-	const word = new RegExp(`(^|[^A-Za-z0-9_'])${escapeRegExp(element.name)}($|[^A-Za-z0-9_'])`);
-	return undoable(workspace, `Renamed ${element.label} to ${to}`, async () => {
-		for (const path of workspace.modelPaths) {
-			const source = workspace.text(path);
-			if (source === undefined || !word.test(source)) continue;
-			const error = await workspace.edit(path, {
-				op: 'rename',
-				path,
-				source,
-				from: element.name,
-				to
-			});
-			if (error) return error;
-		}
-		return null;
-	});
+	const source = workspace.text(element.file);
+	if (source === undefined) return `${element.file} is not open.`;
+	return undoable(workspace, `Renamed ${element.label} to ${to}`, () =>
+		workspace.edit(element.file, {
+			op: 'rename',
+			path: element.file,
+			source,
+			from: element.name,
+			line: element.span.start_row,
+			...(element.id ? { id: element.id } : {}),
+			to
+		})
+	);
+}
+
+/** How an edit names an element: its id, and its name and line for when the id is unknown. */
+export function parentOf(owner: ModelElement): {
+	parent: string;
+	parentLine: number;
+	parentId?: string;
+} {
+	return {
+		parent: owner.name,
+		parentLine: owner.span.start_row,
+		...(owner.id ? { parentId: owner.id } : {})
+	};
 }
 
 export async function deleteElement(
@@ -93,7 +108,9 @@ export async function deleteElement(
 			op: 'remove',
 			path: element.file,
 			source,
-			name: element.name
+			name: element.name,
+			line: element.span.start_row,
+			...(element.id ? { id: element.id } : {})
 		})
 	);
 }
@@ -116,8 +133,7 @@ export async function setField(
 			element: source.element,
 			line: source.line,
 			field,
-			value,
-			files: workspace.sourceFiles()
+			value
 		})
 	);
 }
@@ -142,7 +158,8 @@ export async function setTableColumns(
  * it is now (`before`), for what the engine cannot edit yet.
  */
 export type EditStep =
-	| { kind: 'member'; path: string; parent: string; text: string }
+	| { kind: 'member'; path: string; parent: ModelElement; text: string }
+	| { kind: 'declaration'; path: string; element: ModelElement; set: DeclarationSet }
 	| { kind: 'patch'; path: string; before: string; after: string };
 
 /**
@@ -166,8 +183,21 @@ export async function applySteps(
 					op: 'insertMember',
 					path: step.path,
 					source,
-					parent: step.parent,
+					...parentOf(step.parent),
 					text: step.text
+				});
+				if (error) return error;
+				continue;
+			}
+			if (step.kind === 'declaration') {
+				const error = await workspace.edit(step.path, {
+					op: 'setDeclaration',
+					path: step.path,
+					source,
+					element: step.element.name,
+					line: step.element.span.start_row,
+					...(step.element.id ? { id: step.element.id } : {}),
+					set: step.set
 				});
 				if (error) return error;
 				continue;
@@ -182,8 +212,4 @@ export async function applySteps(
 		}
 		return null;
 	});
-}
-
-function escapeRegExp(text: string): string {
-	return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

@@ -1,7 +1,8 @@
 /**
  * Small, careful text patches on SysML source, for the diagram edits the
- * engine cannot compute yet (members of usages, objectives, declarations,
- * statements without a name). Offsets are UTF-16 string offsets.
+ * engine has no operation for (a statement beside its kind, a member of an
+ * unnamed objective, removing an unnamed statement). Offsets are UTF-16
+ * string offsets.
  *
  * Every function returns the new text, or null when the source does not
  * have the expected shape; callers then refuse rather than guess.
@@ -189,55 +190,6 @@ export function removeStatement(text: string, from: number, to: number): string 
 export function simpleName(reference: string): string {
 	const last = reference.trim().split('::').pop() ?? reference;
 	return last.replace(/^'(.*)'$/, '$1');
-}
-
-const SPECIALIZES = /(\s*(?::>(?!>)|\bspecializes\b)\s*)([^]*?)(\s*)$/;
-
-/**
- * Add `:> target` to the declaration at `from`, or `, target` when it
- * already specializes something.
- *
- * TODO(engine): replace with the engine's `setDeclaration` edit when it lands.
- */
-export function addSpecialization(
-	text: string,
-	from: number,
-	to: number,
-	target: string
-): Patched | null {
-	const head = headerEnd(text, from, to);
-	if (!head) return null;
-	const header = text.slice(from, head.index);
-	const trimmed = header.trimEnd();
-	const end = from + trimmed.length;
-	const match = SPECIALIZES.exec(trimmed);
-	if (match?.[2]?.split(',').some((s) => simpleName(s) === simpleName(target))) return null;
-	const insert = match ? `, ${target}` : ` :> ${target}`;
-	return {
-		text: text.slice(0, end) + insert + text.slice(end),
-		from: end + insert.length - target.length,
-		to: end + insert.length
-	};
-}
-
-/** Remove `target` from the declaration's `:>` list (and the `:>` when it was the only one). */
-export function removeSpecialization(
-	text: string,
-	from: number,
-	to: number,
-	target: string
-): string | null {
-	const head = headerEnd(text, from, to);
-	if (!head) return null;
-	const header = text.slice(from, head.index);
-	const match = SPECIALIZES.exec(header);
-	if (!match || match.index === undefined) return null;
-	const list = (match[2] ?? '').split(',').map((s) => s.trim());
-	const kept = list.filter((s) => simpleName(s) !== simpleName(target));
-	if (kept.length === list.length) return null;
-	const clause = kept.length ? `${match[1]}${kept.join(', ')}${match[3]}` : match[3] || ' ';
-	const next = header.slice(0, match.index) + clause;
-	return text.slice(0, from) + next + text.slice(head.index);
 }
 
 /**

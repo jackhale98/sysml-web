@@ -10,6 +10,7 @@ import type { Analysis, EdgeKind, Span } from '#lib/engine/types.ts';
 import { byteToUtf16, type ModelElement } from '#lib/project/elements.ts';
 import type { EditStep } from '#lib/workbench/actions.ts';
 import { formatName } from '#lib/workbench/templates.ts';
+import { readHeader } from '#lib/engine/toolkit/header.ts';
 import {
 	findDefinition,
 	interfaceEnds,
@@ -23,12 +24,11 @@ import {
 	type PortInfo
 } from './model.ts';
 import {
-	addSpecialization,
 	findStatement,
 	insertIntoBody,
 	insertLineAfter,
+	matchBrace,
 	referencePattern,
-	removeSpecialization,
 	removeStatement,
 	simpleName
 } from './textpatch.ts';
@@ -273,19 +273,10 @@ export function interfacesFor(
 	return result;
 }
 
-/** Text a statement goes into: the engine for definitions and packages, a patch for usages. */
+/** A statement the engine adds as the last member of `host` (a usage ending in `;` gains a body). */
 function memberStep(host: ModelElement, text: string, ctx: ModelContext): EditStep | string {
-	if (host.isDefinition) return { kind: 'member', path: host.file, parent: host.name, text };
-	const source = ctx.textOf(host.file);
-	if (source === undefined) return `${host.file} is not in the project.`;
-	const patched = insertIntoBody(
-		source,
-		byteToUtf16(source, host.span.start_byte),
-		byteToUtf16(source, host.span.end_byte),
-		text
-	);
-	if (!patched) return `Could not find where ${host.label} ends in ${host.file}.`;
-	return { kind: 'patch', path: host.file, before: source, after: patched.text };
+	if (ctx.textOf(host.file) === undefined) return `${host.file} is not in the project.`;
+	return { kind: 'member', path: host.file, parent: host, text };
 }
 
 /** The package that already holds statements like these, so new ones join them. */
@@ -345,16 +336,25 @@ function besideStep(
 	return { kind: 'patch', path: host.file, before: text, after: patched.text };
 }
 
-/** The `objective { … }` of a verification, from the engine's model. */
-function objectiveSpan(verification: ModelElement, ctx: ModelContext): Span | undefined {
-	const analysis = ctx.analyses.find((a) => a.model.file === verification.file);
-	return analysis?.model.usages.find(
-		(u) =>
-			u.kind === 'objective' &&
-			u.parent_def === verification.name &&
-			u.span.start_byte >= verification.span.start_byte &&
-			u.span.end_byte <= verification.span.end_byte
-	)?.span;
+/**
+ * The `objective { … }` of a verification, as UTF-16 offsets: found in its
+ * text, since an objective has no name for the model to list it by.
+ */
+function objectiveRange(
+	verification: ModelElement,
+	ctx: ModelContext
+): [number, number] | undefined {
+	const text = ctx.textOf(verification.file);
+	if (text === undefined) return undefined;
+	const at = findStatement(
+		text,
+		/\bobjective\b[^;{]*\{/,
+		byteToUtf16(text, verification.span.start_byte),
+		byteToUtf16(text, verification.span.end_byte)
+	);
+	if (!at) return undefined;
+	const close = matchBrace(text, at[1] - 1);
+	return close < 0 ? undefined : [at[0], close + 1];
 }
 
 /** A path from `owner` down to `element`: `battery` inside `drone`. */
@@ -411,15 +411,10 @@ export function planRelation(
 			const req = referenceFrom(to, from, ctx.owners, ctx.textOf);
 			const statement = `verify ${req};`;
 			const label = `${from.label} now verifies ${to.label}`;
-			const objective = objectiveSpan(from, ctx);
+			const objective = objectiveRange(from, ctx);
 			if (!objective) return step(from, `objective { ${statement} }`, label);
 			const source = ctx.textOf(from.file) ?? '';
-			const patched = insertIntoBody(
-				source,
-				byteToUtf16(source, objective.start_byte),
-				byteToUtf16(source, objective.end_byte),
-				statement
-			);
+			const patched = insertIntoBody(source, objective[0], objective[1], statement);
 			if (!patched) return `Could not read the objective of ${from.label}.`;
 			return {
 				label,
@@ -466,20 +461,32 @@ export function planRelation(
 			const ref = referenceFrom(to, namespace, ctx.owners, ctx.textOf);
 			const source = ctx.textOf(from.file);
 			if (source === undefined) return `${from.file} is not in the project.`;
-			const patched = addSpecialization(
-				source,
-				byteToUtf16(source, from.span.start_byte),
-				byteToUtf16(source, from.span.end_byte),
-				ref
-			);
-			if (!patched) return `${from.label} already specializes ${to.label}.`;
+			const generals = specializationsOf(from, source);
+			if (generals.some((g) => simpleName(g) === simpleName(ref)))
+				return `${from.label} already specializes ${to.label}.`;
 			return {
 				label: `${from.label} now specializes ${to.label}`,
 				statement: `:> ${ref}`,
-				steps: [{ kind: 'patch', path: from.file, before: source, after: patched.text }]
+				steps: [
+					{
+						kind: 'declaration',
+						path: from.file,
+						element: from,
+						set: { specializes: [...generals, ref] }
+					}
+				]
 			};
 		}
 	}
+}
+
+/** What an element's declaration specializes, as written (`:> A, B`). */
+function specializationsOf(element: ModelElement, text: string): string[] {
+	const header = readHeader(text, byteToUtf16(text, element.span.start_byte));
+	return (header?.parts ?? [])
+		.filter((p) => p.slot === 'specialization')
+		.flatMap((p) => p.targets ?? [])
+		.map((t) => text.slice(t.start, t.end));
 }
 
 /** The statement behind a drawn edge, and how to remove it; a message when there is none. */
@@ -540,17 +547,16 @@ export function planEdgeRemoval(
 		case 'specialization': {
 			const text = ctx.textOf(source.file);
 			if (text === undefined) return `${source.file} is not in the project.`;
-			const after = removeSpecialization(
-				text,
-				byteToUtf16(text, source.span.start_byte),
-				byteToUtf16(text, source.span.end_byte),
-				target.name
-			);
-			if (after === null) return `${source.label} does not declare :> ${target.label} itself.`;
+			const generals = specializationsOf(source, text);
+			const kept = generals.filter((g) => simpleName(g) !== simpleName(target.name));
+			if (kept.length === generals.length)
+				return `${source.label} does not declare :> ${target.label} itself.`;
 			return {
 				label: `${source.label} no longer specializes ${target.label}`,
 				statement: `:> ${target.name}`,
-				steps: [{ kind: 'patch', path: source.file, before: text, after }]
+				steps: [
+					{ kind: 'declaration', path: source.file, element: source, set: { specializes: kept } }
+				]
 			};
 		}
 		case 'connection': {

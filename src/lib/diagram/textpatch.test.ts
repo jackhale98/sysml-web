@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
-	addSpecialization,
 	findStatement,
 	headerEnd,
 	insertIntoBody,
 	matchBrace,
-	removeSpecialization,
 	removeStatement
 } from './textpatch.ts';
 
@@ -70,29 +68,6 @@ describe('removeStatement', () => {
 		const text = "objective { verify 'A'; verify 'B'; }";
 		const [from, to] = span(text, "verify 'A';");
 		expect(removeStatement(text, from, to)).toBe("objective { verify 'B'; }");
-	});
-});
-
-describe('specialization patches', () => {
-	it('adds :> to a declaration, or extends the list', () => {
-		const text = 'part def A {\n}\npart def B :> C;\n';
-		const a = span(text, 'part def A {\n}');
-		expect(addSpecialization(text, a[0], a[1], 'Base')!.text).toBe(
-			'part def A :> Base {\n}\npart def B :> C;\n'
-		);
-		const b = span(text, 'part def B :> C;');
-		expect(addSpecialization(text, b[0], b[1], 'D')!.text).toBe(
-			'part def A {\n}\npart def B :> C, D;\n'
-		);
-		expect(addSpecialization(text, b[0], b[1], 'C')).toBeNull();
-	});
-
-	it('removes one supertype, or the clause', () => {
-		const text = 'part def B :> C, D { }';
-		expect(removeSpecialization(text, 0, text.length, 'C')).toBe('part def B :> D { }');
-		const single = 'part def B :> C { }';
-		expect(removeSpecialization(single, 0, single.length, 'P::C')).toBe('part def B { }');
-		expect(removeSpecialization(single, 0, single.length, 'X')).toBeNull();
 	});
 });
 

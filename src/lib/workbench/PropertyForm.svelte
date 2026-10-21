@@ -4,6 +4,7 @@
 	import type { ModelElement } from '#lib/project/elements.ts';
 	import type { Workspace } from '#lib/project/workspace.svelte.ts';
 	import { toasts } from '#lib/ui/toasts.svelte.ts';
+	import { parentOf } from './actions.ts';
 	import TypePicker from './TypePicker.svelte';
 
 	/**
@@ -79,8 +80,7 @@
 				op: 'setDeclaration',
 				path: element.file,
 				source,
-				element: element.name,
-				line: element.span.start_row,
+				...address(element),
 				set: { type: name }
 			});
 			if (typed) return typed;
@@ -88,16 +88,30 @@
 				op: 'insertMember',
 				path: element.file,
 				source: workspace.text(element.file) ?? source,
-				parent: pkg.name,
+				...parentOf(pkg),
 				text: `${kind} def ${name} {\n}`
 			});
 		});
-		if (error) toasts.show(error, { tone: 'error' });
-		else if (workspace.undoStack.length > before)
-			toasts.show(label, {
-				tone: 'success',
-				action: { label: 'Undo', run: () => workspace.undo() }
-			});
+		if (error || workspace.undoStack.length > before) done(error, label);
+	}
+
+	/** How an edit names the element: its id, with its name and line for when the id is stale. */
+	function address(e: ModelElement) {
+		return { element: e.name, line: e.span.start_row, ...(e.id ? { id: e.id } : {}) };
+	}
+
+	/** The toast after an edit: the error, or what changed with Undo (and what it left unresolved). */
+	function done(error: string | null, label: string) {
+		if (error) {
+			toasts.show(error, { tone: 'error' });
+			return;
+		}
+		const warning = workspace.warnings.join(' ');
+		toasts.show(warning ? `${label}. ${warning}` : label, {
+			tone: warning ? 'info' : 'success',
+			...(warning ? { duration: 12_000 } : {}),
+			action: { label: 'Undo', run: () => workspace.undo() }
+		});
 	}
 
 	async function apply(set: DeclarationSet, label: string) {
@@ -109,19 +123,11 @@
 				op: 'setDeclaration',
 				path: element.file,
 				source,
-				element: element.name,
-				line: element.span.start_row,
+				...address(element),
 				set
 			})
 		);
-		if (result) {
-			toasts.show(result, { tone: 'error' });
-		} else if (workspace.undoStack.length > before) {
-			toasts.show(label, {
-				tone: 'success',
-				action: { label: 'Undo', run: () => workspace.undo() }
-			});
-		}
+		if (result || workspace.undoStack.length > before) done(result, label);
 	}
 
 	function commit(

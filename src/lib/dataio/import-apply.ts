@@ -110,12 +110,18 @@ export async function applyImport(
 			a.existing.row.file.localeCompare(b.existing.row.file) ||
 			b.existing.row.span.start_row - a.existing.row.span.start_row
 	);
-	const renames: { from: string; to: string }[] = [];
+	// Renames last: a rename changes the qualified name the other updates find their requirement by.
+	const renames: { file: string; line: number; qualifiedName: string; to: string }[] = [];
 	for (const update of updates) {
 		const { row, qualifiedName } = update.existing;
 		for (const change of update.changes) {
 			if (change.field === 'name') {
-				renames.push({ from: update.existing.name, to: sysmlName(change.to) });
+				renames.push({
+					file: row.file,
+					line: row.span.start_row,
+					qualifiedName,
+					to: sysmlName(change.to)
+				});
 				continue;
 			}
 			const source = workspace.text(row.file);
@@ -127,20 +133,24 @@ export async function applyImport(
 				element: qualifiedName,
 				line: row.span.start_row,
 				field: change.field,
-				value: change.to,
-				files: workspace.sourceFiles()
+				value: change.to
 			});
 			if (error) return `Could not update ${row.id ?? row.title}: ${error}`;
 		}
 	}
-	for (const { from, to } of renames) {
-		const word = new RegExp(`(^|[^A-Za-z0-9_'])${escapeRegExp(from)}($|[^A-Za-z0-9_'])`);
-		for (const path of workspace.modelPaths) {
-			const source = workspace.text(path);
-			if (source === undefined || !word.test(source)) continue;
-			const error = await workspace.edit(path, { op: 'rename', path, source, from, to });
-			if (error) return `Could not rename ${from}: ${error}`;
-		}
+	for (const { file, line, qualifiedName, to } of renames) {
+		// The engine renames the requirement and every reference to it, in every file.
+		const source = workspace.text(file);
+		if (source === undefined) return `${file} is not in the project.`;
+		const error = await workspace.edit(file, {
+			op: 'rename',
+			path: file,
+			source,
+			from: qualifiedName,
+			line,
+			to
+		});
+		if (error) return `Could not rename ${qualifiedName}: ${error}`;
 	}
 
 	if (!plan.create.length) return { created: 0, updated: plan.update.length, path: null };
@@ -166,6 +176,7 @@ export async function applyImport(
 		path,
 		source,
 		parent,
+		...(destination.kind === 'new' ? {} : { parentLine: destination.package.line }),
 		text: `\n${membersText(plan)}`
 	});
 	if (error) return error;

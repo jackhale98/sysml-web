@@ -8,7 +8,6 @@ import type { Init, Method, Request, Response, SourceFile } from './protocol';
 import type {
 	Analysis,
 	DiagramGraph,
-	EditResult,
 	Highlights,
 	RenderedTable,
 	StateMachine,
@@ -22,7 +21,6 @@ interface Wasm {
 	analyzeProject(files: string): string;
 	highlight(source: string): string;
 	diagram(view: string, files: string, scope: string | null): string;
-	edit(request: string): string;
 	listViews(files: string): string;
 	renderView(files: string, name: string): string;
 	viewLibraries(): string;
@@ -56,7 +54,8 @@ function cachedFiles(files: unknown): string {
 	return lastFiles.json;
 }
 
-const handlers: { [M in Method]: (wasm: Wasm, ...params: never[]) => unknown } = {
+/** The methods still served here; the toolkit serves the rest (`TOOLKIT_METHODS`). */
+const handlers: { [M in Method]?: (wasm: Wasm, ...params: never[]) => unknown } = {
 	version: (wasm) => wasm.version(),
 	analyze: (wasm, path: string, source: string): Analysis =>
 		JSON.parse(wasm.analyze(path, source)) as Analysis,
@@ -65,8 +64,6 @@ const handlers: { [M in Method]: (wasm: Wasm, ...params: never[]) => unknown } =
 	highlight: (wasm, source: string): Highlights => JSON.parse(wasm.highlight(source)) as Highlights,
 	diagram: (wasm, view: string, files: unknown, scope: string | null): DiagramGraph =>
 		JSON.parse(wasm.diagram(view, JSON.stringify(files), scope)) as DiagramGraph,
-	edit: (wasm, request: unknown): EditResult =>
-		JSON.parse(wasm.edit(JSON.stringify(request))) as EditResult,
 	listViews: (wasm, files: unknown): ViewInfo[] =>
 		JSON.parse(wasm.listViews(JSON.stringify(files))) as ViewInfo[],
 	renderView: (wasm, files: unknown, name: string): RenderedTable =>
@@ -103,7 +100,9 @@ scope.onmessage = async (event: MessageEvent<Init | Request>) => {
 	try {
 		if (!engine) throw new Error('engine not initialised');
 		const wasm = await engine;
-		const handler = handlers[message.method] as (wasm: Wasm, ...params: unknown[]) => unknown;
+		const handler = handlers[message.method] as
+			((wasm: Wasm, ...params: unknown[]) => unknown) | undefined;
+		if (!handler) throw new Error(`${message.method} is served by the toolkit`);
 		response = { id: message.id, ok: true, result: handler(wasm, ...message.params) };
 	} catch (error) {
 		response = { id: message.id, ok: false, error: String(error) };
