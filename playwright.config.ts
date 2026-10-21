@@ -2,7 +2,8 @@ import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
 
-const PORT = 4173;
+// PW_PORT lets several checkouts run their e2e suites side by side.
+const PORT = Number(process.env.PW_PORT ?? 4173);
 
 /**
  * Resolve a Chromium binary when the installed Playwright revision does not match the

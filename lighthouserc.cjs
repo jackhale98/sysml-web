@@ -6,7 +6,7 @@ const path = require('node:path');
 
 const desktop = process.env.LH_PRESET === 'desktop';
 const preset = desktop ? 'desktop' : 'mobile';
-const port = 4174;
+const port = Number(process.env.LH_PORT ?? 4174);
 const origin = `http://localhost:${port}`;
 
 // Prefer an explicit CHROME_PATH; otherwise look for a Playwright-installed Chromium.
