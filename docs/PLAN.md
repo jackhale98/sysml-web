@@ -51,7 +51,7 @@ need a model run in parallel with the foundation.
    in the background for later visits; analysis and the model adapter
    (explorer, tree, inspector details, requirements, overview, problems);
    worker restart on crash.
-2. **Editor** — completion, hover, definition, references, rename,
+2. ✅ **Editor** (done; see `docs/engine.md`) — completion, hover, definition, references, rename,
    format, code actions and highlighting from the toolkit's language
    server.
 3. **Views and tables** — view listing and table rendering in TypeScript

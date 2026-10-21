@@ -11,7 +11,17 @@ export const TOOLKIT_METHODS = [
 	'version',
 	'analyze',
 	'analyzeProject',
-	'elementDetails'
+	'elementDetails',
+	// Phase 2: the editor's language services.
+	'highlight',
+	'format',
+	'complete',
+	'hover',
+	'definition',
+	'references',
+	'renameSymbol',
+	'outline',
+	'codeActions'
 ] as const satisfies readonly (keyof EngineApi)[];
 
 export type ToolkitMethod = (typeof TOOLKIT_METHODS)[number];

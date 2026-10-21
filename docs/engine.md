@@ -98,6 +98,35 @@ positions in the repaired text back to the person's text. Then
   unclosed `{` otherwise gave 40 such warnings on the demo), and the first
   syntax error says how many were hidden.
 
+## Language services
+
+The editor's completion, hover, go to definition, references, rename,
+outline and quick fixes come from the toolkit's in-wasm language server
+(`LspServer`, LSP messages as strings, UTF-16 positions), through
+`LanguageServices` (`toolkit/language.ts`), answered in the existing
+`EngineApi` shapes so `src/lib/editor/language.ts` is unchanged:
+
+- One server sees the project and the standard library
+  (`LspServer.withPreparedLibrary`). Each call brings it up to date: the
+  workspace is re-seeded when a file that isn't open changes, and the file
+  being edited is opened in it (later texts arrive as `didChange`). URIs are
+  `file:///project/<path>`; the library's are `sysmlv2-lib:/<path>`, which
+  go to definition opens in the library browser.
+- Rename, formatting and code actions answer with whole new documents or
+  edits; `diffTexts` (`toolkit/diff.ts`) turns them into minimal changes, so
+  the cursor and undo history stay put.
+- Quick fixes are asked for with the analysis's own problems at the
+  selection (the server's own diagnostics are syntax-only).
+- Highlighting uses a second server without the project or library (syntax
+  only, so any text — a library file — can be highlighted), its semantic
+  token types mapped to the editor's names (`type` declarations as
+  `type.definition`, a comment after `doc` as `comment.documentation`).
+- Formatting is `formatSource` with four-space indentation; text that
+  doesn't parse is left alone.
+- Highlighting and formatting (`SyntaxServices`) need no library, so the
+  worker answers them as soon as the module is compiled, while the library
+  is still loading: text is coloured seconds before the model is ready.
+
 ## Library loading
 
 The first visit loads the standard library from its sources (`sysml-library.json.gz`,

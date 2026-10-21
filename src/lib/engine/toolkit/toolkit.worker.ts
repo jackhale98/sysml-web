@@ -12,6 +12,7 @@
 import type { SourceFile } from '../protocol';
 import type { Toolkit } from './api';
 import { ToolkitHost } from './host';
+import { SyntaxServices } from './language';
 import type {
 	ToolkitCall,
 	ToolkitInbound,
@@ -25,6 +26,9 @@ const started = performance.now();
 
 let init: ToolkitInit | undefined;
 let booting: Promise<ToolkitHost> | undefined;
+/** Highlighting and formatting, available before the library has loaded. */
+let syntax: Promise<SyntaxServices> | undefined;
+let syntaxReady: (s: SyntaxServices) => void = () => undefined;
 let memory: WebAssembly.Memory | undefined;
 let prefetching = false;
 
@@ -69,6 +73,8 @@ async function boot(i: ToolkitInit): Promise<ToolkitHost> {
 	const tk = await glue;
 	({ memory } = await tk.default({ module_or_path: await compiled }));
 	tk.install_panic_hook?.();
+	const early = new SyntaxServices(tk);
+	syntaxReady(early);
 	post({ type: 'loaded' });
 	const bundle = new TextDecoder().decode(await gunzipMaybe(await bundleBytes));
 	const libraryStart = performance.now();
@@ -86,7 +92,7 @@ async function boot(i: ToolkitInit): Promise<ToolkitHost> {
 		}
 	}
 	library ??= new tk.PreparedLibrary(bundle, null);
-	const host = new ToolkitHost(tk, library);
+	const host = new ToolkitHost(tk, library, early);
 	post({
 		type: 'ready',
 		stats: {
@@ -132,7 +138,22 @@ const handlers: { [M in ToolkitMethod]: Handler } = {
 	analyze: (host, path: string, source: string) => host.analyze(path, source),
 	analyzeProject: (host, files: SourceFile[]) => host.analyzeProject(files),
 	elementDetails: (host, files: SourceFile[], path: string, line: number, element: string | null) =>
-		host.elementDetails(files, path, line, element)
+		host.elementDetails(files, path, line, element),
+	highlight: (host, source: string) => host.highlight(source),
+	format: (host, source: string) => host.format(source),
+	complete: (host, files: SourceFile[], path: string, offset: number) =>
+		host.complete(files, path, offset),
+	hover: (host, files: SourceFile[], path: string, offset: number) =>
+		host.hover(files, path, offset),
+	definition: (host, files: SourceFile[], path: string, offset: number) =>
+		host.definition(files, path, offset),
+	references: (host, files: SourceFile[], path: string, offset: number) =>
+		host.references(files, path, offset),
+	renameSymbol: (host, files: SourceFile[], path: string, offset: number, newName: string) =>
+		host.renameSymbol(files, path, offset, newName),
+	outline: (host, files: SourceFile[], path: string) => host.outline(files, path),
+	codeActions: (host, files: SourceFile[], path: string, from: number, to: number) =>
+		host.codeActions(files, path, from, to)
 };
 
 /** A trap or a failed memory grow leaves the instance unusable: the page restarts the worker. */
@@ -146,7 +167,15 @@ function isFatal(error: unknown): boolean {
 
 async function call(message: ToolkitCall) {
 	try {
-		if (!booting) throw new Error('toolkit not initialised');
+		if (!booting || !syntax) throw new Error('toolkit not initialised');
+		if (message.method === 'highlight' || message.method === 'format') {
+			const tools = await Promise.race([syntax, booting.then((h) => h.syntax)]);
+			const [source] = message.params as [string];
+			const result =
+				message.method === 'highlight' ? tools.highlight(source) : tools.format(source);
+			post({ type: 'result', id: message.id, ok: true, result });
+			return;
+		}
 		const host = await booting;
 		const handler = handlers[message.method] as (host: ToolkitHost, ...p: unknown[]) => unknown;
 		post({ type: 'result', id: message.id, ok: true, result: handler(host, ...message.params) });
@@ -160,6 +189,7 @@ scope.onmessage = (event: MessageEvent<ToolkitInbound>) => {
 	const message = event.data;
 	if (message.type === 'init') {
 		init = message;
+		syntax = new Promise((resolve) => (syntaxReady = resolve));
 		booting = boot(message);
 		booting.catch((error: unknown) => post({ type: 'fatal', error: String(error) }));
 	} else if (message.type === 'prefetch') {

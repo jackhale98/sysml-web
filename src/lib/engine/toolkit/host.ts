@@ -9,7 +9,19 @@
  * incremental path).
  */
 import type { SourceFile } from '../protocol';
-import type { Analysis, Diagnostic, ElementDetails } from '../types';
+import type {
+	Analysis,
+	CodeAction,
+	Completion,
+	DefinitionTarget,
+	Diagnostic,
+	ElementDetails,
+	FileChange,
+	FileRange,
+	Highlights,
+	Hover,
+	OutlineItem
+} from '../types';
 import type {
 	TkFinding,
 	TkLenient,
@@ -20,6 +32,7 @@ import type {
 	Toolkit
 } from './api';
 import { toProblems } from './diagnostics';
+import { LanguageServices, SyntaxServices } from './language';
 import { detailsOf, extractModel, findElement, type ExtractedModel, type UnitInfo } from './model';
 import { TextIndexCache } from './offsets';
 import { RepairMap } from './repair';
@@ -40,10 +53,73 @@ export class ToolkitHost {
 	private readonly texts = new TextIndexCache();
 	/** Timings of the latest build, for the status line and measurements. */
 	lastBuild = { ms: 0, lenient: false, findings: 0 };
+	/** The editor's language services (the toolkit's language server), started on first use. */
+	private readonly language: LanguageServices;
+	readonly syntax: SyntaxServices;
 
-	constructor(tk: Toolkit, library: TkLibrary) {
+	constructor(tk: Toolkit, library: TkLibrary, syntax = new SyntaxServices(tk)) {
 		this.tk = tk;
 		this.library = library;
+		this.language = new LanguageServices(tk, library);
+		this.syntax = syntax;
+	}
+
+	highlight(source: string): Highlights {
+		return this.syntax.highlight(source);
+	}
+
+	format(source: string): { changes: { from: number; to: number; insert: string }[] } {
+		return this.syntax.format(source);
+	}
+
+	complete(files: SourceFile[], path: string, offset: number): Completion {
+		return this.language.complete(files, path, offset);
+	}
+
+	hover(files: SourceFile[], path: string, offset: number): Hover | null {
+		return this.language.hover(files, path, offset);
+	}
+
+	definition(files: SourceFile[], path: string, offset: number): DefinitionTarget | null {
+		return this.language.definition(files, path, offset);
+	}
+
+	references(files: SourceFile[], path: string, offset: number): FileRange[] {
+		return this.language.references(files, path, offset);
+	}
+
+	renameSymbol(
+		files: SourceFile[],
+		path: string,
+		offset: number,
+		newName: string
+	): { changes: FileChange[] } | { error: string } {
+		return this.language.rename(files, path, offset, newName);
+	}
+
+	outline(files: SourceFile[], path: string): OutlineItem[] {
+		return this.language.outline(files, path);
+	}
+
+	/** Quick fixes, for the problems the analysis found where the selection is. */
+	codeActions(files: SourceFile[], path: string, from: number, to: number): CodeAction[] {
+		// Fixes need the project's problems; analysing is cheap when the text is unchanged.
+		const analysis = this.build(files.filter((f) => isModel(f.path))).analyses.find(
+			(a) => a.model.file === path
+		);
+		const problems: Diagnostic[] = analysis
+			? [
+					...analysis.model.syntax_errors.map((e): Diagnostic => ({
+						file: path,
+						span: e.span,
+						severity: 'error',
+						code: 'syntax',
+						message: e.message
+					})),
+					...analysis.diagnostics
+				]
+			: [];
+		return this.language.codeActions(files, path, from, to, problems);
 	}
 
 	version(): string {
@@ -66,6 +142,9 @@ export class ToolkitHost {
 			single.session?.free();
 			return single.analyses[0]!;
 		} finally {
+			// The one-file build's outcomes are no start for the project's next build.
+			const fresh = this.settled as TkSettledOutcomes | undefined;
+			if (fresh !== settled) fresh?.free();
 			this.built = previous;
 			this.settled = settled;
 		}
@@ -186,6 +265,8 @@ export class ToolkitHost {
 		return session;
 	}
 }
+
+const isModel = (path: string) => path.endsWith('.sysml') || path.endsWith('.kerml');
 
 function sameFiles(a: SourceFile[], b: SourceFile[]): boolean {
 	return a.length === b.length && a.every((f, i) => f.path === b[i]!.path && f.text === b[i]!.text);

@@ -80,7 +80,11 @@ export interface Toolkit {
 			settled: TkSettledOutcomes
 		): TkSession;
 	};
-	LspServer: { withPreparedLibrary(library: TkLibrary): TkLspServer };
+	LspServer: {
+		/** A server for the syntax tier only (no standard library). */
+		new (): TkLspServer;
+		withPreparedLibrary(library: TkLibrary): TkLspServer;
+	};
 	/** Parse and context findings only, JSON `TkFinding[]` (byte columns). */
 	checkSyntax(sourcesJson: string): string;
 	/** JSON `TkLenient`. */
