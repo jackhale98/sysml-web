@@ -447,6 +447,16 @@ Svelte Flow canvas with SysML notation (§5.2), laid out by ELK:
   CodeMirror are code-split; fonts self-hosted and subset.
 - WCAG 2.1 AA (axe in e2e); keyboard-operable diagrams; touch targets ≥ 44 px.
 - Responsive from 360 px phones to wide desktops; installable PWA, offline.
+- Offline (`src/service-worker`, rules in `src/lib/offline/caching.ts`): the
+  worker registers after load and precaches the shell (prerendered pages, the
+  `404.html` SPA fallback that opens stored `/p/<id>` links, hashed JS/CSS/fonts,
+  icons), served cache-first. The ~10 MB engine is never precached: it is cached
+  on first use (cache-first after), and the page asks the worker to fill in
+  missing engine files when idle after the engine starts. Caches are named by
+  build version and old ones deleted on activate; an unchanged engine (same
+  `engine/build.json`) carries over. Other origins (GitHub) and non-GET requests
+  go to the network, uncached. A new version waits for "Reload" in a toast,
+  which saves pending edits first; there is no automatic `skipWaiting`.
 
 ### 7.7 Visual language
 
