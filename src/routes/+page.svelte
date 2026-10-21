@@ -94,7 +94,7 @@
 	];
 
 	const projects = resolve('/projects');
-	const newProject = resolve('/projects#new');
+	const newProject = resolve('/projects?new');
 	const soon: { icon: typeof GitBranch; title: string; text: string; href?: string }[] = [
 		{
 			icon: Plus,

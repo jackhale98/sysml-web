@@ -118,7 +118,7 @@
 				role="menuitem"
 				onclick={() => {
 					open = false;
-					void goto(resolve('/projects#new'));
+					void goto(resolve('/projects?new'));
 				}}
 			>
 				<Plus size={15} /> New project…

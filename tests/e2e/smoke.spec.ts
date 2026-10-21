@@ -12,7 +12,9 @@ async function expectAccessible(page: Page) {
 /** Open the demo and wait for the engine (WebAssembly, in a worker) to read it. */
 async function openDemo(page: Page) {
 	await page.goto('/p/demo');
-	await expect(page.getByRole('status')).toContainText('Model ready', { timeout: 30_000 });
+	await expect(page.getByRole('status').filter({ hasText: 'Model ready' })).toBeVisible({
+		timeout: 30_000
+	});
 }
 
 async function openFile(page: Page, name: RegExp) {
@@ -269,5 +271,22 @@ test('a new project is ready to use, survives a reload, and round-trips as .kpar
 		.getByRole('button', { name: /TestBench\.sysml/ })
 		.click();
 	await expect(page.locator('.cm-content')).toContainText('part def Motor;');
+	await expectAccessible(page);
+});
+
+test('a state machine runs step by step in the emulator', async ({ page }) => {
+	await openDemo(page);
+	await page
+		.locator('section[aria-labelledby="views-heading"]')
+		.getByRole('button', { name: 'Run FlightModes' })
+		.click();
+	await expect(page.getByText(/(Started|Now) in idle/)).toBeVisible({ timeout: 15_000 });
+	// The blocked event explains why and links to the variable to set.
+	await page.getByRole('button', { name: 'preflightChecksPassed', exact: true }).click();
+	await page.getByRole('switch', { name: /preflightChecksPassed/ }).click();
+	await page.getByRole('button', { name: 'ArmCommand to armed' }).click();
+	await expect(page.getByText(/Now in armed/)).toBeVisible();
+	await page.getByRole('button', { name: 'TakeOffCommand to flying' }).click();
+	await expect(page.getByText(/Now in flying/)).toBeVisible();
 	await expectAccessible(page);
 });
