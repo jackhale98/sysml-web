@@ -420,14 +420,6 @@ engine) leaves room for a CRDT layer later.
 
 ```
 /
-├─ engine/                    Rust workspace
-│  ├─ crates/sysml-syntax/    tree-sitter binding, CST → AST lowering
-│  ├─ crates/sysml-semantic/  element graph, resolution, implied rels, validation
-│  ├─ crates/sysml-eval/      expressions, units, rollups, sim (ported from sysml-core)
-│  ├─ crates/sysml-edit/      EditOps → TextEdits, formatter, pretty-printer
-│  ├─ crates/sysml-interchange/ JSON, .kpar, (XMI)
-│  ├─ crates/sysml-wasm/      wasm-bindgen API + worker protocol types
-│  └─ tests/corpus/           OMG corpus, book fixtures, pilot golden JSON
 ├─ src/                       Astro + Svelte app
 │  ├─ app/                    workbench, views, components
 │  ├─ lib/engine/             worker client, typed RPC, snapshot store
@@ -441,8 +433,37 @@ engine) leaves room for a CRDT layer later.
 └─ .github/workflows/         ci, conformance, deploy
 ```
 
-Long-term, `sysml-cli` and `sysml-lsp` move onto `engine/` crates (published or
-consumed via git) so all tools share one engine.
+### The engine lives in `jackhale98/sysml-cli`
+
+The engine is built in place in the `sysml-cli` Rust workspace rather than
+copied here, so the CLI, LSP and web app share one engine from the start.
+
+```
+sysml-cli/crates/
+├─ sysml-core/          existing; migrated module by module onto the crates below
+├─ sysml-semantic/      NEW element graph, element IDs, resolution, implied rels, validation
+├─ sysml-interchange/   NEW JSON (API schema), .kpar, pretty-printer, (XMI)
+├─ sysml-wasm/          NEW wasm-bindgen API + worker protocol types
+├─ sysml-cli/           gains `export/import --format json|kpar`, `conformance`
+└─ sysml-lsp/           moves onto sysml-semantic (fixes simple-name index collisions)
+```
+
+Changes in `sysml-cli`:
+
+1. Relicense to `Apache-2.0 OR MIT`.
+2. Gate `std::fs` code (`resolver::Project::from_directory`, `config`, `project`)
+   behind a `fs` feature; add a `wasm32-unknown-unknown` CI build (spike recipe).
+3. Build `sysml-semantic` beside `sysml-core`; keep `sysml-core`'s public API
+   working through an adapter while checks, queries, `view_render`, sims and
+   codegen move over one at a time, so the CLI never breaks.
+4. Prebuilt standard-library index generated at build time.
+5. Conformance suite in CI: OMG corpus parse + resolve, pilot JSON diff,
+   round-trip fidelity.
+6. Releases publish the `sysml-wasm` package (npm + GitHub Release asset); this
+   app pins a version and upgrades deliberately.
+
+`tree-sitter-sysml` needs its licence metadata fixed (and relicensed) and the
+`satisfy … by` GLR ambiguity resolved (`prec.dynamic`), ideally in the same pass.
 
 ---
 
@@ -540,12 +561,10 @@ Each phase ends in something usable and demoable; vertical slices over breadth.
 | 3 | Static app + git only; no backend holds data; stateless proxy worker; optional Systems Modeling API client | 2026-10-21 |
 | 4 | Licence `Apache-2.0 OR MIT`; relicense own grammar/core code; OMG library bundled under EPL-2.0 | 2026-10-21 |
 | 5 | Astro + Svelte 5 shell reusing mycelium-web's git/auth/worker/design system | 2026-10-21 |
+| 6 | Engine built in the `sysml-cli` workspace (new `sysml-semantic`, `sysml-interchange`, `sysml-wasm` crates); this app consumes its WASM release | 2026-10-21 |
 
 ## Open questions
 
 1. **Name and domain** for the product.
-2. **Engine home**: build `engine/` in this repo and later move `sysml-cli`/
-   `sysml-lsp` onto it (proposed), or restructure `sysml-cli`'s workspace first
-   and consume it here?
-3. **Element-ID scheme**: confirm deterministic UUIDv5 + rename map after
+2. **Element-ID scheme**: confirm deterministic UUIDv5 + rename map after
    spike B compares against the pilot implementation.
