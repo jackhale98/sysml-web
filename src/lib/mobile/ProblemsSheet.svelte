@@ -13,6 +13,7 @@
 	const warnings = $derived(shown.length - errors);
 
 	function show(file: string, byte: number) {
+		if (!file) return; // about the engine, not a file
 		ui.problemsSheet = false;
 		const element = elementAt(workspace.elements, file, byte);
 		if (element) ui.select(element.key, 'inspector');
@@ -37,7 +38,7 @@
 							/>{/if}
 						<span class="text">
 							<span class="msg">{p.message}</span>
-							<span class="loc">{p.file}:{p.span.start_row}</span>
+							{#if p.file}<span class="loc">{p.file}:{p.span.start_row}</span>{/if}
 						</span>
 					</button>
 				</li>

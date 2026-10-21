@@ -111,6 +111,7 @@
 	});
 
 	function openProblem(file: string, byte: number) {
+		if (!file) return; // about the engine, not a file
 		ui.open({ kind: 'file', path: file });
 		const element = elementAt(workspace.elements, file, byte);
 		if (element) ui.select(element.key, 'inspector');
@@ -557,7 +558,7 @@
 									size={14}
 								/>{/if}
 							<span class="msg">{p.message}</span>
-							<span class="loc">{p.file}:{p.span.start_row}</span>
+							{#if p.file}<span class="loc">{p.file}:{p.span.start_row}</span>{/if}
 						</button>
 					</li>
 				{:else}

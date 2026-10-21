@@ -14,6 +14,9 @@ export interface Span {
 	end_col: number;
 	start_byte: number;
 	end_byte: number;
+	/** UTF-16 offsets into the file (from the toolkit engine; absent from the classic one). */
+	from?: number;
+	to?: number;
 }
 
 export interface Definition {
@@ -24,6 +27,10 @@ export interface Definition {
 	parent_def?: string;
 	short_name?: string;
 	doc?: string;
+	is_abstract?: boolean;
+	/** The toolkit's element id and qualified name (absent from the classic engine). */
+	id?: string;
+	qualified_name?: string;
 }
 
 export interface Usage {
@@ -37,12 +44,33 @@ export interface Usage {
 	value_expr?: string;
 	redefinition?: string;
 	multiplicity?: string;
+	/** The toolkit's element id and qualified name (absent from the classic engine). */
+	id?: string;
+	qualified_name?: string;
 }
 
 /** A `satisfy … by …` or a `verify` inside a verification case. */
 export interface TraceLink {
 	requirement: string;
 	by: string;
+	span: Span;
+	/** The resolved requirement's element id (toolkit only). */
+	requirement_id?: string;
+}
+
+/** A `connect a to b` (connection or interface usage), ends as written. */
+export interface Connection {
+	name: string | null;
+	type_ref?: string | null;
+	source: string;
+	target: string;
+	span: Span;
+}
+
+/** A `view` or `view def` with its `filter` conditions as written. */
+export interface ModelView {
+	name: string;
+	filters: string[];
 	span: Span;
 }
 
@@ -52,6 +80,10 @@ export interface MetadataAnnotation {
 	values: [string, string][];
 	target: string;
 	span: Span;
+	/** The metadata definition's qualified name (toolkit only). */
+	metadata_qualified_type?: string;
+	/** The annotated element's id (toolkit only). */
+	target_id?: string;
 }
 
 export interface SyntaxError {
@@ -65,6 +97,8 @@ export interface Model {
 	usages: Usage[];
 	satisfactions: TraceLink[];
 	verifications: TraceLink[];
+	connections?: Connection[];
+	views?: ModelView[];
 	annotations?: MetadataAnnotation[];
 	syntax_errors: SyntaxError[];
 }

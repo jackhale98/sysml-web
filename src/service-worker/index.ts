@@ -59,18 +59,25 @@ async function storeFallback(shell: Cache) {
 	await shell.put(plan.fallback, page);
 }
 
-/** Reuse the engine cached by an earlier build when the engine itself hasn't changed. */
+/** Reuse the engines cached by an earlier build when the engines themselves haven't changed. */
 async function carryOverEngine() {
 	const earlier = earlierEngineCaches(await caches.keys(), names);
 	if (!earlier.length) return;
-	const stamp = await fetch(fresh(plan.engineStamp))
-		.then((response) => (response.ok ? response.text() : null))
-		.catch(() => null);
-	if (stamp === null) return;
+	const stamps = [plan.engineStamp, plan.toolkitStamp];
+	const current = await Promise.all(
+		stamps.map((path) =>
+			fetch(fresh(path))
+				.then((response) => (response.ok ? response.text() : null))
+				.catch(() => null)
+		)
+	);
+	if (current.some((stamp) => stamp === null)) return;
 	for (const name of earlier) {
 		const old = await caches.open(name);
-		const oldStamp = await old.match(plan.engineStamp);
-		if (!oldStamp || (await oldStamp.text()) !== stamp) continue;
+		const same = await Promise.all(
+			stamps.map(async (path, i) => (await (await old.match(path))?.text()) === current[i])
+		);
+		if (!same.every(Boolean)) continue;
 		const engine = await caches.open(names.engine);
 		for (const request of await old.keys()) {
 			const response = await old.match(request);
@@ -136,8 +143,6 @@ async function answer(event: FetchEvent, route: Exclude<Route, { strategy: 'netw
 async function warmEngine() {
 	const cache = await caches.open(names.engine);
 	for (const path of plan.engine) {
-		// TEST BUILD (?toolkit): toolkit files are only cached when used.
-		if (path.startsWith(`${plan.base}/toolkit/`)) continue;
 		if (await cache.match(path)) continue;
 		try {
 			const response = await fetch(path);

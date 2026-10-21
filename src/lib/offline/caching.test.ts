@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+	SNAPSHOT_CACHE,
 	cacheNames,
 	earlierEngineCaches,
 	planCaches,
@@ -18,7 +19,12 @@ const manifest = {
 		'engine/build.json',
 		'engine/sysml_wasm.d.ts',
 		'engine/sysml_wasm.js',
-		'engine/sysml_wasm_bg.wasm'
+		'engine/sysml_wasm_bg.wasm',
+		'toolkit/sysmlv2.js',
+		'toolkit/sysmlv2_bg.wasm',
+		'toolkit/stdlib/sysml-library.json.gz',
+		'toolkit/stdlib/sysml-library.libcache.gz',
+		'toolkit/stdlib/sysml-library.prepared.gz'
 	],
 	prerendered: ['', 'projects', 'p/demo']
 };
@@ -39,9 +45,14 @@ describe('planCaches', () => {
 			'/sysml-web/engine/LICENSE-MIT',
 			'/sysml-web/engine/build.json',
 			'/sysml-web/engine/sysml_wasm.js',
-			'/sysml-web/engine/sysml_wasm_bg.wasm'
+			'/sysml-web/engine/sysml_wasm_bg.wasm',
+			// The toolkit's snapshots are left to its worker (10 MB is not for every visitor).
+			'/sysml-web/toolkit/sysmlv2.js',
+			'/sysml-web/toolkit/sysmlv2_bg.wasm',
+			'/sysml-web/toolkit/stdlib/sysml-library.json.gz'
 		]);
 		expect(plan.engineStamp).toBe('/sysml-web/engine/build.json');
+		expect(plan.toolkitStamp).toBe('/sysml-web/toolkit/stdlib/manifest.json');
 	});
 
 	it('works at the site root', () => {
@@ -65,6 +76,7 @@ describe('cache names', () => {
 			'sysml-web-shell-100',
 			'sysml-web-engine-100',
 			'other-app',
+			SNAPSHOT_CACHE,
 			...Object.values(current)
 		];
 		expect(staleCaches(keys, current)).toEqual(['sysml-web-shell-100', 'sysml-web-engine-100']);
@@ -133,6 +145,9 @@ describe('routeRequest', () => {
 			it('leaves everything else to the network', () => {
 				expect(get(`${base}/_app/version.json`)).toEqual({ strategy: 'network' });
 				expect(get(`${base}/engine/sysml_wasm.d.ts`)).toEqual({ strategy: 'network' });
+				expect(get(`${base}/toolkit/stdlib/sysml-library.prepared.gz`)).toEqual({
+					strategy: 'network'
+				});
 				expect(get(`${base}/service-worker.js`)).toEqual({ strategy: 'network' });
 				expect(navigate(`${base}/robots.txt`)).toEqual({ strategy: 'network' });
 				expect(

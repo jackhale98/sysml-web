@@ -109,10 +109,14 @@ export class Workspace {
 		verified: this.requirements.filter((r) => r.verifiedBy.length > 0).length
 	});
 
+	/** Why the latest analysis failed (the engine stopped, or refused the model). */
+	engineError = $state<string | null>(null);
+
 	/** Syntax errors and checks, errors first. */
 	problems: Diagnostic[] = $derived(
-		Object.values(this.analyses)
-			.flatMap((a) => [
+		[
+			...(this.engineError ? [engineProblem(this.engineError)] : []),
+			...Object.values(this.analyses).flatMap((a) => [
 				...a.model.syntax_errors.map((e): Diagnostic => ({
 					file: a.model.file,
 					span: e.span,
@@ -122,7 +126,7 @@ export class Workspace {
 				})),
 				...a.diagnostics
 			])
-			.sort((a, b) => severityRank(a.severity) - severityRank(b.severity))
+		].sort((a, b) => severityRank(a.severity) - severityRank(b.severity))
 	);
 
 	private engine: Engine | null = null;
@@ -154,29 +158,45 @@ export class Workspace {
 		const started = performance.now();
 		try {
 			this.engineVersion = await engine.version();
-			await this.analyse();
+			await this.analyse(true);
 			if (generation !== this.generation) return;
 			this.state = { phase: 'ready', millis: performance.now() - started };
 		} catch (error) {
-			this.state = { phase: 'error', message: String(error) };
+			this.failed(error);
 		}
 	}
 
 	/** Analyse every model file together, so references resolve across files. */
-	private async analyse() {
+	private async analyse(throwing = false) {
 		const engine = this.engine;
 		if (!engine) return;
 		const files = this.sourceFiles();
-		const results = await engine.analyzeProject(files);
-		// Drop the result if any file changed while the engine was working.
-		if (files.some((f) => this.files[f.path] !== f.text)) return;
-		this.analyses = Object.fromEntries(files.map((f, i) => [f.path, results[i]!]));
-		const views = await engine.listViews(files);
-		const machines = await engine.stateMachines(files);
-		if (files.every((f) => this.files[f.path] === f.text)) {
-			this.views = views;
-			this.machines = machines;
+		try {
+			const results = await engine.analyzeProject(files);
+			// Drop the result if any file changed while the engine was working.
+			if (files.some((f) => this.files[f.path] !== f.text)) return;
+			this.analyses = Object.fromEntries(files.map((f, i) => [f.path, results[i]!]));
+			if (this.engineError) {
+				this.engineError = null;
+				if (this.state.phase === 'error') this.state = { phase: 'ready', millis: 0 };
+			}
+			const views = await engine.listViews(files);
+			const machines = await engine.stateMachines(files);
+			if (files.every((f) => this.files[f.path] === f.text)) {
+				this.views = views;
+				this.machines = machines;
+			}
+		} catch (error) {
+			if (throwing) throw error;
+			this.failed(error);
 		}
+	}
+
+	/** Show that the engine couldn't analyse the model: status bar and problems. */
+	private failed(error: unknown) {
+		const message = error instanceof Error ? error.message : String(error);
+		this.engineError = message;
+		this.state = { phase: 'error', message };
 	}
 
 	text(path: string): string | undefined {
@@ -323,6 +343,17 @@ export function applyChanges(text: string, changes: Change[]): string {
 		result = result.slice(0, change.from) + change.insert + result.slice(change.to);
 	}
 	return result;
+}
+
+/** The engine's failure as a problem, so it shows where problems are listed. */
+function engineProblem(message: string): Diagnostic {
+	return {
+		file: '',
+		span: { start_row: 1, start_col: 1, end_row: 1, end_col: 1, start_byte: 0, end_byte: 0 },
+		severity: 'error',
+		code: 'engine',
+		message
+	};
 }
 
 function severityRank(severity: Diagnostic['severity']): number {

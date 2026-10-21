@@ -1,0 +1,295 @@
+/**
+ * The toolkit engine on the demo project, through the same code the worker
+ * runs (`ToolkitHost`): the model adapter's output, the diagnostics, broken
+ * text, and where the classic engine and the toolkit disagree (the
+ * toolkit's answer is asserted, with the reason).
+ */
+import { beforeAll, describe, expect, it } from 'vitest';
+import { buildTree, collectElements, type ModelElement } from '#lib/project/elements.ts';
+import { collectRequirements } from '#lib/project/requirements.ts';
+import type { Analysis } from '../types';
+import type { ToolkitHost } from './host';
+import { TextIndex } from './offsets';
+import { demoFiles, loadHost } from './testing';
+
+let host: ToolkitHost;
+let analyses: Analysis[];
+let elements: ModelElement[];
+const files = demoFiles();
+const text = (path: string) => files.find((f) => f.path === path)!.text;
+
+beforeAll(async () => {
+	host = await loadHost();
+	analyses = host.analyzeProject(files);
+	elements = collectElements(analyses);
+}, 60_000);
+
+const element = (path: string, name: string, parent?: string) =>
+	elements.find((e) => e.file === path && e.name === name && (!parent || e.parent === parent));
+
+describe('the demo, analysed by the toolkit', () => {
+	it('has one analysis per file, in order', () => {
+		expect(analyses.map((a) => a.model.file)).toEqual(files.map((f) => f.path));
+	});
+
+	it('finds exactly the two real problems', () => {
+		const problems = analyses.flatMap((a) => [...a.model.syntax_errors, ...a.diagnostics]);
+		expect(problems).toHaveLength(2);
+		const [first, second] = analyses.find(
+			(a) => a.model.file === 'analysis/Performance.sysml'
+		)!.diagnostics;
+		// `subject estimate = drone;` has no type, so `estimate.takeOffMass` can't resolve.
+		expect(first).toMatchObject({
+			severity: 'warning',
+			code: 'referential',
+			message: 'unresolved reference `takeOffMass`',
+			span: { start_row: 29 }
+		});
+		expect(second?.message).toBe('unresolved reference `endurance`');
+		const source = text('analysis/Performance.sysml');
+		expect(source.slice(first!.span.from, first!.span.to)).toBe('takeOffMass');
+		expect(new TextIndex(source).sliceBytes(first!.span.start_byte, first!.span.end_byte)).toBe(
+			'takeOffMass'
+		);
+	});
+
+	it('does not report connected ports as unconnected (classic: 19 false W016)', () => {
+		const all = analyses.flatMap((a) => a.diagnostics);
+		expect(all.filter((d) => /never connected|not connected/.test(d.message))).toEqual([]);
+	});
+
+	it('resolves feature chains through performed actions (classic: 8 false W005)', () => {
+		expect(
+			analyses.find((a) => a.model.file === 'behaviour/Allocation.sysml')!.diagnostics
+		).toEqual([]);
+	});
+
+	it('lists named definitions and usages with kinds, types and owners', () => {
+		expect(elements.length).toBeGreaterThan(450);
+		expect(element('system/Components.sysml', 'Component')).toMatchObject({
+			kind: 'part',
+			isDefinition: true,
+			parent: 'DroneComponents'
+		});
+		expect(element('system/Components.sysml', 'Airframe')?.typeRef).toBe('Component');
+		expect(element('system/DroneArchitecture.sysml', 'rotors')).toMatchObject({
+			kind: 'part',
+			isDefinition: false,
+			typeRef: 'Rotor',
+			multiplicity: '4',
+			parent: 'drone'
+		});
+		// `:>> mass = 650 [g]` is named by what it redefines.
+		expect(element('system/Components.sysml', 'mass', 'Airframe')).toMatchObject({
+			kind: 'attribute',
+			value: '650 [g]'
+		});
+		// Quoted names stay as written; short names and docs come along.
+		expect(element('requirements/SystemRequirements.sysml', "'Flight endurance'")).toMatchObject({
+			kind: 'requirement',
+			label: 'Flight endurance',
+			shortName: 'SYS-001',
+			typeRef: 'DroneRequirement'
+		});
+		expect(element('system/Components.sysml', 'Battery')?.doc).toMatch(/^Six-cell lithium-ion/);
+	});
+
+	it('nests elements under their real owner (classic put `plan` under DeliveryFlight)', () => {
+		expect(element('behaviour/DeliveryMission.sysml', 'plan')?.parent).toBe('flyToDropPoint');
+		const tree = buildTree(elements);
+		const components = tree.find((n) => n.element.name === 'DroneComponents')!;
+		const battery = components.children.find((n) => n.element.name === 'Battery')!;
+		expect(battery.children.map((n) => n.element.name)).toEqual([
+			'mass',
+			'nominalVoltage',
+			'capacity',
+			'usableFraction',
+			'usableEnergy',
+			'powerOut'
+		]);
+	});
+
+	it('gives spans as bytes, UTF-16 offsets and lines of the whole declaration', () => {
+		const rotors = element('system/DroneArchitecture.sysml', 'rotors')!;
+		const source = text('system/DroneArchitecture.sysml');
+		expect(source.slice(rotors.span.from, rotors.span.to)).toBe('part rotors : Rotor[4];');
+		expect(rotors.span.start_row).toBe(source.slice(0, rotors.span.from).split('\n').length);
+	});
+
+	it('types ports by their conjugate as `~P`, written `P` with a flag', () => {
+		const usage = analyses
+			.find((a) => a.model.file === 'system/Components.sysml')!
+			.model.usages.find((u) => u.name === 'powerIn' && u.parent_def === 'PowerDistributionBoard');
+		expect(usage).toMatchObject({ type_ref: 'PowerPort', is_conjugated: true });
+	});
+
+	it('reads satisfy, verify and metadata from the resolved model', () => {
+		const requirements = collectRequirements(analyses);
+		// 6 stakeholder needs, 11 system requirements, 3 risk controls (the same as classic).
+		expect(requirements).toHaveLength(20);
+		const endurance = requirements.find((r) => r.id === 'SYS-001')!;
+		expect(endurance).toMatchObject({
+			title: 'Flight endurance',
+			kind: 'performance',
+			priority: 'high',
+			verificationMethods: ['analysis', 'test'],
+			status: 'done',
+			owner: 'J. Hale',
+			satisfiedBy: ['drone'],
+			verifiedBy: ['enduranceFlightTest']
+		});
+		expect(endurance.rationale).toMatch(/^A 3 km delivery/);
+		expect(requirements.find((r) => r.id === 'SYS-002')?.satisfiedBy).toEqual([
+			'drone.payloadRelease'
+		]);
+		// The two open gaps the demo describes.
+		const unsatisfied = requirements.filter((r) => r.satisfiedBy.length === 0).map((r) => r.id);
+		expect(unsatisfied).toEqual(expect.arrayContaining(['SYS-005', 'SYS-006']));
+		const fmea = analyses.find((a) => a.model.file === 'risk/DesignFmea.sysml')!.model;
+		expect(fmea.annotations?.[0]).toMatchObject({
+			metadata_type: 'Fmea',
+			target: 'drone::battery'
+		});
+		expect(fmea.satisfactions.map((s) => s.by)).toContain('batteryManagementSystem');
+	});
+
+	it('lists `connect` statements with their ends as written', () => {
+		const architecture = analyses.find((a) => a.model.file === 'system/DroneArchitecture.sysml')!;
+		expect(architecture.model.connections?.[0]).toMatchObject({
+			name: 'batteryPower',
+			type_ref: 'PowerSupply',
+			source: 'battery.powerOut',
+			target: 'powerDistribution.powerIn'
+		});
+	});
+
+	it('answers elementDetails for the inspector', () => {
+		const component = element('system/Components.sysml', 'Component')!;
+		expect(
+			host.elementDetails(files, component.file, component.span.start_row, 'Component')
+		).toMatchObject({
+			name: 'Component',
+			kind: 'part',
+			isDefinition: true,
+			abstract: true,
+			qualifiedName: 'DroneComponents::Component',
+			doc: expect.stringMatching(/^Anything built into the drone/)
+		});
+		const mass = element('system/Components.sysml', 'mass', 'Airframe')!;
+		expect(host.elementDetails(files, mass.file, mass.span.start_row, 'mass')).toMatchObject({
+			kind: 'attribute',
+			redefines: 'mass',
+			value: '650 [g]',
+			valueKind: 'bind'
+		});
+		const endurance = element('requirements/SystemRequirements.sysml', "'Flight endurance'")!;
+		expect(
+			host.elementDetails(files, endurance.file, endurance.span.start_row, "'Flight endurance'")
+		).toMatchObject({ shortName: 'SYS-001', type: 'DroneRequirement', kind: 'requirement' });
+		const takeOff = element('system/DroneArchitecture.sysml', 'takeOffMass')!;
+		expect(
+			host.elementDetails(files, takeOff.file, takeOff.span.start_row, 'takeOffMass')
+		).toMatchObject({
+			specializes: ['mass'],
+			value: 'emptyMass + payloadCapacity'
+		});
+		expect(() => host.elementDetails(files, 'system/Components.sysml', 1, 'Nope')).toThrow(
+			/not found/
+		);
+	});
+
+	it('re-analyses an edit', () => {
+		const path = 'system/Components.sysml';
+		const edited = files.map((f) =>
+			f.path === path ? { ...f, text: f.text.replace('650 [g]', '700 [g]') } : f
+		);
+		const again = collectElements(host.analyzeProject(edited));
+		expect(
+			again.find((e) => e.file === path && e.name === 'mass' && e.parent === 'Airframe')?.value
+		).toBe('700 [g]');
+		host.analyzeProject(files);
+	});
+
+	it('reports a parse error at the right UTF-16 offset after multi-byte text', () => {
+		const unit = 'package Wärme {}';
+		const [analysis] = host.analyzeProject([{ path: 'w.sysml', text: unit }]);
+		const [error] = analysis!.model.syntax_errors;
+		expect(error?.message).toBe('unexpected character `ä`');
+		expect(unit.slice(error!.span.from, error!.span.to)).toBe('ä');
+		host.analyzeProject(files);
+	});
+});
+
+describe('broken text', () => {
+	const path = 'system/Components.sysml';
+	const original = text(path);
+	const batteryEnd = original.indexOf('\n    }', original.indexOf('part def Battery'));
+	const analyse = (edited: string) =>
+		host.analyzeProject(files.map((f) => (f.path === path ? { ...f, text: edited } : f)));
+	const problemsOf = (result: Analysis[]) => ({
+		syntax: result.flatMap((a) => a.model.syntax_errors),
+		diagnostics: result.flatMap((a) => a.diagnostics)
+	});
+
+	it('keeps the real error and hides the follow-on noise of an unclosed brace', () => {
+		// Without the policy, the repair re-nests every later definition and 40 references break.
+		const { syntax, diagnostics } = problemsOf(
+			analyse(original.slice(0, batteryEnd) + original.slice(batteryEnd + 6))
+		);
+		expect(syntax).toHaveLength(1);
+		expect(syntax[0]!.message).toMatch(/expected `}`.*\(\d+ follow-on problems are hidden/);
+		expect(diagnostics.map((d) => d.message).sort()).toEqual([
+			'unresolved reference `endurance`',
+			'unresolved reference `takeOffMass`'
+		]);
+	});
+
+	it('shows only the first of a burst of parse errors, at the right place', () => {
+		const edited =
+			original.slice(0, batteryEnd) + '\n        part x : ' + original.slice(batteryEnd);
+		const result = analyse(edited);
+		const { syntax } = problemsOf(result);
+		expect(syntax).toHaveLength(1);
+		expect(syntax[0]!.message).toMatch(/^missing `;`/);
+		expect(syntax[0]!.span.start_row).toBe(
+			edited.slice(0, edited.indexOf('part x')).split('\n').length
+		);
+		// The model of the broken file is still there, in the person's text's positions.
+		const els = collectElements(result);
+		const pdb = els.find((e) => e.file === path && e.name === 'PowerDistributionBoard')!;
+		expect(
+			edited.slice(pdb.span.from, pdb.span.from! + 'part def PowerDistributionBoard'.length)
+		).toBe('part def PowerDistributionBoard');
+	});
+
+	it('keeps a missing `;` to one error', () => {
+		const { syntax, diagnostics } = problemsOf(
+			analyse(original.replace('port powerOut : PowerPort;', 'port powerOut : PowerPort'))
+		);
+		expect(syntax).toHaveLength(1);
+		expect(syntax[0]!.span.start_row).toBe(35);
+		// `powerOut` (dropped by the repair) no longer resolving elsewhere is hidden too.
+		expect(diagnostics).toHaveLength(2);
+	});
+
+	it('reports positions in UTF-16 for text with multi-byte characters', () => {
+		const unit = "package 'Wärme' {\n    part def 'Ölpumpe😀';\n    part p : Nope;\n}\n";
+		const result = host.analyzeProject([{ path: 'w.sysml', text: unit }]);
+		const [finding] = result[0]!.diagnostics;
+		expect(finding?.message).toBe('unresolved reference `Nope`');
+		expect(unit.slice(finding!.span.from, finding!.span.to)).toBe('Nope');
+		const pump = collectElements(result).find((e) => e.label === 'Ölpumpe😀')!;
+		expect(pump.name).toBe("'Ölpumpe😀'");
+		expect(unit.slice(pump.span.from, pump.span.to)).toBe("part def 'Ölpumpe😀';");
+		host.analyzeProject(files);
+	});
+
+	it('reports a parse error at the right UTF-16 offset after multi-byte text', () => {
+		const unit = 'package Wärme {}';
+		const [analysis] = host.analyzeProject([{ path: 'w.sysml', text: unit }]);
+		const [error] = analysis!.model.syntax_errors;
+		expect(error?.message).toBe('unexpected character `ä`');
+		expect(unit.slice(error!.span.from, error!.span.to)).toBe('ä');
+		host.analyzeProject(files);
+	});
+});

@@ -1,7 +1,8 @@
 /**
  * Requirements as rows: the plain-language view of `requirement` usages
- * (PLAN.md §7.3). Reads the per-file models the engine returns today; the
- * semantic engine (Phase 1) will replace the name matching used here.
+ * (PLAN.md §7.3). Satisfy/verify links and metadata are matched to their
+ * requirement by the toolkit's resolved element ids; by name for models
+ * without ids.
  */
 import type { Analysis, MetadataAnnotation, Span, TraceLink, Usage } from '#lib/engine/types.ts';
 import { displayReference, lastSegment, stringValue, unescapeName } from './names';
@@ -39,7 +40,9 @@ export function collectRequirements(analyses: Iterable<Analysis>): RequirementRo
 			const attributes = model.usages.filter(
 				(u) => u.kind === 'attribute' && u.parent_def === usage.name && u.value_expr
 			);
-			const annotations = (model.annotations ?? []).filter((a) => a.target === usage.name);
+			const annotations = (model.annotations ?? []).filter((a) =>
+				a.target_id && usage.id ? a.target_id === usage.id : a.target === usage.name
+			);
 			const status = metadata(annotations, 'StatusInfo');
 			rows.push({
 				key: `${model.file}@${usage.span.start_byte}`,
@@ -113,6 +116,8 @@ function linksTo(usage: Usage, links: TraceLink[]): string[] {
 	const names = referencesTo(usage);
 	const targets = links
 		.filter((link) => {
+			// The toolkit resolves the link's requirement; the classic engine gives its name.
+			if (link.requirement_id && usage.id) return link.requirement_id === usage.id;
 			const segments = link.requirement.split('::');
 			return names.has(link.requirement) || names.has(segments[segments.length - 1] ?? '');
 		})

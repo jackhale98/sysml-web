@@ -6,10 +6,14 @@
  * - The app shell (prerendered pages, the `404.html` SPA fallback, hashed
  *   JS/CSS/fonts, icons and the manifest) is precached when the worker
  *   installs, and served cache-first.
- * - The engine (`engine/*`, ~10 MB of WebAssembly) is not precached, so a
- *   phone visiting the landing page doesn't download it: it is cached on first
- *   use (cache-first afterwards), and the page asks the worker to fill in any
+ * - The engines (`engine/*` and the sysml-toolkit's `toolkit/*`, WebAssembly
+ *   and the standard library) are not precached, so a phone visiting the
+ *   landing page doesn't download them: they are cached on first use
+ *   (cache-first afterwards), and the page asks the worker to fill in any
  *   missing engine files once the engine has started.
+ * - The toolkit's library snapshots (`*.prepared.gz`, 10 MB, and
+ *   `*.libcache.gz`) are never cached here: the toolkit worker downloads the
+ *   prepared one into its own cache (`SNAPSHOT_CACHE`) once the app is idle.
  * - Anything else (other origins such as api.github.com, non-GET requests,
  *   unknown files) goes to the network and is never cached.
  */
@@ -22,6 +26,12 @@ export interface CacheNames {
 	engine: string;
 }
 
+/**
+ * The toolkit's prepared library snapshot, kept across builds (its key names
+ * the toolkit release) and managed by the toolkit worker.
+ */
+export const SNAPSHOT_CACHE = `${CACHE_PREFIX}toolkit-snapshot`;
+
 /** Cache names for a build: a new build gets new caches, and old ones are deleted. */
 export function cacheNames(version: string): CacheNames {
 	return { shell: `${CACHE_PREFIX}shell-${version}`, engine: `${CACHE_PREFIX}engine-${version}` };
@@ -29,7 +39,7 @@ export function cacheNames(version: string): CacheNames {
 
 /** Caches from other builds of this app, to delete once a new worker activates. */
 export function staleCaches(keys: string[], current: CacheNames): string[] {
-	const keep = new Set([current.shell, current.engine]);
+	const keep = new Set([current.shell, current.engine, SNAPSHOT_CACHE]);
 	return keys.filter((key) => key.startsWith(CACHE_PREFIX) && !keep.has(key));
 }
 
@@ -51,17 +61,27 @@ export interface CachePlan {
 	engine: string[];
 	/** The engine's build stamp; when it is unchanged, cached engine files carry over. */
 	engineStamp: string;
+	/** The toolkit's (it names the release); both must be unchanged for a carry-over. */
+	toolkitStamp: string;
 }
 
 const ENGINE_DIR = 'engine/';
-/** TEST BUILD (?toolkit): the toolkit engine, cached on first use like ours. */
+/** The sysml-toolkit engine, cached on first use like the classic one. */
 const TOOLKIT_DIR = 'toolkit/';
 const engineFile = (path: string) => path.startsWith(ENGINE_DIR) || path.startsWith(TOOLKIT_DIR);
 
-/** Static files not worth keeping offline (type declarations, host markers). */
+/**
+ * Static files not worth keeping offline (type declarations, host markers),
+ * and the toolkit's library snapshots, which its worker caches itself.
+ */
 function skipped(path: string): boolean {
 	const name = path.slice(path.lastIndexOf('/') + 1);
-	return name.startsWith('.') || name.endsWith('.d.ts');
+	return (
+		name.startsWith('.') ||
+		name.endsWith('.d.ts') ||
+		name.endsWith('.prepared.gz') ||
+		name.endsWith('.libcache.gz')
+	);
 }
 
 /**
@@ -83,7 +103,8 @@ export function planCaches(input: {
 		fallback: at('404.html'),
 		shell: [...input.immutable.map(at), ...statics.filter((path) => !engineFile(path)).map(at)],
 		engine: statics.filter(engineFile).map(at),
-		engineStamp: at(`${ENGINE_DIR}build.json`)
+		engineStamp: at(`${ENGINE_DIR}build.json`),
+		toolkitStamp: at(`${TOOLKIT_DIR}stdlib/manifest.json`)
 	};
 }
 

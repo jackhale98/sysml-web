@@ -287,8 +287,8 @@
 		const diagnostics: CmDiagnostic[] = workspace.problems
 			.filter((p) => p.file === path)
 			.map((p) => ({
-				from: Math.min(byteToUtf16(text, p.span.start_byte), length),
-				to: Math.min(byteToUtf16(text, p.span.end_byte), length),
+				from: Math.min(p.span.from ?? byteToUtf16(text, p.span.start_byte), length),
+				to: Math.min(p.span.to ?? byteToUtf16(text, p.span.end_byte), length),
 				severity: p.severity === 'note' ? 'info' : p.severity,
 				message: p.suggestion ? `${p.message}. ${p.suggestion}` : p.message,
 				source: p.code
@@ -303,7 +303,10 @@
 		const element = workspace.elements.find((e) => e.key === selection.key);
 		if (!element || element.file !== path) return;
 		const text = view.state.doc.toString();
-		const anchor = Math.min(byteToUtf16(text, element.span.start_byte), view.state.doc.length);
+		const anchor = Math.min(
+			element.span.from ?? byteToUtf16(text, element.span.start_byte),
+			view.state.doc.length
+		);
 		revealing = true;
 		view.dispatch({
 			selection: { anchor },
