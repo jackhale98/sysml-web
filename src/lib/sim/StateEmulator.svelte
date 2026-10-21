@@ -4,8 +4,15 @@
 	import type { Workspace } from '#lib/project/workspace.svelte.ts';
 	import type { WorkbenchUi } from '#lib/workbench/ui.svelte.ts';
 
-	let { machine }: { machine: string; workspace?: Workspace; ui?: WorkbenchUi; engine?: Engine } =
-		$props();
+	let {
+		machine,
+		workspace,
+		ui,
+		engine
+	}: { machine: string; workspace: Workspace; ui: WorkbenchUi; engine: Engine } = $props();
+	const known = $derived(
+		!!engine && !!ui && workspace.machines.some((m) => (m.qualifiedName ?? m.name) === machine)
+	);
 </script>
 
-<p>The emulator for {machine} is on its way.</p>
+<p>The emulator for {machine} is on its way{known ? '' : ' (machine not found)'}.</p>
