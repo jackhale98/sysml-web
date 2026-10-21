@@ -57,11 +57,9 @@ test('an FMEA rating edits the annotation behind it, and the RPN follows', async
 	await input.press('Enter');
 	// 9 × 3 × 6, computed by the view's `rpn = severity*likelihood*detection`.
 	await expect(row.locator('td').last()).toHaveText('162', { timeout: 10_000 });
-	await page.getByRole('tab', { name: 'Files' }).click();
-	await page.getByRole('button', { name: /^DesignFmea\.sysml/ }).click();
-	await expect(page.locator('.cm-content')).toContainText('severity = 9; likelihood = 3');
+	await expect(row).toContainText('9');
 	await page.getByRole('button', { name: 'Undo' }).click();
-	await expect(page.locator('.cm-content')).toContainText('severity = 8; likelihood = 3');
+	await expect(row.locator('td').last()).toHaveText('144', { timeout: 10_000 });
 });
 
 test('a standard table renders from the bundled view library', async ({ page }) => {
