@@ -1,7 +1,7 @@
 /**
  * How table cells read values and names as written: unquoting, the simple
  * name of a reference, a value as a person reads it, numbers and ordering.
- * Ported from the classic engine's `view_render.rs` so cells read the same.
+ * Ported from the earlier engine's `view_render.rs` so cells read the same.
  */
 
 /** `'Flight endurance'` → `Flight endurance` (names that aren't quoted stay as they are). */

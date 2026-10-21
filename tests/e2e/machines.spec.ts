@@ -16,7 +16,7 @@ async function openDemo(page: Page) {
 	});
 }
 
-/** A parallel state def: both regions take the same event (classic didn't see `parallel` here). */
+/** A parallel state def: both regions take the same event (the earlier engine didn't see `parallel` here). */
 const PAYLOAD = `
     state def PayloadModes parallel {
         state latch {

@@ -96,7 +96,7 @@ test('go to definition opens a library type in the library file', async ({ page 
 	await expect(file.locator('.cm-activeLine')).toContainText('datatype Real');
 });
 
-test('a .kpar written by the classic engine imports, with its metadata', async ({ page }) => {
+test('a .kpar written by another tool imports, with its metadata', async ({ page }) => {
 	await page.goto('/projects');
 	await page
 		.locator('input[type=file][accept*=kpar]')

@@ -1,7 +1,7 @@
 /**
  * The declaration header editor on its own (no toolkit): each field set,
- * changed and cleared on each kind of declaration, ported from the classic
- * engine's `declaration.rs` table. Where the outputs differ from classic,
+ * changed and cleared on each kind of declaration, ported from the earlier
+ * engine's `declaration.rs` table. Where the outputs differ from that engine's,
  * the reason is noted (prefix order and `constant` follow the SysML v2
  * notation the toolkit parses).
  */
@@ -140,11 +140,11 @@ const cases: [string, string, DeclarationSet, string][] = [
 	['private part def A;', 'A', { abstract: true }, 'private abstract part def A;'],
 	['private abstract part def A;', 'A', { abstract: false }, 'private part def A;'],
 	['in part a;', 'a', { abstract: true }, 'in abstract part a;'],
-	// Classic wrote `readonly`, which the SysML v2 notation (and the toolkit) does not accept.
+	// The earlier engine wrote `readonly`, which the SysML v2 notation (and the toolkit) does not accept.
 	['attribute x : Real;', 'x', { readonly: true }, 'constant attribute x : Real;'],
 	['readonly attribute x : Real;', 'x', { readonly: false }, 'attribute x : Real;'],
 	['attribute x : Real;', 'x', { derived: true }, 'derived attribute x : Real;'],
-	// Classic: `in readonly derived`; the notation orders direction, derived, abstract, constant.
+	// The earlier engine: `in readonly derived`; the notation orders direction, derived, abstract, constant.
 	[
 		'in attribute x : Real;',
 		'x',

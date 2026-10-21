@@ -1,11 +1,9 @@
 /**
  * State machines read from the toolkit's model (`machines.ts`): the forms
- * the emulator runs, the texts in its conventions, and agreement with the
- * classic engine's extraction (`stateMachines`) on the demo and the
- * emulator's test machines, except where listed.
+ * the emulator runs and the texts in its conventions, on small sources, the
+ * demo and the emulator's test machines (`#lib/sim/fixtures.ts`, which
+ * `sim/semantics.test.ts` also checks).
  */
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { COUNTER, DRONE, LAMP, MISSION, NESTED } from '#lib/sim/fixtures.ts';
 import type { SourceFile } from '../protocol';
@@ -81,7 +79,7 @@ describe('state machines from the toolkit', () => {
 		expect(names).toEqual(['F::M', 'F::d::modes']);
 	});
 
-	it('marks a parallel state def parallel (classic missed `state def M parallel`)', () => {
+	it('marks a parallel state def parallel (`state def M parallel`)', () => {
 		const m = machine(FORMS, 'M');
 		expect(m.parallel).toBe(true);
 		expect(m.doc).toBe('Two regions.');
@@ -234,39 +232,9 @@ describe('texts in the emulator’s conventions', () => {
 	});
 });
 
-// ---------------------------------------------------------------- the classic engine
+// ---------------------------------------------------------------- the emulator's machines
 
-const ENGINE = join(import.meta.dirname, '../../../../static/engine');
-
-interface Classic {
-	initSync(options: { module: Buffer }): void;
-	stateMachines(files: string): string;
-}
-
-describe('agreement with the classic engine’s extraction', () => {
-	let classic: Classic;
-	beforeAll(async () => {
-		classic = (await import(/* @vite-ignore */ join(ENGINE, 'sysml_wasm.js'))) as Classic;
-		classic.initSync({ module: readFileSync(join(ENGINE, 'sysml_wasm_bg.wasm')) });
-	});
-
-	/**
-	 * Without the documented differences: an initial state and its transition
-	 * are on the `entry; then x;` line (classic: the line of the region's `{`);
-	 * a variable's type is spelled the shortest way that resolves (classic: as
-	 * written).
-	 */
-	const comparable = (machines: StateMachine[]) =>
-		machines.map((m) => {
-			const initial = new Set(m.states.filter((s) => s.kind === 'initial').map((s) => s.name));
-			return {
-				...m,
-				states: m.states.map((s) => (initial.has(s.name) ? { ...s, line: 'entry' } : s)),
-				transitions: m.transitions.map((t) => (initial.has(t.from) ? { ...t, line: 'entry' } : t)),
-				variables: m.variables.map((v) => ({ ...v, type: v.type?.split('::').pop() }))
-			};
-		});
-
+describe('the demo and the emulator’s test machines', () => {
 	const cases: [string, SourceFile[]][] = [
 		['the demo', demoFiles()],
 		['LAMP', one(LAMP)],
@@ -276,12 +244,10 @@ describe('agreement with the classic engine’s extraction', () => {
 		['MISSION', one(MISSION)]
 	];
 	for (const [label, files] of cases) {
-		it(`extracts ${label} as the classic engine did`, () => {
-			const ours = host.stateMachines(files);
-			const theirs = JSON.parse(classic.stateMachines(JSON.stringify(files))) as StateMachine[];
-			expect(ours.length).toBeGreaterThan(0);
-			expect(comparable(ours)).toEqual(comparable(theirs));
-			for (const m of ours) {
+		it(`extracts ${label}, each initial state on its \`entry;\` line`, () => {
+			const machines = host.stateMachines(files);
+			expect(machines.length).toBeGreaterThan(0);
+			for (const m of machines) {
 				const lines = files.find((f) => f.path === m.file)!.text.split('\n');
 				for (const s of m.states.filter((s) => s.kind === 'initial'))
 					expect(lines[s.line - 1]).toMatch(/^\s*entry\s*;/);

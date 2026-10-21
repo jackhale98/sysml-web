@@ -1,7 +1,7 @@
 /**
  * The toolkit engine on the demo project, through the same code the worker
  * runs (`ToolkitHost`): the model adapter's output, the diagnostics, broken
- * text, and where the classic engine and the toolkit disagree (the
+ * text, and where the earlier engine and the toolkit disagreed (the
  * toolkit's answer is asserted, with the reason).
  */
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -53,12 +53,12 @@ describe('the demo, analysed by the toolkit', () => {
 		);
 	});
 
-	it('does not report connected ports as unconnected (classic: 19 false W016)', () => {
+	it('does not report connected ports as unconnected (the earlier engine: 19 false W016)', () => {
 		const all = analyses.flatMap((a) => a.diagnostics);
 		expect(all.filter((d) => /never connected|not connected/.test(d.message))).toEqual([]);
 	});
 
-	it('resolves feature chains through performed actions (classic: 8 false W005)', () => {
+	it('resolves feature chains through performed actions (the earlier engine: 8 false W005)', () => {
 		expect(
 			analyses.find((a) => a.model.file === 'behaviour/Allocation.sysml')!.diagnostics
 		).toEqual([]);
@@ -94,7 +94,7 @@ describe('the demo, analysed by the toolkit', () => {
 		expect(element('system/Components.sysml', 'Battery')?.doc).toMatch(/^Six-cell lithium-ion/);
 	});
 
-	it('nests elements under their real owner (classic put `plan` under DeliveryFlight)', () => {
+	it('nests elements under their real owner (the earlier engine put `plan` under DeliveryFlight)', () => {
 		expect(element('behaviour/DeliveryMission.sysml', 'plan')?.parent).toBe('flyToDropPoint');
 		const tree = buildTree(elements);
 		const components = tree.find((n) => n.element.name === 'DroneComponents')!;
@@ -125,7 +125,7 @@ describe('the demo, analysed by the toolkit', () => {
 
 	it('reads satisfy, verify and metadata from the resolved model', () => {
 		const requirements = collectRequirements(analyses);
-		// 6 stakeholder needs, 11 system requirements, 3 risk controls (the same as classic).
+		// 6 stakeholder needs, 11 system requirements, 3 risk controls (as the earlier engine counted).
 		expect(requirements).toHaveLength(20);
 		const endurance = requirements.find((r) => r.id === 'SYS-001')!;
 		expect(endurance).toMatchObject({

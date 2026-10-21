@@ -1,7 +1,7 @@
 /**
  * Views and tables over the toolkit's model, in Node against the real
- * toolkit: the classic engine's table tests (`view_render.rs`) ported, and
- * every standard table of the demo compared with what the classic engine
+ * toolkit: the earlier engine's table tests (`view_render.rs`) ported, and
+ * every standard table of the demo compared with what the earlier engine
  * rendered (row and column counts, spot cells), with the deliberate
  * differences asserted.
  */
@@ -27,7 +27,7 @@ const col = (t: RenderedTable, name: string) => {
 const record = (t: RenderedTable, row: number) =>
 	Object.fromEntries(t.columns.map((c, i) => [c, t.rows[row]![i]!]));
 
-describe('table rendering (the classic engine’s tests)', () => {
+describe('table rendering (the earlier engine’s tests)', () => {
 	const FMEA = `package P {
 		metadata def Fmea {
 			attribute failureMode : ScalarValues::String;
@@ -374,7 +374,7 @@ describe('view usages: expose, filter and inherited tables', () => {
 			const t = render(one(src), v);
 			return { rows: t.rows.map((r) => r[0]), warnings: t.warnings };
 		};
-		// A part is an item (PartUsage specializes ItemUsage); the classic engine
+		// A part is an item (PartUsage specializes ItemUsage); the earlier engine
 		// compared metaclass names and kept only `b`.
 		expect(get('items')).toEqual({ rows: ['a', 'b', 'c'], warnings: [] });
 		expect(get('parts')).toEqual({ rows: ['a', 'c'], warnings: [] });
@@ -507,7 +507,7 @@ describe('requirements, trace and ports', () => {
 	});
 
 	it('don’t count a link whose requirement doesn’t resolve', () => {
-		// The classic engine matched `'R-3'` by name across packages; it isn't visible here.
+		// The earlier engine matched `'R-3'` by name across packages; it isn't visible here.
 		const loose = [
 			files[0]!,
 			{ path: 'design.sysml', text: `package Design { part d; satisfy 'R-3' by d; }` }
@@ -611,7 +611,7 @@ describe('the bundled view libraries', () => {
 });
 
 /**
- * The demo's tables against what the classic engine rendered (its row and
+ * The demo's tables against what the earlier engine rendered (its row and
  * column counts and cells, recorded before it went), with the deliberate
  * differences asserted.
  */
@@ -620,7 +620,7 @@ describe('the demo’s tables', () => {
 	const table = (name: string) => render(demo, name);
 	const shape = (t: RenderedTable) => [t.rows.length, t.columns.length];
 
-	it('lists the views the classic engine listed', () => {
+	it('lists the views the earlier engine listed', () => {
 		const views = host.listViews(demo);
 		expect(views).toHaveLength(41);
 		expect(views.filter((v) => v.hasTable)).toHaveLength(26);
@@ -760,7 +760,7 @@ describe('the demo’s tables', () => {
 		const connections = table('ConnectionTable');
 		expect(shape(connections)).toEqual([11, 2]);
 		expect(connections.rows[0]).toEqual(['battery.powerOut', 'powerDistribution.powerIn']);
-		// A named connection is the element behind its row (the classic engine gave none).
+		// A named connection is the element behind its row (the earlier engine gave none).
 		expect(connections.sources[0]!.element).toBe('DroneArchitecture::drone::batteryPower');
 		const allocations = table('AllocationMatrix');
 		expect(shape(allocations)).toEqual([8, 2]);
@@ -807,7 +807,7 @@ describe('the demo’s tables', () => {
 	it('the bill of materials follows the toolkit’s types and SysML’s `::**`', () => {
 		const bom = table('BillOfMaterials');
 		expect(shape(bom)).toEqual([32, 5]);
-		// `part drone :> DroneArchitecture::drone` is a DeliveryDrone (the classic engine said `drone`).
+		// `part drone :> DroneArchitecture::drone` is a DeliveryDrone (the earlier engine said `drone`).
 		expect(bom.rows[1]!.slice(0, 2)).toEqual(['deliveryService.drone', 'DeliveryDrone']);
 		expect(bom.rows[13]).toEqual([
 			'deliveryService.drone.rotors.motor',

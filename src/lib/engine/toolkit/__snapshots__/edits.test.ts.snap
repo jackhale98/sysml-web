@@ -1,0 +1,229 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`edits > adds a definition with a body to a package 1`] = `
+"+     part def Parachute :> Component {
++         attribute :>> mass = 300 [g];
++     }"
+`;
+
+exports[`edits > adds a field to a one-line annotation 1`] = `
+"-         @StatusInfo { status = StatusKind::done; owner = "J. Hale"; }
++         @StatusInfo { status = StatusKind::done; owner = "J. Hale"; originator = "Ops"; }"
+`;
+
+exports[`edits > adds a multiplicity after the name 1`] = `
+"-         part battery : Battery;
++         part battery[2] : Battery;"
+`;
+
+exports[`edits > adds a short name 1`] = `
+"-     part def Battery :> Component {
++     part def <'BAT'> Battery :> Component {"
+`;
+
+exports[`edits > adds a specialization 1`] = `
+"-     part def Camera :> Component {
++     part def Camera :> Component, Airframe {"
+`;
+
+exports[`edits > adds an annotation after the others 1`] = `"+         @Issue { text = "Check the reserve."; }"`;
+
+exports[`edits > appends a package to a file 1`] = `
+"+ package Spares {
++     part def SpareBattery;
++ }
++ "
+`;
+
+exports[`edits > changes a direction 1`] = `
+"-         out item power : ElectricPower;
++         inout item power : ElectricPower;"
+`;
+
+exports[`edits > changes a multiplicity written after the type 1`] = `
+"-         part rotors : Rotor[4];
++         part rotors : Rotor[6];"
+`;
+
+exports[`edits > changes a one-line doc comment 1`] = `
+"-         doc /* Six-cell lithium-ion pack with a built-in battery management system. */
++         doc /* A new description. */"
+`;
+
+exports[`edits > changes a short name (a label as the element) 1`] = `
+"-     requirement <'SYS-001'> 'Flight endurance' : DroneRequirement {
++     requirement <'SYS-101'> 'Flight endurance' : DroneRequirement {"
+`;
+
+exports[`edits > changes a string field 1`] = `
+"-         @Rationale { text = "A 3 km delivery and return takes about 10 minutes; the rest covers hover at the drop point, headwind and battery ageing."; }
++         @Rationale { text = "Short."; }"
+`;
+
+exports[`edits > changes a value 1`] = `
+"-         attribute capacity :> energy = 216 [W*h];
++         attribute capacity :> energy = 300 [W*h];"
+`;
+
+exports[`edits > chooses the columns of a view def 1`] = `
+"-             columns = "id; title; text; kind; priority; verificationMethod; status; owner; satisfiedBy; verifiedBy";
++             columns = "id; title; status";"
+`;
+
+exports[`edits > clears a field inside a one-line annotation 1`] = `
+"-         @StatusInfo { status = StatusKind::done; owner = "J. Hale"; }
++         @StatusInfo { status = StatusKind::done; }"
+`;
+
+exports[`edits > clears an enum cell 1`] = `"-         :>> priority = Priority::high;"`;
+
+exports[`edits > gives a declaration without a body a doc comment 1`] = `
+"-         attribute maxPower :> power = 450 [W];
++         attribute maxPower :> power = 450 [W] {
++             doc /* Peak power. */
++         }"
+`;
+
+exports[`edits > keeps the unit of a number 1`] = `
+"-         attribute :>> mass = 1100 [g];
++         attribute :>> mass = 1150 [g];"
+`;
+
+exports[`edits > lays out a doc comment like the one it replaces 1`] = `
+"-         doc /* One propulsion unit: speed controller, motor and propeller, replaced as one unit.
+-              * Its mass is the sum of its own parts. */
++         doc /* One unit.
++              * Two lines. */"
+`;
+
+exports[`edits > makes a definition abstract 1`] = `
+"-     part def Camera :> Component {
++     abstract part def Camera :> Component {"
+`;
+
+exports[`edits > makes a definition concrete 1`] = `
+"-     abstract part def Component {
++     part def Component {"
+`;
+
+exports[`edits > makes a value a default 1`] = `
+"-         attribute capacity :> energy = 216 [W*h];
++         attribute capacity :> energy default = 216 [W*h];"
+`;
+
+exports[`edits > removes a direction 1`] = `
+"-         out item power : ElectricPower;
++         item power : ElectricPower;"
+`;
+
+exports[`edits > removes a doc comment 1`] = `"-         doc /* Six-cell lithium-ion pack with a built-in battery management system. */"`;
+
+exports[`edits > removes a short name 1`] = `
+"-     requirement <'SYS-001'> 'Flight endurance' : DroneRequirement {
++     requirement 'Flight endurance' : DroneRequirement {"
+`;
+
+exports[`edits > removes a type, keeping the multiplicity 1`] = `
+"-         part airframe : Airframe;
++         part airframe;"
+`;
+
+exports[`edits > removes a value 1`] = `
+"-         attribute capacity :> energy = 216 [W*h];
++         attribute capacity :> energy;"
+`;
+
+exports[`edits > removes an annotation whose only field is cleared 1`] = `"-         @Rationale { text = "A 3 km delivery and return takes about 10 minutes; the rest covers hover at the drop point, headwind and battery ageing."; }"`;
+
+exports[`edits > removes an attribute nothing refers to 1`] = `"-         attribute maxPower :> power = 450 [W];"`;
+
+exports[`edits > removes the specializations 1`] = `
+"-     part def Airframe :> Component {
++     part def Airframe {"
+`;
+
+exports[`edits > renames a definition in its file 1`] = `
+"-         part propeller : Propeller;
+- 
+-         bind powerIn = esc.powerIn;     // the rotor's ports are the speed controller's ports
+-         bind control = esc.control;
+-         connect esc to motor;           // three motor phase wires
+-         connect motor to propeller;     // shaft and hub
+-     }
+- 
+-     part def SpeedController :> Component {
+-         doc /* Turns battery power into motor current at the commanded speed. */
+-         attribute :>> mass = 35 [g];
+-         port powerIn : ~PowerPort;
+-         port control : ~MotorControlPort;
+-     }
+- 
+-     part def Motor :> Component {
+-         doc /* Brushless outrunner motor. */
+-         attribute :>> mass = 120 [g];
+-         attribute maxPower :> power = 450 [W];
+-     }
+- 
+-     part def Propeller :> Component {
++         part propeller : Prop;
++ 
++         bind powerIn = esc.powerIn;     // the rotor's ports are the speed controller's ports
++         bind control = esc.control;
++         connect esc to motor;           // three motor phase wires
++         connect motor to propeller;     // shaft and hub
++     }
++ 
++     part def SpeedController :> Component {
++         doc /* Turns battery power into motor current at the commanded speed. */
++         attribute :>> mass = 35 [g];
++         port powerIn : ~PowerPort;
++         port control : ~MotorControlPort;
++     }
++ 
++     part def Motor :> Component {
++         doc /* Brushless outrunner motor. */
++         attribute :>> mass = 120 [g];
++         attribute maxPower :> power = 450 [W];
++     }
++ 
++     part def Prop :> Component {"
+`;
+
+exports[`edits > sets a doc cell 1`] = `
+"-         doc /* The drone shall fly for at least 25 minutes with a 1 kg payload in still air
+-              * before it reaches its landing reserve. */
++         doc /* Shorter. */"
+`;
+
+exports[`edits > sets a list of enum literals, quoting a keyword 1`] = `
+"-         :>> verificationMethod = (VerificationMethod::'analysis', VerificationMethod::test);
++         :>> verificationMethod = (VerificationMethod::test, VerificationMethod::'analysis');"
+`;
+
+exports[`edits > sets a metadata field 1`] = `
+"-         @StatusInfo { status = StatusKind::done; owner = "J. Hale"; }
++         @StatusInfo { status = StatusKind::open; owner = "J. Hale"; }"
+`;
+
+exports[`edits > sets a short name cell 1`] = `
+"-     requirement <'SYS-001'> 'Flight endurance' : DroneRequirement {
++     requirement <'SYS-101'> 'Flight endurance' : DroneRequirement {"
+`;
+
+exports[`edits > sets an enum cell 1`] = `
+"-         :>> priority = Priority::high;
++         :>> priority = Priority::low;"
+`;
+
+exports[`edits > sets an enum on an element found by name alone 1`] = `
+"-         :>> kind = RequirementKind::environmental;
++         :>> kind = RequirementKind::safety;"
+`;
+
+exports[`edits > wraps a long doc comment to the old one’s width 1`] = `
+"-      * The component catalogue. Each \`part def\` is a definition: it says what a kind of
+-      * component is - its properties and its ports - like a datasheet. A definition is not
+-      * part of any drone yet; DroneArchitecture uses these definitions to build one.
++      * The component catalogue: a very long single line that keeps going well past the
++      * width of the old comment so that it wraps."
+`;

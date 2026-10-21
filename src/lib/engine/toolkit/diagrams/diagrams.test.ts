@@ -1,34 +1,21 @@
 /**
- * The seven diagram views on the demo, from the toolkit (`ToolkitHost.diagram`),
- * compared with the classic engine's graphs: the same nodes and edges where
- * classic was right, and the deliberate differences asserted where it was
- * not (inherited ports, flows and bindings, typing edges, transitions,
- * decision branches, «derive» links, view usages drawn with their filters).
+ * The seven diagram views on the demo, from the toolkit (`ToolkitHost.diagram`):
+ * nodes and edges, inherited ports, flows and bindings, typing edges,
+ * transitions, decision branches, «derive» links, and view usages drawn with
+ * their filters.
  */
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { DiagramGraph, DiagramView } from '../../types';
 import type { ToolkitHost } from '../host';
 import { demoFiles, loadHost } from '../testing';
 
-const ENGINE = join(import.meta.dirname, '../../../../../static/engine');
-
-interface Classic {
-	initSync(options: { module: Buffer }): void;
-	diagram(view: string, files: string, scope: string | null): string;
-}
-
 let host: ToolkitHost;
-let classic: Classic;
 const files = demoFiles();
 const timings: Record<string, number> = {};
 
 beforeAll(async () => {
 	host = await loadHost();
 	host.analyzeProject(files);
-	classic = (await import(/* @vite-ignore */ join(ENGINE, 'sysml_wasm.js'))) as Classic;
-	classic.initSync({ module: readFileSync(join(ENGINE, 'sysml_wasm_bg.wasm')) });
 }, 60_000);
 
 function toolkit(view: DiagramView, scope: string | null): DiagramGraph {
@@ -37,9 +24,6 @@ function toolkit(view: DiagramView, scope: string | null): DiagramGraph {
 	timings[`${view}:${scope ?? ''}`] = performance.now() - started;
 	return graph;
 }
-
-const old = (view: DiagramView, scope: string | null): DiagramGraph =>
-	JSON.parse(classic.diagram(view, JSON.stringify(files), scope)) as DiagramGraph;
 
 const ids = (g: DiagramGraph) => g.nodes.map((n) => n.id).sort();
 const node = (g: DiagramGraph, id: string) => g.nodes.find((n) => n.id === id)!;
@@ -50,12 +34,33 @@ const edges = (g: DiagramGraph, kind?: string) =>
 		.sort();
 
 describe('general view', () => {
-	it('draws a package like classic, without the package box (the frame names it)', () => {
+	it('draws a package without the package box (the frame names it)', () => {
 		const tk = toolkit('general', 'DroneArchitecture');
-		const was = old('general', 'DroneArchitecture');
-		expect(ids(tk)).toEqual(ids(was).filter((id) => id !== 'DroneArchitecture'));
-		expect(edges(tk, 'composition')).toEqual(edges(was, 'composition'));
-		// New: the usage is "defined by" its definition.
+		expect(ids(tk)).toEqual([
+			'DeliveryDrone',
+			'drone',
+			'drone.airframe',
+			'drone.battery',
+			'drone.camera',
+			'drone.flightController',
+			'drone.gnss',
+			'drone.payloadRelease',
+			'drone.powerDistribution',
+			'drone.radio',
+			'drone.rotors'
+		]);
+		expect(edges(tk, 'composition')).toEqual([
+			'drone -composition-> drone.airframe',
+			'drone -composition-> drone.battery',
+			'drone -composition-> drone.camera',
+			'drone -composition-> drone.flightController',
+			'drone -composition-> drone.gnss',
+			'drone -composition-> drone.payloadRelease',
+			'drone -composition-> drone.powerDistribution',
+			'drone -composition-> drone.radio',
+			'drone -composition-> drone.rotors'
+		]);
+		// The usage is "defined by" its definition.
 		expect(edges(tk, 'typing')).toEqual(['drone -typing-> DeliveryDrone']);
 		expect(node(tk, 'drone')).toMatchObject({
 			label: 'drone : DeliveryDrone',
@@ -75,11 +80,40 @@ describe('general view', () => {
 		);
 	});
 
-	it('keeps specializations and definition compositions as classic drew them', () => {
+	it('draws specializations and definition compositions', () => {
 		const tk = toolkit('general', 'DroneComponents');
-		const was = old('general', 'DroneComponents');
-		expect(ids(tk)).toEqual(ids(was).filter((id) => id !== 'DroneComponents'));
-		expect(edges(tk)).toEqual(edges(was));
+		expect(ids(tk)).toEqual([
+			'Airframe',
+			'Battery',
+			'Camera',
+			'Component',
+			'FlightController',
+			'GnssReceiver',
+			'Motor',
+			'PayloadRelease',
+			'PowerDistributionBoard',
+			'Propeller',
+			'Rotor',
+			'SpeedController',
+			'TelemetryRadio'
+		]);
+		expect(edges(tk)).toEqual([
+			'Airframe -specialization-> Component',
+			'Battery -specialization-> Component',
+			'Camera -specialization-> Component',
+			'FlightController -specialization-> Component',
+			'GnssReceiver -specialization-> Component',
+			'Motor -specialization-> Component',
+			'PayloadRelease -specialization-> Component',
+			'PowerDistributionBoard -specialization-> Component',
+			'Propeller -specialization-> Component',
+			'Rotor -composition-> Motor (motor)',
+			'Rotor -composition-> Propeller (propeller)',
+			'Rotor -composition-> SpeedController (esc)',
+			'Rotor -specialization-> Component',
+			'SpeedController -specialization-> Component',
+			'TelemetryRadio -specialization-> Component'
+		]);
 		expect(node(tk, 'Component').attributes[0]).toEqual(['modifier', 'abstract']);
 	});
 
@@ -110,8 +144,6 @@ describe('general view', () => {
 		const tk = toolkit('general', 'drone');
 		expect(tk.nodes).toHaveLength(10);
 		expect(edges(tk, 'composition')).toContain('drone -composition-> drone.battery');
-		// Classic drew the nine parts unconnected, without the drone itself.
-		expect(old('general', 'drone').edges).toHaveLength(0);
 	});
 
 	it('draws view usages from what they expose, filters applied', () => {
@@ -141,7 +173,7 @@ describe('general view', () => {
 		expect(node(tree, "'Flight endurance'").attributes[0]![0]).toBe('text');
 	});
 
-	it('draws the view usages of a package with what they expose (classic drew none)', () => {
+	it('draws the view usages of a package with what they expose', () => {
 		const tk = toolkit('general', 'DroneViews');
 		expect(tk.nodes).toHaveLength(15);
 		expect(node(tk, 'componentCatalogue')).toMatchObject({
@@ -152,15 +184,42 @@ describe('general view', () => {
 				['filter', '@SysML::PartDefinition']
 			]
 		});
-		expect(old('general', 'DroneViews').nodes.map((n) => n.id)).toEqual(['DroneViews']);
 	});
 
-	it('draws every definition of the project without a scope, as classic did', () => {
+	it('draws every definition of the project without a scope', () => {
 		const tk = toolkit('general', null);
-		const was = old('general', null);
-		const packages = was.nodes.filter((n) => n.stereotype === '<<package>>').map((n) => n.id);
-		expect(ids(tk)).toEqual(ids(was).filter((id) => !packages.includes(id)));
-		expect(edges(tk, 'specialization')).toEqual(edges(was, 'specialization'));
+		const definitions = host
+			.analyzeProject(files)
+			.flatMap((a) => a.model.definitions)
+			.filter((d) => d.kind !== 'package')
+			.map((d) => d.name)
+			.sort();
+		expect(definitions).toHaveLength(90);
+		expect(ids(tk)).toEqual(definitions);
+		expect(edges(tk, 'specialization')).toEqual([
+			'Airframe -specialization-> Component',
+			'ArmCommand -specialization-> FlightCommand',
+			'Battery -specialization-> Component',
+			'Camera -specialization-> Component',
+			'DisarmCommand -specialization-> FlightCommand',
+			'DroneRequirement -specialization-> EngineeringRequirement',
+			'FailureMode -specialization-> RiskEvent',
+			'FlightController -specialization-> Component',
+			'FlightPlan -specialization-> FlightCommand',
+			'GnssReceiver -specialization-> Component',
+			'Harm -specialization-> RiskEvent',
+			'Hazard -specialization-> RiskEvent',
+			'HazardousSituation -specialization-> RiskEvent',
+			'Motor -specialization-> Component',
+			'PayloadRelease -specialization-> Component',
+			'PowerDistributionBoard -specialization-> Component',
+			'Propeller -specialization-> Component',
+			'ReturnHomeCommand -specialization-> FlightCommand',
+			'Rotor -specialization-> Component',
+			'SpeedController -specialization-> Component',
+			'TakeOffCommand -specialization-> FlightCommand',
+			'TelemetryRadio -specialization-> Component'
+		]);
 	});
 
 	it('says where each element is declared, so the canvas finds it without guessing', () => {
@@ -175,17 +234,46 @@ describe('general view', () => {
 });
 
 describe('interconnection view', () => {
-	it('draws the same parts with the same ports as classic, and adds what classic missed', () => {
+	it('draws the parts with their ports, connections, bindings and flows', () => {
 		const tk = toolkit('interconnection', 'drone');
-		const was = old('interconnection', 'drone');
-		const parts = (g: DiagramGraph) => g.nodes.filter((n) => n.kind === 'block');
-		expect(ids({ ...tk, nodes: parts(tk) })).toEqual(ids(was));
-		for (const n of parts(was)) expect(node(tk, n.id).attributes).toEqual(n.attributes);
-		expect(edges(tk, 'connection')).toEqual(edges(was, 'connection'));
-		// New: the drone's own port, inherited from DeliveryDrone, bound to the radio's.
+		const parts = tk.nodes.filter((n) => n.kind === 'block');
+		const ports: Record<string, string[]> = {
+			airframe: [],
+			battery: ['powerOut : PowerPort'],
+			powerDistribution: [
+				'powerIn : ~PowerPort',
+				'rotorPower : PowerPort',
+				'avionicsPower : PowerPort'
+			],
+			rotors: ['powerIn : ~PowerPort', 'control : ~MotorControlPort'],
+			flightController: [
+				'powerIn : ~PowerPort',
+				'motorControl : MotorControlPort',
+				'navigation : ~NavigationPort',
+				'commandLink : ~CommandLinkPort',
+				'imageIn : ~ImagePort',
+				'releaseControl : ReleaseControlPort'
+			],
+			gnss: ['navigation : NavigationPort'],
+			radio: ['airLink : ~CommandLinkPort', 'controllerLink : CommandLinkPort'],
+			camera: ['imageOut : ImagePort'],
+			payloadRelease: ['releaseControl : ~ReleaseControlPort']
+		};
+		expect(parts.map((n) => n.id).sort()).toEqual(Object.keys(ports).sort());
+		for (const n of parts) {
+			expect(n.attributes.every(([kind]) => kind === 'port')).toBe(true);
+			expect(n.attributes.map(([, text]) => text)).toEqual(ports[n.id]);
+		}
+		expect(edges(tk, 'connection')).toEqual([
+			'battery -connection-> powerDistribution (batteryPower)',
+			'powerDistribution -connection-> flightController (avionicsPower)',
+			'powerDistribution -connection-> rotors (rotorPower)',
+			'radio -connection-> flightController (radioCable)'
+		]);
+		// The drone's own port, inherited from DeliveryDrone, bound to the radio's.
 		expect(node(tk, 'commandLink')).toMatchObject({ kind: 'port' });
 		expect(edges(tk, 'binding')).toEqual(['commandLink -binding-> radio']);
-		// New: the four item flows (classic's model had no flows with feature-chain ends).
+		// The four item flows, whose ends are feature chains.
 		expect(edges(tk, 'flow')).toEqual([
 			'camera -flow-> flightController (Image)',
 			'flightController -flow-> payloadRelease (ReleaseCommand)',
@@ -196,10 +284,11 @@ describe('interconnection view', () => {
 
 	it('shows ports a part inherits through what it subsets', () => {
 		const tk = toolkit('interconnection', 'deliveryService');
-		const was = old('interconnection', 'deliveryService');
-		expect(ids(tk)).toEqual(ids(was));
-		expect(edges(tk)).toEqual(edges(was));
-		expect(node(was, 'drone').attributes).toEqual([]);
+		expect(ids(tk)).toEqual(['drone', 'groundStation', 'operator', 'recipient']);
+		expect(edges(tk)).toEqual([
+			'groundStation -connection-> drone (radioLink)',
+			'operator -connection-> groundStation'
+		]);
 		expect(node(tk, 'drone')).toMatchObject({
 			label: 'drone :> DroneArchitecture::drone',
 			attributes: [['port', 'commandLink : ~CommandLinkPort']]
@@ -217,11 +306,17 @@ describe('interconnection view', () => {
 });
 
 describe('state transition view', () => {
-	it('draws every transition, labelled (classic drew only the initial one)', () => {
+	it('draws every transition, labelled', () => {
 		const tk = toolkit('states', 'FlightModes');
-		const was = old('states', 'FlightModes');
-		expect(ids(tk)).toEqual(ids(was));
-		expect(was.edges).toHaveLength(1);
+		expect(ids(tk)).toEqual([
+			'__initial__',
+			'armed',
+			'failsafe',
+			'flying',
+			'idle',
+			'landing',
+			'returningHome'
+		]);
 		expect(tk.edges).toHaveLength(12);
 		expect(edges(tk)).toEqual(
 			expect.arrayContaining([
@@ -238,9 +333,7 @@ describe('state transition view', () => {
 describe('action flow view', () => {
 	it('draws the whole flow, decisions with their guards', () => {
 		const tk = toolkit('actions', 'DeliveryFlight');
-		const was = old('actions', 'DeliveryFlight');
-		expect(tk.nodes).toHaveLength(was.nodes.length);
-		// Ids are names now (classic numbered them: act_0, fork_3, …).
+		// Ids are names (unnamed control nodes are numbered by kind).
 		expect(ids(tk)).toEqual(
 			[
 				'__final__',
@@ -259,8 +352,6 @@ describe('action flow view', () => {
 				'takeOff'
 			].sort()
 		);
-		// Classic lost returnHome and land, and left the decision without branches.
-		expect(was.nodes.map((n) => n.label)).not.toContain('returnHome');
 		expect(edges(tk)).toEqual(
 			expect.arrayContaining([
 				'decide#1 -flow-> releaseParcel ([checkDropZone.isClear])',
@@ -278,19 +369,67 @@ describe('action flow view', () => {
 });
 
 describe('requirement views', () => {
-	it('draws the same requirements, satisfy and verify links as classic, plus «derive»', () => {
+	it('draws the requirements with their satisfy, verify and «derive» links', () => {
 		const tk = toolkit('requirements', null);
-		const was = old('requirements', null);
-		const requirements = (g: DiagramGraph) =>
-			g.nodes
-				.filter((n) => n.kind === 'requirement')
-				.map((n) => n.id)
-				.sort();
-		expect(requirements(tk)).toEqual(requirements(was));
-		// Satisfiers are named by their path from the design (`drone.battery`, classic: `battery`).
+		const requirements = tk.nodes
+			.filter((n) => n.kind === 'requirement')
+			.map((n) => n.id)
+			.sort();
+		expect(requirements).toEqual([
+			"'Acoustic noise'",
+			"'Approved for operation'",
+			"'Battery protection'",
+			"'Battery thermal protection'",
+			"'Command and telemetry link'",
+			"'Controlled parcel release'",
+			"'Flight endurance'",
+			"'Flying in typical weather'",
+			"'Geofencing'",
+			"'Ingress protection'",
+			"'Maximum take-off mass'",
+			"'Navigation integrity monitoring'",
+			"'Parcel delivery'",
+			"'Payload capacity'",
+			"'Quiet neighbour'",
+			"'Return to home'",
+			"'Rotor health monitoring'",
+			"'Safe hand-over'",
+			"'Safe operation'",
+			"'Wind tolerance'",
+			'DroneRequirement',
+			'EngineeringRequirement',
+			'RiskControl'
+		]);
+		// Satisfiers are named by their path from the design (`drone.battery`).
+		expect(edges(tk, 'satisfy')).toContain(
+			"drone.battery -satisfy-> 'Battery protection' (<<satisfy>>)"
+		);
 		const last = (s: string) => s.split(' -')[0]!.split('.').pop() + ' -' + s.split(' -')[1];
-		expect(edges(tk, 'satisfy').map(last).sort()).toEqual(edges(was, 'satisfy').map(last).sort());
-		expect(edges(tk, 'verify')).toEqual(edges(was, 'verify'));
+		expect(edges(tk, 'satisfy').map(last).sort()).toEqual([
+			"battery -satisfy-> 'Battery protection' (<<satisfy>>)",
+			"batteryManagementSystem -satisfy-> 'Battery thermal protection' (<<satisfy>>)",
+			"drone -satisfy-> 'Flight endurance' (<<satisfy>>)",
+			"drone -satisfy-> 'Maximum take-off mass' (<<satisfy>>)",
+			"flightController -satisfy-> 'Geofencing' (<<satisfy>>)",
+			"flightController -satisfy-> 'Return to home' (<<satisfy>>)",
+			"flightController -satisfy-> 'Wind tolerance' (<<satisfy>>)",
+			"navigationIntegrityMonitor -satisfy-> 'Navigation integrity monitoring' (<<satisfy>>)",
+			"payloadRelease -satisfy-> 'Controlled parcel release' (<<satisfy>>)",
+			"payloadRelease -satisfy-> 'Payload capacity' (<<satisfy>>)",
+			"radio -satisfy-> 'Command and telemetry link' (<<satisfy>>)",
+			"rotorHealthMonitor -satisfy-> 'Rotor health monitoring' (<<satisfy>>)"
+		]);
+		expect(edges(tk, 'verify')).toEqual([
+			"batteryAbuseTest -verify-> 'Battery protection' (<<verify>>)",
+			"batteryAbuseTest -verify-> 'Battery thermal protection' (<<verify>>)",
+			"enduranceFlightTest -verify-> 'Flight endurance' (<<verify>>)",
+			"failsafeFlightTest -verify-> 'Geofencing' (<<verify>>)",
+			"failsafeFlightTest -verify-> 'Return to home' (<<verify>>)",
+			"linkRangeTest -verify-> 'Command and telemetry link' (<<verify>>)",
+			"massAndPayloadCheck -verify-> 'Maximum take-off mass' (<<verify>>)",
+			"massAndPayloadCheck -verify-> 'Payload capacity' (<<verify>>)",
+			"windHoldTest -verify-> 'Wind tolerance' (<<verify>>)"
+		]);
 		expect(edges(tk, 'dependency')).toHaveLength(11);
 	});
 
@@ -304,18 +443,34 @@ describe('requirement views', () => {
 		expect(status("'Flight endurance'")).toEqual([]);
 		expect(edges(tk, 'satisfy')).toHaveLength(12);
 		expect(edges(tk, 'verify')).toHaveLength(9);
-		// Classic drew requirement definitions only, so its links pointed at nothing.
-		const was = old('trace', null);
-		expect(was.nodes.some((n) => n.id === "'Acoustic noise'")).toBe(false);
 	});
 });
 
 describe('package view', () => {
-	it('draws the packages and their definitions like classic, joined by membership', () => {
+	it('draws the packages and their definitions, joined by membership', () => {
 		const tk = toolkit('packages', null);
-		const was = old('packages', null);
-		expect(ids(tk)).toEqual(ids(was));
-		expect(tk.subgraphs.map((s) => s.id).sort()).toEqual(was.subgraphs.map((s) => s.id).sort());
+		const names = host
+			.analyzeProject(files)
+			.flatMap((a) => a.model.definitions)
+			.map((d) => d.name)
+			.sort();
+		expect(ids(tk)).toEqual(names);
+		// A frame for each package that has definitions of its own.
+		expect(tk.subgraphs.map((s) => s.id).sort()).toEqual([
+			'DeliveryContext',
+			'DeliveryMission',
+			'DroneArchitecture',
+			'DroneComponents',
+			'DroneInterfaces',
+			'DronePerformance',
+			'EngineeringBasics',
+			'FlightControl',
+			'HazardAnalysis',
+			'ModelViews',
+			'Reporting',
+			'RiskAnalysis',
+			'SystemRequirements'
+		]);
 		expect(edges(tk, 'containment')).toContain('DroneComponents -containment-> Battery');
 	});
 });

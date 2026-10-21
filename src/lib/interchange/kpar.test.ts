@@ -1,12 +1,11 @@
 /**
- * `.kpar` reading and writing, with the fixtures of `sysml-interchange`
- * (our Rust engine's crate) ported, plus round trips with that engine in
- * WebAssembly: what it writes reads here, and what this writes reads there.
+ * `.kpar` reading and writing, with the fixtures of `sysml-interchange` (the
+ * Rust crate this replaced) ported, and archives written by other tools.
  */
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { join, relative } from 'node:path';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
 import { unzip, zip } from '#lib/dataio/zip.ts';
 import {
 	computeChecksums,
@@ -189,106 +188,37 @@ describe('kpar', () => {
 	});
 });
 
-// --- Round trips with the classic engine (WebAssembly in Node) ----------------
+// --- Archives written elsewhere --------------------------------------------------
 
-const ENGINE = join(import.meta.dirname, '../../../static/engine');
-const DEMO = join(import.meta.dirname, '../../demo/drone');
-const CREATED = '2026-10-21T12:00:00Z';
+/** A `.kpar` written by another tool (the e2e import test opens it too). */
+const FOREIGN = join(import.meta.dirname, '../../../tests/e2e/fixtures/motor-rig.kpar');
 
-interface Wasm {
-	initSync(options: { module: Buffer }): void;
-	readKpar(bytes: Uint8Array): string;
-	readProjectArchive(bytes: Uint8Array, fallbackName: string): string;
-	writeKpar(info: string, files: string, created: string): Uint8Array;
-}
-
-function walk(dir: string): string[] {
-	return readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
-		e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)]
-	);
-}
-
-describe.skipIf(!existsSync(join(ENGINE, 'sysml_wasm.js')))('kpar and the classic engine', () => {
-	let wasm: Wasm;
-	let info: Record<string, unknown>;
-	let files: { path: string; text: string }[];
-
-	beforeAll(async () => {
-		wasm = (await import(join(ENGINE, 'sysml_wasm.js'))) as Wasm;
-		wasm.initSync({ module: readFileSync(join(ENGINE, 'sysml_wasm_bg.wasm')) });
-		info = JSON.parse(readFileSync(join(DEMO, '.project.json'), 'utf8')) as Record<string, unknown>;
-		files = walk(DEMO)
-			.filter((p) => !p.endsWith('.project.json'))
-			.map((p) => ({ path: relative(DEMO, p), text: readFileSync(p, 'utf8') }))
-			.sort((a, b) => (a.path < b.path ? -1 : 1));
-	});
-
-	it('reads what the engine writes', async () => {
-		const bytes = wasm.writeKpar(JSON.stringify(info), JSON.stringify(files), CREATED);
+describe('archives written elsewhere', () => {
+	it('reads one with its metadata, and writes the same index and checksums for it', async () => {
+		const bytes = new Uint8Array(readFileSync(FOREIGN));
+		const kpar = await readKpar(bytes);
+		expect(await verifyChecksums(kpar)).toEqual([]);
+		expect(kpar.meta.created).toBe('2026-10-21T00:00:00Z');
 		const read = await readProjectArchive(bytes, 'fallback');
-		expect(read.info).toEqual(info);
-		expect(read.files).toEqual(files);
+		expect(read.info.name).toBe('Motor rig');
+		expect(read.files.map((f) => f.path)).toEqual(['README.md', 'model/MotorRig.sysml']);
 		expect(read.skipped).toEqual([]);
 		expect(read.warnings).toEqual([]);
-
-		const kpar = await readKpar(bytes);
-		expect(kpar.meta.created).toBe(CREATED);
-		expect(await verifyChecksums(kpar)).toEqual([]);
-		// The engine indexes top-level definitions; ours agrees on every one.
-		const ours = await readKpar(await writeKpar(info, files, CREATED));
-		for (const [name, path] of Object.entries(kpar.meta.index)) {
-			expect(ours.meta.index[name], name).toBe(path);
-		}
+		const ours = await readKpar(await writeKpar(read.info, read.files, kpar.meta.created));
+		expect(ours.meta.index).toEqual(kpar.meta.index);
 		expect(ours.meta.checksum).toEqual(kpar.meta.checksum);
 	});
 
-	it('writes what the engine reads', async () => {
-		const bytes = await writeKpar(info, files, CREATED);
-		const read = JSON.parse(wasm.readProjectArchive(bytes, 'fallback')) as {
-			info: unknown;
-			files: unknown;
-			skipped: unknown;
-			warnings: unknown;
-		};
-		expect(read.info).toEqual(info);
-		expect(read.files).toEqual(files);
-		expect(read.skipped).toEqual([]);
-		expect(read.warnings).toEqual([]);
-
-		const strict = JSON.parse(wasm.readKpar(bytes)) as {
-			meta: ProjectMeta;
-			files: string[];
-			checksumProblems: string[];
-		};
-		expect(strict.checksumProblems).toEqual([]);
-		expect(strict.files).toEqual(files.map((f) => f.path));
-		expect(strict.meta.created).toBe(CREATED);
-		expect(strict.meta.index.DroneArchitecture).toMatch(/\.sysml$/);
-	});
-
-	it('reads a repository ZIP the way the engine does', async () => {
-		const bytes = await zip([
-			{ path: 'drone-main/.project.json', data: JSON.stringify(info) },
-			...files.map((f) => ({ path: `drone-main/${f.path}`, data: f.text })),
-			{ path: 'drone-main/assets/logo.png', data: new Uint8Array([0x89, 0x50, 0xff, 0xd8]) }
-		]);
-		const theirs = JSON.parse(wasm.readProjectArchive(bytes, 'fallback')) as unknown;
-		expect(await readProjectArchive(bytes, 'fallback')).toEqual(theirs);
-	});
-
-	it('round-trips a project with odd paths and text through both', async () => {
+	it('round-trips a project with odd paths and text', async () => {
 		const odd = [
 			{ path: 'Ünïcode/Модель.sysml', text: "package 'Модель' { doc /* ✓ */ }\n" },
 			{ path: 'empty.sysml', text: '' }
 		];
-		const viaEngine = wasm.writeKpar(JSON.stringify({ name: 'Odd' }), JSON.stringify(odd), CREATED);
-		const viaUs = await writeKpar({ name: 'Odd' }, odd, CREATED);
-		expect((await readProjectArchive(viaEngine, 'x')).files).toEqual(
+		const bytes = await writeKpar({ name: 'Odd' }, odd, '2026-10-21T12:00:00Z');
+		expect((await readProjectArchive(bytes, 'x')).files).toEqual(
 			[...odd].sort((a, b) => (a.path < b.path ? -1 : 1))
 		);
-		const back = JSON.parse(wasm.readProjectArchive(viaUs, 'x')) as { files: unknown };
-		expect(back.files).toEqual((await readProjectArchive(viaUs, 'x')).files);
-		expect(decode((await unzip(viaUs))[0]!.data)).toBe('{"name":"Odd"}');
+		expect(decode((await unzip(bytes))[0]!.data)).toBe('{"name":"Odd"}');
 	});
 });
 

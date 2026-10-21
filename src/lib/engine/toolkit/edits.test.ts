@@ -1,38 +1,24 @@
 /**
  * Model edits on the toolkit (`edits.ts`), through the host the worker runs,
- * on the demo. Each edit is compared with what the classic engine wrote for
- * the same request (its WebAssembly build is still in `static/engine/`)
- * wherever classic was right; where it was wrong, the toolkit's answer is
- * asserted with the reason.
+ * on the demo. The lines each edit changes are pinned in a snapshot
+ * (`__snapshots__/edits.test.ts.snap`, recorded when they still matched what
+ * the earlier engine wrote, byte for byte); the edits that engine got wrong
+ * are asserted below with the reason.
  */
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { Engine } from '../client';
 import type { EditOperation, EditRequest } from '../types';
 import { Workspace } from '#lib/project/workspace.svelte.ts';
-import { applyEditChanges, editFiles } from './edit-testing';
+import { editFiles } from './edit-testing';
 import type { ToolkitHost } from './host';
 import { demoFiles, loadHost } from './testing';
 
-const ENGINE = join(import.meta.dirname, '../../../../static/engine');
-
-interface Classic {
-	initSync(options: { module: Buffer }): void;
-	edit(request: string): string;
-}
-
 let host: ToolkitHost;
-let classic: Classic | null = null;
 const files = Object.fromEntries(demoFiles().map((f) => [f.path, f.text]));
 
 beforeAll(async () => {
 	host = await loadHost();
 	host.analyzeProject(demoFiles());
-	if (existsSync(join(ENGINE, 'sysml_wasm.js'))) {
-		classic = (await import(/* @vite-ignore */ join(ENGINE, 'sysml_wasm.js'))) as Classic;
-		classic.initSync({ module: readFileSync(join(ENGINE, 'sysml_wasm_bg.wasm')) });
-	}
 }, 60_000);
 
 type Request = EditOperation & { path: string };
@@ -49,16 +35,27 @@ function ours(request: Request) {
 	return { text: edited.files[request.path]!, files: edited.files, result: edited.result };
 }
 
-function theirs(request: Request): string {
-	const source = files[request.path]!;
-	const r = JSON.parse(
-		classic!.edit(JSON.stringify({ ...request, source, files: demoFiles() }))
-	) as { changes: { from: number; to: number; insert: string }[] };
-	return applyEditChanges(source, r.changes);
+/** The lines an edit changed in a text, as `-` and `+` lines, as a diff shows them. */
+function changedLines(before: string, after: string): string {
+	const a = before.split('\n');
+	const b = after.split('\n');
+	let start = 0;
+	while (start < a.length && start < b.length && a[start] === b[start]) start++;
+	let end = 0;
+	while (
+		end < a.length - start &&
+		end < b.length - start &&
+		a[a.length - 1 - end] === b[b.length - 1 - end]
+	)
+		end++;
+	return [
+		...a.slice(start, a.length - end).map((line) => `- ${line}`),
+		...b.slice(start, b.length - end).map((line) => `+ ${line}`)
+	].join('\n');
 }
 
-/** Edits where the toolkit writes exactly what classic wrote. */
-const same: [string, Request][] = [
+/** Edits whose changed lines are pinned in the snapshot. */
+const pinned: [string, Request][] = [
 	[
 		'adds a definition with a body to a package',
 		{
@@ -318,15 +315,15 @@ const same: [string, Request][] = [
 	]
 ];
 
-describe('edits the classic engine made the same way', () => {
-	it.skipIf(!existsSync(join(ENGINE, 'sysml_wasm.js'))).each(same)('%s', (_, request) => {
-		expect(ours(request).text).toBe(theirs(request));
+describe('edits', () => {
+	it.each(pinned)('%s', (_, request) => {
+		expect(changedLines(files[request.path]!, ours(request).text)).toMatchSnapshot();
 	});
 });
 
-describe('edits where the toolkit is right and classic was not', () => {
+describe('edits the earlier engine got wrong', () => {
 	it('puts a new member before the closing brace, which keeps its indentation', () => {
-		// Classic inserted after the brace line's indentation, moving `}` to column 0.
+		// The earlier engine inserted after the brace line's indentation, moving `}` to column 0.
 		const { text } = ours({
 			op: 'insertMember',
 			path: C,
@@ -339,7 +336,7 @@ describe('edits where the toolkit is right and classic was not', () => {
 	});
 
 	it('renames every reference in every file, but not prose', () => {
-		// Classic renamed words in one file only, comments included.
+		// The earlier engine renamed words in one file only, comments included.
 		const { files: after, result } = ours({
 			op: 'setField',
 			path: R,

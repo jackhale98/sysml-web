@@ -32,7 +32,7 @@ test('the model is analysed by the sysml-toolkit, with only the real problems', 
 	await openDemo(page);
 	const footer = page.locator('footer');
 	await expect(footer).toContainText('engine toolkit 0.10.10');
-	// The two genuine warnings (`estimate` has no type); the classic engine reported 78 findings.
+	// The two genuine warnings (`estimate` has no type); the earlier engine reported 78 findings.
 	await expect(page.getByRole('button', { name: 'Problems: 0 errors, 2 warnings' })).toBeVisible();
 	await expect(page.getByRole('tree', { name: 'Model' })).toContainText('DroneArchitecture');
 	await expectAccessible(page);
