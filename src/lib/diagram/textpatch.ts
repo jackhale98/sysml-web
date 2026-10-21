@@ -114,7 +114,7 @@ export function insertIntoBody(
 		const indent = base + INDENT;
 		const insert = ` {\n${indent}${member}\n${base}}`;
 		const at = head.index;
-		const start = at + 3 + indent.length - 1;
+		const start = at + 3 + indent.length;
 		return {
 			text: text.slice(0, at) + insert + text.slice(at + 1),
 			from: start,
@@ -275,4 +275,16 @@ function insideComment(text: string, at: number): boolean {
 export function referencePattern(reference: string): string {
 	const escaped = reference.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 	return `(?:[\\w']+::)*${escaped}`;
+}
+
+/** Add `line` on a new line after the line containing `at`, with the same indentation. */
+export function insertLineAfter(text: string, at: number, line: string): Patched {
+	const end = text.indexOf('\n', at);
+	const lineEnd = end < 0 ? text.length : end;
+	const insert = `\n${indentOf(text, at)}${line}`;
+	return {
+		text: text.slice(0, lineEnd) + insert + text.slice(lineEnd),
+		from: lineEnd + insert.length - line.length,
+		to: lineEnd + insert.length
+	};
 }

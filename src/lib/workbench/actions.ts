@@ -136,6 +136,54 @@ export async function setTableColumns(
 	);
 }
 
+/**
+ * One change of a model edit made on a diagram: a member the engine places
+ * in a definition or package, or a text patch computed against the file as
+ * it is now (`before`), for what the engine cannot edit yet.
+ */
+export type EditStep =
+	| { kind: 'member'; path: string; parent: string; text: string }
+	| { kind: 'patch'; path: string; before: string; after: string };
+
+/**
+ * Apply edit steps as one undoable change, confirmed by a toast with Undo
+ * ("Battery is now part of DeliveryDrone"). `check` can refuse a patched
+ * text, e.g. when it would not parse.
+ */
+export async function applySteps(
+	workspace: Workspace,
+	label: string,
+	steps: EditStep[],
+	check?: (path: string, before: string, after: string) => Promise<string | null>
+): Promise<string | null> {
+	if (!steps.length) return 'Nothing to change.';
+	return undoable(workspace, label, async () => {
+		for (const step of steps) {
+			const source = workspace.text(step.path);
+			if (source === undefined) return `${step.path} is not in the project.`;
+			if (step.kind === 'member') {
+				const error = await workspace.edit(step.path, {
+					op: 'insertMember',
+					path: step.path,
+					source,
+					parent: step.parent,
+					text: step.text
+				});
+				if (error) return error;
+				continue;
+			}
+			if (source !== step.before) return 'The file changed meanwhile; try again.';
+			const refused = check ? await check(step.path, step.before, step.after) : null;
+			if (refused) return refused;
+			if (workspace.text(step.path) !== step.before) {
+				return 'The file changed meanwhile; try again.';
+			}
+			workspace.setText(step.path, step.after);
+		}
+		return null;
+	});
+}
+
 function escapeRegExp(text: string): string {
 	return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
