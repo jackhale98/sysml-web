@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 /**
- * SPIKE (claude/toolkit-spike, not for merging): loads one SysML engine —
+ * TEST BUILD (temporary, for trying the toolkit engine with ?toolkit): loads one SysML engine —
  * the Open-MBEE sysml-toolkit (`@sysml/wasm`, from `static/toolkit/`) or our
  * own (`static/engine/`) — in its own worker, and times every step the same
  * way for both, so the two can be compared in a real browser.

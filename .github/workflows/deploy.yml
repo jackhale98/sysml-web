@@ -29,6 +29,10 @@ jobs:
 
       - uses: ./.github/actions/build-engine
 
+      # TEST BUILD: the sysml-toolkit engine for /p/demo?toolkit (pinned in toolkit.json).
+      - name: Fetch toolkit test build
+        run: scripts/fetch-toolkit.sh
+
       - name: Build
         run: npm run build
         env:

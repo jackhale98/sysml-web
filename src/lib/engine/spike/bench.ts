@@ -1,5 +1,6 @@
 /**
- * SPIKE (claude/toolkit-spike, not for merging): the page side of
+ * TEST BUILD of the sysml-toolkit engine (temporary; removed when the app
+ * moves to it or drops it). The page side of
  * `bench.worker.ts`. With `?toolkit` in the URL, once the workbench is ready
  * the page starts the toolkit in its own worker, analyses the workspace's
  * files with it, and puts the timings on `window.__toolkitStats` (and logs
@@ -9,10 +10,10 @@
  *   ?toolkit                  the toolkit, default library variant (none: no snapshot)
  *   ?toolkit=<variant>        libcache | none | prepared | prepared-stream | subset
  *   ?toolkit=ours             our engine, in a second worker, measured the same way
- *   &wasm=plain               the toolkit's wasm before wasm-opt
  *   &tkdelay=<ms>             wait this long after the workbench is ready
  */
 import { asset } from '$app/paths';
+import demoSubset from './demo-subset.json';
 
 export type Variant = 'libcache' | 'none' | 'prepared' | 'prepared-stream' | 'subset' | 'embedded';
 // Measured best general option on a phone, cold: no snapshot (2 MB less to download).
@@ -96,7 +97,7 @@ export function startBench(): Bench {
 	};
 }
 
-interface Stats {
+export interface Stats {
 	params: Record<string, string>;
 	/** When the workbench was ready (the model analysed by our engine). */
 	workbenchReady?: number;
@@ -110,6 +111,19 @@ interface Stats {
 	longTasks: { start: number; duration: number }[];
 	error?: string;
 	done: boolean;
+	status?: 'loading' | 'ready' | 'error';
+	/** The files analysed, for the stress run. */
+	files?: FileText[];
+	/** A test that was running when the page last went away. */
+	unfinished?: { step: string; variant: string; at: string };
+	stressing?: boolean;
+	stress?: {
+		runs: { ms: number; mem: number }[];
+		memBefore: number;
+		memAfter: number;
+		navigate?: Record<string, unknown>;
+		error?: string;
+	};
 }
 
 declare global {
@@ -140,7 +154,12 @@ export function spikeRequested(url: URL): boolean {
 
 /** Create the stats object (and the long-task watch) as early as possible. */
 export function prepareSpike(url: URL): Stats {
-	const stats: Stats = { params: Object.fromEntries(url.searchParams), longTasks: [], done: false };
+	const stats: Stats = {
+		params: Object.fromEntries(url.searchParams),
+		longTasks: [],
+		done: false,
+		unfinished: previousRun()
+	};
 	window.__toolkitStats = stats;
 	observeLongTasks(stats.longTasks);
 	return stats;
@@ -171,11 +190,8 @@ export async function runSpike(stats: Stats, files: FileText[]) {
 					engine: 'toolkit',
 					variant: which as Variant,
 					glueUrl: absolute('/toolkit/sysmlv2.js'),
-					wasmUrl: absolute(
-						params.get('wasm') === 'plain'
-							? '/toolkit/sysmlv2_bg.wasm'
-							: '/toolkit/sysmlv2_bg.opt.wasm'
-					),
+					// The release's module is already size-optimised.
+					wasmUrl: absolute('/toolkit/sysmlv2_bg.wasm'),
 					lib: {
 						bundleUrl: absolute('/toolkit/stdlib/sysml-library.json.gz'),
 						libcacheUrl: absolute('/toolkit/stdlib/sysml-library.libcache.gz'),
@@ -183,14 +199,15 @@ export async function runSpike(stats: Stats, files: FileText[]) {
 					}
 				};
 	try {
-		if (boot.variant === 'subset')
-			boot.lib.subset = (await (
-				await fetch(absolute('/toolkit/stdlib/demo-subset.json'))
-			).json()) as string[];
+		if (boot.variant === 'subset') boot.lib.subset = demoSubset;
+		mark({ step: 'loading', variant: boot.variant });
+		stats.status = 'loading';
+		changed();
 		stats.spawned = now();
 		const bench = startBench();
 		window.__toolkit = bench;
 		stats.boot = (await bench.call('boot', { boot })) as BootStats;
+		changed();
 		stats.firstAnalysis = (await bench.call('analyze', { files })) as Record<string, unknown>;
 		stats.ready = now();
 		stats.timeToReadyMs = Math.round(stats.ready - stats.spawned);
@@ -200,9 +217,109 @@ export async function runSpike(stats: Stats, files: FileText[]) {
 			'[toolkit-spike]',
 			JSON.stringify({ ...stats, longTasks: stats.longTasks.length })
 		);
+		stats.status = 'ready';
 	} catch (error) {
 		stats.error = String(error);
+		stats.status = 'error';
 		console.error('[toolkit-spike]', error);
 	}
 	stats.done = true;
+	stats.files = files;
+	unmark();
+	changed();
+}
+
+// ---- For testing on a phone: results on screen, a stress run, crash detection ----
+
+const MARK = 'sysml-toolkit-test';
+
+/** Note what is running, so a tab the OS closed mid-test is noticed on reload. */
+function mark(what: { step: string; variant: string }) {
+	try {
+		localStorage.setItem(MARK, JSON.stringify({ ...what, at: new Date().toISOString() }));
+	} catch {
+		// storage unavailable: no crash detection
+	}
+}
+function unmark() {
+	try {
+		localStorage.removeItem(MARK);
+	} catch {
+		// storage unavailable
+	}
+}
+function previousRun(): Stats['unfinished'] {
+	try {
+		const raw = localStorage.getItem(MARK);
+		localStorage.removeItem(MARK);
+		return raw ? (JSON.parse(raw) as Stats['unfinished']) : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+/** Tell the on-screen panel the numbers changed. */
+function changed() {
+	window.dispatchEvent(new Event('toolkit-stats'));
+}
+
+/**
+ * Edit one file `count` times (adding and removing a comment line), timing
+ * each re-analysis and watching memory; then time hover and go to definition.
+ */
+export async function stress(stats: Stats, count = 20) {
+	const bench = window.__toolkit;
+	const files = stats.files;
+	if (!bench || !files?.length || stats.stressing) return;
+	const file = files.find((f) => /DroneArchitecture/.test(f.path)) ?? files[0]!;
+	stats.stressing = true;
+	stats.stress = { runs: [], memBefore: 0, memAfter: 0 };
+	mark({ step: 'stress test', variant: stats.boot?.variant ?? '' });
+	changed();
+	try {
+		stats.stress.memBefore = ((await bench.call('mem')) as { mem: number }).mem;
+		for (let i = 1; i <= count; i++) {
+			const text =
+				i % 2
+					? `${file.text}
+// edit ${i}
+`
+					: file.text;
+			const result = (await bench.call('edit', { path: file.path, text })) as {
+				ms: number;
+				mem: number;
+			};
+			stats.stress.runs.push({ ms: result.ms, mem: result.mem });
+			changed();
+		}
+		const at = file.text.search(/\b[A-Z][A-Za-z]+\b/);
+		stats.stress.navigate = (await bench.call('navigate', {
+			path: file.path,
+			offset: Math.max(0, at) + 1
+		})) as Record<string, unknown>;
+		stats.stress.memAfter = ((await bench.call('mem')) as { mem: number }).mem;
+	} catch (error) {
+		stats.stress.error = String(error);
+	}
+	stats.stressing = false;
+	unmark();
+	changed();
+}
+
+/** Everything measured, as text to paste into a message. */
+export function report(stats: Stats): string {
+	const nav = navigator as Navigator & { deviceMemory?: number };
+	return JSON.stringify(
+		{
+			url: location.href,
+			userAgent: navigator.userAgent,
+			deviceMemoryGB: nav.deviceMemory,
+			...stats,
+			files: stats.files?.length,
+			longTasks: stats.longTasks.length,
+			boot: stats.boot && { ...stats.boot, resources: undefined }
+		},
+		null,
+		1
+	);
 }

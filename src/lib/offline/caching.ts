@@ -54,7 +54,7 @@ export interface CachePlan {
 }
 
 const ENGINE_DIR = 'engine/';
-/** SPIKE (claude/toolkit-spike): the toolkit engine, cached on first use like ours. */
+/** TEST BUILD (?toolkit): the toolkit engine, cached on first use like ours. */
 const TOOLKIT_DIR = 'toolkit/';
 const engineFile = (path: string) => path.startsWith(ENGINE_DIR) || path.startsWith(TOOLKIT_DIR);
 
@@ -81,10 +81,7 @@ export function planCaches(input: {
 		base,
 		pages: input.prerendered.map(at),
 		fallback: at('404.html'),
-		shell: [
-			...input.immutable.map(at),
-			...statics.filter((path) => !engineFile(path)).map(at)
-		],
+		shell: [...input.immutable.map(at), ...statics.filter((path) => !engineFile(path)).map(at)],
 		engine: statics.filter(engineFile).map(at),
 		engineStamp: at(`${ENGINE_DIR}build.json`)
 	};
