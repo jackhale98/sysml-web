@@ -13,7 +13,10 @@ export interface StandardReport {
 	/** The view def in `ModelViews`. */
 	definition: string;
 	kind: ReportKind;
+	/** What kind of document it is, on its title page. */
 	title: string;
+	/** Its name in lists of views. */
+	label: string;
 	description: string;
 }
 
@@ -22,6 +25,7 @@ export const STANDARD_REPORTS: readonly StandardReport[] = [
 		definition: 'SpecificationDocument',
 		kind: 'specification',
 		title: 'Requirements specification',
+		label: 'Specification',
 		description:
 			'Every requirement with its statement, attributes and trace, then the coverage and the gaps.'
 	},
@@ -29,6 +33,7 @@ export const STANDARD_REPORTS: readonly StandardReport[] = [
 		definition: 'InterfaceControlDocument',
 		kind: 'icd',
 		title: 'Interface control document',
+		label: 'Interface control document',
 		description: 'How the parts connect: connections, interfaces, ports and the items that flow.'
 	}
 ];
@@ -70,7 +75,7 @@ export function reportEntries(
 		});
 	const standard = STANDARD_REPORTS.map((r): ReportEntry => ({
 		name: r.definition,
-		title: r.title,
+		title: r.label,
 		kind: r.kind,
 		doc: r.description,
 		saved: false

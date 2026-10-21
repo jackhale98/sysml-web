@@ -130,17 +130,17 @@ test('a standard report can be saved into the model as a view', async ({ page })
 	await openDemo(page);
 	await page
 		.getByRole('navigation', { name: 'Explorer' })
-		.getByRole('button', { name: 'Requirements specification' })
+		.getByRole('button', { name: 'Specification', exact: true })
 		.click();
 	await expect(
 		page.getByRole('article', { name: 'Drone UAV requirements specification' })
 	).toBeVisible({ timeout: 15_000 });
 	await page.getByRole('button', { name: 'Save to model' }).click();
-	await expect(page.getByText(/Saved as the view specification/)).toBeVisible();
+	await expect(page.getByText(/Saved as the view systemSpecification/)).toBeVisible();
 	await expect(
 		page
 			.getByRole('navigation', { name: 'Explorer' })
-			.getByRole('button', { name: 'Specification', exact: true })
+			.getByRole('button', { name: 'System specification', exact: true })
 	).toBeVisible();
 	await expect(page.getByRole('button', { name: 'SysML' })).toBeVisible();
 });

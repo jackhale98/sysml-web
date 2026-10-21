@@ -109,7 +109,7 @@ export async function saveReport(
 			const saved = workspace.views.find((v) => v.isUsage && !v.builtin && !isLibraryFile(v.file));
 			const name = uniqueName(
 				workspace,
-				ctx.kind === 'icd' ? 'interfaceControlDocument' : 'specification'
+				ctx.kind === 'icd' ? 'interfaceControlDocument' : 'systemSpecification'
 			);
 			const text = reportViewText(name, definition, ctx.kindLabel, defaultExposes(ctx));
 			const file = saved?.file;
