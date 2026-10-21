@@ -29,11 +29,15 @@ describe('presentationOf', () => {
 				view({ definition: 'ActionFlowView', exposes: ['DeliveryMission::DeliveryFlight'] })
 			)
 		).toEqual({ kind: 'diagram', view: 'actions', scope: 'DeliveryFlight' });
-		expect(presentationOf(view({ definition: 'GeneralView', exposes: ['A::*', 'B::*'] }))).toEqual({
-			kind: 'diagram',
-			view: 'requirements',
-			scope: null
-		});
+		// A general view is drawn from the view usage itself, so its filters apply.
+		expect(
+			presentationOf(
+				view({ definition: 'GeneralView', qualifiedName: 'Views::tree', exposes: ['A::*', 'B::*'] })
+			)
+		).toEqual({ kind: 'diagram', view: 'general', scope: 'Views::tree' });
+		expect(
+			presentationOf(view({ definition: 'GeneralView', builtin: true, exposes: ['A::*'] }))
+		).toEqual({ kind: 'diagram', view: 'general', scope: 'A' });
 		expect(presentationOf(view({ definition: 'InterconnectionView' }))).toEqual({ kind: 'none' });
 		expect(presentationOf(view({ isUsage: false }))).toEqual({ kind: 'none' });
 	});

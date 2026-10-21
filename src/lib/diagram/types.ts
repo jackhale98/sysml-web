@@ -16,4 +16,6 @@ export interface SysmlNodeData extends Record<string, unknown> {
 export interface SysmlEdgeData extends Record<string, unknown> {
 	kind: EdgeKind;
 	label: string | null;
+	/** Drawn from the model's target to its source (the general end first, see `UPWARD`). */
+	reversed?: boolean;
 }

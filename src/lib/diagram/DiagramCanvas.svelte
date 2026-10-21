@@ -27,7 +27,7 @@
 	import ConnectPicker, { type ConnectTarget } from './ConnectPicker.svelte';
 	import { DiagramEditing, provideEditing } from './editing.svelte.ts';
 	import FlowBridge, { type FlowApi } from './FlowBridge.svelte';
-	import { layout, nodeSize, type Direction } from './layout.ts';
+	import { layout, nodeSize, UPWARD, type Direction } from './layout.ts';
 	import { ownersOf, resolveNode } from './model.ts';
 	import NodeMenu, { type MenuItem } from './NodeMenu.svelte';
 	import {
@@ -185,7 +185,8 @@
 
 	/**
 	 * Interconnection views read left to right. Trees go top-down unless a
-	 * node has many children, which would make one very wide row.
+	 * node has many children (parts, or specializations under a supertype),
+	 * which would make one very wide row.
 	 */
 	function directionFor(graph: DiagramGraph): Direction {
 		if (view === 'interconnection') return 'RIGHT';
@@ -193,6 +194,8 @@
 		for (const e of graph.edges) {
 			if (e.kind === 'composition' || e.kind === 'containment') {
 				children[e.source] = (children[e.source] ?? 0) + 1;
+			} else if (UPWARD.has(e.kind)) {
+				children[e.target] = (children[e.target] ?? 0) + 1;
 			}
 		}
 		return Math.max(0, ...Object.values(children)) > 5 ? 'RIGHT' : 'DOWN';
@@ -297,8 +300,18 @@
 			}
 
 			const selectedKey = untrack(() => selected?.key);
+			const byKey = new Map(workspace.elements.map((e) => [e.key, e]));
+			const pseudo = ['initial_state', 'final_state', 'fork', 'join', 'decision'];
 			nodes = graph.nodes.map((node) => {
-				const element = resolveNode(node.id, node.is_definition, scope, workspace.elements, owners);
+				// The engine says where the element is declared; ids are only names.
+				const declared = node.element
+					? byKey.get(`${node.element.file}@${node.element.start_byte}`)
+					: undefined;
+				const element =
+					declared ??
+					(node.element || !pseudo.includes(node.kind)
+						? resolveNode(node.id, node.is_definition, scope, workspace.elements, owners)
+						: undefined);
 				return {
 					id: node.id,
 					type: 'sysml',
@@ -321,14 +334,18 @@
 			const labelOf = (id: string) => graph.nodes.find((n) => n.id === id)?.label ?? id;
 			edges = graph.edges
 				.filter((e) => ids.has(e.source) && ids.has(e.target))
-				.map((e, i) => ({
-					id: `${e.kind}:${e.source}:${e.target}:${i}`,
-					source: e.source,
-					target: e.target,
-					type: 'sysml',
-					ariaLabel: `${e.kind.replace(/_/g, ' ')} from ${labelOf(e.source)} to ${labelOf(e.target)}`,
-					data: { kind: e.kind, label: e.label }
-				}));
+				.map((e, i) => {
+					// Drawn from the general end (laid out above), so the line leaves its bottom.
+					const reversed = UPWARD.has(e.kind);
+					return {
+						id: `${e.kind}:${e.source}:${e.target}:${i}`,
+						source: reversed ? e.target : e.source,
+						target: reversed ? e.source : e.target,
+						type: 'sysml',
+						ariaLabel: `${e.kind.replace(/_/g, ' ')} from ${labelOf(e.source)} to ${labelOf(e.target)}`,
+						data: { kind: e.kind, label: e.label, reversed }
+					};
+				});
 			frameTitle = graph.title;
 			status = 'ready';
 
@@ -642,8 +659,11 @@
 
 	function askDeleteEdge(edge: Edge<SysmlEdgeData>) {
 		menu = null;
-		const source = elementOf(edge.source);
-		const target = elementOf(edge.target);
+		const [from, to] = edge.data?.reversed
+			? [edge.target, edge.source]
+			: [edge.source, edge.target];
+		const source = elementOf(from);
+		const target = elementOf(to);
 		if (!source || !target || !edge.data) return;
 		const plan = planEdgeRemoval(edge.data.kind, edge.data.label, source, target, ctx);
 		if (typeof plan === 'string') {
@@ -809,6 +829,25 @@
 			>
 				<path
 					d="M1 1 L11 6 L1 11 Z"
+					fill="var(--surface)"
+					stroke="var(--text-2)"
+					stroke-width="1.2"
+				/>
+			</marker>
+			<marker
+				id="sysml-typing"
+				viewBox="0 0 20 12"
+				refX="19"
+				refY="6"
+				markerWidth="22"
+				markerHeight="14"
+				orient="auto-start-reverse"
+			>
+				<rect x="0" y="3.5" width="9" height="5" fill="var(--surface)" />
+				<circle cx="2" cy="6" r="1.4" fill="var(--text-2)" />
+				<circle cx="6" cy="6" r="1.4" fill="var(--text-2)" />
+				<path
+					d="M9 1 L19 6 L9 11 Z"
 					fill="var(--surface)"
 					stroke="var(--text-2)"
 					stroke-width="1.2"

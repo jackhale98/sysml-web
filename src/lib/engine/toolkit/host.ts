@@ -15,6 +15,8 @@ import type {
 	Completion,
 	DefinitionTarget,
 	Diagnostic,
+	DiagramGraph,
+	DiagramView,
 	ElementDetails,
 	FileChange,
 	FileRange,
@@ -32,6 +34,7 @@ import type {
 	Toolkit
 } from './api';
 import { toProblems } from './diagnostics';
+import { buildDiagram } from './diagrams';
 import { LanguageServices, SyntaxServices } from './language';
 import { detailsOf, extractModel, findElement, type ExtractedModel, type UnitInfo } from './model';
 import { TextIndexCache } from './offsets';
@@ -160,6 +163,19 @@ export class ToolkitHost {
 		const record = extracted ? findElement(extracted.elements, path, line, element) : undefined;
 		if (!record) throw new Error(`element \`${element ?? `at line ${line}`}\` not found`);
 		return detailsOf(record, (s) => s);
+	}
+
+	/** A standard view of the project as a diagram graph (`diagrams/`). */
+	diagram(view: DiagramView, files: SourceFile[], scope: string | null): DiagramGraph {
+		const built = this.build(files);
+		if (!built.session || !built.extracted) {
+			return { title: '', nodes: [], edges: [], subgraphs: [], direction: 'top_bottom' };
+		}
+		return buildDiagram(
+			{ tk: this.tk, session: built.session, model: built.extracted, units: built.units },
+			view,
+			scope
+		);
 	}
 
 	/** The current session, built for `files` (for language services). */

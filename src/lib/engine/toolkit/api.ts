@@ -48,6 +48,8 @@ export interface TkSession {
 	toGraph(optionsJson?: string | null): string;
 	referenceSpelling(e: TkElement): string | undefined;
 	unresolvedCount(): number;
+	/** JSON `{qualifiedName, id, rendering, exposed: [{id, qualifiedName, metaclass}], …}` of a view usage. */
+	viewInfo(qualifiedName: string): string;
 }
 
 export interface TkLspServer {
