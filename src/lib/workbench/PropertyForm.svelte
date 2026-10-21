@@ -259,6 +259,15 @@
 							{#if why}<p class="reason">{computed.reason}.</p>{/if}
 						{:else}
 							<span class="result"><span class="visually-hidden">Comes to </span>= {result}</span>
+							{#if computed.kind === 'number' && computed.byApp}
+								<span class="note">Added up by the app.</span>
+								<button type="button" class="why" aria-expanded={why} onclick={() => (why = !why)}
+									>Why?</button
+								>
+								{#if why}<p class="reason">
+										{computed.byApp[0]!.toUpperCase()}{computed.byApp.slice(1)}.
+									</p>{/if}
+							{/if}
 						{/if}
 					</div>
 				{/if}

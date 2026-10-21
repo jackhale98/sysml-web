@@ -102,6 +102,9 @@
 		ui.open({ kind: 'file', path: e.file });
 		ui.select(e.key, 'inspector');
 	}
+
+	/** `a` or `an` before a concept's name (`an attribute usage`, `a part`). */
+	const article = (word: string) => (/^[aeio]/i.test(word) ? 'an' : 'a');
 </script>
 
 <aside class="inspector" class:phone={ui.phone} aria-label="Inspector">
@@ -139,7 +142,7 @@
 					aria-expanded={learnMore}
 					onclick={() => (learnMore = !learnMore)}
 				>
-					{learnMore ? 'Less' : `What is a ${concept.title.toLowerCase()}?`}
+					{learnMore ? 'Less' : `What is ${article(concept.title)} ${concept.title.toLowerCase()}?`}
 				</button>
 				{#if learnMore}
 					<p class="explanation">{concept.explanation}</p>
@@ -267,7 +270,10 @@
 											>?<span class="visually-hidden">: not computed, {v.reason}</span></span
 										>
 									{:else if shown}
-										<span class="child-value">{shown}</span>
+										<span
+											class="child-value"
+											title={v.kind === 'number' && v.byApp ? v.byApp : undefined}>{shown}</span
+										>
 									{/if}
 								{/if}
 							</button>

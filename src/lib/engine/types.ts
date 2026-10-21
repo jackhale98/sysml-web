@@ -245,6 +245,8 @@ export interface Check {
 	span: Span;
 	/** Where the constraint is written, when that is elsewhere (a `satisfy`'s requirement). */
 	constraintAt?: { file: string; span: Span };
+	/** Set when the app decided the verdict with values the engine cannot yet work out: why. */
+	byApp?: string;
 }
 
 export interface CheckReport {
@@ -261,7 +263,16 @@ export interface CheckReport {
  * or why it could not (`undecided`).
  */
 export type Evaluated =
-	| { kind: 'number'; value: number; unit: string | null }
+	| {
+			kind: 'number';
+			value: number;
+			unit: string | null;
+			/**
+			 * Set when the app worked the value out because the engine cannot
+			 * yet (a sum over a collection of parts): why, in plain words.
+			 */
+			byApp?: string;
+	  }
 	| { kind: 'text'; text: string }
 	| { kind: 'none' }
 	| { kind: 'undecided'; reason: string };

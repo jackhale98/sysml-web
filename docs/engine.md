@@ -266,6 +266,18 @@ ask and cached with it):
   unit, text, none, or undecided with the reason). An undecided value says
   why, followed through what its expression refers to: a collection of
   parts on the way (`rotors : Rotor[4]`), or a feature without a value.
+- **Sums over collections, by the app.** While the toolkit can't evaluate a
+  value over a collection of parts (upstream request 2 below), `Evaluation`
+  works such a value out itself: the feature's expression is evaluated with
+  `sim/expr.ts`, `sum(parts.x)` over a fixed-size collection (`[4]`) counts
+  each part's `x` (as the collection or its definition gives it) once per
+  part, and every other value comes from the toolkit. It only fills in what
+  the toolkit leaves undecided, and only when a collection was summed on
+  the way, so it steps aside by itself once the toolkit evaluates these.
+  Such values and verdicts carry `byApp` (why, in words), which the
+  inspector, the checks and the budget tables show. `evaluation.test.ts`
+  ("adds up a value over a collection of parts only while the toolkit
+  cannot") fails when the toolkit decides it, so the code can go.
 - **The evaluation session.** The toolkit refuses the values a part
   inherits from its definition when metadata annotates the part (see
   below). Metadata takes no part in evaluating values, so `Evaluation`
@@ -368,9 +380,9 @@ Found while making the drone demo's budgets and checks (sysml-toolkit
    indeterminate, and so is every form over it (`rotors.mass`,
    `size(rotors) * rotors.mass`, `collect`, `#(1)`): by design, an unbound
    collection never materialises as instances. Each of the four has the
-   mass `Rotor` binds, so the sum is determined; the demo's take-off mass
-   check stays undecided because of it. Writing the rotors as four named
-   parts would decide it, at the cost of the model's `[4]`.
+   mass `Rotor` binds, so the sum is determined. Until it is fixed the app
+   adds such sums up itself (above), so the demo's take-off mass check is
+   decided.
 3. **`sum(x.mass)` and uniqueness.** The toolkit reads a dot chain over
    several values as a set (`sum(concrete.mass)` of four equal masses is one
    mass; its tests say so), while the specification's own mass roll-up

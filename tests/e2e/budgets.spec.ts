@@ -89,8 +89,10 @@ test('the checks view says which requirements the design meets, and shows the cl
 	const table = await openView(page, 'Design checks');
 	const rows = table.locator('tbody tr');
 	await expect(rows).toHaveCount(3, { timeout: 15_000 });
-	await expect(rows.nth(0)).toContainText('Undecided');
-	await expect(rows.nth(0)).toContainText('rotors is a collection of 4 parts');
+	const mass = rows.filter({ hasText: 'SYS-003' });
+	await expect(mass).toContainText('Satisfied');
+	await expect(mass).toContainText('0.23 kg (5.8 %)');
+	await expect(mass).toContainText('The app added up the 4 rotors itself');
 	const endurance = rows.filter({ hasText: 'SYS-001' });
 	await expect(endurance).toContainText('Satisfied');
 	await expect(endurance).toContainText('2.54 min (10 %)');
@@ -148,10 +150,18 @@ test('the inspector shows what an expression comes to, and why when it cannot', 
 	);
 	await expect(endurance.getByText('= 27.54 min')).toBeVisible({ timeout: 10_000 });
 
+	// The rotors are a collection the engine cannot sum yet: the app adds them up, and says so.
 	const empty = await select(page, 'emptyMass', 'attribute', 1);
-	await expect(empty.getByText('= ?')).toBeVisible({ timeout: 10_000 });
+	await expect(empty.getByText('= 2.77 kg')).toBeVisible({ timeout: 10_000 });
+	await expect(empty.getByText('Added up by the app.')).toBeVisible();
 	await empty.getByRole('button', { name: 'Why?' }).click();
-	await expect(empty).toContainText('`rotors` is a collection of 4 parts');
+	await expect(empty).toContainText('The app added up the 4 `rotors` itself');
+
+	// What nothing gives a value stays unknown, with the reason.
+	const takeOff = await select(page, 'takeOffMass', 'attribute');
+	await expect(takeOff.getByText('= ?')).toBeVisible({ timeout: 10_000 });
+	await takeOff.getByRole('button', { name: 'Why?' }).click();
+	await expect(takeOff).toContainText('`emptyMass` has no value in `DeliveryDrone`');
 	await expectAccessible(page);
 
 	// A part's attributes, with their values.
@@ -169,7 +179,7 @@ test('the requirements table says whether the design meets each requirement', as
 	const row = table.locator('tbody tr').filter({ hasText: 'SYS-001' });
 	await expect(row.getByText('Satisfied')).toBeAttached({ timeout: 15_000 });
 	await expect(
-		table.locator('tbody tr').filter({ hasText: 'SYS-003' }).getByText('Undecided')
+		table.locator('tbody tr').filter({ hasText: 'SYS-003' }).getByText('Satisfied')
 	).toBeAttached();
 	await expectAccessible(page);
 });

@@ -32,7 +32,7 @@ describe('the demo’s checks', () => {
 		expect(checkable.map((c) => [c.requirement?.id, c.status])).toEqual([
 			['SYS-001', 'satisfied'],
 			['SYS-002', 'satisfied'],
-			['SYS-003', 'undecided']
+			['SYS-003', 'satisfied']
 		]);
 		// Requirements in words only are listed, with nothing to check.
 		const words = report.checks.filter((c) => !c.checkable);
@@ -40,7 +40,7 @@ describe('the demo’s checks', () => {
 		expect(words.every((c) => c.status === 'undecided' && c.kind === 'satisfy')).toBe(true);
 		// The libraries' type invariants (`that >= 1 and that <= 10`) hold and are left out.
 		expect(report.checks.some((c) => c.kind === 'assert')).toBe(false);
-		expect(report.summary).toEqual({ satisfied: 2, violated: 0, undecided: 10 });
+		expect(report.summary).toEqual({ satisfied: 3, violated: 0, undecided: 9 });
 	});
 
 	it('gives the values, the limit and the margin of a met requirement', () => {
@@ -71,18 +71,29 @@ describe('the demo’s checks', () => {
 		expect(payload.margin).toEqual({ value: 0, unit: 'kg', ratio: 0 });
 	});
 
-	it('says why the take-off mass is undecided: the rotors are a collection', () => {
+	it('decides the take-off mass with the rotors added up by the app', () => {
 		const mass = byId(host.checks(files).checks, 'SYS-003');
-		expect(mass.limit).toEqual({
-			feature: 'drone.takeOffMass',
-			operator: '<=',
-			value: 4,
-			unit: 'kg'
+		const byApp =
+			'the app added up the 4 `rotors` itself, as the engine cannot yet evaluate a value over a collection of parts';
+		expect(mass).toMatchObject({
+			status: 'satisfied',
+			byApp,
+			limit: { feature: 'drone.takeOffMass', operator: '<=', value: 4, unit: 'kg' },
+			values: [
+				{ feature: 'drone.takeOffMass', value: { kind: 'number', value: 3770, unit: 'g', byApp } }
+			],
+			explanation: `Met: drone.takeOffMass = 3.77 kg (needs ≤ 4 kg). T${byApp.slice(1)}.`
 		});
-		expect(mass.margin).toBeUndefined();
-		expect(mass.explanation).toBe(
-			'drone.takeOffMass cannot be worked out: `rotors` is a collection of 4 parts (`part rotors : Rotor[4]`), and the engine cannot yet evaluate a value over a collection (`rotors.mass`).'
-		);
+		expect(mass.margin!.value).toBeCloseTo(0.23);
+		expect(mass.margin!.ratio).toBeCloseTo(0.0575);
+
+		// Heavier motors (190 g): 4 rotors of 250 g put the drone at 4.05 kg.
+		const edited = edit('system/Components.sysml', 'mass = 120 [g]', 'mass = 190 [g]');
+		host.analyzeProject(edited);
+		const heavy = byId(host.checks(edited).checks, 'SYS-003');
+		expect(heavy.status).toBe('violated');
+		expect(heavy.margin!.value).toBeCloseTo(-0.05);
+		host.analyzeProject(files);
 	});
 
 	it('reports a violation, with the values, when a value changes', () => {
@@ -170,10 +181,8 @@ describe('evaluated values', () => {
 			kind: 'undecided',
 			reason: '`emptyMass` has no value in `DeliveryDrone`'
 		});
-		expect(values[empty!]).toMatchObject({
-			kind: 'undecided',
-			reason: expect.stringMatching(/^`rotors` is a collection of 4 parts/)
-		});
+		// In the drone, the app adds up its 4 rotors (see the next test).
+		expect(values[empty!]).toMatchObject({ kind: 'number', value: 2770, unit: 'g' });
 	});
 
 	it('evaluates the values a part inherits although metadata annotates it', () => {
@@ -191,6 +200,34 @@ describe('evaluated values', () => {
 
 describe('checks on small models', () => {
 	const model = (text: string) => [{ path: 'm.sysml', text }];
+
+	it('adds up a value over a collection of parts only while the toolkit cannot', () => {
+		const text = [
+			'package P {',
+			'    private import SI::*;',
+			'    part def Wheel { attribute mass :> ISQ::mass = 9 [kg]; }',
+			'    part def Car {',
+			'        part wheels : Wheel[4];',
+			'        attribute body :> ISQ::mass = 1200 [kg];',
+			'        attribute total :> ISQ::mass = body + sum(wheels.mass);',
+			'        assert constraint light { total <= 1250 [kg] }',
+			'    }',
+			'}',
+			''
+		].join('\n');
+		const files = model(text);
+		host.analyzeProject(files);
+		const [check] = host.checks(files).checks;
+		expect(check).toMatchObject({
+			kind: 'assert',
+			status: 'satisfied',
+			values: [{ feature: 'total', value: { kind: 'number', value: 1236, unit: 'kg' } }]
+		});
+		// When this fails because `byApp` is gone, the toolkit sums over collections itself:
+		// remove the app's sums from evaluation.ts (and this test's expectation of them).
+		expect(check!.byApp).toMatch(/^the app added up the 4 `wheels` itself/);
+		host.analyzeProject(demoFiles());
+	});
 
 	it('maps an assertion’s byte positions to UTF-16 after multi-byte text', () => {
 		const text =
@@ -270,7 +307,13 @@ describe('the budget and checks tables', () => {
 			'0 kg (0 %)',
 			'satisfied'
 		]);
-		expect(row('drone.takeOffMass').slice(6)).toEqual(['≤ 4 kg', '', 'undecided']);
+		expect(row('drone.takeOffMass').slice(4)).toEqual([
+			'3.77 kg',
+			'',
+			'≤ 4 kg',
+			'0.23 kg (5.8 %)',
+			'satisfied'
+		]);
 		// The parts first, then the drone's own masses.
 		expect(table.rows.map((r) => r[0]).slice(-3)).toEqual([
 			'drone.emptyMass',
@@ -296,7 +339,7 @@ describe('the budget and checks tables', () => {
 		});
 		const takeOff = table.rowInfo![table.rows.findIndex((r) => r[0] === 'drone.takeOffMass')]!;
 		expect(takeOff.role).toBe('attribute');
-		expect(takeOff.notes![4]).toMatch(/collection of 4 parts/);
+		expect(takeOff.notes![4]).toMatch(/^the app added up the 4 `rotors` itself/);
 	});
 
 	it('leaves parts that draw no power out of the power budget', () => {
@@ -314,11 +357,11 @@ describe('the budget and checks tables', () => {
 		const table = host.renderView(files, 'designChecks');
 		expect(table.opensText).toBe(true);
 		expect(table.rows.map((r) => [r[0], r[1]])).toEqual([
-			['undecided', 'SYS-003'],
 			['satisfied', 'SYS-001'],
-			['satisfied', 'SYS-002']
+			['satisfied', 'SYS-002'],
+			['satisfied', 'SYS-003']
 		]);
-		expect(table.rows[1]).toEqual([
+		expect(table.rows[0]).toEqual([
 			'satisfied',
 			'SYS-001',
 			'Flight endurance',
@@ -326,8 +369,8 @@ describe('the budget and checks tables', () => {
 			'2.54 min (10 %)',
 			'Met: drone.endurance = 27.54 min (needs ≥ 25 min).'
 		]);
-		expect(table.sources[1]).toMatchObject({ file: 'system/Satisfaction.sysml', line: 12 });
-		expect(typeof table.sources[1]!.byte).toBe('number');
+		expect(table.sources[0]).toMatchObject({ file: 'system/Satisfaction.sysml', line: 12 });
+		expect(typeof table.sources[0]!.byte).toBe('number');
 	});
 });
 

@@ -94,8 +94,8 @@ subject to `drone`, so `drone.endurance >= 25 [min]` is evaluated with the drone
 216 W·h × 0.85 / 400 W = 27.5 minutes, so it is **satisfied**, with 2.5 minutes to spare.
 Change `hoverPower` in `DroneArchitecture::drone` to `450 [W]` and the check turns
 **violated** and shows up under Problems; Undo puts it back. The take-off mass check is
-**undecided**: the engine cannot yet add up `rotors.mass` over four rotors, and the view
-says so. Tables: **`DroneViews::droneMassBudget`** adds up what each part weighs (2.77 kg
+met with 0.23 kg to spare (3.77 kg of 4 kg). The engine cannot yet add up `rotors.mass`
+over four rotors, so the app adds them up itself and says so. Tables: **`DroneViews::droneMassBudget`** adds up what each part weighs (2.77 kg
 empty) and **`DroneViews::dronePowerBudget`** what each part draws in hover (397 W).
 
 ## 12. Proving it: `DroneVerification::enduranceFlightTest`

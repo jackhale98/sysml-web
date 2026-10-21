@@ -23,8 +23,27 @@
  *   so every position is unchanged; element ids are the same). It costs
  *   about 25 ms on the demo in Node, once per analysis, and only when asked.
  *
+ * - **Sums over collections, by the app.** The toolkit 0.10 doesn't evaluate
+ *   a value over a collection of parts (`sum(rotors.mass)` with `part rotors
+ *   : Rotor[4]`; reported upstream). While it can't, the app works such a
+ *   value out itself: the expression is evaluated with `sim/expr.ts`, a
+ *   `sum` over a fixed-size collection counts each part's value as many
+ *   times as there are parts, and every other value comes from the toolkit.
+ *   This only ever fills in a value the toolkit leaves undecided and only
+ *   when a collection was the reason, so it stops by itself once the
+ *   toolkit evaluates these; a test fails then, to remove it. Values and
+ *   verdicts worked out this way carry `byApp`.
+ *
  * Everything is cached per analysis (one `Evaluation` per built session).
  */
+import {
+	EvalError,
+	evaluate as evaluateExpr,
+	parseExpr,
+	Quantity as ExprQuantity,
+	type Expr,
+	type Value
+} from '#lib/sim/expr.ts';
 import { convert, formatQuantity, parseLiteral, readable, type Quantity } from '../quantity';
 import type { Check, CheckReport, CheckStatus, CheckValue, Evaluated, Span } from '../types';
 import type { TkElement, TkLibrary, TkSession, TkSite, Toolkit } from './api';
@@ -134,7 +153,9 @@ export class Evaluation {
 		const record = this.source.extracted.byId.get(id);
 		const owner = record?.ownerId ? this.source.extracted.byId.get(record.ownerId) : undefined;
 		if (value.kind === 'undecided' && record?.name && owner?.qualifiedName)
-			value = this.withCause(value, owner.qualifiedName, record.name);
+			value =
+				this.byApp(owner.qualifiedName, record.name) ??
+				this.withCause(value, owner.qualifiedName, record.name);
 		this.values.set(id, value);
 		return value;
 	}
@@ -151,8 +172,10 @@ export class Evaluation {
 		this.values.set(key, value);
 		if (value.kind === 'undecided') {
 			const at = qualifiedName.lastIndexOf('::');
-			if (at > 0)
-				value = this.withCause(value, qualifiedName.slice(0, at), qualifiedName.slice(at + 2));
+			if (at > 0) {
+				const [context, feature] = [qualifiedName.slice(0, at), qualifiedName.slice(at + 2)];
+				value = this.byApp(context, feature) ?? this.withCause(value, context, feature);
+			}
 			this.values.set(key, value);
 		}
 		return value;
@@ -199,6 +222,147 @@ export class Evaluation {
 			if (found) return found;
 		}
 		return null;
+	}
+
+	// ---- Sums over collections, worked out by the app (see the top of the file) ----
+
+	/** `feature`'s value in `context`, worked out by the app, or null when it can't or needn't. */
+	private byApp(context: string, feature: string): Evaluated | null {
+		const over: Collection[] = [];
+		const value = this.appValue(context, feature, 0, over);
+		if (value === null || !over.length) return null;
+		const result = fromValue(value);
+		if (!result) return null;
+		const parts = [...new Map(over.map((c) => [c.name, c])).values()]
+			.map((c) => `${c.count} \`${c.name}\``)
+			.join(' and ');
+		return {
+			...result,
+			byApp: `the app added up the ${parts} itself, as the engine cannot yet evaluate a value over a collection of parts`
+		};
+	}
+
+	/**
+	 * The value of `feature` (a name or a chain) in `context`: the toolkit's,
+	 * else its expression evaluated here. Collections summed on the way are
+	 * added to `over`; null when it can't be worked out.
+	 */
+	private appValue(
+		context: string,
+		feature: string,
+		depth: number,
+		over: Collection[]
+	): Value | null {
+		if (depth > 8) return null;
+		const path = `${context}::${feature.replace(/\./g, '::')}`;
+		const known = this.rawValueAt(path);
+		if (known?.kind === 'number')
+			return known.unit ? new ExprQuantity(known.value, known.unit) : known.value;
+		if (known && known.kind !== 'undecided') return null;
+		const segments = feature.split('.');
+		let scope = context;
+		for (const segment of segments.slice(0, -1)) {
+			// Through one part, not a collection: a collection only counts inside `sum`.
+			const record = this.recordAt(`${scope}::${segment}`);
+			if (!record || collectionCount(record.header) !== null) return null;
+			scope = `${scope}::${segment}`;
+		}
+		const record = this.recordAt(path);
+		if (!record?.value) return null;
+		let expr: Expr;
+		try {
+			expr = this.withSums(parseExpr(record.value), scope, depth, over);
+		} catch {
+			return null;
+		}
+		try {
+			return evaluateExpr(expr, {
+				get: (name) => this.appValue(scope, name, depth + 1, over) ?? undefined
+			});
+		} catch (error) {
+			if (error instanceof EvalError) return null;
+			throw error;
+		}
+	}
+
+	/** `expr` with every `sum(parts.x)` over a fixed-size collection replaced by its total. */
+	private withSums(expr: Expr, scope: string, depth: number, over: Collection[]): Expr {
+		const walk = (e: Expr): Expr => {
+			switch (e.kind) {
+				case 'call': {
+					const [arg] = e.args;
+					if (e.name.split('::').pop() === 'sum' && e.args.length === 1 && arg?.kind === 'name') {
+						const total = this.collectionSum(arg.name, scope, depth, over);
+						if (total !== null) return { kind: 'literal', value: total };
+					}
+					return { ...e, args: e.args.map(walk) };
+				}
+				case 'binary':
+					return { ...e, left: walk(e.left), right: walk(e.right) };
+				case 'unary':
+				case 'unit':
+					return { ...e, operand: walk(e.operand) };
+				case 'if':
+					return { ...e, condition: walk(e.condition), then: walk(e.then), else: walk(e.else) };
+				default:
+					return e;
+			}
+		};
+		return walk(expr);
+	}
+
+	/** `parts.x` summed over a collection of exactly n parts: n × each part's `x`. */
+	private collectionSum(
+		chain: string,
+		scope: string,
+		depth: number,
+		over: Collection[]
+	): Value | null {
+		const [first, ...rest] = chain.split('.');
+		if (!first || !rest.length) return null;
+		const record = this.recordAt(`${scope}::${first}`);
+		const count = record ? collectionCount(record.header) : null;
+		if (!record || count === null) return null;
+		// Each part's value: as the collection gives it, else as its definition does.
+		let each = this.appValue(`${scope}::${first}`, rest.join('.'), depth + 1, over);
+		const type = record.typeIds[0] ? this.source.extracted.byId.get(record.typeIds[0]) : undefined;
+		if (each === null && type?.qualifiedName)
+			each = this.appValue(type.qualifiedName, rest.join('.'), depth + 1, over);
+		if (each === null) return null;
+		over.push({ name: first, count });
+		if (each instanceof ExprQuantity) return new ExprQuantity(each.value * count, each.unit);
+		return typeof each === 'number' ? each * count : null;
+	}
+
+	/**
+	 * A verdict the engine left undecided for want of a value the app worked
+	 * out: each constraint evaluated with the check's values.
+	 */
+	private decideByApp(check: Check, constraints: string[]): void {
+		const reasons = check.values.flatMap((v) =>
+			v.value.kind === 'number' && v.value.byApp ? [v.value.byApp] : []
+		);
+		if (check.status !== 'undecided' || !reasons.length || !constraints.length) return;
+		const values = new Map(check.values.map((v) => [v.feature, v.value]));
+		const scope = {
+			get: (name: string): Value | undefined => {
+				const v = values.get(name);
+				if (v?.kind !== 'number') return undefined;
+				return v.unit ? new ExprQuantity(v.value, v.unit) : v.value;
+			}
+		};
+		let met = true;
+		for (const text of constraints) {
+			try {
+				const result = evaluateExpr(parseExpr(text.replace(/^\{|\}$/g, '').trim()), scope);
+				if (typeof result !== 'boolean') return;
+				met &&= result;
+			} catch {
+				return;
+			}
+		}
+		check.status = met ? 'satisfied' : 'violated';
+		check.byApp = reasons[0];
 	}
 
 	/** A value without looking for causes (no recursion through `valueAt`). */
@@ -326,6 +490,7 @@ export class Evaluation {
 			span: at.span,
 			...(constraintAt ? { constraintAt } : {})
 		};
+		if (!s.negated) this.decideByApp(check, constraintTexts);
 		if (s.constraints.length === 1) addMargin(check);
 		check.explanation = explain(check, s.vacuous);
 		return check;
@@ -353,6 +518,7 @@ export class Evaluation {
 			file: at.unit.path,
 			span: at.span
 		};
+		this.decideByApp(check, [at.text]);
 		addMargin(check);
 		check.explanation = explain(check, false);
 		return check;
@@ -468,6 +634,27 @@ const overlaps = (a: Span, b: Span) => a.start_byte < b.end_byte && b.start_byte
 
 const lastSegment = (qualified: string) =>
 	(qualified.split('::').pop() ?? qualified).replace(/^'|'$/g, '');
+
+interface Collection {
+	name: string;
+	count: number;
+}
+
+/** How many parts a usage stands for when it is a collection of a fixed size (`[4]`), else null. */
+function collectionCount(header: string): number | null {
+	const text = multiplicityOf(header);
+	if (!text) return null;
+	const [lower, upper = lower] = text.split('..').map((x) => x.trim());
+	if (lower !== upper || !/^\d+$/.test(upper!) || Number(upper) <= 1) return null;
+	return Number(upper);
+}
+
+/** An expression's result as a number value, or null. */
+function fromValue(value: Value): Extract<Evaluated, { kind: 'number' }> | null {
+	if (value instanceof ExprQuantity)
+		return { kind: 'number', value: value.value, unit: value.unit };
+	return typeof value === 'number' ? { kind: 'number', value, unit: null } : null;
+}
 
 /** How many parts a usage stands for when it is a collection (`[4]`, `[2..*]`), else null. */
 function collectionSize(header: string): string | null {
@@ -632,12 +819,13 @@ function explain(check: Check, vacuous: boolean): string {
 	const needs = check.limit
 		? ` (needs ${SYMBOL[check.limit.operator] ?? check.limit.operator} ${formatQuantity(check.limit)})`
 		: '';
+	const byApp = check.byApp ? ` ${check.byApp[0]!.toUpperCase()}${check.byApp.slice(1)}.` : '';
 	switch (check.status) {
 		case 'satisfied':
 			if (vacuous) return 'Met only because an assumption of the requirement does not hold.';
-			return valueText ? `Met: ${valueText}${needs}.` : 'Met.';
+			return (valueText ? `Met: ${valueText}${needs}.` : 'Met.') + byApp;
 		case 'violated':
-			return valueText ? `Not met: ${valueText}${needs}.` : 'Not met.';
+			return (valueText ? `Not met: ${valueText}${needs}.` : 'Not met.') + byApp;
 		case 'undecided': {
 			const unresolved = /unresolved reference `([^`]+)`/.exec(check.detail);
 			if (unresolved)
