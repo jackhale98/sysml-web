@@ -160,6 +160,7 @@ export async function setTableColumns(
 export type EditStep =
 	| { kind: 'member'; path: string; parent: ModelElement; text: string }
 	| { kind: 'declaration'; path: string; element: ModelElement; set: DeclarationSet }
+	| { kind: 'remove'; path: string; element: ModelElement }
 	| { kind: 'patch'; path: string; before: string; after: string };
 
 /**
@@ -185,6 +186,18 @@ export async function applySteps(
 					source,
 					...parentOf(step.parent),
 					text: step.text
+				});
+				if (error) return error;
+				continue;
+			}
+			if (step.kind === 'remove') {
+				const error = await workspace.edit(step.path, {
+					op: 'remove',
+					path: step.path,
+					source,
+					name: step.element.name,
+					line: step.element.span.start_row,
+					...(step.element.id ? { id: step.element.id } : {})
 				});
 				if (error) return error;
 				continue;

@@ -44,23 +44,31 @@ function apply(plan: Plan): Record<string, string> {
 		const edited = editFiles(
 			host,
 			next,
-			step.kind === 'member'
+			step.kind === 'remove'
 				? {
-						op: 'insertMember',
+						op: 'remove',
 						path: step.path,
-						parent: step.parent.name,
-						parentLine: step.parent.span.start_row,
-						...(step.parent.id ? { parentId: step.parent.id } : {}),
-						text: step.text
-					}
-				: {
-						op: 'setDeclaration',
-						path: step.path,
-						element: step.element.name,
+						name: step.element.name,
 						line: step.element.span.start_row,
-						...(step.element.id ? { id: step.element.id } : {}),
-						set: step.set
+						...(step.element.id ? { id: step.element.id } : {})
 					}
+				: step.kind === 'member'
+					? {
+							op: 'insertMember',
+							path: step.path,
+							parent: step.parent.name,
+							parentLine: step.parent.span.start_row,
+							...(step.parent.id ? { parentId: step.parent.id } : {}),
+							text: step.text
+						}
+					: {
+							op: 'setDeclaration',
+							path: step.path,
+							element: step.element.name,
+							line: step.element.span.start_row,
+							...(step.element.id ? { id: step.element.id } : {}),
+							set: step.set
+						}
 		);
 		if ('error' in edited) throw new Error(edited.error);
 		next = edited.files;

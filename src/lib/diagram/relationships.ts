@@ -510,6 +510,19 @@ export function planEdgeRemoval(
 			]
 		};
 	};
+	/** A named element's removal, by the engine. */
+	const removeElement = (element: ModelElement, what: string): Plan | string => {
+		const text = ctx.textOf(element.file);
+		if (text === undefined) return `${element.file} is not in the project.`;
+		return {
+			label: what,
+			statement: text.slice(
+				byteToUtf16(text, element.span.start_byte),
+				byteToUtf16(text, element.span.end_byte)
+			),
+			steps: [{ kind: 'remove', path: element.file, element }]
+		};
+	};
 	const plainLabel = label?.replace(/^<<(.*)>>$/, '$1') ?? null;
 	switch (kind) {
 		case 'satisfy':
@@ -542,7 +555,7 @@ export function planEdgeRemoval(
 					)
 				: target;
 			if (!part) return `The part of ${source.label} was not found.`;
-			return patchSpan(part, `Removed ${part.label} from ${source.label}`);
+			return removeElement(part, `Removed ${part.label} from ${source.label}`);
 		}
 		case 'specialization': {
 			const text = ctx.textOf(source.file);
@@ -565,7 +578,7 @@ export function planEdgeRemoval(
 				const named = ctx.elements.find(
 					(e) => e.name === plainLabel && ctx.owners.get(e.key)?.key === owner.key
 				);
-				if (named) return patchSpan(named, `Disconnected ${source.label} from ${target.label}`);
+				if (named) return removeElement(named, `Disconnected ${source.label} from ${target.label}`);
 			}
 			if (!owner) return 'This connection is not written in a part.';
 			const text = ctx.textOf(owner.file) ?? '';
