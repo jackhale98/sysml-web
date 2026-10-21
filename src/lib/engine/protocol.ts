@@ -5,7 +5,15 @@ import type {
 	EditRequest,
 	EditResult,
 	Highlights,
+	CodeAction,
+	ElementDetails,
+	Completion,
+	DefinitionTarget,
+	FileChange,
+	FileRange,
+	Hover,
 	LibraryEntry,
+	OutlineItem,
 	ProjectArchive,
 	LibraryHit,
 	LibraryLicense,
@@ -33,6 +41,25 @@ export interface EngineApi {
 	/** The view libraries the engine bundles (`Reporting`, `ModelViews`). */
 	viewLibraries(): SourceFile[];
 	libraryIndex(): LibraryEntry[];
+	elementDetails(
+		files: SourceFile[],
+		path: string,
+		line: number,
+		element: string | null
+	): ElementDetails;
+	complete(files: SourceFile[], path: string, offset: number): Completion;
+	hover(files: SourceFile[], path: string, offset: number): Hover | null;
+	definition(files: SourceFile[], path: string, offset: number): DefinitionTarget | null;
+	references(files: SourceFile[], path: string, offset: number): FileRange[];
+	renameSymbol(
+		files: SourceFile[],
+		path: string,
+		offset: number,
+		newName: string
+	): { changes: FileChange[] } | { error: string };
+	outline(files: SourceFile[], path: string): OutlineItem[];
+	format(source: string): { changes: { from: number; to: number; insert: string }[] };
+	codeActions(files: SourceFile[], path: string, from: number, to: number): CodeAction[];
 	/** A `.kpar` or any ZIP of a project, as text files. */
 	readProjectArchive(bytes: Uint8Array, fallbackName: string): ProjectArchive;
 	/** The project as a `.kpar`. `info` is its `.project.json` object. */

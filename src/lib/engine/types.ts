@@ -130,6 +130,87 @@ export interface RenderedTable {
 	availableFields?: string[];
 }
 
+/** Editor language services (all offsets are UTF-16 into the given file). */
+export interface Completion {
+	from: number;
+	to: number;
+	items: {
+		label: string;
+		kind: 'keyword' | 'definition' | 'usage' | 'package' | 'library' | 'snippet' | string;
+		detail?: string;
+		documentation?: string;
+		insertText?: string;
+		isSnippet?: boolean;
+	}[];
+}
+
+export interface Hover {
+	from: number;
+	to: number;
+	markdown: string;
+}
+
+/** Where a name is declared: a project file range, or a standard library line. */
+export type DefinitionTarget =
+	{ path: string; from: number; to: number } | { library: { path: string; line: number } };
+
+export interface FileRange {
+	path: string;
+	from: number;
+	to: number;
+}
+
+export interface FileChange extends FileRange {
+	insert: string;
+}
+
+export interface OutlineItem {
+	name: string;
+	kind: string;
+	detail?: string;
+	from: number;
+	to: number;
+	selectionFrom: number;
+	selectionTo: number;
+	children: OutlineItem[];
+}
+
+export interface CodeAction {
+	title: string;
+	diagnosticCode?: string;
+	changes: FileChange[];
+}
+
+/** The editable parts of an element's declaration (engine `elementDetails`). */
+export interface ElementDetails {
+	name: string;
+	shortName?: string;
+	kind: string;
+	isDefinition: boolean;
+	type?: string;
+	conjugated?: boolean;
+	specializes: string[];
+	redefines?: string;
+	multiplicity?: string;
+	value?: string;
+	valueKind?: 'bind' | 'default' | 'initial';
+	direction?: 'in' | 'out' | 'inout';
+	abstract?: boolean;
+	readonly?: boolean;
+	derived?: boolean;
+	end?: boolean;
+	doc?: string;
+	qualifiedName: string;
+}
+
+/** Fields to change with `setDeclaration`; null, "", false or [] removes. */
+export type DeclarationSet = Partial<
+	Omit<ElementDetails, 'name' | 'kind' | 'isDefinition' | 'qualifiedName'>
+> & {
+	[K in 'type' | 'redefines' | 'multiplicity' | 'value' | 'direction' | 'shortName' | 'doc']?:
+		string | null;
+};
+
 /** A project read from a `.kpar` or ZIP. */
 export interface ProjectArchive {
 	info: { name: string; description?: string; version?: string } & Record<string, unknown>;
@@ -317,7 +398,16 @@ export type EditRequest =
 			/** The whole project, so inserted values find their types in other files. */
 			files?: { path: string; text: string }[];
 	  }
-	| { op: 'setTableColumns'; path: string; source: string; view: string; columns: string[] };
+	| { op: 'setTableColumns'; path: string; source: string; view: string; columns: string[] }
+	| {
+			op: 'setDeclaration';
+			path: string;
+			source: string;
+			element: string;
+			/** 1-based line of the declaration. */
+			line: number;
+			set: DeclarationSet;
+	  };
 
 export interface EditResult {
 	/** Changes in UTF-16 offsets against the source in the request. */
