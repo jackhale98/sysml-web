@@ -116,7 +116,8 @@ export async function setField(
 			element: source.element,
 			line: source.line,
 			field,
-			value
+			value,
+			files: workspace.sourceFiles()
 		})
 	);
 }

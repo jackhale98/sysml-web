@@ -694,6 +694,25 @@
 	tbody tr.selected {
 		background: var(--accent-weak);
 	}
+	/* The first column (usually the ID) stays put while the table scrolls sideways. */
+	th:first-child,
+	td:first-child {
+		position: sticky;
+		left: 0;
+		z-index: 1;
+		background: var(--surface);
+		box-shadow: inset -1px 0 0 var(--border);
+	}
+	th:first-child {
+		z-index: 2;
+		background: var(--surface-2);
+	}
+	tbody tr:hover td:first-child {
+		background: var(--surface-hover);
+	}
+	tbody tr.selected td:first-child {
+		background: var(--accent-weak);
+	}
 	tbody tr:last-child td {
 		border-bottom: 0;
 	}

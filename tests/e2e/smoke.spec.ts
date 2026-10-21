@@ -93,7 +93,7 @@ test('requirements view lists requirements with their trace status', async ({ pa
 	expect(await rows.count()).toBeGreaterThanOrEqual(15);
 	await page.getByRole('searchbox', { name: 'Search requirements' }).fill('SYS-001');
 	await expect(rows).toHaveCount(1);
-	await rows.first().getByRole('button').click();
+	await rows.first().getByRole('button').first().click();
 	await expect(page.getByRole('complementary', { name: 'Inspector' })).toContainText('Requirement');
 	await expectAccessible(page);
 });
@@ -176,4 +176,22 @@ test('on a phone, filtering the model shows matching elements at once', async ({
 	await expectAccessible(page);
 	await first.click();
 	await expect(page.locator('.cm-content')).toBeVisible();
+});
+
+test('table cells edit the SysML behind them', async ({ page }) => {
+	await openDemo(page);
+	await page
+		.locator('section[aria-labelledby="views-heading"]')
+		.getByRole('button', { name: 'System requirements' })
+		.click();
+	const table = page.getByRole('region', { name: 'System requirements view' });
+	const row = table.locator('tbody tr').filter({ hasText: 'SYS-001' });
+	await row.getByRole('button', { name: /Edit Priority/ }).click();
+	await row.getByRole('combobox', { name: /Priority/ }).selectOption('low');
+	await expect(row).toContainText('low');
+	await page.getByRole('tab', { name: 'Files' }).click();
+	await page.getByRole('button', { name: /^SystemRequirements\.sysml/ }).click();
+	await expect(page.locator('.cm-content')).toContainText('Priority::low');
+	await page.getByRole('button', { name: 'Undo' }).click();
+	await expect(page.locator('.cm-content')).not.toContainText(':>> priority = Priority::low');
 });

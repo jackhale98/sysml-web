@@ -211,6 +211,8 @@ export type EditRequest =
 			line: number;
 			field: string;
 			value: string;
+			/** The whole project, so inserted values find their types in other files. */
+			files?: { path: string; text: string }[];
 	  }
 	| { op: 'setTableColumns'; path: string; source: string; view: string; columns: string[] };
 
