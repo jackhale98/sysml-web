@@ -98,6 +98,43 @@ export async function deleteElement(
 	);
 }
 
+/** Change one table cell: the model value behind it, as a minimal SysML edit. */
+export async function setField(
+	workspace: Workspace,
+	source: { element: string; file: string; line: number },
+	field: string,
+	value: string,
+	label: string
+): Promise<string | null> {
+	const text = workspace.text(source.file);
+	if (text === undefined) return `${source.file} is not in the project.`;
+	return undoable(workspace, label, () =>
+		workspace.edit(source.file, {
+			op: 'setField',
+			path: source.file,
+			source: text,
+			element: source.element,
+			line: source.line,
+			field,
+			value
+		})
+	);
+}
+
+/** Choose and order a table view's columns (its @TableRendering). */
+export async function setTableColumns(
+	workspace: Workspace,
+	file: string,
+	view: string,
+	columns: string[]
+): Promise<string | null> {
+	const text = workspace.text(file);
+	if (text === undefined) return `${file} is not in the project.`;
+	return undoable(workspace, `Changed the columns of ${view}`, () =>
+		workspace.edit(file, { op: 'setTableColumns', path: file, source: text, view, columns })
+	);
+}
+
 function escapeRegExp(text: string): string {
 	return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

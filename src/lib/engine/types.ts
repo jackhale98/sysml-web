@@ -124,6 +124,19 @@ export interface RenderedTable {
 	warnings: string[];
 	/** Parallel to `rows` (empty for a pivot): the element behind each row. */
 	sources: { element: string; file: string; line: number }[];
+	/** Per column: how its cells can be edited, or null when derived. */
+	editable?: (ColumnEdit | null)[];
+	/** Fields the view's row provider offers, for choosing columns. */
+	availableFields?: string[];
+}
+
+/** How a table column maps back to the model. */
+export interface ColumnEdit {
+	/** `name`, `shortName`, `doc`, `feature:priority`, `metadata:StatusInfo.status`, … */
+	field: string;
+	kind: 'text' | 'longText' | 'enum' | 'number' | 'enumList';
+	/** Enum literal names, for `enum` and `enumList`. */
+	options?: string[];
 }
 
 export type NodeKind =
@@ -188,7 +201,18 @@ export type EditRequest =
 	| { op: 'insertMember'; path: string; source: string; parent: string; text: string }
 	| { op: 'insertTopLevel'; source: string; text: string }
 	| { op: 'remove'; path: string; source: string; name: string }
-	| { op: 'rename'; path: string; source: string; from: string; to: string };
+	| { op: 'rename'; path: string; source: string; from: string; to: string }
+	| {
+			op: 'setField';
+			path: string;
+			source: string;
+			/** Qualified name of the row's element, as in `RenderedTable.sources`. */
+			element: string;
+			line: number;
+			field: string;
+			value: string;
+	  }
+	| { op: 'setTableColumns'; path: string; source: string; view: string; columns: string[] };
 
 export interface EditResult {
 	/** Changes in UTF-16 offsets against the source in the request. */

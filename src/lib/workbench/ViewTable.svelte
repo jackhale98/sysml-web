@@ -5,6 +5,7 @@
 		ArrowUp,
 		Check,
 		ChevronsUpDown,
+		Columns3,
 		FileCode,
 		FilePlus,
 		Minus,
@@ -18,6 +19,8 @@
 	import KindGlyph from '#lib/ui/KindGlyph.svelte';
 	import { toasts } from '#lib/ui/toasts.svelte.ts';
 	import type { WorkbenchUi } from './ui.svelte.ts';
+	import { renameElement, setField, setTableColumns } from './actions.ts';
+	import CellEditor from './CellEditor.svelte';
 	import { viewTitle } from './views.ts';
 
 	/**
@@ -137,6 +140,64 @@
 		if (element) ui.select(element.key, 'table');
 	}
 
+	let columnsOpen = $state(false);
+	let columnChoice = $state<{ field: string; shown: boolean }[]>([]);
+
+	function openColumns() {
+		if (!table) return;
+		const current = table.columns;
+		const rest = (table.availableFields ?? []).filter((f) => !current.includes(f));
+		columnChoice = [
+			...current.map((field) => ({ field, shown: true })),
+			...rest.map((field) => ({ field, shown: false }))
+		];
+		columnsOpen = true;
+	}
+
+	function moveColumn(index: number, by: number) {
+		const next = [...columnChoice];
+		const [item] = next.splice(index, 1);
+		next.splice(index + by, 0, item!);
+		columnChoice = next;
+	}
+
+	async function applyColumns() {
+		if (!info) return;
+		const columns = columnChoice.filter((c) => c.shown).map((c) => c.field);
+		columnsOpen = false;
+		const error = await setTableColumns(workspace, info.file, info.name, columns);
+		if (error) toasts.show(error, { tone: 'error' });
+	}
+
+	/** The cell being edited, if any. */
+	let editing = $state<{ row: number; column: number } | null>(null);
+
+	function rowLabel(cells: string[]): string {
+		return cells[1] ? `${cells[0]} ${cells[1]}` : (cells[0] ?? 'row');
+	}
+
+	async function saveCell(index: number, column: number, value: string, cells: string[]) {
+		editing = null;
+		const edit = table?.editable?.[column];
+		const source = table?.sources[index];
+		if (!edit || !source) return;
+		const what = `${heading(table?.columns[column] ?? '')} of ${rowLabel(cells)}`;
+		let error: string | null;
+		if (edit.field === 'name') {
+			const element = elementFor(index);
+			error = element ? await renameElement(workspace, element, value) : 'Element not found.';
+		} else {
+			error = await setField(
+				workspace,
+				source,
+				edit.field,
+				value,
+				value ? `Set ${what} to ${value}` : `Cleared ${what}`
+			);
+		}
+		if (error) toasts.show(error, { tone: 'error' });
+	}
+
 	type CellKind = 'id' | 'flag' | 'status' | 'list' | 'number' | 'mark' | 'text' | 'long';
 	function cellKind(column: string, value: string): CellKind {
 		const c = column.toLowerCase();
@@ -166,6 +227,23 @@
 		return viewTitle(column);
 	}
 </script>
+
+{#snippet display(kind: CellKind, value: string)}
+	{#if kind === 'flag'}
+		{#if value === '1'}<Check size={15} class="yes" /><span class="visually-hidden">yes</span
+			>{:else}<Minus size={15} class="no" /><span class="visually-hidden">no</span>{/if}
+	{:else if kind === 'mark'}
+		{#if value === '' || value === '0'}<span class="visually-hidden">none</span
+			>{:else if value === '1' || value.toLowerCase() === 'x'}<span class="dot" title={value}
+			></span>{:else}{value}{/if}
+	{:else if kind === 'status' && value}
+		<span class="chip {STATUS_TONE[value.toLowerCase()] ?? 'plain'}">{value}</span>
+	{:else if kind === 'list' && value}
+		{#each value.split(/,\s*/) as item, i (i)}<span class="ref">{item}</span>{/each}
+	{:else}
+		{value}
+	{/if}
+{/snippet}
 
 <section class="view-table" aria-label="{title} view">
 	<header class="head">
@@ -210,6 +288,56 @@
 						? `${table.rows.length} rows`
 						: `${rows.length} of ${table.rows.length} rows`}
 				</span>
+			{/if}
+			{#if table?.availableFields?.length && info && !info.builtin && !isPivot}
+				<div class="columns-menu">
+					<button
+						type="button"
+						class="source"
+						aria-expanded={columnsOpen}
+						onclick={() => (columnsOpen ? (columnsOpen = false) : openColumns())}
+					>
+						<Columns3 size={14} /> Columns
+					</button>
+					{#if columnsOpen}
+						<div class="columns-panel" role="dialog" aria-label="Choose columns">
+							<p class="panel-hint">
+								Saved in the view's <code>@TableRendering</code>, so the table stays part of the
+								model.
+							</p>
+							<ul>
+								{#each columnChoice as choice, i (choice.field)}
+									<li>
+										<label>
+											<input type="checkbox" bind:checked={choice.shown} />
+											{heading(choice.field)}
+										</label>
+										<button
+											type="button"
+											class="move"
+											aria-label="Move {heading(choice.field)} up"
+											disabled={i === 0}
+											onclick={() => moveColumn(i, -1)}><ArrowUp size={13} /></button
+										>
+										<button
+											type="button"
+											class="move"
+											aria-label="Move {heading(choice.field)} down"
+											disabled={i === columnChoice.length - 1}
+											onclick={() => moveColumn(i, 1)}><ArrowDown size={13} /></button
+										>
+									</li>
+								{/each}
+							</ul>
+							<div class="panel-buttons">
+								<button type="button" class="source" onclick={() => (columnsOpen = false)}
+									>Cancel</button
+								>
+								<button type="button" class="apply" onclick={applyColumns}>Apply</button>
+							</div>
+						</div>
+					{/if}
+				</div>
 			{/if}
 		</div>
 		{#if table?.warnings.length}
@@ -259,6 +387,8 @@
 						>
 							{#each row.cells as value, c (c)}
 								{@const kind = cellKind(table.columns[c] ?? '', value)}
+								{@const edit = table.editable?.[c] ?? null}
+								{@const canEdit = selectable && !!edit}
 								<td class={kind}>
 									{#if c === 0 && selectable}
 										<button
@@ -269,23 +399,29 @@
 												openRow(row.index);
 											}}>{value || '—'}</button
 										>
-									{:else if kind === 'flag'}
-										{#if value === '1'}<Check size={15} class="yes" /><span class="visually-hidden"
-												>yes</span
-											>{:else}<Minus size={15} class="no" /><span class="visually-hidden">no</span
-											>{/if}
-									{:else if kind === 'mark'}
-										{#if value === '' || value === '0'}<span class="visually-hidden">none</span
-											>{:else if value === '1' || value.toLowerCase() === 'x'}<span
-												class="dot"
-												title={value}
-											></span>{:else}{value}{/if}
-									{:else if kind === 'status' && value}
-										<span class="chip {STATUS_TONE[value.toLowerCase()] ?? 'plain'}">{value}</span>
-									{:else if kind === 'list' && value}
-										{#each value.split(/,\s*/) as item, i (i)}<span class="ref">{item}</span>{/each}
+									{:else if editing?.row === row.index && editing.column === c && edit}
+										<CellEditor
+											{edit}
+											{value}
+											label="{heading(table.columns[c] ?? '')} of {rowLabel(row.cells)}"
+											onsave={(next) => saveCell(row.index, c, next, row.cells)}
+											oncancel={() => (editing = null)}
+										/>
+									{:else if canEdit}
+										<button
+											type="button"
+											class="cell"
+											onclick={(e) => {
+												e.stopPropagation();
+												openRow(row.index);
+												editing = { row: row.index, column: c };
+											}}
+											><span class="visually-hidden">Edit {heading(table.columns[c] ?? '')}:</span
+											>{@render display(kind, value)}{#if !value}<span class="empty">Add</span
+												>{/if}</button
+										>
 									{:else}
-										{value}
+										{@render display(kind, value)}
 									{/if}
 								</td>
 							{/each}
@@ -395,6 +531,82 @@
 		font-size: var(--text-sm);
 		font-variant-numeric: tabular-nums;
 	}
+	.columns-menu {
+		position: relative;
+		margin-left: auto;
+	}
+	.columns-panel {
+		position: absolute;
+		top: calc(100% + 6px);
+		right: 0;
+		z-index: 5;
+		display: grid;
+		gap: var(--space-2);
+		width: min(18rem, 80vw);
+		padding: var(--space-3);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-md);
+		background: var(--surface);
+		box-shadow: var(--shadow-lg);
+	}
+	.panel-hint {
+		color: var(--text-2);
+		font-size: var(--text-xs);
+	}
+	.columns-panel ul {
+		display: grid;
+		gap: 2px;
+		max-height: 18rem;
+		margin: 0;
+		padding: 0;
+		overflow-y: auto;
+		list-style: none;
+	}
+	.columns-panel li {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+	}
+	.columns-panel label {
+		display: flex;
+		flex: 1;
+		align-items: center;
+		gap: var(--space-2);
+		font-size: var(--text-sm);
+	}
+	.move {
+		display: grid;
+		place-items: center;
+		width: 1.75rem;
+		height: 1.75rem;
+		border: 0;
+		border-radius: var(--radius-sm);
+		background: transparent;
+		color: var(--text-2);
+		cursor: pointer;
+	}
+	.move:hover:not(:disabled) {
+		background: var(--surface-hover);
+	}
+	.move:disabled {
+		opacity: 0.35;
+		cursor: default;
+	}
+	.panel-buttons {
+		display: flex;
+		justify-content: flex-end;
+		gap: var(--space-2);
+	}
+	.apply {
+		height: 2rem;
+		padding: 0 var(--space-3);
+		border: 0;
+		border-radius: var(--radius-sm);
+		background: var(--accent);
+		color: var(--accent-text);
+		font-weight: 600;
+		cursor: pointer;
+	}
 	.warnings {
 		display: flex;
 		align-items: center;
@@ -494,6 +706,33 @@
 		font-weight: 600;
 		text-align: left;
 		cursor: pointer;
+	}
+	.cell {
+		display: block;
+		width: 100%;
+		min-height: 1.5rem;
+		margin: -2px -6px;
+		padding: 2px 6px;
+		border: 1px solid transparent;
+		border-radius: var(--radius-sm);
+		background: transparent;
+		color: inherit;
+		font: inherit;
+		text-align: inherit;
+		cursor: text;
+	}
+	.cell:hover,
+	.cell:focus-visible {
+		border-color: var(--border-strong);
+		background: var(--surface);
+	}
+	.cell .empty {
+		color: var(--text-3);
+		opacity: 0;
+	}
+	.cell:hover .empty,
+	.cell:focus-visible .empty {
+		opacity: 1;
 	}
 	.open:hover {
 		text-decoration: underline;
