@@ -1,5 +1,8 @@
 # Spike A — tree-sitter-sysml + Rust → WebAssembly
 
+*History: this spike led to our own engine (`sysml-cli` in WebAssembly), which the
+app no longer uses; it runs on the Open-MBEE sysml-toolkit (decision #16, `docs/engine.md`).*
+
 **Verdict: feasible, no workarounds.** Run 2026-10-21.
 
 ## Versions

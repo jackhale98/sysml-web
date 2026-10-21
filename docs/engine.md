@@ -1,44 +1,38 @@
 # The engine
 
 The app talks to one engine interface, `EngineApi` (`src/lib/engine/protocol.ts`),
-through `getEngine()` (`src/lib/engine/instance.ts`). Behind it are two
-WebAssembly engines, each in its own Web Worker:
+through `getEngine()` (`src/lib/engine/instance.ts`). Behind it is the
+Open-MBEE **sysml-toolkit** (`@sysml/wasm`, Apache-2.0; its standard library is
+EPL-2.0), WebAssembly in a Web Worker (`toolkit/toolkit.worker.ts`). Its
+release is pinned in `toolkit.json` and fetched into `static/toolkit/` by
+`scripts/fetch-toolkit.sh` (every workflow runs it; run it once after
+cloning).
 
-- **the sysml-toolkit** (Open-MBEE, `@sysml/wasm`, Apache-2.0; its standard
-  library is EPL-2.0) — the app's engine. Its release is pinned in
-  `toolkit.json` and fetched into `static/toolkit/` by
-  `scripts/fetch-toolkit.sh` (every workflow runs it; run it once after
-  cloning).
-- **the classic engine** (`sysml-cli` built by `scripts/build-engine.sh` into
-  `static/engine/`) — still serving the methods not moved yet. It goes in
-  phase 7 of the migration plan (`docs/PLAN.md`, decision #16).
+`toolkitEngine` (`src/lib/engine/client.ts`) gives the app its `Engine`:
+every `EngineApi` method, made asynchronous, sent to the worker by
+`startToolkit` (`toolkit/client.ts`). In the worker, `ToolkitHost`
+(`toolkit/host.ts`) answers each method. The host keeps one session for the
+latest project text; `this.session(files)` (or `this.build(files)`) reuses it
+while the texts are unchanged. It returns the app's result types, with
+positions converted (below).
 
-## The composite
+## Adding a method
 
-`composeEngine` (`src/lib/engine/composite.ts`) gives the app one `Engine`:
-every method listed in `TOOLKIT_METHODS` (`src/lib/engine/toolkit/protocol.ts`)
-goes to the toolkit, every other method to the classic engine. The first
-toolkit call also starts the classic worker, since the app needs both right
-after a project opens. There is no switch between engines: the list is the
-whole routing.
-
-### Moving a method to the toolkit
-
-1. Implement it on `ToolkitHost` (`src/lib/engine/toolkit/host.ts`). The host
-   keeps one session for the latest project text; `this.session(files)` (or
-   `this.build(files)`) reuses it while the texts are unchanged. Return the
-   app's existing result type, with positions converted (below).
-2. Add a handler for it in `toolkit.worker.ts` and add its name to
-   `TOOLKIT_METHODS`.
-3. Test it in Node against the real toolkit (`testing.ts` loads it and the
+1. Add it to `EngineApi`, implement it on `ToolkitHost`, add a handler for it
+   in `toolkit.worker.ts` and a line in `toolkitEngine` (the types make sure
+   none is missing).
+2. Test it in Node against the real toolkit (`testing.ts` loads it and the
    demo; see `host.test.ts`), and run the e2e suite.
-4. Delete it from the classic worker and client, and add it to
-   `RetiredMethod` (`protocol.ts`; the composite checks every retired method
-   is routed to the toolkit).
-5. When no method routes to the classic engine any more, delete it.
 
 The host runs in Node too (no worker globals), which is what the unit tests
 use; keep it that way.
+
+## History
+
+Until phase 7 of the migration (`docs/PLAN.md`, decision #16) a second
+engine, `sysml-cli` built to WebAssembly, served the methods not yet ported,
+and a composite routed each method to one engine or the other. Some notes
+and tests below still compare with what that engine did.
 
 ## Positions
 
@@ -51,9 +45,9 @@ text and converts between byte offsets, UTF-16 offsets, 1-based line/column
 the `\r` belongs to its line, as the toolkit counts it). Use it for every
 position the toolkit returns.
 
-The app's `Span` carries byte offsets (`start_byte`, `end_byte`, what the
-classic engine gave), 1-based lines and UTF-16 columns, and — from the
-toolkit — UTF-16 offsets `from`/`to`, which the editor prefers.
+The app's `Span` carries byte offsets (`start_byte`, `end_byte`), 1-based
+lines and UTF-16 columns, and UTF-16 offsets `from`/`to`, which the editor
+prefers.
 
 ## The model adapter
 
@@ -198,7 +192,7 @@ its resolver recorded, reparses, and refuses an edit that doesn't parse
   analysis) when known, else by name as written (simple or qualified) and
   the 1-based declaration line — what table rows carry.
 - **Table cells** (`setField`): `name`, `shortName`, `doc`, `feature:<x>`
-  and `metadata:<Type>.<field>`, as classic named them. A field's type comes
+  and `metadata:<Type>.<field>`, as the earlier engine named them. A field's type comes
   from the model (the feature's declaration in the element's types, its
   enum literals, its multiplicity); enum and metadata types are written the
   shortest way that resolves where they are written (`minimalSpelling`).
@@ -207,7 +201,7 @@ its resolver recorded, reparses, and refuses an edit that doesn't parse
   texts (`ToolkitHost.pending`), so a series of edits (an import) doesn't
   rebuild the model each time. A file with a syntax error is not edited
   (the session holds its repaired text); other files are.
-- Cost on the demo in Node: 40–75 ms per edit (classic: a few ms), then the
+- Cost on the demo in Node: 40–75 ms per edit (the earlier engine: a few ms), then the
   analysis of the edited text 90–130 ms. It runs in the worker.
 
 ## Diagrams
@@ -287,8 +281,8 @@ idle (and not on Save-Data or 2G), the worker downloads the prepared snapshot
 cache, keyed by the toolkit release; later starts load the library from it,
 which is about three times faster and takes a third less memory. A snapshot
 the toolkit refuses (another build) is deleted and the library loads from
-source. The service worker caches the toolkit's other files on first use, like
-the classic engine's, but never the snapshots (`src/lib/offline/caching.ts`).
+source. The service worker caches the toolkit's other files on first use, but
+never the snapshots (`src/lib/offline/caching.ts`).
 
 ## When the toolkit fails
 
@@ -297,10 +291,4 @@ running out of memory fails a `memory.grow`. Either way the worker is useless.
 `startToolkit` (`toolkit/client.ts`) then starts a new worker once and sends
 the calls in flight again. If that fails too, every toolkit call fails from
 then on: a toast says so once, the status bar shows "Engine error" and the
-problems list says why. The classic engine is not a fallback.
-
-## The test build
-
-`?toolkit` in a project URL still runs the spike's measuring panel
-(`src/lib/engine/spike/`), in a worker of its own, for trying library
-variants on a phone. It goes with the classic engine in phase 7.
+problems list says why. There is no other engine to fall back to.

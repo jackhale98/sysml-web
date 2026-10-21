@@ -8,8 +8,8 @@ SysML text in a git repository is the single source of truth; every change is a
 minimal, reviewable diff that any other conformant tool can read. It runs well
 on desktop and mobile.
 
-Status (2026-10-21): **Phases 2–4 largely built; the app is moving onto the
-Open-MBEE sysml-toolkit engine (decision #16).**
+Status (2026-10-21): **Phases 2–4 largely built; the app runs on the
+Open-MBEE sysml-toolkit engine (decision #16, migration done).**
 - Built: workbench with text and diagram editing, language features,
   property form with type suggestions, unified undo; tables as SysML views,
   editable in place; requirements, trace and verification matrices;
@@ -23,9 +23,9 @@ Open-MBEE sysml-toolkit engine (decision #16).**
 
 ### Engine migration (decision #16)
 
-Why: the current engine (`sysml-cli`, tree-sitter) resolves names
-approximately — 48 of its 78 findings on the demo are false, it accepts
-invalid SysML, and it has no standard JSON interchange. The toolkit
+Why: our own engine (`sysml-cli`, tree-sitter) resolved names
+approximately — 48 of its 78 findings on the demo were false, it accepted
+invalid SysML, and it had no standard JSON interchange. The toolkit
 resolves 99.96 % of the official corpus's references, agrees with the
 release XMI on 99.90 % of library relationships, rejects 440 of 462
 invalid fixtures (ours: 63) and exports schema-valid JSON. Measured in the
@@ -36,9 +36,9 @@ phone first visit, 2.6 s on return with the prepared snapshot) and memory
 `scratchpad/toolkit-browser-measurements.md` (in the session record).
 
 How: one engine interface (`EngineApi`) stays the app's only contract. The
-toolkit is the default engine from phase 1; methods not yet ported are
-routed to the current engine as a temporary convenience, and each phase
-deletes its routes until phase 7 deletes the current engine. Nobody uses
+toolkit was the default engine from phase 1; methods not yet ported were
+routed to our own engine as a temporary convenience, and each phase
+deleted its routes until phase 7 deleted that engine. Nobody uses
 the app yet, so there is no setting, no dual-engine testing and no
 fallback: a crashed toolkit worker restarts once, then shows an error.
 Pieces the toolkit doesn't provide are written in TypeScript over its model
@@ -72,19 +72,21 @@ need a model run in parallel with the foundation.
    transition and decision branch.
 6. **The rest** — state machine emulator, `.kpar` read/write, library
    browser. *Done:* the emulator (`src/lib/sim/emulator.ts` runs any
-   `StateMachine` in TypeScript; `parity.test.ts` checks it against the old
-   `stateStep` and lists where it follows the SysML/UML semantics instead)
+   `StateMachine` in TypeScript; `sim/semantics.test.ts` runs it on the
+   machines the toolkit extracts and pins where it follows the SysML/UML
+   semantics, which the old `stateStep` did not)
    and the machines it runs, read from the toolkit's model
    (`engine/toolkit/machines.ts`, see `docs/engine.md`). `.kpar`/ZIP read and
    write are TypeScript (`src/lib/interchange/kpar.ts`, over
-   `dataio/zip.ts`, round-trip tested against our engine's output both
-   ways), and the library browser and search read the toolkit's library
+   `dataio/zip.ts`, round-trip tested against our earlier engine's output
+   both ways while it was here, and against an archive it wrote), and the library browser and search read the toolkit's library
    bundle (`static/toolkit/stdlib/sysml-library.json.gz`) in a worker with a
-   TypeScript declaration scanner (`src/lib/library/`). Library tabs opened
-   from our engine's go-to-definition find the name near the given line,
-   since that engine embeds an older library release.
-7. **Remove the current engine** — once nothing routes to it: delete it,
-   its build and the `?toolkit` test build. On a real iPhone the toolkit
+   TypeScript declaration scanner (`src/lib/library/`), the same library
+   release the toolkit's go-to-definition points into.
+7. ✅ **Remove the current engine** (done) — `sysml-cli`'s WebAssembly
+   build, its build scripts and CI steps, the routing composite and the
+   `?toolkit` test build are gone; the app's `EngineApi` talks straight to
+   the toolkit worker. On a real iPhone the toolkit
    held 154–160 MB with no growth over 20 edits and no tab kill (library
    build 3.2 s, analysis 0.3 s). Upstream requests (lighter build,
    on-demand library packages, declaration-header edit, semantic
@@ -633,6 +635,9 @@ engine) leaves room for a CRDT layer later.
 
 ### The engine lives in `jackhale98/sysml-cli`
 
+*Superseded by decision #16: the app runs on the Open-MBEE sysml-toolkit
+(`docs/engine.md`). This section records the earlier plan.*
+
 The engine is built in place in the `sysml-cli` Rust workspace rather than
 copied here, so the CLI, LSP and web app share one engine from the start.
 
@@ -676,7 +681,7 @@ ecosystem convention) to maximise adoption and integration.
 | `sysml-cli` workspace (engine) | GPL-3.0-or-later | Relicense to `Apache-2.0 OR MIT` (sole author) |
 | `mycelium-web` code (git, auth, shell) | GPL-3.0 because of uniorg; our own code otherwise | Reuse own code under the new licence; uniorg is not needed here |
 | `mycelium-web` worker | Apache-2.0 | Compatible |
-| OMG `sysml.library` | EPL-2.0 (SysML v2 Release 2026-05 and later) | Served unmodified from the sysml-toolkit's bundle (`static/toolkit/stdlib/`, with the toolkit's `LICENSE-EPL-2.0` and `THIRD-PARTY-NOTICES.md` next to it); its licence and notice are shown in the app's standard-library browser and in Settings → About. Our current engine still embeds the 2026-02 release under LGPL-3.0-only until it is removed (decision #16) |
+| OMG `sysml.library` | EPL-2.0 (SysML v2 Release 2026-05 and later) | Served unmodified from the sysml-toolkit's bundle (`static/toolkit/stdlib/`, with the toolkit's `LICENSE-EPL-2.0` and `THIRD-PARTY-NOTICES.md` next to it); its licence and notice are shown in the app's standard-library browser and in Settings → About |
 | `sysml-domain-libraries` packs | per that repo | Confirm before bundling |
 | Third-party npm/crates | various | Allowlist permissive licences in CI (`cargo deny`, `license-checker`) |
 
@@ -794,7 +799,7 @@ Engine gaps found while authoring the demo (inputs to Phase 1):
 | 1 | One shared Rust semantic engine compiled to WebAssembly (web, CLI, LSP) | 2026-10-21 |
 | 2 | Operational records (test runs, NCR, CAPA, inspections) deferred | 2026-10-21 |
 | 3 | Static app + git only; no backend holds data; stateless proxy worker; optional Systems Modeling API client | 2026-10-21 |
-| 4 | Licence `Apache-2.0 OR MIT`; relicense own grammar/core code; OMG library bundled under its own licence (EPL-2.0 for the 2026-05+ release the toolkit bundles; the 2026-02 release our engine embeds is LGPL-3.0-only) | 2026-10-21 |
+| 4 | Licence `Apache-2.0 OR MIT`; relicense own grammar/core code; OMG library bundled under its own licence (EPL-2.0, the 2026-05+ release the toolkit bundles) | 2026-10-21 |
 | 5 | SvelteKit (static SPA) + Svelte 5; reuse mycelium-web's git/auth/worker code but **not** its structure or UI | 2026-10-21 |
 | 7 | ~~Object-first, spreadsheet-like UX~~ — superseded by #9 | 2026-10-21 |
 | 9 | SysML is the product: a workbench where text and diagrams are equal ways to build the model, made approachable through in-context explanation and guidance; tables are SysML views, not the editing paradigm | 2026-10-21 |

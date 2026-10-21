@@ -1,6 +1,8 @@
 # Model interchange reference: KerML Clause 10, `.kpar`, JSON, element identity, Systems Modeling API, XMI
 
-Status: research reference for the engine's `sysml-interchange` work. Sources are the formal OMG
+Status: research reference, written for our earlier engine's `sysml-interchange` work (`sysml-cli`,
+replaced by the Open-MBEE sysml-toolkit under decision #16; the app now reads and writes `.kpar` in
+TypeScript, `src/lib/interchange/kpar.ts`). Sources are the formal OMG
 specs (KerML 1.0 formal/2025-09-01, SysML 2.0, Systems Modeling API and Services 1.0
 formal/2025-09-04) plus direct inspection of the release artifacts in
 `sysml-v2-release/` (`sysml.library.kpar/`, `sysml.library.xmi/`, `sysml.library.xmi.implied/`).
@@ -652,7 +654,7 @@ What implied adds (type counts of `isImplied="true"` relationships): `TypeFeatur
 Explicit relationships/elements and their ids are byte-identical between the two sets (except the added attributes). Roughly 3.7x element growth: do not import `.implied` data into an
 engine that recomputes implied relationships itself unless it dedups on `isImplied`.
 
-## 7. Implications for our engine (`sysml-interchange`) - checklist
+## 7. Implications for an implementation (written for `sysml-interchange`) - checklist
 
 ### 7.1 Must emit to round-trip with other tools
 1. **Model files**: textual `.sysml`/`.kerml` (source of truth) and/or JSON `.json` array. Minimum for K conformance: textual OR JSON. XMI optional.
