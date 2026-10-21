@@ -144,6 +144,27 @@
 		}
 	}
 
+	// Fit the drawing again when the pane changes size a lot (layout switch,
+	// window resize), so it never sits tiny in a corner.
+	let host: HTMLDivElement;
+	$effect(() => {
+		let width = 0;
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		const observer = new ResizeObserver(([entry]) => {
+			const next = entry?.contentRect.width ?? 0;
+			if (width && Math.abs(next - width) / width > 0.2) {
+				clearTimeout(timer);
+				timer = setTimeout(() => fitNonce++, 120);
+			}
+			width = next;
+		});
+		observer.observe(host);
+		return () => {
+			observer.disconnect();
+			clearTimeout(timer);
+		};
+	});
+
 	// Redraw shortly after the model text changes.
 	$effect(() => {
 		void workspace.files;
@@ -180,7 +201,7 @@
 	}
 </script>
 
-<div class="canvas" aria-label={label} role="region">
+<div class="canvas" aria-label={label} role="region" bind:this={host}>
 	<svg class="markers" aria-hidden="true">
 		<defs>
 			<marker
@@ -296,7 +317,7 @@
 						aria-expanded={popover === 'add'}
 						title={owner ? `Add to ${owner.label}` : 'Select a package or definition first'}
 					>
-						<Plus size={15} /> Add
+						<Plus size={15} /> <span>Add</span>
 					</button>
 					<button
 						type="button"
@@ -304,7 +325,7 @@
 						disabled={!selected}
 						aria-expanded={popover === 'rename'}
 					>
-						<Pencil size={14} /> Rename
+						<Pencil size={14} /> <span>Rename</span>
 					</button>
 					<button
 						type="button"
@@ -315,7 +336,7 @@
 						disabled={!selected}
 						aria-expanded={popover === 'delete'}
 					>
-						<Trash2 size={14} /> Delete
+						<Trash2 size={14} /> <span>Delete</span>
 					</button>
 				</div>
 				{#if popover === 'add' && owner}
@@ -369,6 +390,7 @@
 
 <style>
 	.canvas {
+		container-type: size;
 		position: relative;
 		height: 100%;
 		min-height: 18rem;
@@ -411,6 +433,19 @@
 	}
 	.toolbar button:hover:not(:disabled) {
 		background: var(--surface-hover);
+	}
+	@container (max-width: 34rem) {
+		.toolbar button span {
+			position: absolute;
+			width: 1px;
+			height: 1px;
+			overflow: hidden;
+			clip-path: inset(50%);
+			white-space: nowrap;
+		}
+		.toolbar button {
+			padding: 0 var(--space-2);
+		}
 	}
 	.toolbar button:disabled {
 		color: var(--text-3);

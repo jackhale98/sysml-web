@@ -6,12 +6,14 @@
 		LayoutDashboard,
 		ListChecks,
 		Network,
-		Search
+		Search,
+		Table2
 	} from '@lucide/svelte';
 	import type { TreeNode } from '#lib/project/elements.ts';
 	import { isLibraryFile, type Workspace } from '#lib/project/workspace.svelte.ts';
 	import KindGlyph from '#lib/ui/KindGlyph.svelte';
 	import type { WorkbenchUi } from './ui.svelte.ts';
+	import { presentationOf, viewTitle } from './views.ts';
 
 	let { workspace, ui }: { workspace: Workspace; ui: WorkbenchUi } = $props();
 
@@ -24,6 +26,18 @@
 	const userRoots = $derived(workspace.tree.filter((n) => !isLibraryFile(n.element.file)));
 	const libraryRoots = $derived(workspace.tree.filter((n) => isLibraryFile(n.element.file)));
 	const packages = $derived(userRoots.filter((n) => n.element.kind === 'package'));
+	/** Views saved in the project's model (diagrams and tables). */
+	const savedViews = $derived(
+		workspace.views
+			.filter((v) => v.isUsage && !v.builtin && !isLibraryFile(v.file))
+			.map((v) => ({ info: v, presentation: presentationOf(v) }))
+			.filter((v) => v.presentation.kind !== 'none')
+	);
+	/** The standard tables the engine bundles (ModelViews). */
+	const standardViews = $derived(
+		workspace.views.filter((v) => v.builtin && v.hasTable && v.name !== 'RequirementsTable')
+	);
+	let packagesOpen = $state(false);
 
 	const needle = $derived(query.trim().toLowerCase());
 	function matches(node: TreeNode): boolean {
@@ -130,24 +144,69 @@
 							<span class="count">{workspace.requirements.length}</span>
 						</button>
 					</li>
-					{#each packages as p (p.element.key)}
-						<li>
-							<button
-								type="button"
-								class="item"
-								onclick={() =>
-									ui.open({
-										kind: 'diagram',
-										view: 'general',
-										scope: p.element.name,
-										title: p.element.label
-									})}
-							>
-								<Network size={14} /> <span class="label">{p.element.label}</span>
-							</button>
-						</li>
-					{/each}
 				</ul>
+				{#if savedViews.length}
+					<h3>Saved views</h3>
+					<ul class="flat">
+						{#each savedViews as v (v.info.name)}
+							<li>
+								<button
+									type="button"
+									class="item"
+									title={v.info.doc}
+									onclick={() =>
+										ui.open({ kind: 'view', name: v.info.name, title: viewTitle(v.info.name) })}
+								>
+									{#if v.presentation.kind === 'table'}<Table2 size={14} />{:else}<Network
+											size={14}
+										/>{/if}
+									<span class="label">{viewTitle(v.info.name)}</span>
+								</button>
+							</li>
+						{/each}
+					</ul>
+				{/if}
+				{#if standardViews.length}
+					<h3>Standard tables</h3>
+					<ul class="flat">
+						{#each standardViews as v (v.name)}
+							<li>
+								<button
+									type="button"
+									class="item"
+									title={v.doc}
+									onclick={() => ui.open({ kind: 'view', name: v.name, title: viewTitle(v.name) })}
+								>
+									<Table2 size={14} /> <span class="label">{viewTitle(v.name)}</span>
+								</button>
+							</li>
+						{/each}
+					</ul>
+				{/if}
+				<details class="group" bind:open={packagesOpen}>
+					<summary>Package diagrams</summary>
+					{#if packagesOpen}
+						<ul class="flat">
+							{#each packages as p (p.element.key)}
+								<li>
+									<button
+										type="button"
+										class="item"
+										onclick={() =>
+											ui.open({
+												kind: 'diagram',
+												view: 'general',
+												scope: p.element.name,
+												title: p.element.label
+											})}
+									>
+										<Network size={14} /> <span class="label">{p.element.label}</span>
+									</button>
+								</li>
+							{/each}
+						</ul>
+					{/if}
+				</details>
 			</section>
 			<section aria-labelledby="model-heading">
 				<h2 id="model-heading">Model</h2>
@@ -310,6 +369,18 @@
 	.empty {
 		padding: var(--space-2);
 		color: var(--text-3);
+	}
+	h3 {
+		margin: var(--space-3) var(--space-2) var(--space-1);
+		color: var(--text-3);
+		font-size: var(--text-xs);
+		font-weight: 500;
+	}
+	.group summary {
+		margin: var(--space-3) var(--space-2) var(--space-1);
+		color: var(--text-3);
+		font-size: var(--text-xs);
+		cursor: pointer;
 	}
 	.libraries summary {
 		margin: var(--space-2);

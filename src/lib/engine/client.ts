@@ -41,6 +41,8 @@ export function startEngine(urls: Init): Engine {
 		highlight: (...params) => call('highlight', ...params),
 		diagram: (...params) => call('diagram', ...params),
 		edit: (...params) => call('edit', ...params),
+		listViews: (...params) => call('listViews', ...params),
+		renderView: (...params) => call('renderView', ...params),
 		terminate: () => worker.terminate()
 	};
 }

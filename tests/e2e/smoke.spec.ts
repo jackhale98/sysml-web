@@ -108,3 +108,28 @@ test('on a phone, one pane shows at a time', async ({ page }) => {
 	await expect(page.getByRole('complementary', { name: 'Inspector' })).toBeVisible();
 	await expectAccessible(page);
 });
+
+test('saved SysML views render as tables and diagrams', async ({ page }) => {
+	await openDemo(page);
+	const views = page.locator('section[aria-labelledby="views-heading"]');
+	await views.getByRole('button', { name: 'Requirement gaps' }).click();
+	const table = page.getByRole('region', { name: 'Requirement gaps view' });
+	await expect(table.locator('tbody tr').first()).toBeVisible();
+	await expect(table).toContainText('SYS-005');
+	await expectAccessible(page);
+
+	await views.getByRole('button', { name: 'Drone interconnection' }).click();
+	const diagram = page.getByRole('region', { name: /Drone interconnection diagram/ });
+	await expect(diagram.getByText('battery : Battery')).toBeVisible();
+});
+
+test('the command palette jumps to any element', async ({ page }) => {
+	await openDemo(page);
+	await page.keyboard.press('Control+k');
+	const palette = page.getByRole('dialog', { name: 'Command palette' });
+	await palette.getByRole('combobox').fill('Battery');
+	await page.keyboard.press('Enter');
+	await expect(palette).toBeHidden();
+	const inspector = page.getByRole('complementary', { name: 'Inspector' });
+	await expect(inspector.getByRole('heading', { level: 2 })).toContainText('Battery');
+});

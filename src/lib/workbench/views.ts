@@ -1,0 +1,51 @@
+/**
+ * How a SysML view is presented: views with a `@TableRendering` are tables
+ * the engine renders; the standard diagram views (SysML v2 clause 9.2.20)
+ * are drawn from what they expose.
+ */
+import type { DiagramView, ViewInfo } from '#lib/engine/types.ts';
+
+export type Presentation =
+	| { kind: 'table' }
+	| { kind: 'diagram'; view: DiagramView; scope: string | null }
+	| { kind: 'none' };
+
+/** `DroneArchitecture::drone::*` → `drone`; quotes removed. */
+export function exposedName(expose: string): string {
+	const path = expose.replace(/::\*\*?$/, '');
+	const last = path.split('::').pop() ?? path;
+	return last.replace(/^'|'$/g, '');
+}
+
+export function presentationOf(view: ViewInfo): Presentation {
+	if (view.hasTable) return { kind: 'table' };
+	if (!view.isUsage) return { kind: 'none' };
+	const exposes = view.exposes ?? [];
+	const scope = exposes.length === 1 ? exposedName(exposes[0]!) : null;
+	switch (view.definition) {
+		case 'GeneralView':
+			// Several exposed packages: requirement trees are the common case.
+			return exposes.length > 1
+				? { kind: 'diagram', view: 'requirements', scope: null }
+				: { kind: 'diagram', view: 'general', scope };
+		case 'InterconnectionView':
+			return scope ? { kind: 'diagram', view: 'interconnection', scope } : { kind: 'none' };
+		case 'StateTransitionView':
+			return { kind: 'diagram', view: 'states', scope };
+		case 'ActionFlowView':
+			return { kind: 'diagram', view: 'actions', scope };
+		default:
+			return { kind: 'none' };
+	}
+}
+
+/** "requirementCoverage" → "Requirement coverage"; "RequirementGaps" → "Requirement gaps". */
+export function viewTitle(name: string): string {
+	const words = name
+		.replace(/^'|'$/g, '')
+		.replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+		.split(/\s+/);
+	return words
+		.map((w, i) => (i === 0 ? w[0]!.toUpperCase() + w.slice(1) : w.toLowerCase()))
+		.join(' ');
+}

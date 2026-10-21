@@ -9,7 +9,7 @@
  */
 import { SvelteSet } from 'svelte/reactivity';
 import type { Engine } from '#lib/engine/client.ts';
-import type { Analysis, Diagnostic, EditRequest, EditResult } from '#lib/engine/types.ts';
+import type { Analysis, Diagnostic, EditRequest, EditResult, ViewInfo } from '#lib/engine/types.ts';
 import { buildTree, collectElements, type ModelElement, type TreeNode } from './elements';
 import { collectRequirements, type RequirementRow } from './requirements';
 
@@ -62,6 +62,13 @@ export function isLibraryFile(path: string): boolean {
 }
 
 const ANALYSIS_DELAY_MS = 250;
+const UNDO_LIMIT = 50;
+
+interface UndoEntry {
+	label: string;
+	/** Text of each changed file before the edit. */
+	before: Record<string, string>;
+}
 
 export class Workspace {
 	info = $state.raw<ProjectInfo | null>(null);
@@ -70,8 +77,12 @@ export class Workspace {
 	analyses = $state.raw<Record<string, Analysis>>({});
 	state = $state.raw<LoadState>({ phase: 'idle' });
 	engineVersion = $state<string | null>(null);
+	/** The project's views (and the standard ones the engine bundles). */
+	views = $state.raw<ViewInfo[]>([]);
 	/** Paths edited since the project was opened. */
 	readonly dirty = new SvelteSet<string>();
+	/** Model edits made through `transact`, newest last. */
+	undoStack = $state.raw<UndoEntry[]>([]);
 
 	paths: string[] = $derived(Object.keys(this.files).sort());
 	modelPaths: string[] = $derived(this.paths.filter(isModelFile));
@@ -138,6 +149,8 @@ export class Workspace {
 		// Drop the result if any file changed while the engine was working.
 		if (files.some((f) => this.files[f.path] !== f.text)) return;
 		this.analyses = Object.fromEntries(files.map((f, i) => [f.path, results[i]!]));
+		const views = await engine.listViews(files);
+		if (files.every((f) => this.files[f.path] === f.text)) this.views = views;
 	}
 
 	text(path: string): string | undefined {
@@ -184,10 +197,57 @@ export class Workspace {
 		return null;
 	}
 
+	/**
+	 * Run a model edit (one or several engine edits) as one undoable step.
+	 * Files it changed are remembered so `undo` can put them back.
+	 */
+	async transact(label: string, run: () => Promise<string | null>): Promise<string | null> {
+		const before = { ...this.files };
+		const error = await run();
+		const changed = Object.keys(this.files).filter((p) => this.files[p] !== before[p]);
+		if (changed.length) {
+			this.undoStack = [
+				...this.undoStack.slice(-(UNDO_LIMIT - 1)),
+				{ label, before: Object.fromEntries(changed.map((p) => [p, before[p] ?? ''])) }
+			];
+		}
+		return error;
+	}
+
+	/** Undo the latest model edit; returns its label, or null when there is none. */
+	undo(): string | null {
+		const entry = this.undoStack.at(-1);
+		if (!entry) return null;
+		this.undoStack = this.undoStack.slice(0, -1);
+		for (const [path, text] of Object.entries(entry.before)) this.replaceText(path, text);
+		return entry.label;
+	}
+
+	/** Replace a file's text with one minimal change, through its editor when open. */
+	private replaceText(path: string, text: string) {
+		const current = this.files[path] ?? '';
+		const change = minimalChange(current, text);
+		if (!change) return;
+		const editor = this.editors.get(path);
+		if (editor) editor.apply([change]);
+		else this.setText(path, text);
+	}
+
 	/** Every model file, for project-wide engine calls such as diagrams. */
 	sourceFiles(): ProjectFile[] {
 		return this.modelPaths.map((path) => ({ path, text: this.files[path] ?? '' }));
 	}
+}
+
+/** The single change that turns `from` into `to` (common prefix and suffix kept). */
+export function minimalChange(from: string, to: string): Change | null {
+	if (from === to) return null;
+	let start = 0;
+	const max = Math.min(from.length, to.length);
+	while (start < max && from[start] === to[start]) start++;
+	let end = 0;
+	while (end < max - start && from[from.length - 1 - end] === to[to.length - 1 - end]) end++;
+	return { from: start, to: from.length - end, insert: to.slice(start, to.length - end) };
 }
 
 /** Apply non-overlapping changes (UTF-16 offsets) to a string. */

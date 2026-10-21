@@ -96,7 +96,35 @@ export interface Highlights {
 }
 
 export type DiagramView =
-	'general' | 'interconnection' | 'requirements' | 'states' | 'packages' | 'trace';
+	'general' | 'interconnection' | 'requirements' | 'states' | 'packages' | 'trace' | 'actions';
+
+/** A `view def` or `view` usage in the project or the bundled libraries. */
+export interface ViewInfo {
+	name: string;
+	qualifiedName?: string;
+	file: string;
+	isUsage: boolean;
+	/** Whether a `@TableRendering` applies, so the view renders as a table. */
+	hasTable: boolean;
+	/** For a usage, the view def it is typed by (e.g. `GeneralView`). */
+	definition?: string;
+	doc?: string;
+	renderAs?: string;
+	/** The `expose` targets as written (`P`, `P::*`, `P::**`). */
+	exposes?: string[];
+	/** From a library the engine bundles, not from the project's files. */
+	builtin: boolean;
+}
+
+/** A view rendered as a table by the engine. */
+export interface RenderedTable {
+	view: string;
+	columns: string[];
+	rows: string[][];
+	warnings: string[];
+	/** Parallel to `rows` (empty for a pivot): the element behind each row. */
+	sources: { element: string; file: string; line: number }[];
+}
 
 export type NodeKind =
 	| 'block'

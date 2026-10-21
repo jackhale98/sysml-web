@@ -5,7 +5,8 @@ export type Tab =
 	| { kind: 'home' }
 	| { kind: 'requirements' }
 	| { kind: 'file'; path: string }
-	| { kind: 'diagram'; view: DiagramView; scope: string | null; title: string };
+	| { kind: 'diagram'; view: DiagramView; scope: string | null; title: string }
+	| { kind: 'view'; name: string; title: string };
 
 export type SelectionSource = 'text' | 'diagram' | 'explorer' | 'inspector' | 'table';
 
@@ -19,12 +20,17 @@ export interface Selection {
 
 export type MobilePane = 'explorer' | 'editor' | 'inspector' | 'problems';
 
+/** How a file tab shows its model: as text, as a diagram, or both side by side. */
+export type FileLayout = 'text' | 'split' | 'diagram';
+
 export function tabId(tab: Tab): string {
 	switch (tab.kind) {
 		case 'file':
 			return `file:${tab.path}`;
 		case 'diagram':
 			return `diagram:${tab.view}:${tab.scope ?? ''}`;
+		case 'view':
+			return `view:${tab.name}`;
 		default:
 			return tab.kind;
 	}
@@ -39,6 +45,7 @@ export function tabTitle(tab: Tab): string {
 		case 'file':
 			return tab.path.split('/').pop() ?? tab.path;
 		case 'diagram':
+		case 'view':
 			return tab.title;
 	}
 }
@@ -46,8 +53,10 @@ export function tabTitle(tab: Tab): string {
 export class WorkbenchUi {
 	tabs = $state<Tab[]>([{ kind: 'home' }]);
 	active = $state(0);
-	/** Show a live diagram beside text tabs. */
-	split = $state(true);
+	/** How file tabs show their model. */
+	layout = $state<FileLayout>('split');
+	/** The command palette (⌘K). */
+	paletteOpen = $state(false);
 	selection = $state<Selection | null>(null);
 	mobilePane = $state<MobilePane>('editor');
 	inspectorOpen = $state(true);

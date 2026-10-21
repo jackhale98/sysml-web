@@ -5,7 +5,34 @@
  */
 import type { ModelElement } from '#lib/project/elements.ts';
 import type { Workspace } from '#lib/project/workspace.svelte.ts';
+import { toasts } from '#lib/ui/toasts.svelte.ts';
 import { elementText, formatName, type AddKind } from './templates';
+
+/**
+ * Run an edit as one undoable step and confirm it with a toast that offers
+ * Undo, so every gesture is safe to try.
+ */
+async function undoable(
+	workspace: Workspace,
+	label: string,
+	run: () => Promise<string | null>
+): Promise<string | null> {
+	const before = workspace.undoStack.length;
+	const error = await workspace.transact(label, run);
+	if (!error && workspace.undoStack.length > before) {
+		toasts.show(label, {
+			tone: 'success',
+			action: {
+				label: 'Undo',
+				run: () => {
+					const undone = workspace.undo();
+					if (undone) toasts.show(`Undid: ${undone}`);
+				}
+			}
+		});
+	}
+	return error;
+}
 
 export async function addElement(
 	workspace: Workspace,
@@ -17,13 +44,15 @@ export async function addElement(
 	if (!name.trim()) return 'Give the new element a name.';
 	const source = workspace.text(owner.file);
 	if (source === undefined) return `${owner.file} is not open.`;
-	return workspace.edit(owner.file, {
-		op: 'insertMember',
-		path: owner.file,
-		source,
-		parent: owner.name,
-		text: elementText(kind, name, type)
-	});
+	return undoable(workspace, `Added ${kind} ${formatName(name)} to ${owner.label}`, () =>
+		workspace.edit(owner.file, {
+			op: 'insertMember',
+			path: owner.file,
+			source,
+			parent: owner.name,
+			text: elementText(kind, name, type)
+		})
+	);
 }
 
 /** Rename an element and its references, in every file that mentions it. */
@@ -36,19 +65,21 @@ export async function renameElement(
 	if (!newName.trim()) return 'A name cannot be empty.';
 	if (to === element.name) return null;
 	const word = new RegExp(`(^|[^A-Za-z0-9_'])${escapeRegExp(element.name)}($|[^A-Za-z0-9_'])`);
-	for (const path of workspace.modelPaths) {
-		const source = workspace.text(path);
-		if (source === undefined || !word.test(source)) continue;
-		const error = await workspace.edit(path, {
-			op: 'rename',
-			path,
-			source,
-			from: element.name,
-			to
-		});
-		if (error) return error;
-	}
-	return null;
+	return undoable(workspace, `Renamed ${element.label} to ${to}`, async () => {
+		for (const path of workspace.modelPaths) {
+			const source = workspace.text(path);
+			if (source === undefined || !word.test(source)) continue;
+			const error = await workspace.edit(path, {
+				op: 'rename',
+				path,
+				source,
+				from: element.name,
+				to
+			});
+			if (error) return error;
+		}
+		return null;
+	});
 }
 
 export async function deleteElement(
@@ -57,12 +88,14 @@ export async function deleteElement(
 ): Promise<string | null> {
 	const source = workspace.text(element.file);
 	if (source === undefined) return `${element.file} is not open.`;
-	return workspace.edit(element.file, {
-		op: 'remove',
-		path: element.file,
-		source,
-		name: element.name
-	});
+	return undoable(workspace, `Deleted ${element.label}`, () =>
+		workspace.edit(element.file, {
+			op: 'remove',
+			path: element.file,
+			source,
+			name: element.name
+		})
+	);
 }
 
 function escapeRegExp(text: string): string {

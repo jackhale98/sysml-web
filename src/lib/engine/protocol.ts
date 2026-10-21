@@ -4,7 +4,9 @@ import type {
 	DiagramView,
 	EditRequest,
 	EditResult,
-	Highlights
+	Highlights,
+	RenderedTable,
+	ViewInfo
 } from './types';
 
 export interface SourceFile {
@@ -20,6 +22,8 @@ export interface EngineApi {
 	highlight(source: string): Highlights;
 	diagram(view: DiagramView, files: SourceFile[], scope: string | null): DiagramGraph;
 	edit(request: EditRequest): EditResult;
+	listViews(files: SourceFile[]): ViewInfo[];
+	renderView(files: SourceFile[], name: string): RenderedTable;
 }
 
 export type Method = keyof EngineApi;
