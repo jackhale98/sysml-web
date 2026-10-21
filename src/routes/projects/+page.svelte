@@ -39,6 +39,7 @@
 		type StoredProject
 	} from '#lib/project/store.ts';
 	import type { ProjectFile } from '#lib/project/workspace.svelte.ts';
+	import { pwa } from '#lib/offline/pwa.svelte.ts';
 	import Logo from '#lib/ui/Logo.svelte';
 	import ThemeToggle from '#lib/ui/ThemeToggle.svelte';
 
@@ -256,9 +257,20 @@
 					Work on a repository's models, then save back to it, start a branch or propose changes for
 					review. No git know-how needed.
 				</p>
-				<button type="button" class="dark" onclick={() => (githubOpen = true)} disabled={!!busy}>
+				<button
+					type="button"
+					class="dark"
+					onclick={() => (githubOpen = true)}
+					disabled={!!busy || !pwa.online}
+					aria-describedby={pwa.online ? undefined : 'github-offline'}
+				>
 					{accounts.github ? 'Choose a repository…' : 'Connect GitHub…'}
 				</button>
+				{#if !pwa.online}
+					<p class="offline" id="github-offline">
+						You're offline. Opening a repository needs a connection to GitHub.
+					</p>
+				{/if}
 			</div>
 
 			<div class="card">
@@ -391,6 +403,13 @@
 	}
 	.github {
 		border-color: color-mix(in oklab, var(--text) 18%, var(--border));
+	}
+	.offline {
+		padding: var(--space-2) var(--space-3);
+		border-radius: var(--radius-sm);
+		background: var(--warn-weak);
+		color: var(--text);
+		font-size: var(--text-sm);
 	}
 	.dark {
 		border: 0;

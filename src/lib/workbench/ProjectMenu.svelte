@@ -14,15 +14,19 @@
 		GitBranch,
 		GitPullRequest,
 		LoaderCircle,
+		MonitorDown,
 		Plus,
 		RotateCcw,
-		Settings as SettingsIcon
+		Settings as SettingsIcon,
+		WifiOff
 	} from '@lucide/svelte';
 	import type { Engine } from '#lib/engine/client.ts';
 	import { accounts } from '#lib/git/account.svelte.ts';
 	import { messageOf } from '#lib/git/errors.ts';
 	import GitHubMark from '#lib/git/GitHubMark.svelte';
 	import { keepRepository } from '#lib/git/project.ts';
+	import OfflineBadge from '#lib/offline/OfflineBadge.svelte';
+	import { pwa } from '#lib/offline/pwa.svelte.ts';
 	import type { Progress, RepoChoice } from '#lib/git/types.ts';
 	import type { ProjectSession } from '#lib/project/session.svelte.ts';
 	import { deleteProject } from '#lib/project/store.ts';
@@ -61,6 +65,7 @@
 	const changeCount = $derived(session.git.changes.length);
 	const behind = $derived(session.git.behind);
 	const unsaved = $derived(session.unsavedToFolder.length);
+	const offline = $derived(!pwa.online);
 
 	$effect(() => {
 		settings.init();
@@ -176,6 +181,7 @@
 		<strong>{workspace.info?.name ?? 'Project'}</strong>
 		<ChevronDown size={14} aria-hidden="true" />
 	</button>
+	<span class="phone-offline"><OfflineBadge compact /></span>
 	<span class="save" role="status" title={session.saveError ?? undefined}>
 		{#if git}
 			<button
@@ -212,6 +218,13 @@
 
 	{#if open}
 		<div class="popover">
+			{#if offline}
+				<p class="offline">
+					<WifiOff size={14} aria-hidden="true" />
+					<span>You're offline. Your work is saved in this browser; GitHub needs a connection.</span
+					>
+				</p>
+			{/if}
 			{#if git}
 				<div class="status">
 					<span class="repo"><GitHubMark size={14} /> {git.owner}/{git.repo}</span>
@@ -238,8 +251,13 @@
 					<button type="button" role="menuitem" onclick={showSourceControl}>
 						<CloudUpload size={15} /> Save to GitHub… <small>commit & push</small>
 					</button>
-					<button type="button" role="menuitem" onclick={getLatest} disabled={!!session.git.busy}>
-						<ArrowDownToLine size={15} /> Get latest <small>pull</small>
+					<button
+						type="button"
+						role="menuitem"
+						onclick={getLatest}
+						disabled={!!session.git.busy || offline}
+					>
+						<ArrowDownToLine size={15} /> Get latest <small>{offline ? 'offline' : 'pull'}</small>
 					</button>
 					<button type="button" role="menuitem" onclick={showSourceControl}>
 						<GitPullRequest size={15} /> Propose changes… <small>pull request</small>
@@ -283,12 +301,14 @@
 				<button
 					type="button"
 					role="menuitem"
+					disabled={offline}
 					onclick={() => {
 						open = false;
 						openRepo = true;
 					}}
 				>
 					<GitHubMark size={15} /> Open from GitHub…
+					{#if offline}<small>offline</small>{/if}
 				</button>
 				{#if record?.origin === 'demo'}
 					<button type="button" role="menuitem" onclick={resetDemo}>
@@ -296,6 +316,18 @@
 					</button>
 				{/if}
 				<div role="separator"></div>
+				{#if pwa.canInstall}
+					<button
+						type="button"
+						role="menuitem"
+						onclick={() => {
+							open = false;
+							void pwa.install();
+						}}
+					>
+						<MonitorDown size={15} /> Install app <small>works offline</small>
+					</button>
+				{/if}
 				<button type="button" role="menuitem" onclick={showSettings}>
 					<SettingsIcon size={15} /> Settings… <kbd>Ctrl ,</kbd>
 				</button>
@@ -429,6 +461,24 @@
 	.menu {
 		display: grid;
 	}
+	.offline {
+		display: flex;
+		align-items: flex-start;
+		gap: var(--space-2);
+		margin-bottom: var(--space-2);
+		padding: var(--space-2) var(--space-3);
+		border-radius: var(--radius-sm);
+		background: var(--warn-weak);
+		color: var(--text);
+		font-size: var(--text-xs);
+	}
+	.offline :global(svg) {
+		flex: none;
+		margin-top: 1px;
+	}
+	.phone-offline {
+		display: none;
+	}
 	.where {
 		padding: var(--space-1) var(--space-2) var(--space-2);
 		color: var(--text-2);
@@ -514,6 +564,9 @@
 	@media (max-width: 760px) {
 		.save {
 			display: none;
+		}
+		.phone-offline {
+			display: contents;
 		}
 	}
 </style>

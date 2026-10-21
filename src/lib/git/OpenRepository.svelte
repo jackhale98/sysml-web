@@ -6,6 +6,7 @@
 	 * while the dialog shows progress and any error.
 	 */
 	import { GitBranch, LoaderCircle, Lock, Search, X } from '@lucide/svelte';
+	import { pwa } from '#lib/offline/pwa.svelte.ts';
 	import { accounts } from './account.svelte.ts';
 	import ConnectGitHub from './ConnectGitHub.svelte';
 	import { messageOf } from './errors.ts';
@@ -162,6 +163,12 @@
 		</header>
 
 		<div class="body">
+			{#if !pwa.online && connected}
+				<p class="offline" role="status">
+					You're offline. Opening a repository needs a connection to GitHub; try again once you're
+					back online.
+				</p>
+			{/if}
 			{#if !connected}
 				<ConnectGitHub onconnected={() => void loadRepos()} />
 			{:else}
@@ -267,7 +274,7 @@
 					type="submit"
 					form="{uid}-form"
 					class="primary"
-					disabled={!selected || !branches || !!busy}
+					disabled={!selected || !branches || !!busy || !pwa.online}
 				>
 					{action}
 				</button>
@@ -480,11 +487,15 @@
 		border-radius: var(--radius-sm);
 		background: var(--surface);
 	}
-	.error {
+	.error,
+	.offline {
 		padding: var(--space-2) var(--space-3);
 		border-radius: var(--radius-sm);
 		background: var(--danger-weak);
 		font-size: var(--text-sm);
+	}
+	.offline {
+		background: var(--warn-weak);
 	}
 	footer {
 		display: flex;
