@@ -102,3 +102,12 @@ on the design. Mitigations are the work that implements them (`satisfy`). Each
 `@Fmea` line rates one failure mode of one component. The risk priority number is
 calculated from the ratings, never typed in. Two risk controls are not verified yet.
 Diagram: **`DroneViews::fmeaWorksheet`**.
+
+## 13. Documents for review: `DroneViews::droneSpecification`
+
+Not everyone who reviews the design reads SysML. A report is a view too: it puts
+what it exposes into a document. `droneSpecification` lists the needs and
+requirements with their attributes, what satisfies and verifies each one, and
+the gaps; `DroneViews::droneInterfaceControl` describes the connections, interfaces
+and ports between the drone's parts. Print them, save them as PDF, or download
+them as HTML or Markdown to send round. Report: **`DroneViews::droneSpecification`**.
