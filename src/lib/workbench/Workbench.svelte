@@ -159,6 +159,15 @@
 	const section: Section = $derived(
 		ui.mobilePane === 'model' ? 'model' : tab && tab.kind !== 'home' ? 'views' : ui.mobilePane
 	);
+	/**
+	 * Phones show the model tree only in its section, so it is built the first
+	 * time that section opens (and kept after), not while the page loads.
+	 */
+	let explorerVisited = $state(false);
+	$effect(() => {
+		if (section === 'model') explorerVisited = true;
+	});
+	const explorerMounted = $derived(!phone || explorerVisited);
 	const showCatalog = $derived(phone && section === 'views' && (!tab || tab.kind === 'home'));
 	const detailsOpen = $derived(ui.details === 'half' || ui.details === 'full');
 	let moreOpen = $state(false);
@@ -331,7 +340,7 @@
 	<main class="panes">
 		<h1 class="visually-hidden">{workspace.info?.name ?? 'Project'}</h1>
 		<div class="pane explorer-pane">
-			<Explorer {workspace} {ui} />
+			{#if explorerMounted}<Explorer {workspace} {ui} />{/if}
 		</div>
 
 		<section class="pane editor-pane" aria-label="Editor">
