@@ -243,6 +243,62 @@ Cost on the demo in Node, after analysis: 0.4–16 ms per view. The one
 expensive read (a connector's resolved ends, a whole-model pass of ~300 ms
 the first time) is only made when an end's name matches nothing drawn.
 
+## Values and constraint checks
+
+`EngineApi.checks(files)` and `EngineApi.evaluate(files, ids)` are answered
+by `toolkit/evaluation.ts` (`Evaluation`, one per analysis, made on first
+ask and cached with it):
+
+- **Checks** come from the toolkit's `verify` (evaluation, then interval
+  propagation). Each `satisfy R by x` claim is one `Check`: R's constraints
+  evaluated with R's subject bound to x. A requirement constraint that
+  nothing claims to satisfy is one (undecided: there is nothing to evaluate
+  it against); an `assert constraint` is one, except a type's invariant
+  (`assert constraint { that >= 1 }` in an attribute def), which is left out
+  while it holds. A check has the toolkit's verdict line, a plain-language
+  explanation, the feature chains its constraints name with their values
+  (evaluated with the subject bound to what satisfies it, since `verify`
+  gives bindings only for what it could not decide), and — for a single
+  comparison with a literal, `x <= 4 [kg]` — the limit and the margin in
+  the limit's unit. `verify` reports 1-based lines and byte columns; they
+  are mapped like findings (through the repair, then to UTF-16).
+- **Values**: `evaluate` on each element, as `Evaluated` (a number with its
+  unit, text, none, or undecided with the reason). An undecided value says
+  why, followed through what its expression refers to: a collection of
+  parts on the way (`rotors : Rotor[4]`), or a feature without a value.
+- **The evaluation session.** The toolkit refuses the values a part
+  inherits from its definition when metadata annotates the part (see
+  below). Metadata takes no part in evaluating values, so `Evaluation`
+  evaluates in a second session over the same texts with every annotation
+  written with `@` or `metadata` blanked out with spaces (newlines kept):
+  positions and element ids stay the same. `#` prefix keywords are kept
+  (they can carry semantics, `#derivation`). No annotations: the analysed
+  session is used.
+- **Units** (`src/lib/engine/quantity.ts`): conversion between the SI units
+  and the ISQ library's common others, the unit a person reads a value in
+  (2770 g reads 2.77 kg, 1652.4 s reads 27.54 min), four significant
+  digits. Shared by the worker and the page.
+- **Where they show.** The workspace asks for the checks after each
+  analysis; a violated check is a warning (`code: 'check'`) at its claim in
+  Problems and the editor, which jumps to the claim's range
+  (`WorkbenchUi.revealText`); undecided ones are not problems. The
+  `checks` and `budget:<attribute>` row providers (`toolkit/views/budget.ts`)
+  and the requirements' `check` field make the `ConstraintChecks`,
+  `MassBudget` and `PowerBudget` tables and the requirements table's
+  verdict column. The inspector shows what an attribute's expression comes
+  to (`= 27.54 min`), and the values of the attributes an element contains,
+  in one `evaluate` call per selection.
+- **Budgets** walk the bill of materials' composition rows: each part's
+  value of the attribute where the model binds it (on the usage, else its
+  type or a supertype), evaluated in its definition; a part without one
+  adds up its parts; totals are quantity × value; the root's own values of
+  the same quantity (`emptyMass :> mass`) follow, with the limit and margin
+  a claim's constraint sets on them. An attribute declared optional
+  (`powerDraw [0..1]`) leaves the parts without a value out.
+- **Cost on the demo in Node**: the evaluation session ~25–30 ms, `verify`
+  ~15–30 ms (once per analysis, on first ask); `evaluate` of all 171
+  attributes 3 ms; a budget table 2 ms after that. All in the worker.
+
 ## Language services
 
 The editor's completion, hover, go to definition, references, rename,
@@ -292,3 +348,36 @@ running out of memory fails a `memory.grow`. Either way the worker is useless.
 the calls in flight again. If that fails too, every toolkit call fails from
 then on: a toast says so once, the status bar shows "Engine error" and the
 problems list says why. There is no other engine to fall back to.
+
+## Upstream requests
+
+Found while making the drone demo's budgets and checks (sysml-toolkit
+0.10.10); each with a minimal reproduction, for the owner to file:
+
+1. **Metadata on a part blocks evaluating its inherited values.** With
+   `metadata def M;`, `part def B { attribute mass :> ISQ::mass = 50 [g]; }`,
+   `part d { part b : B; attribute t :> ISQ::mass = b.mass; }` and
+   `@M about d::b;` (or `@M;` in `b`'s or `B`'s body), `evaluate(d::t)`
+   throws "value receiver identity is incomplete or ambiguous"; without the
+   annotation it is 50 g. A value `b` binds itself still evaluates. Every
+   FMEA line of the demo annotates a part this way. Worked around by the
+   evaluation session (above); `evaluation.test.ts` fails when the toolkit
+   is fixed, so the workaround can go.
+2. **Values over a collection of parts.** `sum(rotors.mass)` with
+   `part rotors : Rotor[4]` (no binding; `Rotor` binds `mass`) is
+   indeterminate, and so is every form over it (`rotors.mass`,
+   `size(rotors) * rotors.mass`, `collect`, `#(1)`): by design, an unbound
+   collection never materialises as instances. Each of the four has the
+   mass `Rotor` binds, so the sum is determined; the demo's take-off mass
+   check stays undecided because of it. Writing the rotors as four named
+   parts would decide it, at the cost of the model's `[4]`.
+3. **`sum(x.mass)` and uniqueness.** The toolkit reads a dot chain over
+   several values as a set (`sum(concrete.mass)` of four equal masses is one
+   mass; its tests say so), while the specification's own mass roll-up
+   examples write `sum(subcomponents.totalMass)`. The idiom and the
+   semantics disagree; one of them should change, or the toolkit could warn.
+4. **`collect` with a typed parameter** (`rotors->collect { in r : Rotor;
+   r.mass }`) is "unsupported for evaluation: control function `collect`".
+5. **`verify` bindings for satisfied constraints** are empty; the values a
+   verdict rests on are worth reporting either way (the app evaluates them
+   itself).

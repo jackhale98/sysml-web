@@ -15,7 +15,8 @@ Open-MBEE sysml-toolkit engine (decision #16, migration done).**
   editable in place; requirements, trace and verification matrices;
   generated specification and ICD reports; spreadsheet import and table
   export; projects in the browser, folders, `.kpar`/zip; GitHub source
-  control; state machine emulator; library browser; settings; offline and
+  control; state machine emulator; mass and power budgets and constraint
+  checks (does the design meet its requirements?); library browser; settings; offline and
   installable; touch-first phone layout. Lighthouse ≥ 0.9 performance and
   1.0 accessibility on mobile and desktop, enforced in CI.
 - Not yet started: semantic diff and review mode, Sequence view, FMEA and
@@ -543,7 +544,7 @@ SysML libraries so they travel with the model to other tools.
 | Modes and states | state machines | State Transition view, simulation (Phase 5) |
 | Test plans | verification cases with objectives and `verify` | verification matrix, coverage |
 | FMEA and hazard logs | `RiskAnalysis` / `HazardAnalysis` libraries | FMEA and risk-matrix Grid views (`@TableRendering`), RPN calc |
-| Budgets (mass, power) | attributes with units, calcs, constraints | roll-ups, constraint checks |
+| Budgets (mass, power) | attributes with units, calcs, constraints | ✅ mass and power budget tables (`budget:<attribute>`), constraint checks of every `satisfy` claim and `assert` (`ConstraintChecks`), violations in Problems, computed values in the inspector |
 | Design reviews | git branches, commits | semantic diff, review mode (Phase 4) |
 
 On-ramps for existing material (later phases): import a requirements
@@ -763,6 +764,10 @@ Engine gaps found while authoring the demo (inputs to Phase 1):
 **Phase 5 — Behaviour**
 - Action Flow, State Transition and Sequence views (read, then visual
   editing); state/action simulation; roll-ups and trade studies.
+  *Done:* roll-ups and constraint checks — budgets over the parts tree
+  and a checks view from the toolkit's `verify`, violations as problems,
+  evaluated values in the inspector (`docs/engine.md`, "Values and
+  constraint checks"). Trade studies not started.
 
 **Phase 6 — Verification, risk and on-ramps**
 - Verification cases and matrix; FMEA and hazard views over the risk
