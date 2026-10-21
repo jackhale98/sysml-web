@@ -6,6 +6,7 @@ playwright-report
 package-lock.json
 LICENSE-*
 /static/engine
+/static/toolkit
 docs
 README.md
 /.cache

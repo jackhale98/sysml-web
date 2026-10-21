@@ -13,6 +13,7 @@ export default ts.config(
 			'playwright-report/',
 			'test-results/',
 			'static/engine/',
+			'static/toolkit/',
 			'.cache/',
 			'.lighthouseci/',
 			'lighthouserc.cjs'

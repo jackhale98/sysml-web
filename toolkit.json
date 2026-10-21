@@ -1,0 +1,6 @@
+{
+	"comment": "TEST BUILD: the sysml-toolkit engine served under static/toolkit/ for ?toolkit. scripts/fetch-toolkit.sh downloads and verifies it.",
+	"version": "0.10.10",
+	"url": "https://github.com/Open-MBEE/sysml-toolkit/releases/download/v0.10.10/sysml-wasm-0.10.10.tgz",
+	"sha256": "93d6ef0a2140fceabc3115cd95d629146bc004c3959bfa23d715cce8b06cc13c"
+}

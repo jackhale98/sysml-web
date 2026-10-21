@@ -136,6 +136,8 @@ async function answer(event: FetchEvent, route: Exclude<Route, { strategy: 'netw
 async function warmEngine() {
 	const cache = await caches.open(names.engine);
 	for (const path of plan.engine) {
+		// TEST BUILD (?toolkit): toolkit files are only cached when used.
+		if (path.startsWith(`${plan.base}/toolkit/`)) continue;
 		if (await cache.match(path)) continue;
 		try {
 			const response = await fetch(path);
