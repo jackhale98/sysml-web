@@ -576,8 +576,12 @@
 			{/if}
 		</span>
 		{#if workspace.state.phase === 'ready'}
-			<span class="meta">{userElements} elements</span>
-			<span class="meta">{workspace.requirements.length} requirements</span>
+			<span class="meta">{userElements} element{userElements === 1 ? '' : 's'}</span>
+			<span class="meta"
+				>{workspace.requirements.length} requirement{workspace.requirements.length === 1
+					? ''
+					: 's'}</span
+			>
 		{/if}
 		<button
 			type="button"

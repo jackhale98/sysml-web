@@ -82,7 +82,9 @@
 	}
 	function fileMeta(path: string) {
 		const folder = path.includes('/') ? `${path.slice(0, path.lastIndexOf('/'))}/` : 'Project root';
-		return ready ? `${folder} · ${elementsPerFile[path] ?? 0} elements` : folder;
+		return ready
+			? `${folder} · ${elementsPerFile[path] ?? 0} element${elementsPerFile[path] === 1 ? '' : 's'}`
+			: folder;
 	}
 
 	// ── Navigation ────────────────────────────────────────────────────────────
@@ -194,7 +196,10 @@
 						<div class="heading">
 							<h3 id="attention-heading">Needs attention</h3>
 							<p class="sub">
-								{#if !ready}{@render skeleton('9rem')}{:else if gaps.length}{gaps.length} requirements
+								{#if !ready}{@render skeleton('9rem')}{:else if gaps.length}{gaps.length} requirement{gaps.length ===
+									1
+										? ''
+										: 's'}
 									with a gap{:else}Nothing to follow up{/if}
 							</p>
 						</div>

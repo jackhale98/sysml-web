@@ -62,10 +62,14 @@
 		{#if rest}<p class="description">{rest}</p>{/if}
 
 		<ul class="facts" aria-label="Project facts">
-			<li><FileCode size={14} aria-hidden="true" /> {workspace.modelPaths.length} model files</li>
+			<li>
+				<FileCode size={14} aria-hidden="true" />
+				{workspace.modelPaths.length} model file{workspace.modelPaths.length === 1 ? '' : 's'}
+			</li>
 			<li>
 				<Shapes size={14} aria-hidden="true" />
-				{#if ready}{ownElements} elements{:else}<span class="skeleton"></span> elements{/if}
+				{#if ready}{ownElements} element{ownElements === 1 ? '' : 's'}{:else}<span class="skeleton"
+					></span> elements{/if}
 			</li>
 			<li>
 				<Timer size={14} aria-hidden="true" />
