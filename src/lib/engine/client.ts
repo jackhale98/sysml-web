@@ -10,11 +10,16 @@ export type Engine = {
  * (and its WebAssembly download) starts on the first call, so a page can
  * paint before the engine competes for the network. The URLs may be given
  * as a function, so they are only worked out then (not while prerendering).
+ * `onReady` runs once, after the engine first answers.
  */
-export function startEngine(urls: Init | (() => Init)): Engine {
+export function startEngine(
+	urls: Init | (() => Init),
+	options: { onReady?: () => void } = {}
+): Engine {
 	const pending = new Map<number, { resolve(value: unknown): void; reject(error: Error): void }>();
 	let nextId = 1;
 	let started: Worker | undefined;
+	let onReady = options.onReady;
 
 	function worker(): Worker {
 		if (started) return started;
@@ -24,8 +29,11 @@ export function startEngine(urls: Init | (() => Init)): Engine {
 			const call = pending.get(response.id);
 			if (!call) return;
 			pending.delete(response.id);
-			if (response.ok) call.resolve(response.result);
-			else call.reject(new Error(response.error));
+			if (response.ok) {
+				onReady?.();
+				onReady = undefined;
+				call.resolve(response.result);
+			} else call.reject(new Error(response.error));
 		};
 		w.onerror = (event) => {
 			const error = new Error(event.message || 'The SysML engine failed to start');
