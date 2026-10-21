@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { BookOpen, CircleAlert, FileCode, Link2, Plus, Trash2 } from '@lucide/svelte';
 	import { conceptFor } from '#lib/learn/concepts.ts';
+	import KindGlyph from '#lib/ui/KindGlyph.svelte';
+	import { familyColor } from '#lib/ui/kinds.ts';
 	import type { ModelElement, TreeNode } from '#lib/project/elements.ts';
 	import { displayReference } from '#lib/project/names.ts';
 	import { humanize, statusLabel } from '#lib/project/status.ts';
@@ -73,11 +75,17 @@
 			</p>
 		</div>
 	{:else}
-		<header>
-			<span class="kind"
-				>{concept?.title ??
-					humanize(element.isDefinition ? `${element.kind} definition` : element.kind)}</span
-			>
+		<header style:--fam={familyColor(element.kind)}>
+			<span class="kind">
+				<KindGlyph kind={element.kind} isDefinition={element.isDefinition} size={20} />
+				{concept?.title ??
+					humanize(element.isDefinition ? `${element.kind} definition` : element.kind)}
+				<code class="keyword"
+					>{element.isDefinition && element.kind !== 'package'
+						? `${element.kind.replace(/_/g, ' ')} def`
+						: element.kind.replace(/_/g, ' ')}</code
+				>
+			</span>
 			<h2>
 				{#if element.shortName}<span class="id">{element.shortName}</span>{/if}
 				{element.label}
@@ -281,12 +289,37 @@
 		text-align: center;
 		color: var(--text-3);
 	}
+	header {
+		margin: calc(-1 * var(--space-4)) calc(-1 * var(--space-4)) 0;
+		padding: var(--space-4) var(--space-4) var(--space-3);
+		border-top: 3px solid var(--fam);
+		background: linear-gradient(
+			to bottom,
+			color-mix(in oklab, var(--fam) 9%, var(--surface)),
+			var(--surface)
+		);
+	}
 	.kind {
-		color: var(--accent);
+		display: flex;
+		align-items: center;
+		gap: var(--space-2);
+		color: var(--text-2);
 		font-size: var(--text-xs);
 		font-weight: 600;
 		text-transform: uppercase;
 		letter-spacing: 0.06em;
+	}
+	.keyword {
+		margin-left: auto;
+		padding: 1px 6px;
+		border: 1px solid var(--border);
+		border-radius: var(--radius-sm);
+		color: var(--syntax-keyword);
+		font-family: var(--font-mono);
+		font-size: var(--text-xs);
+		font-weight: 500;
+		letter-spacing: 0;
+		text-transform: none;
 	}
 	h2 {
 		margin-top: 2px;

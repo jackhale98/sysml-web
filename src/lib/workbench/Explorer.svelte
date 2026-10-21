@@ -1,21 +1,16 @@
 <script lang="ts">
 	import {
-		Box,
-		Boxes,
 		ChevronRight,
-		CircleDot,
 		FileCode,
 		Folder,
 		LayoutDashboard,
 		ListChecks,
 		Network,
-		Package,
-		Search,
-		Workflow
+		Search
 	} from '@lucide/svelte';
-	import type { Component } from 'svelte';
 	import type { TreeNode } from '#lib/project/elements.ts';
 	import { isLibraryFile, type Workspace } from '#lib/project/workspace.svelte.ts';
+	import KindGlyph from '#lib/ui/KindGlyph.svelte';
 	import type { WorkbenchUi } from './ui.svelte.ts';
 
 	let { workspace, ui }: { workspace: Workspace; ui: WorkbenchUi } = $props();
@@ -45,15 +40,6 @@
 		return needle ? true : (expanded[node.element.key] ?? depth < 1);
 	}
 
-	function iconFor(node: TreeNode): Component {
-		const e = node.element;
-		if (e.kind === 'package') return Package;
-		if (e.kind === 'requirement') return ListChecks;
-		if (e.kind === 'port') return CircleDot;
-		if (e.kind === 'action' || e.kind === 'state') return Workflow;
-		return e.isDefinition ? Boxes : Box;
-	}
-
 	const folders = $derived.by(() => {
 		const byFolder: Record<string, string[]> = {};
 		for (const path of workspace.modelPaths) {
@@ -67,7 +53,6 @@
 {#snippet tree(nodes: TreeNode[], depth: number)}
 	<ul role={depth === 0 ? 'tree' : 'group'} aria-label={depth === 0 ? 'Model' : undefined}>
 		{#each nodes.filter(matches) as node (node.element.key)}
-			{@const Icon = iconFor(node)}
 			{@const open = isOpen(node, depth)}
 			{@const hasChildren = node.children.length > 0}
 			<li
@@ -99,7 +84,7 @@
 							? `${node.element.kind} def`
 							: node.element.kind} {node.element.label}"
 					>
-						<Icon size={14} />
+						<KindGlyph kind={node.element.kind} isDefinition={node.element.isDefinition} />
 						{#if node.element.shortName}<span class="id">{node.element.shortName}</span>{/if}
 						<span class="label">{node.element.label}</span>
 					</button>

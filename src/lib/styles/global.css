@@ -66,6 +66,16 @@
 	--muted: #5f636a;
 	--muted-weak: #ececea;
 
+	/* Element families: one hue per kind of SysML element, used for icons,
+	   diagram accents and badges (always alongside a label or shape). */
+	--kind-structure: #3b5bdb;
+	--kind-interface: #0b7285;
+	--kind-behavior: #2b8a3e;
+	--kind-requirement: #9c36b5;
+	--kind-analysis: #c2410c;
+	--kind-package: #5c6370;
+	--kind-view: #5f3dc4;
+
 	--syntax-keyword: #8a2c8f;
 	--syntax-definition: #1f4fbf;
 	--syntax-type: #0f6b78;
@@ -110,6 +120,13 @@
 		--info-weak: #1d2440;
 		--muted: #a0a3aa;
 		--muted-weak: #24262a;
+		--kind-structure: #91a7ff;
+		--kind-interface: #66d9e8;
+		--kind-behavior: #69db7c;
+		--kind-requirement: #e599f7;
+		--kind-analysis: #ffa94d;
+		--kind-package: #adb5bd;
+		--kind-view: #b197fc;
 		--syntax-keyword: #d79bf0;
 		--syntax-definition: #8fb0ff;
 		--syntax-type: #6fd3d9;
@@ -153,6 +170,13 @@
 	--info-weak: #1d2440;
 	--muted: #a0a3aa;
 	--muted-weak: #24262a;
+	--kind-structure: #91a7ff;
+	--kind-interface: #66d9e8;
+	--kind-behavior: #69db7c;
+	--kind-requirement: #e599f7;
+	--kind-analysis: #ffa94d;
+	--kind-package: #adb5bd;
+	--kind-view: #b197fc;
 	--syntax-keyword: #d79bf0;
 	--syntax-definition: #8fb0ff;
 	--syntax-type: #6fd3d9;

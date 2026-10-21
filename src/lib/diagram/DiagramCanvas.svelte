@@ -13,7 +13,7 @@
 	import { untrack } from 'svelte';
 	import { Pencil, Plus, Trash2 } from '@lucide/svelte';
 	import type { Engine } from '#lib/engine/client.ts';
-	import type { DiagramView } from '#lib/engine/types.ts';
+	import type { DiagramGraph, DiagramView } from '#lib/engine/types.ts';
 	import type { ModelElement } from '#lib/project/elements.ts';
 	import type { Workspace } from '#lib/project/workspace.svelte.ts';
 	import { theme } from '#lib/ui/theme.svelte.ts';
@@ -21,7 +21,7 @@
 	import AddForm from '#lib/workbench/AddForm.svelte';
 	import { canOwnMembers, type AddKind } from '#lib/workbench/templates.ts';
 	import type { WorkbenchUi } from '#lib/workbench/ui.svelte.ts';
-	import { layout, type Direction } from './layout.ts';
+	import { layout, nodeSize, type Direction } from './layout.ts';
 	import SysmlEdge from './SysmlEdge.svelte';
 	import SysmlNode from './SysmlNode.svelte';
 	import type { SysmlEdgeData, SysmlNodeData } from './types.ts';
@@ -44,7 +44,6 @@
 
 	const nodeTypes: NodeTypes = { sysml: SysmlNode };
 	const edgeTypes: EdgeTypes = { sysml: SysmlEdge };
-	const direction: Direction = $derived(view === 'interconnection' ? 'RIGHT' : 'DOWN');
 
 	let nodes = $state.raw<Node<SysmlNodeData>[]>([]);
 	let edges = $state.raw<Edge<SysmlEdgeData>[]>([]);
@@ -54,6 +53,8 @@
 	let renameTo = $state('');
 	let actionError = $state<string | null>(null);
 	let fitNonce = $state(0);
+	/** The diagram frame's name, as SysML writes it: "gv [Scope]". */
+	let frameTitle = $state('');
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	let generation = 0;
 
@@ -74,11 +75,31 @@
 			: ['part', 'port', 'attribute', 'action', 'requirement']
 	);
 
+	/** Node ids are names, or dotted paths (`drone.battery`) for nested usages. */
+	const nameOf = (id: string) => id.slice(id.lastIndexOf('.') + 1);
+
 	function elementFor(id: string): ModelElement | undefined {
+		const name = nameOf(id);
+		const usage = id.includes('.');
 		return (
-			workspace.elements.find((e) => e.name === id && e.isDefinition) ??
-			workspace.elements.find((e) => e.name === id)
+			workspace.elements.find((e) => e.name === name && e.isDefinition !== usage) ??
+			workspace.elements.find((e) => e.name === name)
 		);
+	}
+
+	/**
+	 * Interconnection views read left to right. Trees go top-down unless a
+	 * node has many children, which would make one very wide row.
+	 */
+	function directionFor(graph: DiagramGraph): Direction {
+		if (view === 'interconnection') return 'RIGHT';
+		const children: Record<string, number> = {};
+		for (const e of graph.edges) {
+			if (e.kind === 'composition' || e.kind === 'containment') {
+				children[e.source] = (children[e.source] ?? 0) + 1;
+			}
+		}
+		return Math.max(0, ...Object.values(children)) > 5 ? 'RIGHT' : 'DOWN';
 	}
 
 	async function refresh() {
@@ -86,19 +107,21 @@
 		try {
 			const graph = await engine.diagram(view, workspace.sourceFiles(), scope);
 			if (current !== generation) return;
+			const direction = directionFor(graph);
 			const sameNodes =
 				graph.nodes.length === nodes.length &&
 				graph.nodes.every((n) => nodes.some((m) => m.id === n.id));
 			const positions = new Map(nodes.map((n) => [n.id, n.position]));
 			const placed = sameNodes
 				? graph.nodes.map((node) => ({ node, x: 0, y: 0 }))
-				: await layout(graph, direction);
+				: await layout(graph, direction, view);
 			if (current !== generation) return;
 			nodes = placed.map(({ node, x, y }) => ({
 				id: node.id,
 				type: 'sysml',
 				position: (sameNodes && positions.get(node.id)) || { x, y },
-				data: { node, selected: node.id === selected?.name, direction },
+				...nodeSize(node, view),
+				data: { node, selected: nameOf(node.id) === selected?.name, direction, view },
 				ariaLabel: `${node.stereotype ?? node.kind} ${node.label}`
 			}));
 			const ids = new Set(graph.nodes.map((n) => n.id));
@@ -111,6 +134,7 @@
 					type: 'sysml',
 					data: { kind: e.kind, label: e.label }
 				}));
+			frameTitle = graph.title;
 			status = 'ready';
 			if (!sameNodes) fitNonce++;
 		} catch (error) {
@@ -135,11 +159,12 @@
 	$effect(() => {
 		const name = selected?.name;
 		const current = untrack(() => nodes);
-		if (current.every((n) => n.data.selected === (n.id === name))) return;
+		const isSelected = (id: string) => nameOf(id) === name;
+		if (current.every((n) => n.data.selected === isSelected(n.id))) return;
 		nodes = current.map((n) =>
-			n.data.selected === (n.id === name)
+			n.data.selected === isSelected(n.id)
 				? n
-				: { ...n, data: { ...n.data, selected: n.id === name } }
+				: { ...n, data: { ...n.data, selected: isSelected(n.id) } }
 		);
 	});
 
@@ -177,13 +202,32 @@
 			<marker
 				id="sysml-composition"
 				viewBox="0 0 16 10"
-				refX="1"
+				refX="15"
 				refY="5"
 				markerWidth="16"
 				markerHeight="10"
 				orient="auto-start-reverse"
 			>
 				<path d="M1 5 L8 1 L15 5 L8 9 Z" fill="var(--text-2)" />
+			</marker>
+			<marker
+				id="sysml-membership"
+				viewBox="0 0 14 14"
+				refX="12.6"
+				refY="7"
+				markerWidth="14"
+				markerHeight="14"
+				orient="auto-start-reverse"
+			>
+				<circle
+					cx="7"
+					cy="7"
+					r="5.6"
+					fill="var(--surface)"
+					stroke="var(--text-2)"
+					stroke-width="1.2"
+				/>
+				<path d="M7 3.6 V10.4 M3.6 7 H10.4" stroke="var(--text-2)" stroke-width="1.2" />
 			</marker>
 			<marker
 				id="sysml-open-arrow"
@@ -227,7 +271,6 @@
 			minZoom={0.15}
 			colorMode={theme.choice}
 			nodesConnectable={false}
-			proOptions={{ hideAttribution: true }}
 			onnodeclick={({ node }) => {
 				const element = elementFor(node.id);
 				if (element) ui.select(element.key, 'diagram');
@@ -236,7 +279,12 @@
 		>
 			<Background gap={20} />
 			<Controls showLock={false} />
-			<Panel position="top-left">
+			{#if frameTitle}
+				<Panel position="top-left">
+					<p class="frame" title="Diagram frame">{frameTitle}</p>
+				</Panel>
+			{/if}
+			<Panel position="top-right">
 				<div class="toolbar" role="toolbar" aria-label="Diagram tools">
 					<button
 						type="button"
@@ -369,7 +417,20 @@
 		cursor: default;
 	}
 	.popover {
+		display: flex;
+		justify-content: flex-end;
 		margin-top: var(--space-2);
+	}
+	/* The SysML diagram frame label: name in a box with a cut corner. */
+	.frame {
+		margin: 0;
+		padding: 3px 18px 4px 10px;
+		background: var(--surface);
+		border: 1px solid var(--border-strong);
+		clip-path: polygon(0 0, 100% 0, 100% 55%, calc(100% - 10px) 100%, 0 100%);
+		color: var(--text-2);
+		font-family: var(--font-mono);
+		font-size: 12px;
 	}
 	.popover.small {
 		display: grid;
@@ -427,6 +488,12 @@
 		--xy-controls-button-color: var(--text-2);
 		--xy-controls-button-border-color: var(--border);
 		--xy-node-border-radius: 0;
+	}
+	.canvas :global(.svelte-flow__attribution) {
+		background: transparent;
+	}
+	.canvas :global(.svelte-flow__attribution a) {
+		color: var(--text-3);
 	}
 	.canvas :global(.svelte-flow__node-sysml) {
 		padding: 0;
