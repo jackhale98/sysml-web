@@ -1,0 +1,553 @@
+/**
+ * Model edits on the toolkit (`edits.ts`), through the host the worker runs,
+ * on the demo. Each edit is compared with what the classic engine wrote for
+ * the same request (its WebAssembly build is still in `static/engine/`)
+ * wherever classic was right; where it was wrong, the toolkit's answer is
+ * asserted with the reason.
+ */
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { beforeAll, describe, expect, it } from 'vitest';
+import type { Engine } from '../client';
+import type { EditOperation, EditRequest } from '../types';
+import { Workspace } from '#lib/project/workspace.svelte.ts';
+import { applyEditChanges, editFiles } from './edit-testing';
+import type { ToolkitHost } from './host';
+import { demoFiles, loadHost } from './testing';
+
+const ENGINE = join(import.meta.dirname, '../../../../static/engine');
+
+interface Classic {
+	initSync(options: { module: Buffer }): void;
+	edit(request: string): string;
+}
+
+let host: ToolkitHost;
+let classic: Classic | null = null;
+const files = Object.fromEntries(demoFiles().map((f) => [f.path, f.text]));
+
+beforeAll(async () => {
+	host = await loadHost();
+	host.analyzeProject(demoFiles());
+	if (existsSync(join(ENGINE, 'sysml_wasm.js'))) {
+		classic = (await import(/* @vite-ignore */ join(ENGINE, 'sysml_wasm.js'))) as Classic;
+		classic.initSync({ module: readFileSync(join(ENGINE, 'sysml_wasm_bg.wasm')) });
+	}
+}, 60_000);
+
+type Request = EditOperation & { path: string };
+
+const C = 'system/Components.sysml';
+const A = 'system/DroneArchitecture.sysml';
+const R = 'requirements/SystemRequirements.sysml';
+const I = 'interfaces/DroneInterfaces.sysml';
+const FLIGHT = "SystemRequirements::'Flight endurance'";
+
+function ours(request: Request) {
+	const edited = editFiles(host, files, request);
+	if ('error' in edited) throw new Error(edited.error);
+	return { text: edited.files[request.path]!, files: edited.files, result: edited.result };
+}
+
+function theirs(request: Request): string {
+	const source = files[request.path]!;
+	const r = JSON.parse(
+		classic!.edit(JSON.stringify({ ...request, source, files: demoFiles() }))
+	) as { changes: { from: number; to: number; insert: string }[] };
+	return applyEditChanges(source, r.changes);
+}
+
+/** Edits where the toolkit writes exactly what classic wrote. */
+const same: [string, Request][] = [
+	[
+		'adds a definition with a body to a package',
+		{
+			op: 'insertMember',
+			path: C,
+			parent: 'DroneComponents',
+			text: 'part def Parachute :> Component {\n    attribute :>> mass = 300 [g];\n}'
+		}
+	],
+	[
+		'appends a package to a file',
+		{ op: 'insertTopLevel', path: C, text: 'package Spares {\n    part def SpareBattery;\n}' }
+	],
+	['removes an attribute nothing refers to', { op: 'remove', path: C, name: 'maxPower' }],
+	['renames a definition in its file', { op: 'rename', path: C, from: 'Propeller', to: 'Prop' }],
+	[
+		'changes a multiplicity written after the type',
+		{ op: 'setDeclaration', path: A, element: 'rotors', line: 37, set: { multiplicity: '6' } }
+	],
+	[
+		'adds a multiplicity after the name',
+		{ op: 'setDeclaration', path: A, element: 'battery', line: 35, set: { multiplicity: '2' } }
+	],
+	[
+		'changes a direction',
+		{ op: 'setDeclaration', path: I, element: 'power', line: 57, set: { direction: 'inout' } }
+	],
+	[
+		'removes a direction',
+		{ op: 'setDeclaration', path: I, element: 'power', line: 57, set: { direction: null } }
+	],
+	[
+		'adds a specialization',
+		{
+			op: 'setDeclaration',
+			path: C,
+			element: 'Camera',
+			line: 0,
+			set: { specializes: ['Component', 'Airframe'] }
+		}
+	],
+	[
+		'removes the specializations',
+		{ op: 'setDeclaration', path: C, element: 'Airframe', line: 0, set: { specializes: [] } }
+	],
+	[
+		'makes a definition abstract',
+		{ op: 'setDeclaration', path: C, element: 'Camera', line: 0, set: { abstract: true } }
+	],
+	[
+		'makes a definition concrete',
+		{ op: 'setDeclaration', path: C, element: 'Component', line: 0, set: { abstract: false } }
+	],
+	[
+		'changes a value',
+		{ op: 'setDeclaration', path: C, element: 'capacity', line: 0, set: { value: '300 [W*h]' } }
+	],
+	[
+		'removes a value',
+		{ op: 'setDeclaration', path: C, element: 'capacity', line: 0, set: { value: null } }
+	],
+	[
+		'makes a value a default',
+		{ op: 'setDeclaration', path: C, element: 'capacity', line: 0, set: { valueKind: 'default' } }
+	],
+	[
+		'changes a one-line doc comment',
+		{
+			op: 'setDeclaration',
+			path: C,
+			element: 'Battery',
+			line: 0,
+			set: { doc: 'A new description.' }
+		}
+	],
+	[
+		'lays out a doc comment like the one it replaces',
+		{
+			op: 'setDeclaration',
+			path: C,
+			element: 'Rotor',
+			line: 0,
+			set: { doc: 'One unit.\nTwo lines.' }
+		}
+	],
+	[
+		'wraps a long doc comment to the old one’s width',
+		{
+			op: 'setDeclaration',
+			path: C,
+			element: 'DroneComponents',
+			line: 0,
+			set: {
+				doc: 'The component catalogue: a very long single line that keeps going well past the width of the old comment so that it wraps.'
+			}
+		}
+	],
+	[
+		'removes a doc comment',
+		{ op: 'setDeclaration', path: C, element: 'Battery', line: 0, set: { doc: null } }
+	],
+	[
+		'gives a declaration without a body a doc comment',
+		{ op: 'setDeclaration', path: C, element: 'maxPower', line: 0, set: { doc: 'Peak power.' } }
+	],
+	[
+		'adds a short name',
+		{ op: 'setDeclaration', path: C, element: 'Battery', line: 0, set: { shortName: 'BAT' } }
+	],
+	[
+		'changes a short name (a label as the element)',
+		{
+			op: 'setDeclaration',
+			path: R,
+			element: 'Flight endurance',
+			line: 22,
+			set: { shortName: 'SYS-101' }
+		}
+	],
+	[
+		'removes a short name',
+		{
+			op: 'setDeclaration',
+			path: R,
+			element: 'Flight endurance',
+			line: 22,
+			set: { shortName: null }
+		}
+	],
+	[
+		'sets an enum cell',
+		{ op: 'setField', path: R, element: FLIGHT, line: 22, field: 'feature:priority', value: 'low' }
+	],
+	[
+		'clears an enum cell',
+		{ op: 'setField', path: R, element: FLIGHT, line: 22, field: 'feature:priority', value: '' }
+	],
+	[
+		'sets a list of enum literals, quoting a keyword',
+		{
+			op: 'setField',
+			path: R,
+			element: FLIGHT,
+			line: 22,
+			field: 'feature:verificationMethod',
+			value: 'test, analysis'
+		}
+	],
+	[
+		'sets a metadata field',
+		{
+			op: 'setField',
+			path: R,
+			element: FLIGHT,
+			line: 22,
+			field: 'metadata:StatusInfo.status',
+			value: 'open'
+		}
+	],
+	[
+		'adds a field to a one-line annotation',
+		{
+			op: 'setField',
+			path: R,
+			element: FLIGHT,
+			line: 22,
+			field: 'metadata:StatusInfo.originator',
+			value: 'Ops'
+		}
+	],
+	[
+		'clears a field inside a one-line annotation',
+		{
+			op: 'setField',
+			path: R,
+			element: FLIGHT,
+			line: 22,
+			field: 'metadata:StatusInfo.owner',
+			value: ''
+		}
+	],
+	[
+		'changes a string field',
+		{
+			op: 'setField',
+			path: R,
+			element: FLIGHT,
+			line: 22,
+			field: 'metadata:Rationale.text',
+			value: 'Short.'
+		}
+	],
+	[
+		'removes an annotation whose only field is cleared',
+		{
+			op: 'setField',
+			path: R,
+			element: FLIGHT,
+			line: 22,
+			field: 'metadata:Rationale.text',
+			value: ''
+		}
+	],
+	[
+		'adds an annotation after the others',
+		{
+			op: 'setField',
+			path: R,
+			element: FLIGHT,
+			line: 22,
+			field: 'metadata:Issue.text',
+			value: 'Check the reserve.'
+		}
+	],
+	[
+		'sets a short name cell',
+		{ op: 'setField', path: R, element: FLIGHT, line: 22, field: 'shortName', value: 'SYS-101' }
+	],
+	[
+		'sets a doc cell',
+		{ op: 'setField', path: R, element: FLIGHT, line: 22, field: 'doc', value: 'Shorter.' }
+	],
+	[
+		'sets an enum on an element found by name alone',
+		{
+			op: 'setField',
+			path: R,
+			element: "SystemRequirements::'Wind tolerance'",
+			line: 0,
+			field: 'feature:kind',
+			value: 'safety'
+		}
+	],
+	[
+		'keeps the unit of a number',
+		{
+			op: 'setField',
+			path: C,
+			element: 'DroneComponents::Battery',
+			line: 0,
+			field: 'feature:mass',
+			value: '1150'
+		}
+	],
+	[
+		'chooses the columns of a view def',
+		{
+			op: 'setTableColumns',
+			path: 'libraries/ModelViews.sysml',
+			view: 'RequirementsTable',
+			columns: ['id', 'title', 'status']
+		}
+	],
+	[
+		'removes a type, keeping the multiplicity',
+		{ op: 'setDeclaration', path: A, element: 'airframe', line: 34, set: { type: null } }
+	]
+];
+
+describe('edits the classic engine made the same way', () => {
+	it.skipIf(!existsSync(join(ENGINE, 'sysml_wasm.js'))).each(same)('%s', (_, request) => {
+		expect(ours(request).text).toBe(theirs(request));
+	});
+});
+
+describe('edits where the toolkit is right and classic was not', () => {
+	it('puts a new member before the closing brace, which keeps its indentation', () => {
+		// Classic inserted after the brace line's indentation, moving `}` to column 0.
+		const { text } = ours({
+			op: 'insertMember',
+			path: C,
+			parent: 'Battery',
+			text: 'attribute cellCount : ScalarValues::Integer = 6;'
+		});
+		expect(text).toContain(
+			'        port powerOut : PowerPort;\n        attribute cellCount : ScalarValues::Integer = 6;\n    }\n\n    part def PowerDistributionBoard'
+		);
+	});
+
+	it('renames every reference in every file, but not prose', () => {
+		// Classic renamed words in one file only, comments included.
+		const { files: after, result } = ours({
+			op: 'setField',
+			path: R,
+			element: FLIGHT,
+			line: 22,
+			field: 'name',
+			value: 'Endurance'
+		});
+		expect(after[R]).toContain("requirement <'SYS-001'> Endurance : DroneRequirement {");
+		expect(result.otherFiles?.map((c) => c.path).sort()).toEqual([
+			'system/Satisfaction.sysml',
+			'verification/VerificationPlan.sysml'
+		]);
+		expect(after['system/Satisfaction.sysml']).not.toContain("'Flight endurance'");
+		expect(after['analysis/Performance.sysml']).toContain("Show that 'Flight endurance' (SYS-001)");
+	});
+
+	it('adds a view usage’s columns after its last statement, typed as it resolves', () => {
+		const { text } = ours({
+			op: 'setTableColumns',
+			path: 'views/Views.sysml',
+			view: 'systemRequirements',
+			columns: ['id', 'title']
+		});
+		expect(text).toContain(
+			'        expose SystemRequirements::*;\n        @TableRendering { columns = "id; title"; }\n    }'
+		);
+	});
+
+	it('writes metadata and enum types the shortest way that resolves', () => {
+		const { text } = ours({
+			op: 'setField',
+			path: 'requirements/StakeholderNeeds.sysml',
+			element: "StakeholderNeeds::'Parcel delivery'",
+			line: 14,
+			field: 'metadata:Rationale.text',
+			value: 'Why.'
+		});
+		expect(text).toContain('@Rationale { text = "Why."; }');
+	});
+});
+
+describe('edits the app makes although references break', () => {
+	it('removes a used definition and says what no longer resolves', () => {
+		const { text, result } = ours({ op: 'remove', path: C, name: 'Motor' });
+		expect(text).not.toContain('part def Motor');
+		expect(result.warning).toBe(
+			'2 references to Motor no longer resolve (DroneComponents::Rotor::motor).'
+		);
+	});
+
+	it('changes a type that its features’ references depend on, with a warning', () => {
+		const { text, result } = ours({
+			op: 'setDeclaration',
+			path: A,
+			element: 'camera',
+			line: 41,
+			set: { type: 'Motor' }
+		});
+		expect(text).toContain('part camera : Motor;');
+		expect(result.warning).toBe(
+			'Some references no longer resolve as before: imageOut (line 57), image (line 57), mass (line 64).'
+		);
+	});
+});
+
+describe('what the toolkit refuses', () => {
+	const fails = (request: Request) => {
+		const edited = editFiles(host, files, request);
+		return 'error' in edited ? edited.error : null;
+	};
+
+	it('refuses text that does not parse as a syntax error', () => {
+		const result = host.edit({
+			op: 'insertMember',
+			path: C,
+			source: files[C]!,
+			files: demoFiles(),
+			parent: 'Battery',
+			text: 'part x : Motor'
+		});
+		expect(result.syntaxErrors[0]).toMatch(/does not parse/);
+		expect(result.changes).toEqual([]);
+	});
+
+	it('checks enum literals and what a declaration can say', () => {
+		expect(
+			fails({
+				op: 'setField',
+				path: R,
+				element: FLIGHT,
+				line: 22,
+				field: 'feature:priority',
+				value: 'urgent'
+			})
+		).toBe("`urgent` is not one of Priority's literals: high, medium, low");
+		expect(
+			fails({ op: 'setDeclaration', path: C, element: 'Battery', line: 0, set: { type: 'X' } })
+		).toBe('`type` cannot be set on a `part def` declaration');
+		expect(
+			fails({
+				op: 'setTableColumns',
+				path: 'libraries/ModelViews.sysml',
+				view: 'RequirementsTable',
+				columns: []
+			})
+		).toBe('a view def needs at least one column');
+		expect(fails({ op: 'remove', path: C, name: 'Nothing' })).toBe('element `Nothing` not found');
+	});
+
+	it('leaves a file with a syntax error alone', () => {
+		const broken = {
+			...files,
+			[C]: files[C]!.replace('port powerOut : PowerPort;', 'port powerOut : PowerPort')
+		};
+		const edited = editFiles(host, broken, { op: 'remove', path: C, name: 'maxPower' });
+		expect('error' in edited && edited.error).toMatch(/syntax error; fix it/);
+		// Other files can still be edited.
+		const other = editFiles(host, broken, {
+			op: 'setDeclaration',
+			path: A,
+			element: 'rotors',
+			line: 37,
+			set: { multiplicity: '6' }
+		});
+		expect('files' in other && other.files[A]).toContain('part rotors : Rotor[6];');
+	});
+});
+
+describe('addressing', () => {
+	it('finds an element by id, whatever line is given', () => {
+		const id = host
+			.analyzeProject(demoFiles())
+			.find((a) => a.model.file === A)!
+			.model.usages.find((u) => u.name === 'rotors')!.id!;
+		const { text } = ours({
+			op: 'setDeclaration',
+			path: A,
+			element: 'whatever',
+			line: 1,
+			id,
+			set: { multiplicity: '8' }
+		});
+		expect(text).toContain('part rotors : Rotor[8];');
+	});
+
+	it('picks the element declared on the given line among same-named ones', () => {
+		// Several components declare `powerIn`; line 41 is the distribution board's.
+		const { text } = ours({
+			op: 'setDeclaration',
+			path: C,
+			element: 'powerIn',
+			line: 41,
+			set: { direction: 'in' }
+		});
+		expect(text.split('\n')[40]).toBe('        in port powerIn : ~PowerPort;');
+	});
+});
+
+describe('in the workspace', () => {
+	it('applies edits in every file they change, and undo restores the exact text', async () => {
+		const engine = {
+			version: async () => host.version(),
+			analyzeProject: async (f: { path: string; text: string }[]) => host.analyzeProject(f),
+			listViews: async () => [],
+			stateMachines: async () => [],
+			edit: async (request: EditRequest) => host.edit(request)
+		} as unknown as Engine;
+		const workspace = new Workspace();
+		await workspace.open({ id: 'demo', info: { name: 'Demo' }, files: demoFiles() }, engine);
+		const before = { ...workspace.files };
+		const error = await workspace.transact('Renamed', () =>
+			workspace.edit(C, {
+				op: 'rename',
+				path: C,
+				source: workspace.text(C)!,
+				from: 'Battery',
+				to: 'Pack'
+			})
+		);
+		expect(error).toBeNull();
+		expect(workspace.text(A)).toContain('part battery : Pack;');
+		await workspace.transact('Deleted', () =>
+			workspace.edit(C, { op: 'remove', path: C, source: workspace.text(C)!, name: 'Camera' })
+		);
+		expect(workspace.warnings[0]).toMatch(/references to Camera no longer resolve/);
+		workspace.undo();
+		workspace.undo();
+		for (const [path, text] of Object.entries(before)) expect(workspace.text(path)).toBe(text);
+	});
+
+	it('runs a series of edits on the session the previous edit left', () => {
+		let texts = { ...files };
+		const started = performance.now();
+		for (const value of ['low', 'medium', 'high', 'low', 'medium']) {
+			const edited = editFiles(host, texts, {
+				op: 'setField',
+				path: R,
+				element: FLIGHT,
+				line: 22,
+				field: 'feature:priority',
+				value
+			});
+			if ('error' in edited) throw new Error(edited.error);
+			texts = edited.files;
+		}
+		// Without the kept session each edit would rebuild it (~150 ms here).
+		expect(performance.now() - started).toBeLessThan(1500);
+		expect(texts[R]).toContain(':>> priority = Priority::medium;');
+	});
+});
