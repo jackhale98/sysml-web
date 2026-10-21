@@ -79,7 +79,6 @@ export function startEngine(
 		librarySearch: (...params) => call('librarySearch', ...params),
 		libraryLicense: (...params) => call('libraryLicense', ...params),
 		stateMachines: (...params) => call('stateMachines', ...params),
-		stateStep: (...params) => call('stateStep', ...params),
 		terminate: () => started?.terminate()
 	};
 }

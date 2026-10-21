@@ -61,12 +61,17 @@ need a model run in parallel with the foundation.
    retarget), composed where it has no single operation.
 5. **Diagrams** — the seven diagram graphs in TypeScript over the model.
 6. **The rest** — state machine emulator, `.kpar` read/write, library
-   browser.
+   browser. The emulator is done: `src/lib/sim/emulator.ts` runs any
+   `StateMachine` in TypeScript (extraction still comes from the current
+   engine); `parity.test.ts` checks it against the old `stateStep` and
+   lists where it follows the SysML/UML semantics instead.
 7. **Remove the current engine** — once nothing routes to it: delete it,
-   its build and the `?toolkit` test build. A real-iPhone memory check
-   (via `/p/demo?toolkit`) is still wanted, but no longer gates the work. Upstream requests (lighter build, on-demand library packages,
-   declaration-header edit, semantic diagnostics in its language server,
-   consistent offsets) are drafted for the owner to file.
+   its build and the `?toolkit` test build. On a real iPhone the toolkit
+   held 154–160 MB with no growth over 20 edits and no tab kill (library
+   build 3.2 s, analysis 0.3 s). Upstream requests (lighter build,
+   on-demand library packages, declaration-header edit, semantic
+   diagnostics in its language server, consistent offsets) are drafted for
+   the owner to file.
 
 ---
 
