@@ -65,9 +65,10 @@ need a model run in parallel with the foundation.
 5. **Diagrams** — the seven diagram graphs in TypeScript over the model.
 6. **The rest** — state machine emulator, `.kpar` read/write, library
    browser. *Done:* the emulator (`src/lib/sim/emulator.ts` runs any
-   `StateMachine` in TypeScript; extraction still comes from the current
-   engine; `parity.test.ts` checks it against the old `stateStep` and lists
-   where it follows the SysML/UML semantics instead). `.kpar`/ZIP read and
+   `StateMachine` in TypeScript; `parity.test.ts` checks it against the old
+   `stateStep` and lists where it follows the SysML/UML semantics instead)
+   and the machines it runs, read from the toolkit's model
+   (`engine/toolkit/machines.ts`, see `docs/engine.md`). `.kpar`/ZIP read and
    write are TypeScript (`src/lib/interchange/kpar.ts`, over
    `dataio/zip.ts`, round-trip tested against our engine's output both
    ways), and the library browser and search read the toolkit's library

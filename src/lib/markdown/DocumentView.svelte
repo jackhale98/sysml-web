@@ -126,9 +126,12 @@
 </article>
 
 <style>
+	/* A page that scrolls down only: nothing in it makes it pan sideways. */
 	.document {
 		height: 100%;
+		overflow-x: hidden;
 		overflow-y: auto;
+		overscroll-behavior-x: none;
 		background: var(--bg);
 	}
 	.bar {
@@ -165,9 +168,16 @@
 		max-width: 46rem;
 		margin: 0 auto;
 		padding: var(--space-6) var(--space-5) var(--space-8, 4rem);
+		min-width: 0;
 		color: var(--text);
 		font-size: 1rem;
 		line-height: 1.7;
+		/* Long names (qualified names, paths, URLs) break rather than overflow. */
+		overflow-wrap: anywhere;
+	}
+	.page :global(img) {
+		max-width: 100%;
+		height: auto;
 	}
 	h2 {
 		margin: 0 0 var(--space-4);
@@ -221,6 +231,7 @@
 	pre code {
 		padding: 0;
 		background: none;
+		overflow-wrap: normal;
 	}
 	a {
 		color: var(--accent);
@@ -229,6 +240,7 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 4px;
+		max-width: 100%;
 		padding: 0 4px 0 2px;
 		border: 1px solid var(--border);
 		border-radius: 6px;
@@ -246,9 +258,11 @@
 		box-shadow: 0 0 0 3px var(--accent-weak);
 	}
 	.ref code {
+		min-width: 0;
 		padding: 0;
 		background: none;
 		color: inherit;
+		text-align: left;
 	}
 	@media (max-width: 760px) {
 		.page {

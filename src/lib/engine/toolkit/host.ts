@@ -22,6 +22,7 @@ import type {
 	Hover,
 	OutlineItem,
 	RenderedTable,
+	StateMachine,
 	ViewInfo
 } from '../types';
 import type {
@@ -35,6 +36,7 @@ import type {
 } from './api';
 import { toProblems } from './diagnostics';
 import { LanguageServices, SyntaxServices } from './language';
+import { extractMachines } from './machines';
 import { detailsOf, extractModel, findElement, type ExtractedModel, type UnitInfo } from './model';
 import { TextIndexCache } from './offsets';
 import { RepairMap } from './repair';
@@ -48,6 +50,8 @@ interface Built {
 	extracted: ExtractedModel | null;
 	/** The tables' index of the model, made on the first view call. */
 	views?: views.ViewContext;
+	/** The state machines, read on first ask. */
+	machines?: StateMachine[];
 }
 
 export class ToolkitHost {
@@ -191,6 +195,16 @@ export class ToolkitHost {
 			texts: new Map([...built.units.values()].map((u) => [u.path, u.original.text]))
 		});
 		return built.views;
+	}
+
+	/** The project's state machines (`machines.ts`), for the emulator. */
+	stateMachines(files: SourceFile[]): StateMachine[] {
+		const built = this.build(files);
+		built.machines ??=
+			built.session && built.extracted
+				? extractMachines(built.session, built.extracted, built.units)
+				: [];
+		return built.machines;
 	}
 
 	/** The current session, built for `files` (for language services). */

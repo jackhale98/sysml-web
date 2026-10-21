@@ -25,7 +25,9 @@ export const TOOLKIT_METHODS = [
 	// Phase 3: views and tables.
 	'listViews',
 	'renderView',
-	'viewLibraries'
+	'viewLibraries',
+	// Phase 6: state machines for the emulator.
+	'stateMachines'
 ] as const satisfies readonly (keyof EngineApi)[];
 
 export type ToolkitMethod = (typeof TOOLKIT_METHODS)[number];

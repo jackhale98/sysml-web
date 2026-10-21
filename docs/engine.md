@@ -32,7 +32,10 @@ whole routing.
    `TOOLKIT_METHODS`.
 3. Test it in Node against the real toolkit (`testing.ts` loads it and the
    demo; see `host.test.ts`), and run the e2e suite.
-4. When no method routes to the classic engine any more, delete it.
+4. Delete it from the classic worker and client, and add it to
+   `RetiredMethod` (`protocol.ts`; the composite checks every retired method
+   is routed to the toolkit).
+5. When no method routes to the classic engine any more, delete it.
 
 The host runs in Node too (no worker globals), which is what the unit tests
 use; keep it that way.
@@ -129,8 +132,8 @@ session is resolution context.
   (less what it redefines) — not what it imports: the toolkit's own exposure
   (`viewInfo`) follows the letter of the spec, where an expose takes in a
   package's private imports too (`SystemRequirements::*` would bring in all
-  of SI). Targets resolve from the root, then from the namespaces around the
-  view, then by qualified-name suffix. A bill of materials row is exposed by
+  of SI). Targets resolve like names: from the namespaces around the view
+  (innermost first), then from the root, then by qualified-name suffix. A bill of materials row is exposed by
   its path through the tree, so `drone::**` doesn't take in the same motor in
   another assembly. A view without `expose` shows the whole model.
 - **`filter`.** On a view usage that exposes something, the toolkit's
@@ -146,6 +149,26 @@ session is resolution context.
   (~15 ms on the demo in Node); a table then renders in a few milliseconds.
   No derived relationship property is read (those cost a ~300 ms
   derivation pass).
+
+## State machines
+
+`stateMachines` (`toolkit/machines.ts`) builds the emulator's `StateMachine`s
+from the adapter's element records: a machine is a `state def`, or a `state`
+/ `exhibit state` usage not inside another state, with states or
+transitions of its own. States, nesting, `parallel` (`isParallel`), docs and
+variables (attributes of the machine, its states and, for a usage, the
+element it is in) come from the model; each transition's source and target
+are the toolkit's `derived:source` / `derived:target`, so `then done` is the
+library's final state and a nested target is the state it names. The
+expression texts come from the transition's source text (the model has no
+spans for expressions), in the emulator's conventions: a trigger is the
+signal, `when …` or `after …` / `at …`; an action that assigns is
+`assign x := e` statements joined by `; `. Names are matched by hand only
+where the toolkit can't help cheaply: the `entry; then x;` target (a
+succession's `targetFeature` costs the whole-model derivation pass), a
+target transition's source (`accept Go then b;` after `state a;`: the state
+before it) and ends that don't resolve (a placeholder state and a warning).
+It costs about 3 ms on the demo, once per analysis.
 
 ## Language services
 
