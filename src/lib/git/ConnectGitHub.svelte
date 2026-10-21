@@ -4,6 +4,7 @@
 	 * step by step for people who have never made one.
 	 */
 	import { ExternalLink, Eye, EyeOff, LoaderCircle, Lock } from '@lucide/svelte';
+	import { pwa } from '#lib/offline/pwa.svelte.ts';
 	import { accounts } from './account.svelte.ts';
 	import { messageOf } from './errors.ts';
 	import { tokenUrl } from './github.ts';
@@ -85,7 +86,10 @@
 		</li>
 	</ol>
 	{#if error}<p class="error" role="alert">{error}</p>{/if}
-	<button type="submit" class="primary" disabled={busy || !token.trim()}>
+	{#if !pwa.online}<p class="offline" role="status">
+			You're offline. Connect GitHub once you're back online.
+		</p>{/if}
+	<button type="submit" class="primary" disabled={busy || !token.trim() || !pwa.online}>
 		{#if busy}<LoaderCircle size={16} class="spin" aria-hidden="true" /> Checking…{:else}Connect
 			GitHub{/if}
 	</button>
@@ -204,12 +208,16 @@
 			transform: rotate(360deg);
 		}
 	}
-	.error {
+	.error,
+	.offline {
 		padding: var(--space-2) var(--space-3);
 		border-radius: var(--radius-sm);
 		background: var(--danger-weak);
 		color: var(--text);
 		font-size: var(--text-sm);
+	}
+	.offline {
+		background: var(--warn-weak);
 	}
 	.privacy {
 		display: flex;

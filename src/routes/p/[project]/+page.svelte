@@ -3,6 +3,7 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { getEngine } from '#lib/engine/instance.ts';
+	import { pwa } from '#lib/offline/pwa.svelte.ts';
 	import { demoProject } from '#lib/project/demo.ts';
 	import { ProjectSession } from '#lib/project/session.svelte.ts';
 	import { Workspace } from '#lib/project/workspace.svelte.ts';
@@ -43,6 +44,21 @@
 			opened = workspace.files;
 		})();
 	});
+
+	// Before reloading for a new version: save what's pending, and ask before losing anything.
+	onMount(() =>
+		pwa.guardReload(async () => {
+			await session.flush();
+			if (session.saveState === 'error')
+				return confirm('Your latest changes could not be saved in this browser. Reload anyway?');
+			const unsaved = session.unsavedToFolder.length;
+			if (unsaved)
+				return confirm(
+					`${unsaved} ${unsaved === 1 ? 'file is' : 'files are'} not saved to the folder yet. Reload anyway?`
+				);
+			return true;
+		})
+	);
 
 	// Save every change to this browser shortly after it is made.
 	$effect(() => {

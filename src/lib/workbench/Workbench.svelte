@@ -27,6 +27,7 @@
 	import type { Engine } from '#lib/engine/client.ts';
 	import { elementAt } from '#lib/project/elements.ts';
 	import type { Workspace } from '#lib/project/workspace.svelte.ts';
+	import OfflineBadge from '#lib/offline/OfflineBadge.svelte';
 	import Logo from '#lib/ui/Logo.svelte';
 	import ThemeToggle from '#lib/ui/ThemeToggle.svelte';
 	import Toaster from '#lib/ui/Toaster.svelte';
@@ -613,6 +614,7 @@
 			<TriangleAlert size={13} class={warnings ? 'warn' : ''} />
 			{warnings}<span class="visually-hidden">warnings</span>
 		</button>
+		<OfflineBadge />
 		<span class="grow"></span>
 		<span class="meta"
 			>SysML v2{workspace.engineVersion ? ` · engine ${workspace.engineVersion}` : ''}</span

@@ -81,9 +81,15 @@ export class ProjectSession {
 		return Object.entries(this.workspace.files).map(([path, text]) => ({ path, text }));
 	}
 
+	/** Save now if a change is still waiting to be saved (before the page reloads). */
+	async flush() {
+		if (this.timer !== undefined) await this.save();
+	}
+
 	async save() {
 		if (!this.record) return;
 		clearTimeout(this.timer);
+		this.timer = undefined;
 		this.saveState = 'saving';
 		try {
 			const info = this.workspace.info ?? this.record.info;

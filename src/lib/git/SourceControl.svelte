@@ -18,9 +18,11 @@
 		LoaderCircle,
 		RefreshCw,
 		Undo2,
+		WifiOff,
 		X
 	} from '@lucide/svelte';
 	import type { Engine } from '#lib/engine/client.ts';
+	import { pwa } from '#lib/offline/pwa.svelte.ts';
 	import type { ProjectSession } from '#lib/project/session.svelte.ts';
 	import { toasts } from '#lib/ui/toasts.svelte.ts';
 	import { accounts } from './account.svelte.ts';
@@ -49,6 +51,8 @@
 	const record = $derived(session.record?.git ?? null);
 	const changes = $derived(git.changes);
 	const connected = $derived(accounts.connected);
+	/** Signed in and online: GitHub can be reached. */
+	const reachable = $derived(connected && pwa.online);
 	const ref = $derived(record ? { owner: record.owner, repo: record.repo } : null);
 	const webUrl = $derived(ref ? `https://github.com/${ref.owner}/${ref.repo}` : '');
 
@@ -290,7 +294,7 @@
 					type="button"
 					class="icon small"
 					aria-label="Check GitHub for newer versions"
-					disabled={!!busy || !connected}
+					disabled={!!busy || !reachable}
 					onclick={() => void git.check()}
 				>
 					<RefreshCw size={14} />
@@ -299,6 +303,15 @@
 		{/if}
 
 		<div class="body" bind:this={body}>
+			{#if !pwa.online}
+				<p class="offline" role="status">
+					<WifiOff size={16} aria-hidden="true" />
+					<span
+						>You're offline. Your changes are saved in this browser; saving to and getting the
+						latest from GitHub wait until you're back online.</span
+					>
+				</p>
+			{/if}
 			{#if notice}
 				<p class="notice" role="status">
 					<Check size={16} aria-hidden="true" />
@@ -353,7 +366,7 @@
 					<button
 						type="button"
 						class="primary"
-						disabled={!connected}
+						disabled={!reachable}
 						onclick={() => (linkOpen = true)}
 					>
 						<GitHubMark size={16} /> Choose a repository…
@@ -467,7 +480,7 @@
 							<strong>Newer changes are on GitHub</strong>
 							<p>Get them before saving, so nobody's work is lost.</p>
 						</div>
-						<button type="button" class="primary" onclick={pull} disabled={working || !connected}>
+						<button type="button" class="primary" onclick={pull} disabled={working || !reachable}>
 							{#if busy === 'pulling'}<LoaderCircle
 									size={16}
 									class="spin"
@@ -577,7 +590,7 @@
 						<button
 							type="submit"
 							class="primary"
-							disabled={!changes.length || working || !connected}
+							disabled={!changes.length || working || !reachable}
 						>
 							{#if busy === 'saving'}<LoaderCircle size={16} class="spin" aria-hidden="true" /> Saving…{:else}<CloudUpload
 									size={16}
@@ -590,7 +603,7 @@
 							{@render term('commit & push')}
 						</span>
 					</div>
-					{#if git.behind === 0 && connected}
+					{#if git.behind === 0 && reachable}
 						<button type="button" class="link-button" onclick={pull} disabled={working}>
 							{#if busy === 'pulling'}<LoaderCircle
 									size={14}
@@ -622,7 +635,7 @@
 							autocomplete="off"
 							aria-describedby="{uid}-branch-hint"
 						/>
-						<button type="submit" disabled={!newBranch || working || !connected}>
+						<button type="submit" disabled={!newBranch || working || !reachable}>
 							{#if busy === 'branching'}<LoaderCircle
 									size={14}
 									class="spin"
@@ -700,7 +713,7 @@
 									{/each}
 								</select>
 							</label>
-							<button type="submit" class="primary" disabled={working || !connected}>
+							<button type="submit" class="primary" disabled={working || !reachable}>
 								{#if busy === 'proposing'}<LoaderCircle
 										size={16}
 										class="spin"
@@ -911,6 +924,7 @@
 		box-shadow: var(--shadow-sm);
 	}
 	.notice,
+	.offline,
 	.alert {
 		display: flex;
 		gap: var(--space-2);
@@ -920,6 +934,13 @@
 	}
 	.notice {
 		background: var(--ok-weak);
+	}
+	.offline {
+		background: var(--warn-weak);
+	}
+	.offline :global(svg:first-child) {
+		flex: none;
+		color: var(--warn);
 	}
 	.notice :global(svg:first-child) {
 		flex: none;

@@ -5,6 +5,8 @@ export interface Toast {
 	message: string;
 	tone: 'info' | 'success' | 'error';
 	action?: { label: string; run: () => void };
+	/** How long it stays, in ms; 0 keeps it until dismissed. */
+	duration?: number;
 }
 
 const DURATION_MS = 6000;
@@ -15,8 +17,13 @@ class Toasts {
 
 	show(message: string, options: Omit<Partial<Toast>, 'id' | 'message'> = {}) {
 		const toast: Toast = { id: this.next++, message, tone: options.tone ?? 'info', ...options };
-		this.items = [...this.items.slice(-2), toast];
-		setTimeout(() => this.dismiss(toast.id), DURATION_MS);
+		// Up to three at once; one that stays until dismissed isn't pushed out by later ones.
+		const stays = this.items.filter((t) => t.duration === 0);
+		const others = this.items.filter((t) => t.duration !== 0);
+		const room = Math.max(0, 2 - stays.length);
+		this.items = [...stays, ...others.slice(others.length - room), toast];
+		const duration = options.duration ?? DURATION_MS;
+		if (duration > 0) setTimeout(() => this.dismiss(toast.id), duration);
 		return toast.id;
 	}
 
