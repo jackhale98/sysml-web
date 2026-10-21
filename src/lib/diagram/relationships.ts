@@ -90,9 +90,10 @@ export function relationsFor(
 		options.push({ kind, label, from, to });
 
 	if (canSpecialize(source, target)) add('specialize', 'specializes', source, target);
+	// Between sibling parts with ports, wiring them up is the likely intent.
+	if (canConnect(source, target, ctx)) add('connect', 'connect', source, target);
 	if (canCompose(source, target)) add('compose', 'is made of', source, target);
 	if (canCompose(target, source)) add('compose', 'is part of', target, source);
-	if (canConnect(source, target, ctx)) add('connect', 'connect', source, target);
 	if (canSatisfy(source, target)) add('satisfy', 'satisfies', source, target);
 	if (canSatisfy(target, source)) add('satisfy', 'is satisfied by', target, source);
 	if (kindOf(source) === 'verification' && isRequirement(target)) {
@@ -218,7 +219,10 @@ export function defaultChoice(option: RelationOption, ctx: ModelContext): Relati
 	return {};
 }
 
-export function portsFor(option: RelationOption, ctx: ModelContext): {
+export function portsFor(
+	option: RelationOption,
+	ctx: ModelContext
+): {
 	from: PortInfo[];
 	to: PortInfo[];
 } {
@@ -381,7 +385,8 @@ export function planRelation(
 		case 'compose': {
 			const name = (choice.name ?? '').trim();
 			if (!name) return 'Give the new part a name.';
-			const keyword = kindOf(to) === 'item' ? 'item' : kindOf(to) === 'occurrence' ? 'occurrence' : 'part';
+			const keyword =
+				kindOf(to) === 'item' ? 'item' : kindOf(to) === 'occurrence' ? 'occurrence' : 'part';
 			const type = partType(to, from, ctx);
 			const label = to.isDefinition ? to.label : simpleName(to.typeRef ?? to.label);
 			return step(

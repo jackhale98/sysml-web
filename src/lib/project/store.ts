@@ -1,8 +1,10 @@
 /**
  * Projects kept in this browser (IndexedDB): every edit is saved here, so
  * work survives a reload. A project opened from a folder also keeps the
- * folder's handle so it can be saved back to disk.
+ * folder's handle so it can be saved back to disk; one opened from a git
+ * repository keeps where it came from and the version its files are based on.
  */
+import type { GitRecord } from '#lib/git/types.ts';
 import type { ProjectFile, ProjectInfo } from './workspace.svelte.ts';
 
 export interface StoredProject {
@@ -10,11 +12,13 @@ export interface StoredProject {
 	info: ProjectInfo;
 	files: ProjectFile[];
 	/** Where the project came from. */
-	origin: 'new' | 'folder' | 'archive' | 'demo';
+	origin: 'new' | 'folder' | 'archive' | 'demo' | 'git';
 	created: string;
 	updated: string;
 	/** For `folder` projects (Chromium): permission to write the files back. */
 	folder?: FileSystemDirectoryHandle;
+	/** The repository it is connected to (`git` projects, or any project connected later). */
+	git?: GitRecord;
 }
 
 export type ProjectSummary = Omit<StoredProject, 'files'> & { fileCount: number };
@@ -85,6 +89,51 @@ export async function persistStorage(): Promise<boolean> {
 		return (await navigator.storage?.persist?.()) ?? false;
 	} catch {
 		return false;
+	}
+}
+
+/** Whether the browser has agreed to keep this site's storage. */
+export async function isStoragePersisted(): Promise<boolean> {
+	try {
+		return (await navigator.storage?.persisted?.()) ?? false;
+	} catch {
+		return false;
+	}
+}
+
+/** Bytes used and available to this site, when the browser says. */
+export async function storageEstimate(): Promise<{ usage: number; quota: number } | null> {
+	try {
+		const estimate = await navigator.storage?.estimate?.();
+		return estimate ? { usage: estimate.usage ?? 0, quota: estimate.quota ?? 0 } : null;
+	} catch {
+		return null;
+	}
+}
+
+/** Prefix of every key this app keeps in local storage. */
+export const LOCAL_KEY_PREFIX = 'sysml-web:';
+
+/**
+ * Delete every project, setting and saved account in this browser. Files on
+ * disk and in git repositories are not touched.
+ */
+export async function deleteAllData(): Promise<void> {
+	const database = await db?.catch(() => undefined);
+	database?.close();
+	db = undefined;
+	await new Promise<void>((resolve, reject) => {
+		const request = indexedDB.deleteDatabase(DB);
+		request.onsuccess = () => resolve();
+		request.onerror = () => reject(request.error ?? new Error('Browser storage failed.'));
+		request.onblocked = () =>
+			reject(new Error('SysML Web is open in another tab. Close it, then try again.'));
+	});
+	try {
+		for (const key of Object.keys(localStorage))
+			if (key.startsWith(LOCAL_KEY_PREFIX)) localStorage.removeItem(key);
+	} catch {
+		// Local storage unavailable: nothing kept there.
 	}
 }
 

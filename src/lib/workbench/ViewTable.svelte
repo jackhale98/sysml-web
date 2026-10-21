@@ -353,6 +353,71 @@
 		</div>
 	{:else if table.rows.length === 0}
 		<p class="state">No rows. Nothing in the model matches this view yet.</p>
+	{:else if ui.phone}
+		<!-- Phones: one card per row, full width, scrolling down rather than sideways. -->
+		{@const subtitled = !isPivot && table.columns.length > 2 && !table.editable?.[1]}
+		<div class="scroll cards-scroll">
+			<ul class="cards" aria-label="{title} rows">
+				{#each rows as row (row.index)}
+					{@const selectable = !isPivot && !!table.sources[row.index]}
+					<li
+						class="card"
+						class:selected={selectable &&
+							!!ui.selection &&
+							elementFor(row.index)?.key === ui.selection.key}
+					>
+						<div class="card-title">
+							{#if selectable}
+								<button type="button" class="open" onclick={() => openRow(row.index)}
+									>{row.cells[0] || '—'}</button
+								>
+							{:else}
+								<strong>{row.cells[0] || '—'}</strong>
+							{/if}
+							{#if subtitled && row.cells[1]}<span class="subtitle">{row.cells[1]}</span>{/if}
+						</div>
+						<dl>
+							{#each row.cells as value, c (c)}
+								{@const column = table.columns[c] ?? ''}
+								{@const kind = cellKind(column, value)}
+								{@const edit = table.editable?.[c] ?? null}
+								{@const canEdit = selectable && !!edit}
+								{#if c > 0 && !(subtitled && c === 1) && (canEdit || (value !== '' && !(isPivot && value === '0')))}
+									<div class="pair {kind}">
+										<dt>{isPivot ? column : heading(column)}</dt>
+										<dd>
+											{#if editing?.row === row.index && editing.column === c && edit}
+												<CellEditor
+													{edit}
+													{value}
+													label="{heading(column)} of {rowLabel(row.cells)}"
+													onsave={(next) => saveCell(row.index, c, next, row.cells)}
+													oncancel={() => (editing = null)}
+												/>
+											{:else if canEdit}
+												<button
+													type="button"
+													class="cell"
+													onclick={() => {
+														openRow(row.index);
+														editing = { row: row.index, column: c };
+													}}
+													><span class="visually-hidden">Edit {heading(column)}:</span
+													>{@render display(kind, value)}{#if !value}<span class="empty">Add</span
+														>{/if}</button
+												>
+											{:else}
+												{@render display(kind, value)}
+											{/if}
+										</dd>
+									</div>
+								{/if}
+							{/each}
+						</dl>
+					</li>
+				{/each}
+			</ul>
+		</div>
 	{:else}
 		<div class="scroll">
 			<table class:pivot={isPivot}>
@@ -836,13 +901,139 @@
 
 	@media (max-width: 760px) {
 		.head {
-			padding: var(--space-4) var(--space-3) var(--space-3);
+			gap: var(--space-2);
+			padding: var(--space-3) var(--space-3) var(--space-2);
+		}
+		h2 {
+			font-size: var(--text-lg);
+		}
+		.title {
+			flex-wrap: wrap;
+		}
+		.keyword {
+			flex-wrap: wrap;
+			overflow-wrap: anywhere;
+		}
+		.doc {
+			display: -webkit-box;
+			overflow: hidden;
+			-webkit-box-orient: vertical;
+			-webkit-line-clamp: 3;
+			line-clamp: 3;
+		}
+		.tools {
+			flex-wrap: wrap;
+			gap: var(--space-2);
+		}
+		.search {
+			flex: 1 1 12rem;
+			width: auto;
+			height: 2.75rem;
+		}
+		.source {
+			height: 2.75rem;
 		}
 		.scroll {
 			margin: 0 var(--space-3) var(--space-3);
 		}
 		.skeleton {
 			padding: 0 var(--space-3);
+		}
+		/* Cards: the list scrolls down; nothing scrolls sideways or shrinks to fit. */
+		.cards-scroll {
+			margin: 0;
+			padding: var(--space-1) var(--space-3) 6rem;
+			overflow-x: hidden;
+			overflow-y: auto;
+			overscroll-behavior: contain;
+			border: 0;
+			border-radius: 0;
+			background: transparent;
+			box-shadow: none;
+		}
+		.cards {
+			display: grid;
+			gap: var(--space-2);
+			margin: 0;
+			padding: 0;
+			list-style: none;
+		}
+		.card {
+			min-width: 0;
+			padding: var(--space-3);
+			border: 1px solid var(--border);
+			border-radius: var(--radius-lg);
+			background: var(--surface);
+			box-shadow: var(--shadow-sm);
+			transition:
+				border-color var(--duration) var(--ease),
+				background var(--duration) var(--ease);
+		}
+		.card.selected {
+			border-color: color-mix(in oklab, var(--accent) 55%, var(--border));
+			background: color-mix(in oklab, var(--accent-weak) 60%, var(--surface));
+		}
+		.card-title {
+			display: flex;
+			align-items: baseline;
+			flex-wrap: wrap;
+			gap: 2px var(--space-2);
+			margin-bottom: var(--space-2);
+		}
+		.card-title .open,
+		.card-title strong {
+			min-height: 2rem;
+			font-family: var(--font-mono);
+			font-size: var(--text-md);
+		}
+		.subtitle {
+			flex: 1 1 10rem;
+			min-width: 0;
+			font-weight: 600;
+			overflow-wrap: anywhere;
+		}
+		dl {
+			display: grid;
+			gap: 2px;
+			margin: 0;
+		}
+		.pair {
+			display: grid;
+			grid-template-columns: minmax(5.5rem, 34%) minmax(0, 1fr);
+			align-items: start;
+			gap: var(--space-2);
+			min-height: 2.25rem;
+			padding: var(--space-1) 0;
+			border-top: 1px solid var(--border);
+		}
+		dt {
+			padding-top: 0.3rem;
+			color: var(--text-2);
+			font-size: var(--text-xs);
+			font-weight: 600;
+			letter-spacing: 0.02em;
+		}
+		dd {
+			min-width: 0;
+			margin: 0;
+			padding-top: 0.25rem;
+			overflow-wrap: anywhere;
+		}
+		.pair.long dd {
+			color: var(--text-2);
+		}
+		.pair.number dd {
+			font-variant-numeric: tabular-nums;
+		}
+		.pair .cell {
+			min-height: 2.25rem;
+			margin: -0.25rem -6px;
+			padding: 0.25rem 6px;
+			border-color: var(--border);
+			border-style: dashed;
+		}
+		.pair .cell .empty {
+			opacity: 1;
 		}
 	}
 </style>

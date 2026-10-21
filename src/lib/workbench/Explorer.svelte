@@ -106,7 +106,8 @@
 	function openResult(item: PaletteItem) {
 		const action = item.action;
 		if (action.type === 'element') {
-			ui.open({ kind: 'file', path: action.file });
+			// Phones show the element's details over the tree rather than leaving it.
+			if (!ui.phone) ui.open({ kind: 'file', path: action.file });
 			ui.select(action.key, 'explorer');
 		} else if (action.type === 'open') {
 			ui.open(action.tab);
@@ -183,7 +184,7 @@
 	</ul>
 {/snippet}
 
-<nav class="explorer" aria-label="Explorer">
+<nav class="explorer" class:phone={ui.phone} aria-label="Explorer">
 	<div class="tabs" role="tablist" aria-label="Explorer mode">
 		<button role="tab" aria-selected={mode === 'model'} onclick={() => (mode = 'model')}
 			>Model</button
@@ -250,106 +251,110 @@
 				{/if}
 			</section>
 		{:else}
-			<section aria-labelledby="views-heading">
-				<h2 id="views-heading">Views</h2>
-				<ul class="flat">
-					<li>
-						<button type="button" class="item" onclick={() => ui.open({ kind: 'home' })}>
-							<LayoutDashboard size={14} /> <span class="label">Overview</span>
-						</button>
-					</li>
-					<li>
-						<button type="button" class="item" onclick={() => ui.open({ kind: 'requirements' })}>
-							<ListChecks size={14} /> <span class="label">Requirements</span>
-							<span class="count">{workspace.requirements.length}</span>
-						</button>
-					</li>
-				</ul>
-				{#if savedViews.length}
-					<h3>Saved views</h3>
+			<!-- Phones list views in their own section (Views), so the tree comes first here. -->
+			{#if !ui.phone}
+				<section aria-labelledby="views-heading">
+					<h2 id="views-heading">Views</h2>
 					<ul class="flat">
-						{#each savedViews as v (v.info.name)}
-							<li>
-								<button
-									type="button"
-									class="item"
-									title={v.info.doc}
-									onclick={() =>
-										ui.open({ kind: 'view', name: v.info.name, title: viewTitle(v.info.name) })}
-								>
-									{#if v.presentation.kind === 'table'}<Table2 size={14} />{:else}<Network
-											size={14}
-										/>{/if}
-									<span class="label">{viewTitle(v.info.name)}</span>
-								</button>
-							</li>
-						{/each}
+						<li>
+							<button type="button" class="item" onclick={() => ui.open({ kind: 'home' })}>
+								<LayoutDashboard size={14} /> <span class="label">Overview</span>
+							</button>
+						</li>
+						<li>
+							<button type="button" class="item" onclick={() => ui.open({ kind: 'requirements' })}>
+								<ListChecks size={14} /> <span class="label">Requirements</span>
+								<span class="count">{workspace.requirements.length}</span>
+							</button>
+						</li>
 					</ul>
-				{/if}
-				{#if workspace.machines.length}
-					<h3>Simulations</h3>
-					<ul class="flat">
-						{#each workspace.machines as m (m.qualifiedName ?? m.name)}
-							<li>
-								<button
-									type="button"
-									class="item"
-									title={m.doc ?? `Run ${m.name} step by step`}
-									onclick={() =>
-										ui.open({
-											kind: 'emulator',
-											machine: m.qualifiedName ?? m.name,
-											title: m.name
-										})}
-								>
-									<Play size={14} /> <span class="label">Run {m.name}</span>
-								</button>
-							</li>
-						{/each}
-					</ul>
-				{/if}
-				{#if standardViews.length}
-					<h3>Standard tables</h3>
-					<ul class="flat">
-						{#each standardViews as v (v.name)}
-							<li>
-								<button
-									type="button"
-									class="item"
-									title={v.doc}
-									onclick={() => ui.open({ kind: 'view', name: v.name, title: viewTitle(v.name) })}
-								>
-									<Table2 size={14} /> <span class="label">{viewTitle(v.name)}</span>
-								</button>
-							</li>
-						{/each}
-					</ul>
-				{/if}
-				<details class="group" bind:open={packagesOpen}>
-					<summary>Package diagrams</summary>
-					{#if packagesOpen}
+					{#if savedViews.length}
+						<h3>Saved views</h3>
 						<ul class="flat">
-							{#each packages as p (p.element.key)}
+							{#each savedViews as v (v.info.name)}
 								<li>
 									<button
 										type="button"
 										class="item"
+										title={v.info.doc}
 										onclick={() =>
-											ui.open({
-												kind: 'diagram',
-												view: 'general',
-												scope: p.element.name,
-												title: p.element.label
-											})}
+											ui.open({ kind: 'view', name: v.info.name, title: viewTitle(v.info.name) })}
 									>
-										<Network size={14} /> <span class="label">{p.element.label}</span>
+										{#if v.presentation.kind === 'table'}<Table2 size={14} />{:else}<Network
+												size={14}
+											/>{/if}
+										<span class="label">{viewTitle(v.info.name)}</span>
 									</button>
 								</li>
 							{/each}
 						</ul>
 					{/if}
-				</details>
-			</section>
+					{#if workspace.machines.length}
+						<h3>Simulations</h3>
+						<ul class="flat">
+							{#each workspace.machines as m (m.qualifiedName ?? m.name)}
+								<li>
+									<button
+										type="button"
+										class="item"
+										title={m.doc ?? `Run ${m.name} step by step`}
+										onclick={() =>
+											ui.open({
+												kind: 'emulator',
+												machine: m.qualifiedName ?? m.name,
+												title: m.name
+											})}
+									>
+										<Play size={14} /> <span class="label">Run {m.name}</span>
+									</button>
+								</li>
+							{/each}
+						</ul>
+					{/if}
+					{#if standardViews.length}
+						<h3>Standard tables</h3>
+						<ul class="flat">
+							{#each standardViews as v (v.name)}
+								<li>
+									<button
+										type="button"
+										class="item"
+										title={v.doc}
+										onclick={() =>
+											ui.open({ kind: 'view', name: v.name, title: viewTitle(v.name) })}
+									>
+										<Table2 size={14} /> <span class="label">{viewTitle(v.name)}</span>
+									</button>
+								</li>
+							{/each}
+						</ul>
+					{/if}
+					<details class="group" bind:open={packagesOpen}>
+						<summary>Package diagrams</summary>
+						{#if packagesOpen}
+							<ul class="flat">
+								{#each packages as p (p.element.key)}
+									<li>
+										<button
+											type="button"
+											class="item"
+											onclick={() =>
+												ui.open({
+													kind: 'diagram',
+													view: 'general',
+													scope: p.element.name,
+													title: p.element.label
+												})}
+										>
+											<Network size={14} /> <span class="label">{p.element.label}</span>
+										</button>
+									</li>
+								{/each}
+							</ul>
+						{/if}
+					</details>
+				</section>
+			{/if}
 			<section aria-labelledby="model-heading">
 				<h2 id="model-heading">Model</h2>
 				{@render tree(userRoots, 0)}
@@ -585,5 +590,40 @@
 		.twisty {
 			min-height: 2.75rem;
 		}
+	}
+	/* Phones: a full-screen browser of the model, sized for thumbs. */
+	.phone {
+		gap: var(--space-3);
+		padding: var(--space-3) max(var(--space-3), env(safe-area-inset-right)) 6rem
+			max(var(--space-3), env(safe-area-inset-left));
+		overscroll-behavior: contain;
+		font-size: var(--text-md);
+	}
+	.phone .tabs {
+		flex: none;
+		padding: 3px;
+		border-radius: 999px;
+	}
+	.phone .tabs button {
+		height: 2.375rem;
+		border-radius: 999px;
+	}
+	.phone .search {
+		flex: none;
+		height: 2.75rem;
+		padding: 0 var(--space-3);
+		border-radius: 999px;
+		background: var(--surface-2);
+	}
+	.phone .search:focus-within {
+		border-color: var(--accent);
+	}
+	.phone .item {
+		min-height: 2.75rem;
+		border-radius: var(--radius-md);
+	}
+	.phone .twisty {
+		width: 2rem;
+		min-height: 2.75rem;
 	}
 </style>

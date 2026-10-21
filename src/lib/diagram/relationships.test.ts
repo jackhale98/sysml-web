@@ -131,9 +131,9 @@ describe('which relationships fit', () => {
 
 	it('offers composition, connection and allocation between parts', () => {
 		expect(kinds(el('drone.battery', false), el('drone.powerDistribution', false))).toEqual([
+			'connect:connect',
 			'compose:is made of',
 			'compose:is part of',
-			'connect:connect',
 			'allocate:is allocated to'
 		]);
 	});
@@ -178,7 +178,9 @@ describe('statements', () => {
 		expect(p.label).toBe('Battery is now part of DeliveryDrone');
 		const after = apply(p)['system/DroneArchitecture.sysml']!;
 		expect(after).toContain('        port commandLink : ~CommandLinkPort;');
-		expect(after).toMatch(/perform action deliveryFlight : DeliveryFlight;\n\s+part battery : Battery;/);
+		expect(after).toMatch(
+			/perform action deliveryFlight : DeliveryFlight;\n\s+part battery : Battery;/
+		);
 	});
 
 	it('"is made of" into a usage patches its body', () => {
@@ -194,7 +196,7 @@ describe('statements', () => {
 	it('satisfy is written beside the other satisfy statements', () => {
 		const p = plan(el('drone.camera', false), el("'Ingress protection'", false), 'satisfies');
 		expect(p.statement).toBe("satisfy 'Ingress protection' by drone.camera;");
-		expect(p.label).toBe("camera now satisfies Ingress protection");
+		expect(p.label).toBe('camera now satisfies Ingress protection');
 		const after = apply(p)['system/Satisfaction.sysml']!;
 		expect(after).toContain(
 			"    satisfy 'Controlled parcel release' by drone.payloadRelease;\n    satisfy 'Ingress protection' by drone.camera;"
@@ -211,7 +213,9 @@ describe('statements', () => {
 	it('allocate joins the allocation package, with paths', () => {
 		const p = plan(el('drone.camera', false), el('drone.gnss', false), 'is allocated to');
 		expect(p.statement).toBe('allocate drone.camera to drone.gnss;');
-		expect(apply(p)['behaviour/Allocation.sysml']).toContain('allocate drone.camera to drone.gnss;');
+		expect(apply(p)['behaviour/Allocation.sysml']).toContain(
+			'allocate drone.camera to drone.gnss;'
+		);
 	});
 
 	it('connect picks matching ports and an interface definition', () => {
@@ -219,11 +223,17 @@ describe('statements', () => {
 		const to = el('drone.rotors', false);
 		const option = relationsFor(from, to, ctx).find((o) => o.kind === 'connect')!;
 		const choice = defaultChoice(option, ctx);
-		expect(choice).toEqual({ fromPort: 'powerOut', toPort: 'powerIn', interfaceDef: 'PowerSupply' });
+		expect(choice).toEqual({
+			fromPort: 'powerOut',
+			toPort: 'powerIn',
+			interfaceDef: 'PowerSupply'
+		});
 		const p = planRelation(option, choice, ctx) as Plan;
 		expect(p.statement).toBe('interface : PowerSupply connect battery.powerOut to rotors.powerIn;');
 		const after = apply(p)['system/DroneArchitecture.sysml']!;
-		expect(after).toContain('        interface : PowerSupply connect battery.powerOut to rotors.powerIn;\n    }');
+		expect(after).toContain(
+			'        interface : PowerSupply connect battery.powerOut to rotors.powerIn;\n    }'
+		);
 		const plain = planRelation(option, { ...choice, interfaceDef: '' }, ctx) as Plan;
 		expect(plain.statement).toBe('connect battery.powerOut to rotors.powerIn;');
 	});
@@ -239,7 +249,9 @@ describe('statements', () => {
 	it('specializes adds :> to the declaration', () => {
 		const p = plan(el('DeliveryDrone', true), el('Battery', true), 'specializes');
 		expect(p.label).toBe('DeliveryDrone now specializes Battery');
-		expect(apply(p)['system/DroneArchitecture.sysml']).toContain('part def DeliveryDrone :> Battery {');
+		expect(apply(p)['system/DroneArchitecture.sysml']).toContain(
+			'part def DeliveryDrone :> Battery {'
+		);
 	});
 });
 
@@ -299,13 +311,9 @@ describe('removing a drawn relationship', () => {
 	});
 
 	it('removes an allocation', () => {
-		const after = remove(
-			'allocate',
-			null,
-			el('checkDropZone', false),
-			el('camera', false),
-			ctx
-		)['behaviour/Allocation.sysml']!;
+		const after = remove('allocate', null, el('checkDropZone', false), el('camera', false), ctx)[
+			'behaviour/Allocation.sysml'
+		]!;
 		expect(after).not.toContain('checkDropZone');
 	});
 

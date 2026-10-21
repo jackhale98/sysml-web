@@ -27,14 +27,14 @@
 	}
 
 	function focusInput(input: HTMLInputElement) {
-		draft = node.label;
+		draft = data.name ?? node.label;
 		input.focus();
 		input.select();
 	}
 
 	async function save() {
 		if (!editing || saving) return;
-		if (draft.trim() === node.label) {
+		if (draft.trim() === (data.name ?? node.label)) {
 			editing.cancelRename();
 			return;
 		}
@@ -104,7 +104,7 @@
 				{#if renaming}
 					<input
 						class="name-input nodrag nopan nowheel"
-						aria-label="New name for {node.label}"
+						aria-label="New name for {data.name ?? node.label}"
 						bind:value={draft}
 						{@attach focusInput}
 						{onkeydown}

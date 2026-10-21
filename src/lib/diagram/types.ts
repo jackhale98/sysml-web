@@ -7,6 +7,10 @@ export interface SysmlNodeData extends Record<string, unknown> {
 	view: DiagramView;
 	/** The node stands for a model element that can be renamed and connected. */
 	editable: boolean;
+	/** `ModelElement.key` of the element the node draws, when it is in the model. */
+	elementKey: string | null;
+	/** The element's name for display, which the label may decorate (`drone : DeliveryDrone`). */
+	name: string | null;
 }
 
 export interface SysmlEdgeData extends Record<string, unknown> {

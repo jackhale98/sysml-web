@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { BookOpen, CircleAlert, FileCode, Link2, Plus, Trash2 } from '@lucide/svelte';
+	import { BookOpen, CircleAlert, Code, FileCode, Link2, Plus, Trash2 } from '@lucide/svelte';
 	import { conceptFor } from '#lib/learn/concepts.ts';
 	import KindGlyph from '#lib/ui/KindGlyph.svelte';
 	import { familyColor } from '#lib/ui/kinds.ts';
@@ -61,12 +61,18 @@
 	}
 
 	function showInText(e: ModelElement) {
+		if (ui.phone) {
+			// Select first: opening the text then lowers the sheet to show it.
+			ui.select(e.key, 'inspector');
+			ui.showText(e.file);
+			return;
+		}
 		ui.open({ kind: 'file', path: e.file });
 		ui.select(e.key, 'inspector');
 	}
 </script>
 
-<aside class="inspector" aria-label="Inspector">
+<aside class="inspector" class:phone={ui.phone} aria-label="Inspector">
 	{#if !element}
 		<div class="empty">
 			<BookOpen size={22} />
@@ -75,7 +81,7 @@
 			</p>
 		</div>
 	{:else}
-		<header style:--fam={familyColor(element.kind)}>
+		<header style:--fam={familyColor(element.kind)} data-sheet-drag data-sheet-peek>
 			<span class="kind">
 				<KindGlyph kind={element.kind} isDefinition={element.isDefinition} size={20} />
 				{concept?.title ??
@@ -221,6 +227,11 @@
 		{/if}
 
 		<section class="actions">
+			{#if ui.phone}
+				<button type="button" class="button" onclick={() => showInText(element)}>
+					<Code size={15} /> Show SysML
+				</button>
+			{/if}
 			{#if canOwnMembers(element.kind, element.isDefinition)}
 				{#if adding}
 					<AddForm
@@ -482,5 +493,56 @@
 	}
 	.error {
 		color: var(--danger);
+	}
+
+	/* In the phone's details sheet: the header is the sheet's handle and
+	   stays in view; actions are thumb-sized. */
+	.inspector.phone {
+		padding-top: 0;
+		padding-bottom: calc(var(--space-5) + var(--sheet-hidden, 0px) + env(safe-area-inset-bottom));
+		overscroll-behavior: contain;
+		font-size: var(--text-md);
+	}
+	.phone header {
+		position: sticky;
+		top: 0;
+		z-index: 1;
+		margin-top: 0;
+		padding-top: var(--space-2);
+		padding-right: 3.25rem;
+		border-top: 0;
+		background: color-mix(in oklab, var(--fam) 7%, var(--surface));
+		box-shadow:
+			inset 0 3px 0 var(--fam),
+			0 1px 0 var(--border);
+		touch-action: none;
+		cursor: grab;
+	}
+	.phone h2 {
+		font-size: var(--text-xl);
+	}
+	.phone .empty {
+		margin-top: var(--space-6);
+	}
+	.phone .field input {
+		height: 3rem;
+		padding: 0 var(--space-3);
+		border-radius: var(--radius-md);
+	}
+	.phone .links {
+		gap: 0;
+	}
+	.phone .links .link {
+		min-height: 2.75rem;
+	}
+	.phone .actions {
+		margin-top: var(--space-2);
+	}
+	.phone .button {
+		height: 3rem;
+		border-radius: var(--radius-md);
+	}
+	.phone .concept button.link {
+		min-height: 2.75rem;
 	}
 </style>

@@ -27,7 +27,9 @@ describe('layout file', () => {
 
 	it('tolerates broken or foreign content', () => {
 		expect(parseLayout('not json')).toEqual({});
-		expect(parseLayout('{"a:b": {"x": [1], "y": [1, 2]}, "c": 3}')).toEqual({ 'a:b': { y: [1, 2] } });
+		expect(parseLayout('{"a:b": {"x": [1], "y": [1, 2]}, "c": 3}')).toEqual({
+			'a:b': { y: [1, 2] }
+		});
 	});
 
 	it('clears a diagram', () => {

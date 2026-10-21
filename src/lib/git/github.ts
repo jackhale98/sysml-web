@@ -1,0 +1,360 @@
+/**
+ * GitHub through its REST API, straight from the browser (the API allows
+ * cross-origin requests, so no proxy is needed). Authenticated with a
+ * fine-grained personal access token; an OAuth token works the same way.
+ */
+import { GitError, errorFor, networkError } from './errors.ts';
+import type {
+	BranchSummary,
+	CommitRequest,
+	CommitResult,
+	Comparison,
+	FileChange,
+	GitProvider,
+	GitUser,
+	Head,
+	Progress,
+	PullRequest,
+	PullRequestInput,
+	RemoteTree,
+	RepoRef,
+	RepoSummary,
+	TreeEntry
+} from './types.ts';
+
+const API = 'https://api.github.com';
+const HOST = 'GitHub';
+/** Parallel blob downloads: quick without tripping GitHub's abuse limits. */
+const PARALLEL = 6;
+const MAX_REPO_PAGES = 5;
+
+/**
+ * Where to create a fine-grained token with the right permissions filled
+ * in. The person still picks which repositories it covers.
+ */
+export function tokenUrl(): string {
+	const params = new URLSearchParams({
+		name: 'SysML Web',
+		description: 'Open and save SysML models from SysML Web (sysml-web).',
+		expires_in: '90',
+		contents: 'write',
+		pull_requests: 'write',
+		metadata: 'read'
+	});
+	return `https://github.com/settings/personal-access-tokens/new?${params}`;
+}
+
+/** `owner/repo` from a GitHub URL, an SSH remote or `owner/repo`; the branch too if the URL has one. */
+export function parseRepoUrl(input: string): (RepoRef & { branch?: string }) | null {
+	const text = input.trim();
+	const ssh = /^git@github\.com:([\w.-]+)\/([\w.-]+?)(?:\.git)?$/.exec(text);
+	if (ssh) return { owner: ssh[1]!, repo: ssh[2]! };
+	const web =
+		/^(?:https?:\/\/)?(?:www\.)?github\.com\/([\w.-]+)\/([\w.-]+?)(?:\.git)?(?:\/tree\/([^?#]+))?\/?(?:[?#].*)?$/.exec(
+			text
+		);
+	if (web)
+		return {
+			owner: web[1]!,
+			repo: web[2]!,
+			...(web[3] ? { branch: decodeURIComponent(web[3]) } : {})
+		};
+	const short = /^([\w.-]+)\/([\w.-]+)$/.exec(text);
+	if (short) return { owner: short[1]!, repo: short[2]! };
+	return null;
+}
+
+/** The tree for a commit: changed files point at their new blobs, deleted ones at nothing. */
+export function treePayload(
+	baseTree: string,
+	changes: FileChange[],
+	blobs: Record<string, string>
+): {
+	base_tree: string;
+	tree: { path: string; mode: '100644'; type: 'blob'; sha: string | null }[];
+} {
+	return {
+		base_tree: baseTree,
+		tree: changes.map((c) => ({
+			path: c.path,
+			mode: '100644',
+			type: 'blob',
+			sha: c.text === null ? null : blobs[c.path]!
+		}))
+	};
+}
+
+/** UTF-8 text from base64, as the blobs API returns it. */
+export function decodeBase64(data: string): string {
+	const binary = atob(data.replace(/\s/g, ''));
+	const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+	return new TextDecoder().decode(bytes);
+}
+
+const path = (ref: RepoRef) =>
+	`/repos/${encodeURIComponent(ref.owner)}/${encodeURIComponent(ref.repo)}`;
+/** A branch name in a URL path: segments encoded, slashes kept. */
+const branchPath = (name: string) => name.split('/').map(encodeURIComponent).join('/');
+
+interface GitHubRepo {
+	name: string;
+	full_name: string;
+	owner: { login: string };
+	private: boolean;
+	default_branch: string;
+	description: string | null;
+	pushed_at: string | null;
+	html_url: string;
+	permissions?: { push?: boolean; admin?: boolean };
+}
+
+function summary(r: GitHubRepo): RepoSummary {
+	return {
+		owner: r.owner.login,
+		repo: r.name,
+		fullName: r.full_name,
+		private: r.private,
+		defaultBranch: r.default_branch,
+		description: r.description,
+		pushedAt: r.pushed_at,
+		canPush: !!(r.permissions?.push || r.permissions?.admin),
+		htmlUrl: r.html_url
+	};
+}
+
+export class GitHubProvider implements GitProvider {
+	readonly id = 'github' as const;
+	readonly label = HOST;
+	private fetch: typeof fetch;
+	private api: string;
+
+	constructor(
+		private token: string,
+		options: { fetch?: typeof fetch; api?: string } = {}
+	) {
+		this.fetch = options.fetch ?? ((...args) => globalThis.fetch(...args));
+		this.api = options.api ?? API;
+	}
+
+	private async request<T>(method: string, url: string, body?: unknown, what?: string): Promise<T> {
+		let response: Response;
+		try {
+			response = await this.fetch(url.startsWith('http') ? url : this.api + url, {
+				method,
+				headers: {
+					Accept: 'application/vnd.github+json',
+					Authorization: `Bearer ${this.token}`,
+					'X-GitHub-Api-Version': '2022-11-28',
+					...(body === undefined ? {} : { 'Content-Type': 'application/json' })
+				},
+				body: body === undefined ? undefined : JSON.stringify(body),
+				cache: 'no-store'
+			});
+		} catch (error) {
+			throw networkError(HOST, error);
+		}
+		if (!response.ok) {
+			let detail = '';
+			try {
+				const json = (await response.json()) as {
+					message?: string;
+					errors?: { message?: string }[];
+				};
+				detail = [json.message, ...(json.errors ?? []).map((e) => e.message)]
+					.filter(Boolean)
+					.join(': ');
+			} catch {
+				// No JSON body.
+			}
+			throw errorFor(response, detail, HOST, what);
+		}
+		if (response.status === 204) return undefined as T;
+		return (await response.json()) as T;
+	}
+
+	async currentUser(): Promise<GitUser> {
+		const user = await this.request<{ login: string; name: string | null; avatar_url: string }>(
+			'GET',
+			'/user',
+			undefined,
+			'sign in'
+		);
+		return { login: user.login, name: user.name, avatarUrl: user.avatar_url };
+	}
+
+	async listRepos(): Promise<RepoSummary[]> {
+		const out: RepoSummary[] = [];
+		for (let page = 1; page <= MAX_REPO_PAGES; page++) {
+			const repos = await this.request<GitHubRepo[]>(
+				'GET',
+				`/user/repos?per_page=100&sort=pushed&page=${page}`,
+				undefined,
+				'your repositories'
+			);
+			out.push(...repos.map(summary));
+			if (repos.length < 100) break;
+		}
+		return out;
+	}
+
+	async getRepo(ref: RepoRef): Promise<RepoSummary> {
+		return summary(
+			await this.request<GitHubRepo>(
+				'GET',
+				path(ref),
+				undefined,
+				`the repository ${ref.owner}/${ref.repo}`
+			)
+		);
+	}
+
+	async listBranches(ref: RepoRef): Promise<BranchSummary[]> {
+		const branches = await this.request<
+			{ name: string; commit: { sha: string }; protected?: boolean }[]
+		>('GET', `${path(ref)}/branches?per_page=100`, undefined, 'the branches');
+		return branches.map((b) => ({ name: b.name, sha: b.commit.sha, protected: b.protected }));
+	}
+
+	async head(ref: RepoRef, branch: string): Promise<Head> {
+		const b = await this.request<{
+			commit: { sha: string; commit: { tree: { sha: string } } };
+		}>('GET', `${path(ref)}/branches/${branchPath(branch)}`, undefined, `the branch “${branch}”`);
+		return { commit: b.commit.sha, tree: b.commit.commit.tree.sha };
+	}
+
+	async readTree(ref: RepoRef, commit: string): Promise<RemoteTree> {
+		const c = await this.request<{ tree: { sha: string } }>(
+			'GET',
+			`${path(ref)}/git/commits/${commit}`,
+			undefined,
+			'that version'
+		);
+		const tree = await this.request<{
+			sha: string;
+			truncated: boolean;
+			tree: { path: string; type: string; sha: string; size?: number }[];
+		}>('GET', `${path(ref)}/git/trees/${c.tree.sha}?recursive=1`, undefined, 'the files');
+		return {
+			commit,
+			tree: tree.sha,
+			truncated: tree.truncated,
+			entries: tree.tree
+				.filter((e) => e.type === 'blob')
+				.map((e) => ({ path: e.path, sha: e.sha, size: e.size }))
+		};
+	}
+
+	async readFiles(
+		ref: RepoRef,
+		entries: TreeEntry[],
+		progress?: Progress
+	): Promise<Record<string, string>> {
+		const out: Record<string, string> = {};
+		let done = 0;
+		let next = 0;
+		progress?.(0, entries.length);
+		const worker = async () => {
+			while (next < entries.length) {
+				const entry = entries[next++]!;
+				const blob = await this.request<{ content: string; encoding: string }>(
+					'GET',
+					`${path(ref)}/git/blobs/${entry.sha}`,
+					undefined,
+					entry.path
+				);
+				out[entry.path] =
+					blob.encoding === 'base64' ? decodeBase64(blob.content) : String(blob.content);
+				progress?.(++done, entries.length);
+			}
+		};
+		await Promise.all(Array.from({ length: Math.min(PARALLEL, entries.length) }, worker));
+		return out;
+	}
+
+	/** Blobs → tree → commit → move the branch (refused unless it is a fast-forward). */
+	async commit(ref: RepoRef, request: CommitRequest): Promise<CommitResult> {
+		if (!request.changes.length) throw new GitError('invalid', 'There are no changes to save.');
+		const head = await this.head(ref, request.branch);
+		if (head.commit !== request.parent)
+			throw new GitError(
+				'behind',
+				`Someone saved newer changes to “${request.branch}” on ${HOST}. Get the latest first, then save again.`,
+				409
+			);
+		const blobs: Record<string, string> = {};
+		for (const change of request.changes) {
+			if (change.text === null) continue;
+			const blob = await this.request<{ sha: string }>(
+				'POST',
+				`${path(ref)}/git/blobs`,
+				{ content: change.text, encoding: 'utf-8' },
+				`saving ${change.path}`
+			);
+			blobs[change.path] = blob.sha;
+		}
+		const tree = await this.request<{ sha: string }>(
+			'POST',
+			`${path(ref)}/git/trees`,
+			treePayload(request.baseTree, request.changes, blobs),
+			'saving the files'
+		);
+		const commit = await this.request<{ sha: string; html_url?: string }>(
+			'POST',
+			`${path(ref)}/git/commits`,
+			{ message: request.message, tree: tree.sha, parents: [request.parent] },
+			'saving the version'
+		);
+		await this.request(
+			'PATCH',
+			`${path(ref)}/git/refs/heads/${branchPath(request.branch)}`,
+			{ sha: commit.sha, force: false },
+			`updating “${request.branch}”`
+		);
+		return { commit: commit.sha, tree: tree.sha, blobs, url: commit.html_url };
+	}
+
+	async createBranch(ref: RepoRef, name: string, from: string): Promise<BranchSummary> {
+		await this.request(
+			'POST',
+			`${path(ref)}/git/refs`,
+			{ ref: `refs/heads/${name}`, sha: from },
+			`a branch named “${name}”`
+		);
+		return { name, sha: from };
+	}
+
+	async openPullRequest(ref: RepoRef, input: PullRequestInput): Promise<PullRequest> {
+		const pr = await this.request<{ number: number; html_url: string; title: string }>(
+			'POST',
+			`${path(ref)}/pulls`,
+			{
+				title: input.title,
+				body: input.body,
+				head: input.head,
+				base: input.base,
+				draft: input.draft ?? false
+			},
+			'opening a proposal'
+		);
+		return { number: pr.number, url: pr.html_url, title: pr.title };
+	}
+
+	async compare(ref: RepoRef, base: string, head: string): Promise<Comparison> {
+		const c = await this.request<{
+			ahead_by: number;
+			behind_by: number;
+			status: Comparison['status'];
+		}>(
+			'GET',
+			`${path(ref)}/compare/${branchPath(base)}...${branchPath(head)}?per_page=1`,
+			undefined,
+			'the latest changes'
+		);
+		return { ahead: c.ahead_by, behind: c.behind_by, status: c.status };
+	}
+
+	webUrl(ref: RepoRef, branch?: string): string {
+		const base = `https://github.com/${ref.owner}/${ref.repo}`;
+		return branch ? `${base}/tree/${branchPath(branch)}` : base;
+	}
+}

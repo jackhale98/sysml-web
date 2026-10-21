@@ -1,5 +1,6 @@
-/** Workbench UI state: open tabs, the selected element and the mobile pane. */
+/** Workbench UI state: open tabs, the selected element and the phone layout. */
 import type { DiagramView } from '#lib/engine/types.ts';
+import { isPhone } from '#lib/mobile/media.svelte.ts';
 
 export type Tab =
 	| { kind: 'home' }
@@ -23,7 +24,17 @@ export interface Selection {
 	nonce: number;
 }
 
-export type MobilePane = 'explorer' | 'editor' | 'inspector' | 'problems';
+/**
+ * The phone's sections, chosen in the bottom navigation: the overview, the
+ * model tree, and the open view (or the catalogue of views). Element details
+ * are a sheet over any of them.
+ */
+export type MobilePane = 'home' | 'model' | 'views';
+/** Older pane names, still accepted: each maps onto a section or a sheet. */
+export type PaneRequest = MobilePane | 'explorer' | 'editor' | 'inspector' | 'problems';
+
+/** How far the element details sheet is pulled up. */
+export type SheetSnap = 'closed' | 'peek' | 'half' | 'full';
 
 /** How a file tab shows its model: as text, as a diagram, or both side by side. */
 export type FileLayout = 'text' | 'split' | 'diagram';
@@ -71,11 +82,69 @@ export class WorkbenchUi {
 	/** The command palette (⌘K). */
 	paletteOpen = $state(false);
 	selection = $state<Selection | null>(null);
-	mobilePane = $state<MobilePane>('editor');
 	inspectorOpen = $state(true);
 	problemsOpen = $state(false);
+	/** The settings dialog (mounted by the host when it exists). */
+	settingsOpen = $state(false);
+	/** The source control (git) panel (mounted by the host when it exists). */
+	sourceControlOpen = $state(false);
+
+	// ── Phone layout ──────────────────────────────────────────────────────────
+	#pane = $state<MobilePane>('home');
+	/** The element details sheet. */
+	details = $state<SheetSnap>('closed');
+	/** The sheet listing open views and where to go next. */
+	viewsDrawer = $state(false);
+	/** The problems sheet. */
+	problemsSheet = $state(false);
+	/** The "add an element" sheet. */
+	addSheet = $state(false);
+	/** True while SysML text is being typed, with the keyboard up. */
+	editingText = $state(false);
+	/** On phones, each file shows as a diagram or as text; diagram unless chosen. */
+	fileLayouts = $state<Record<string, 'text' | 'diagram'>>({});
 
 	activeTab: Tab | undefined = $derived(this.tabs[this.active]);
+
+	/** Whether the phone layout is in use. */
+	get phone(): boolean {
+		return isPhone();
+	}
+
+	get mobilePane(): MobilePane {
+		return this.#pane;
+	}
+	set mobilePane(pane: PaneRequest) {
+		switch (pane) {
+			case 'explorer':
+				this.#pane = 'model';
+				break;
+			case 'editor':
+				this.#pane = this.activeTab?.kind === 'home' ? 'home' : 'views';
+				break;
+			case 'inspector':
+				this.showDetails('half');
+				break;
+			case 'problems':
+				this.problemsSheet = true;
+				break;
+			default:
+				this.#pane = pane;
+		}
+	}
+
+	/** Pull the details sheet up to at least `snap`. */
+	showDetails(snap: SheetSnap = 'half') {
+		const order: SheetSnap[] = ['closed', 'peek', 'half', 'full'];
+		if (order.indexOf(this.details) < order.indexOf(snap)) this.details = snap;
+	}
+
+	/** Lower the details sheet so the view under it shows (it stays at hand). */
+	lowerDetails() {
+		if (this.details === 'half' || this.details === 'full') {
+			this.details = this.selection ? 'peek' : 'closed';
+		}
+	}
 
 	open(tab: Tab) {
 		const id = tabId(tab);
@@ -86,7 +155,15 @@ export class WorkbenchUi {
 			this.tabs.push(tab);
 			this.active = this.tabs.length - 1;
 		}
-		this.mobilePane = 'editor';
+		this.#pane = tab.kind === 'home' ? 'home' : 'views';
+		this.viewsDrawer = false;
+		this.lowerDetails();
+	}
+
+	/** Open a file as text (on phones, rather than as its diagram). */
+	showText(path: string) {
+		this.fileLayouts[path] = 'text';
+		this.open({ kind: 'file', path });
 	}
 
 	close(index: number) {
@@ -97,5 +174,7 @@ export class WorkbenchUi {
 
 	select(key: string | null, source: SelectionSource) {
 		this.selection = key ? { key, source, nonce: (this.selection?.nonce ?? 0) + 1 } : null;
+		// On a phone, choosing an element (not moving the text cursor) shows its details.
+		if (key && source !== 'text' && this.phone) this.showDetails('half');
 	}
 }

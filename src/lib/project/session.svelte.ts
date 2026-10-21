@@ -1,8 +1,10 @@
 /**
  * One open project: where it is stored, autosaving every change to this
- * browser, and saving back to its folder or exporting it as a `.kpar`.
+ * browser, saving back to its folder or its git repository (`git`), and
+ * exporting it as a `.kpar`.
  */
 import type { Engine } from '#lib/engine/client.ts';
+import { GitConnection } from '#lib/git/connection.svelte.ts';
 import { demoProject } from './demo.ts';
 import { download, writeToFolder } from './sources.ts';
 import { loadProject, saveProject, timestamp, type StoredProject } from './store.ts';
@@ -19,10 +21,20 @@ export class ProjectSession {
 	/** Files changed since the folder was last written (folder projects). */
 	unsavedToFolder = $state.raw<string[]>([]);
 
+	/** The link to a git repository: changes, Save to GitHub, Get latest, … */
+	readonly git: GitConnection;
+
 	private timer: ReturnType<typeof setTimeout> | undefined;
 	private folderTexts: Record<string, string> = {};
 
-	constructor(private workspace: Workspace) {}
+	constructor(private workspace: Workspace) {
+		this.git = new GitConnection(this, workspace);
+	}
+
+	/** Whether the project is connected to a git repository. */
+	get isGit(): boolean {
+		return !!this.record?.git;
+	}
 
 	get canSaveToFolder(): boolean {
 		return this.record?.origin === 'folder' && !!this.record.folder;
@@ -71,6 +83,7 @@ export class ProjectSession {
 
 	async save() {
 		if (!this.record) return;
+		clearTimeout(this.timer);
 		this.saveState = 'saving';
 		try {
 			const info = this.workspace.info ?? this.record.info;

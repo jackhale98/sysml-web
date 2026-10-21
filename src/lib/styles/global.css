@@ -205,6 +205,35 @@ body {
 	height: 100%;
 }
 
+html {
+	/* Keep text at its size when a phone rotates. */
+	-webkit-text-size-adjust: 100%;
+	text-size-adjust: 100%;
+}
+
+/*
+ * The workbench is an app shell, not a page: the document never scrolls,
+ * bounces or pans; only the panes inside it scroll, each on its own.
+ */
+html.app-shell,
+html.app-shell body {
+	overflow: hidden;
+	overscroll-behavior: none;
+}
+html.app-shell body {
+	position: fixed;
+	inset: 0;
+	height: 100dvh;
+	-webkit-tap-highlight-color: transparent;
+}
+html.app-shell body * {
+	overscroll-behavior: contain;
+}
+html.app-shell :is(button, a, [role='button'], [role='tab'], [role='option'], summary, label) {
+	/* No double-tap zoom (and no tap delay) on controls. */
+	touch-action: manipulation;
+}
+
 body {
 	background: var(--bg);
 	color: var(--text);
@@ -245,6 +274,21 @@ select,
 textarea {
 	font: inherit;
 	color: inherit;
+}
+
+/*
+ * iOS Safari zooms into any field whose text is under 16 px when it is
+ * focused, and the zoomed page then pans sideways. On touch screens every
+ * field (and the code editor) is at least 16 px, so nothing zooms.
+ */
+@media (pointer: coarse) {
+	input,
+	select,
+	textarea,
+	[contenteditable='true'],
+	.cm-content {
+		font-size: max(16px, 1em) !important;
+	}
 }
 
 code,

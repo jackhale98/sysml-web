@@ -1,11 +1,20 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
-	import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
+	import {
+		defaultKeymap,
+		history,
+		historyKeymap,
+		indentWithTab,
+		redo,
+		redoDepth,
+		undo,
+		undoDepth
+	} from '@codemirror/commands';
 	import { bracketMatching, indentUnit } from '@codemirror/language';
 	import { lintGutter, setDiagnostics, type Diagnostic as CmDiagnostic } from '@codemirror/lint';
 	import { highlightSelectionMatches, searchKeymap } from '@codemirror/search';
-	import { EditorState } from '@codemirror/state';
+	import { Compartment, EditorState } from '@codemirror/state';
 	import {
 		EditorView,
 		drawSelection,
@@ -14,6 +23,7 @@
 		keymap,
 		lineNumbers
 	} from '@codemirror/view';
+	import { Check, PencilLine, Redo2, Undo2 } from '@lucide/svelte';
 	import type { Engine } from '#lib/engine/client.ts';
 	import { editorTheme, highlightEffect, sysmlHighlighting } from '#lib/editor/sysml.ts';
 	import { byteToUtf16, elementAt, utf16ToByte } from '#lib/project/elements.ts';
@@ -33,6 +43,66 @@
 	let selectTimer: ReturnType<typeof setTimeout> | undefined;
 	/** Set while applying our own selection, to avoid echoing it back. */
 	let revealing = false;
+
+	/**
+	 * On phones the text is for reading first: read-only, soft-wrapped and at
+	 * 16 px (so focusing it never zooms the page). "Edit text" turns typing on.
+	 */
+	const phone = $derived(ui.phone);
+	const editable = $derived(!phone || ui.editingText);
+	const editing = new Compartment();
+	const look = new Compartment();
+	const gutter = new Compartment();
+	let canUndo = $state(false);
+	let canRedo = $state(false);
+
+	const phoneTheme = EditorView.theme({
+		'&': { fontSize: '16px' },
+		'.cm-content': { padding: '10px 0 96px' },
+		'.cm-line': { padding: '0 12px 0 8px' },
+		'.cm-gutters': { fontSize: '11px', minWidth: '0' },
+		'.cm-lineNumbers .cm-gutterElement': { minWidth: '22px', padding: '0 4px 0 6px' }
+	});
+	function editingExtensions(on: boolean) {
+		return [EditorState.readOnly.of(!on), EditorView.editable.of(on)];
+	}
+	function lookExtensions(small: boolean) {
+		return small ? [EditorView.lineWrapping, phoneTheme] : [];
+	}
+	function gutterExtensions(small: boolean) {
+		return small ? [] : [lintGutter()];
+	}
+
+	/** Start typing: turn editing on and focus within the same tap, so the keyboard opens. */
+	function startEditing() {
+		if (!view) return;
+		ui.editingText = true;
+		view.dispatch({ effects: editing.reconfigure(editingExtensions(true)) });
+		// Keep the caret where the reader is looking rather than jumping to the top.
+		const scroller = view.scrollDOM.getBoundingClientRect();
+		const head = view.coordsAtPos(view.state.selection.main.head);
+		if (!head || head.top < scroller.top || head.bottom > scroller.bottom) {
+			const pos = view.posAtCoords({ x: scroller.left + 48, y: scroller.top + 24 });
+			if (pos !== null) view.dispatch({ selection: { anchor: pos } });
+		}
+		view.focus();
+	}
+
+	function stopEditing() {
+		ui.editingText = false;
+		view?.contentDOM.blur();
+	}
+
+	function insert(text: string) {
+		if (!view) return;
+		view.dispatch({
+			...view.state.replaceSelection(text),
+			scrollIntoView: true,
+			userEvent: 'input.type'
+		});
+	}
+
+	const SYMBOLS = ['{', '}', ':', ';', '~', '[', ']', '=', '>'];
 
 	async function refreshHighlights() {
 		if (!view) return;
@@ -64,6 +134,8 @@
 			state: EditorState.create({
 				doc: initial,
 				extensions: [
+					editing.of(editingExtensions(editable)),
+					look.of(lookExtensions(phone)),
 					lineNumbers(),
 					highlightActiveLineGutter(),
 					highlightActiveLine(),
@@ -74,7 +146,7 @@
 					highlightSelectionMatches(),
 					indentUnit.of('    '),
 					EditorState.tabSize.of(4),
-					lintGutter(),
+					gutter.of(gutterExtensions(phone)),
 					keymap.of([
 						...closeBracketsKeymap,
 						...defaultKeymap,
@@ -89,6 +161,8 @@
 						tabindex: '0'
 					}),
 					EditorView.updateListener.of((update) => {
+						canUndo = undoDepth(update.state) > 0;
+						canRedo = redoDepth(update.state) > 0;
 						if (update.docChanged) {
 							workspace.setText(path, update.state.doc.toString());
 							scheduleHighlights(150);
@@ -126,6 +200,26 @@
 			view?.destroy();
 			view = undefined;
 		};
+	});
+
+	// Follow the phone layout and the edit mode (e.g. when the window is resized).
+	$effect(() => {
+		const on = editable;
+		const small = phone;
+		if (!view) return;
+		view.dispatch({
+			effects: [
+				editing.reconfigure(editingExtensions(on)),
+				look.reconfigure(lookExtensions(small)),
+				gutter.reconfigure(gutterExtensions(small))
+			]
+		});
+		if (!on && view.hasFocus) view.contentDOM.blur();
+	});
+
+	// Leaving the file stops typing.
+	$effect(() => () => {
+		if (ui.editingText) ui.editingText = false;
 	});
 
 	// Keep in step with changes made elsewhere while this editor is not the
@@ -172,13 +266,160 @@
 	});
 </script>
 
-<div class="editor" bind:this={host}></div>
+<div class="text-editor" class:phone>
+	<div class="editor" bind:this={host}></div>
+	{#if phone && !ui.editingText}
+		<button type="button" class="edit" onclick={startEditing}>
+			<PencilLine size={17} /> Edit text
+		</button>
+	{:else if phone}
+		<!-- Buttons keep the editor's focus (and the keyboard) by not taking it on press. -->
+		<div class="accessory" role="toolbar" aria-label="Typing">
+			<button
+				type="button"
+				class="done"
+				onmousedown={(e) => e.preventDefault()}
+				onclick={stopEditing}
+			>
+				<Check size={16} /> Done
+			</button>
+			<button
+				type="button"
+				class="key"
+				aria-label="Undo"
+				disabled={!canUndo}
+				onmousedown={(e) => e.preventDefault()}
+				onclick={() => view && undo(view)}
+			>
+				<Undo2 size={17} />
+			</button>
+			<button
+				type="button"
+				class="key"
+				aria-label="Redo"
+				disabled={!canRedo}
+				onmousedown={(e) => e.preventDefault()}
+				onclick={() => view && redo(view)}
+			>
+				<Redo2 size={17} />
+			</button>
+			<span class="symbols">
+				{#each SYMBOLS as symbol (symbol)}
+					<button
+						type="button"
+						class="key sym"
+						aria-label="Type {symbol}"
+						onmousedown={(e) => e.preventDefault()}
+						onclick={() => insert(symbol)}>{symbol}</button
+					>
+				{/each}
+			</span>
+		</div>
+	{/if}
+</div>
 
 <style>
-	.editor {
+	.text-editor {
+		position: relative;
+		display: flex;
+		flex-direction: column;
 		height: 100%;
 		min-height: 0;
+	}
+	.editor {
+		flex: 1;
+		min-height: 0;
 		overflow: hidden;
+	}
+	.edit {
+		position: absolute;
+		right: max(var(--space-4), env(safe-area-inset-right));
+		bottom: var(--space-4);
+		z-index: 5;
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-2);
+		height: 3rem;
+		padding: 0 var(--space-4);
+		border: 0;
+		border-radius: 999px;
+		background: var(--text);
+		color: var(--surface);
+		box-shadow: var(--shadow-lg);
+		font-weight: 650;
+		cursor: pointer;
+		animation: rise 220ms cubic-bezier(0.2, 0.9, 0.25, 1);
+	}
+	.edit:active {
+		transform: scale(0.96);
+	}
+	.accessory {
+		display: flex;
+		align-items: center;
+		flex: none;
+		gap: 4px;
+		height: 3rem;
+		padding: 0 max(var(--space-2), env(safe-area-inset-right)) 0
+			max(var(--space-2), env(safe-area-inset-left));
+		border-top: 1px solid var(--border);
+		background: var(--surface-2);
+		animation: rise 180ms var(--ease);
+	}
+	.accessory button {
+		display: inline-grid;
+		place-items: center;
+		flex: none;
+		height: 2.375rem;
+		min-width: 2.375rem;
+		border: 0;
+		border-radius: 8px;
+		background: var(--surface);
+		box-shadow: 0 1px 0 var(--border-strong);
+		color: var(--text);
+		font-family: var(--font-mono);
+		font-size: 1rem;
+		cursor: pointer;
+		touch-action: manipulation;
+	}
+	.accessory button:active {
+		background: var(--surface-hover);
+	}
+	.accessory button:disabled {
+		opacity: 0.4;
+	}
+	.accessory .done {
+		display: inline-flex;
+		gap: 4px;
+		padding: 0 var(--space-3);
+		background: var(--accent);
+		box-shadow: none;
+		color: var(--accent-text);
+		font-family: var(--font-ui);
+		font-size: var(--text-sm);
+		font-weight: 650;
+	}
+	.symbols {
+		display: flex;
+		flex: 1;
+		gap: 4px;
+		min-width: 0;
+		margin-left: var(--space-1);
+		padding-left: var(--space-2);
+		overflow-x: auto;
+		border-left: 1px solid var(--border-strong);
+		scrollbar-width: none;
+	}
+	@keyframes rise {
+		from {
+			opacity: 0;
+			transform: translateY(8px);
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.edit,
+		.accessory {
+			animation: none;
+		}
 	}
 	.editor :global(.cm-editor) {
 		height: 100%;

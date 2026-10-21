@@ -84,7 +84,8 @@
 		const action = item.action;
 		switch (action.type) {
 			case 'element':
-				ui.open({ kind: 'file', path: action.file });
+				// On a phone the element's details slide up over the current view.
+				if (!ui.phone) ui.open({ kind: 'file', path: action.file });
 				ui.select(action.key, 'explorer');
 				break;
 			case 'open':
@@ -94,6 +95,10 @@
 				ui.layout = action.layout;
 				break;
 			case 'toggle-inspector':
+				if (ui.phone) {
+					ui.showDetails('full');
+					break;
+				}
 				ui.inspectorOpen = !ui.inspectorOpen;
 				if (ui.inspectorOpen) ui.mobilePane = 'inspector';
 				break;
@@ -172,7 +177,8 @@
 				{onkeydown}
 			/>
 			<button type="button" class="esc" title="Close" onclick={close}>
-				<kbd>Esc</kbd><span class="visually-hidden"> to close</span>
+				<span class="esc-key"><kbd>Esc</kbd><span class="visually-hidden"> to close</span></span
+				><span class="cancel">Cancel</span>
 			</button>
 		</div>
 
@@ -441,6 +447,37 @@
 	}
 	@media (pointer: coarse) {
 		.option {
+			min-height: 2.75rem;
+		}
+	}
+	.cancel {
+		display: none;
+	}
+	/* Phones: a sheet from the top, clear of the keyboard, with no key hints. */
+	@media (max-width: 760px) {
+		dialog {
+			width: calc(100vw - 1rem);
+			max-height: calc(var(--app-height, 100dvh) - env(safe-area-inset-top) - 1rem);
+			margin: calc(env(safe-area-inset-top) + 0.5rem) auto auto;
+			border-radius: 18px;
+		}
+		.field {
+			height: 3.5rem;
+		}
+		.option {
+			min-height: 3rem;
+		}
+		.footer,
+		.esc-key {
+			display: none;
+		}
+		.cancel {
+			display: inline;
+			padding: 0 var(--space-2);
+			color: var(--accent);
+			font-weight: 600;
+		}
+		.esc {
 			min-height: 2.75rem;
 		}
 	}
