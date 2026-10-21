@@ -475,7 +475,7 @@ ecosystem convention) to maximise adoption and integration.
 | Component | Current licence | Action |
 | --- | --- | --- |
 | `tree-sitter-sysml` | GPL-3.0-or-later (`package.json`) but MIT (`Cargo.toml`) — inconsistent | Relicense to `Apache-2.0 OR MIT` and make the metadata consistent (sole author) |
-| `sysml-core` code ported into `engine/` | GPL-3.0-or-later | Relicense the ported modules (sole author) before copying |
+| `sysml-cli` workspace (engine) | GPL-3.0-or-later | Relicense to `Apache-2.0 OR MIT` (sole author) |
 | `mycelium-web` code (git, auth, shell) | GPL-3.0 because of uniorg; our own code otherwise | Reuse own code under the new licence; uniorg is not needed here |
 | `mycelium-web` worker | Apache-2.0 | Compatible |
 | OMG `sysml.library` | EPL-2.0 | Bundle unmodified as data with its licence and notice (file-level weak copyleft; compatible with an Apache/MIT app) |
