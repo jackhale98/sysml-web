@@ -60,7 +60,10 @@ worker crashes, restart once, then route everything to the current engine.
    retarget), composed where it has no single operation.
 5. **Diagrams** — the seven diagram graphs in TypeScript over the model.
 6. **The rest** — state machine emulator, `.kpar` read/write, library
-   browser.
+   browser. The emulator is done: `src/lib/sim/emulator.ts` runs any
+   `StateMachine` in TypeScript (extraction still comes from the current
+   engine); `parity.test.ts` checks it against the old `stateStep` and
+   lists where it follows the SysML/UML semantics instead.
 7. **Switch** — after parity (the whole e2e suite green on the toolkit)
    and a real-iPhone test of memory: make the toolkit the default, keep
    the fallback one release, then remove the current engine and its
