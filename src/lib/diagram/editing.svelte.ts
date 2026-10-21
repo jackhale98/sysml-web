@@ -23,6 +23,11 @@ export class DiagramEditing {
 	connectingFrom = $state<string | null>(null);
 	/** A connection is being dragged. */
 	dragging = $state(false);
+	/** The selected node, whose connections are highlighted. */
+	focus = $state<string | null>(null);
+	/** The nodes it connects to (replaced whole, never mutated). */
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity
+	linked = $state.raw<ReadonlySet<string>>(new Set());
 
 	constructor(readonly actions: EditingActions) {}
 

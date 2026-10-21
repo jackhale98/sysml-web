@@ -8,6 +8,7 @@
 		type EdgeProps
 	} from '@xyflow/svelte';
 	import { roundedPath } from '#lib/sim/layout.ts';
+	import { useEditing } from './editing.svelte.ts';
 	import { useLabels } from './labels.svelte.ts';
 	import { edgeText } from './layout.ts';
 	import type { SysmlEdgeData } from './types.ts';
@@ -35,6 +36,11 @@
 	const from = untrack(() => useInternalNode(source));
 	const to = untrack(() => useInternalNode(target));
 	const labels = useLabels();
+	const editing = useEditing();
+	/** One of the selected node's connections: drawn in the accent; the others step back. */
+	const lit = $derived(!!editing?.focus && (source === editing.focus || target === editing.focus));
+	const dim = $derived(!!editing?.focus && !lit);
+	const marker = (url: string | undefined) => (url && lit ? url.replace(/\)$/, '-lit)') : url);
 
 	const near = (a: { x: number; y: number } | undefined, b: { x: number; y: number }) =>
 		!!a && Math.abs(a.x - b.x) < 0.5 && Math.abs(a.y - b.y) < 0.5;
@@ -108,12 +114,16 @@
 
 <BaseEdge
 	{path}
-	markerStart={data?.reversed ? style.end : style.start}
-	markerEnd={data?.reversed ? style.start : style.end}
-	class={style.dashed ? 'sysml-edge dashed' : 'sysml-edge'}
+	markerStart={marker(data?.reversed ? style.end : style.start)}
+	markerEnd={marker(data?.reversed ? style.start : style.end)}
+	class={['sysml-edge', style.dashed && 'dashed', lit && 'lit', dim && 'dim']
+		.filter(Boolean)
+		.join(' ')}
 />
 {#if text}
-	<EdgeLabel x={at.x} y={at.y} class="sysml-edge-label">{text}</EdgeLabel>
+	<EdgeLabel x={at.x} y={at.y} class={lit ? 'sysml-edge-label lit' : 'sysml-edge-label'}
+		>{text}</EdgeLabel
+	>
 {/if}
 
 <style>
@@ -124,6 +134,25 @@
 	:global(.sysml-edge.dashed) {
 		stroke-dasharray: 5 4;
 	}
+	:global(.sysml-edge.lit) {
+		stroke: var(--accent) !important;
+		stroke-width: 2.25 !important;
+	}
+	:global(.sysml-edge.dim) {
+		opacity: 0.3;
+	}
+	:global(.sysml-edge),
+	:global(.sysml-edge-label) {
+		transition:
+			opacity 0.15s,
+			stroke 0.15s;
+	}
+	:global(.sysml-edge-label.lit) {
+		z-index: 1;
+		border-color: var(--accent);
+		color: var(--accent);
+		font-weight: 600;
+	}
 	:global(.sysml-edge-label) {
 		padding: 1px 7px;
 		border: 1px solid var(--border);
@@ -133,5 +162,11 @@
 		font-size: 11px;
 		line-height: 16px;
 		white-space: nowrap;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		:global(.sysml-edge),
+		:global(.sysml-edge-label) {
+			transition: none;
+		}
 	}
 </style>

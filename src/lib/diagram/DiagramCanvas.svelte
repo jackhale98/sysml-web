@@ -191,6 +191,24 @@
 	/** The node that draws the selected element, if this diagram shows it. */
 	const selectedNode = $derived(nodes.find((n) => n.data.selected));
 
+	/** The selection a click on the canvas dismissed the highlight for (it stays selected). */
+	let dismissed = $state<string | null>(null);
+	// The selected node's connections are highlighted, and the nodes they reach ringed.
+	$effect(() => {
+		const fromSelection = selectedNode && selected?.key !== dismissed ? selectedNode.id : null;
+		const focus = nodes.find((n) => n.selected)?.id ?? fromSelection;
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- replaced whole, never mutated
+		const linked = new Set<string>();
+		if (focus)
+			for (const e of edges) {
+				if (e.source === focus) linked.add(e.target);
+				else if (e.target === focus) linked.add(e.source);
+			}
+		linked.delete(focus ?? '');
+		editing.focus = focus;
+		editing.linked = linked;
+	});
+
 	/** Node ids are names, or dotted paths (`drone.battery`) for nested usages. */
 	const nameOf = (id: string) => id.slice(id.lastIndexOf('.') + 1);
 	const layoutKey = $derived(diagramKey(view, scope));
@@ -901,93 +919,9 @@
 >
 	<svg class="markers" aria-hidden="true">
 		<defs>
-			<marker
-				id="sysml-specialization"
-				viewBox="0 0 12 12"
-				refX="11"
-				refY="6"
-				markerWidth="14"
-				markerHeight="14"
-				orient="auto-start-reverse"
-			>
-				<path
-					d="M1 1 L11 6 L1 11 Z"
-					fill="var(--surface)"
-					stroke="var(--text-2)"
-					stroke-width="1.2"
-				/>
-			</marker>
-			<marker
-				id="sysml-typing"
-				viewBox="0 0 20 12"
-				refX="19"
-				refY="6"
-				markerWidth="22"
-				markerHeight="14"
-				orient="auto-start-reverse"
-			>
-				<rect x="0" y="3.5" width="9" height="5" fill="var(--surface)" />
-				<circle cx="2" cy="6" r="1.4" fill="var(--text-2)" />
-				<circle cx="6" cy="6" r="1.4" fill="var(--text-2)" />
-				<path
-					d="M9 1 L19 6 L9 11 Z"
-					fill="var(--surface)"
-					stroke="var(--text-2)"
-					stroke-width="1.2"
-				/>
-			</marker>
-			<marker
-				id="sysml-composition"
-				viewBox="0 0 16 10"
-				refX="15"
-				refY="5"
-				markerWidth="16"
-				markerHeight="10"
-				orient="auto-start-reverse"
-			>
-				<path d="M1 5 L8 1 L15 5 L8 9 Z" fill="var(--text-2)" />
-			</marker>
-			<marker
-				id="sysml-membership"
-				viewBox="0 0 14 14"
-				refX="12.6"
-				refY="7"
-				markerWidth="14"
-				markerHeight="14"
-				orient="auto-start-reverse"
-			>
-				<circle
-					cx="7"
-					cy="7"
-					r="5.6"
-					fill="var(--surface)"
-					stroke="var(--text-2)"
-					stroke-width="1.2"
-				/>
-				<path d="M7 3.6 V10.4 M3.6 7 H10.4" stroke="var(--text-2)" stroke-width="1.2" />
-			</marker>
-			<marker
-				id="sysml-open-arrow"
-				viewBox="0 0 12 12"
-				refX="11"
-				refY="6"
-				markerWidth="12"
-				markerHeight="12"
-				orient="auto-start-reverse"
-			>
-				<path d="M1 1 L11 6 L1 11" fill="none" stroke="var(--text-2)" stroke-width="1.3" />
-			</marker>
-			<marker
-				id="sysml-arrow"
-				viewBox="0 0 12 12"
-				refX="11"
-				refY="6"
-				markerWidth="11"
-				markerHeight="11"
-				orient="auto-start-reverse"
-			>
-				<path d="M1 1 L11 6 L1 11 Z" fill="var(--text-2)" />
-			</marker>
+			{@render markers('', 'var(--text-2)')}
+			<!-- The same, for the highlighted connections of the selected node. -->
+			{@render markers('-lit', 'var(--accent)')}
 		</defs>
 	</svg>
 
@@ -1068,6 +1002,7 @@
 		onpaneclick={({ event }) => {
 			popover = null;
 			menu = null;
+			dismissed = selected?.key ?? null;
 			if (flow) lastClick = flow.screenToFlowPosition({ x: event.clientX, y: event.clientY });
 		}}
 	>
@@ -1285,6 +1220,79 @@
 		</div>
 	{/if}
 </div>
+
+{#snippet markers(suffix: string, ink: string)}
+	<marker
+		id="sysml-specialization{suffix}"
+		viewBox="0 0 12 12"
+		refX="11"
+		refY="6"
+		markerWidth="14"
+		markerHeight="14"
+		orient="auto-start-reverse"
+	>
+		<path d="M1 1 L11 6 L1 11 Z" fill="var(--surface)" stroke={ink} stroke-width="1.2" />
+	</marker>
+	<marker
+		id="sysml-typing{suffix}"
+		viewBox="0 0 20 12"
+		refX="19"
+		refY="6"
+		markerWidth="22"
+		markerHeight="14"
+		orient="auto-start-reverse"
+	>
+		<rect x="0" y="3.5" width="9" height="5" fill="var(--surface)" />
+		<circle cx="2" cy="6" r="1.4" fill={ink} />
+		<circle cx="6" cy="6" r="1.4" fill={ink} />
+		<path d="M9 1 L19 6 L9 11 Z" fill="var(--surface)" stroke={ink} stroke-width="1.2" />
+	</marker>
+	<marker
+		id="sysml-composition{suffix}"
+		viewBox="0 0 16 10"
+		refX="15"
+		refY="5"
+		markerWidth="16"
+		markerHeight="10"
+		orient="auto-start-reverse"
+	>
+		<path d="M1 5 L8 1 L15 5 L8 9 Z" fill={ink} />
+	</marker>
+	<marker
+		id="sysml-membership{suffix}"
+		viewBox="0 0 14 14"
+		refX="12.6"
+		refY="7"
+		markerWidth="14"
+		markerHeight="14"
+		orient="auto-start-reverse"
+	>
+		<circle cx="7" cy="7" r="5.6" fill="var(--surface)" stroke={ink} stroke-width="1.2" />
+		<path d="M7 3.6 V10.4 M3.6 7 H10.4" stroke={ink} stroke-width="1.2" />
+	</marker>
+	<marker
+		id="sysml-open-arrow{suffix}"
+		viewBox="0 0 12 12"
+		refX="11"
+		refY="6"
+		markerWidth="12"
+		markerHeight="12"
+		orient="auto-start-reverse"
+	>
+		<path d="M1 1 L11 6 L1 11" fill="none" stroke={ink} stroke-width="1.3" />
+	</marker>
+	<marker
+		id="sysml-arrow{suffix}"
+		viewBox="0 0 12 12"
+		refX="11"
+		refY="6"
+		markerWidth="11"
+		markerHeight="11"
+		orient="auto-start-reverse"
+	>
+		<path d="M1 1 L11 6 L1 11 Z" fill={ink} />
+	</marker>
+{/snippet}
 
 <style>
 	.canvas {

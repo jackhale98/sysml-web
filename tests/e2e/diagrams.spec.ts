@@ -40,6 +40,22 @@ test('an interconnection view shows inherited ports, flows and bindings', async 
 	await expectAccessible(page);
 });
 
+test('selecting a node highlights its connections and what they reach', async ({ page }) => {
+	await openDemo(page);
+	const diagram = await openView(page, 'Drone interconnection');
+	await expect(diagram.locator('.sysml-edge.lit')).toHaveCount(0);
+	await diagram.getByText('powerDistribution : PowerDistributionBoard', { exact: true }).click();
+	// The battery feeds it; it feeds the four rotors and the flight controller.
+	await expect(diagram.locator('.sysml-edge.lit')).toHaveCount(6);
+	await expect(diagram.locator('.svelte-flow__node .linked')).toHaveCount(6);
+	await expect(diagram.locator('.sysml-edge-label.lit').first()).toBeVisible();
+	await expect(diagram.locator('.sysml-edge.dim').first()).toBeAttached();
+	await expectAccessible(page);
+	// Clicking the canvas clears it.
+	await diagram.locator('.svelte-flow__pane').click({ position: { x: 5, y: 5 } });
+	await expect(diagram.locator('.sysml-edge.lit')).toHaveCount(0);
+});
+
 test('state and action views draw transitions and decision branches', async ({ page }) => {
 	await openDemo(page);
 	const states = await openView(page, 'Flight mode states');

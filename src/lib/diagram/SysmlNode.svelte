@@ -74,6 +74,7 @@
 	class="node"
 	style:--fam="var(--kind-{n.family})"
 	class:selected={data.selected}
+	class:linked={!!editing?.linked.has(id)}
 	class:source={editing?.connectingFrom === id}
 	class:pickable={!!editing?.connectingFrom && editing.connectingFrom !== id}
 >
@@ -190,6 +191,15 @@
 	}
 	.node:hover .box {
 		box-shadow: var(--shadow-md);
+	}
+	/* Connected to the selected node. */
+	.linked .box,
+	.linked .port-node,
+	.linked .pseudo,
+	.linked .decision {
+		border-color: var(--accent);
+		outline: 2px solid color-mix(in oklab, var(--accent) 35%, transparent);
+		outline-offset: 2px;
 	}
 	.selected .box,
 	.selected .port-node,
