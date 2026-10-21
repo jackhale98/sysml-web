@@ -54,6 +54,9 @@ export interface CachePlan {
 }
 
 const ENGINE_DIR = 'engine/';
+/** SPIKE (claude/toolkit-spike): the toolkit engine, cached on first use like ours. */
+const TOOLKIT_DIR = 'toolkit/';
+const engineFile = (path: string) => path.startsWith(ENGINE_DIR) || path.startsWith(TOOLKIT_DIR);
 
 /** Static files not worth keeping offline (type declarations, host markers). */
 function skipped(path: string): boolean {
@@ -80,9 +83,9 @@ export function planCaches(input: {
 		fallback: at('404.html'),
 		shell: [
 			...input.immutable.map(at),
-			...statics.filter((path) => !path.startsWith(ENGINE_DIR)).map(at)
+			...statics.filter((path) => !engineFile(path)).map(at)
 		],
-		engine: statics.filter((path) => path.startsWith(ENGINE_DIR)).map(at),
+		engine: statics.filter(engineFile).map(at),
 		engineStamp: at(`${ENGINE_DIR}build.json`)
 	};
 }

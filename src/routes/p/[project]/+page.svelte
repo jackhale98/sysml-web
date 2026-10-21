@@ -11,6 +11,8 @@
 	import ProjectSplash from '#lib/workbench/ProjectSplash.svelte';
 	import { WorkbenchUi } from '#lib/workbench/ui.svelte.ts';
 	import type WorkbenchComponent from '#lib/workbench/Workbench.svelte';
+	// SPIKE (claude/toolkit-spike): `?toolkit` measures the sysml-toolkit engine after load.
+	import { prepareSpike, runSpike, spikeRequested } from '#lib/engine/spike/bench.ts';
 
 	const workspace = new Workspace();
 	const ui = new WorkbenchUi();
@@ -31,7 +33,9 @@
 	if (page.params.project === 'demo') workspace.preview(demoProject());
 
 	onMount(() => {
-		void loading?.then((module) => (Workbench = module.default));
+		const spike = spikeRequested(new URL(location.href)) ? prepareSpike(new URL(location.href)) : null;
+		const workbenchLoaded = loading?.then((module) => (Workbench = module.default));
+		void workbenchLoaded;
 		void (async () => {
 			const source = await session.load(page.params.project ?? '');
 			if (!source) {
@@ -42,6 +46,16 @@
 			await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
 			await workspace.open(source, engine);
 			opened = workspace.files;
+			performance.mark('sysml:workspace-ready', { detail: { ...workspace.state } });
+			if (spike) {
+				// Only once the workbench is interactive, so first paint and LCP are untouched.
+				await workbenchLoaded;
+				await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
+				const files = Object.entries(workspace.files)
+					.filter(([path]) => /\.(sysml|kerml)$/.test(path))
+					.map(([path, text]) => ({ path, text }));
+				void runSpike(spike, files);
+			}
 		})();
 	});
 

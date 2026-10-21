@@ -16,3 +16,4 @@ vite.config.ts.timestamp-*
 /static/engine/
 /.cache/
 .lighthouseci
+/static/toolkit/
