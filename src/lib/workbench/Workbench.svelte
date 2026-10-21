@@ -39,6 +39,7 @@
 	import DocumentView from '#lib/markdown/DocumentView.svelte';
 	import ViewTable from './ViewTable.svelte';
 	import { presentationOf } from './views.ts';
+	import { reportKindOf, standardReport } from '#lib/reports/kinds.ts';
 	import { tabId, tabTitle, type FileLayout, type WorkbenchUi } from './ui.svelte.ts';
 	import AddSheet from '#lib/mobile/AddSheet.svelte';
 	import DetailsSheet from '#lib/mobile/DetailsSheet.svelte';
@@ -72,6 +73,7 @@
 	});
 	const loadEmulator = () => import('#lib/sim/StateEmulator.svelte').then((m) => m.default);
 	const loadLibraryFile = () => import('./LibraryFile.svelte').then((m) => m.default);
+	const loadReport = () => import('#lib/reports/ReportView.svelte').then((m) => m.default);
 
 	// Deep link: `#emulate=Package::Machine` opens the emulator once the model is read.
 	$effect(() => {
@@ -199,6 +201,13 @@
 		});
 	});
 
+	/** Whether the open view is a report (a document to read, nothing to add to). */
+	const reportTab = $derived.by(() => {
+		if (tab?.kind !== 'view') return false;
+		const info = workspace.views.find((v) => v.name === tab.name);
+		return info ? !!reportKindOf(info) : !!standardReport(tab.name);
+	});
+
 	/** The add button floats over the model and views, but not over text (that has "Edit text"). */
 	const showAdd = $derived(
 		phone &&
@@ -206,6 +215,7 @@
 				(section === 'views' &&
 					tab?.kind !== 'emulator' &&
 					tab?.kind !== 'library' &&
+					!reportTab &&
 					!(tab?.kind === 'file' && showText))) &&
 			!ui.editingText &&
 			!detailsOpen
@@ -421,7 +431,15 @@
 				{:else if tab.kind === 'view'}
 					{@const info = workspace.views.find((v) => v.name === tab.name)}
 					{@const presentation = info ? presentationOf(info) : { kind: 'table' as const }}
-					{#if presentation.kind === 'table'}
+					{#if reportTab}
+						{#key tab.name}
+							{#await loadReport()}
+								<p class="empty">Loading the report…</p>
+							{:then ReportView}
+								<ReportView name={tab.name} {workspace} {ui} {engine} />
+							{/await}
+						{/key}
+					{:else if presentation.kind === 'table'}
 						{#key tab.name}
 							<ViewTable name={tab.name} {workspace} {ui} {engine} />
 						{/key}

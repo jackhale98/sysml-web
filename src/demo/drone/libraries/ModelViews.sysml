@@ -17,6 +17,10 @@ library package ModelViews {
      * `expose P::*` keeps the members of P, `expose P::**` everything
      * nested in P, and `filter @SysML::PartUsage` keeps one kind of
      * element. A view without `expose` shows the whole model.
+     *
+     * Reports (SpecificationDocument, InterfaceControlDocument) are views
+     * too: rendered `asDocument`, each subview becomes a chapter, and the
+     * report's `expose` decides what the chapters cover.
      */
 
     private import Reporting::*;
@@ -74,5 +78,93 @@ library package ModelViews {
             columns = "path; type; quantity; extended; description = doc";
             sortBy = "path";
         }
+    }
+
+    // --- Reports: documents to read and send for review ------------------
+    // A report is a view rendered `asDocument`: a title page and contents,
+    // then a chapter per subview. Names are qualified so this section can
+    // be copied into another project's ModelViews as it is.
+
+    metadata def DocumentInfo {
+        doc /* Title-page details of a report. Values left out come from the project. */
+        attribute title : ScalarValues::String[0..1];
+        attribute number : ScalarValues::String[0..1];
+        attribute version : ScalarValues::String[0..1];
+        attribute status : ScalarValues::String[0..1];
+        attribute author : ScalarValues::String[0..1];
+    }
+
+    rendering def DocumentRendering :> Views::TextualRendering {
+        doc
+        /*
+         * Renders a view as a document: a title page and contents, then one
+         * chapter per subview, in order, each covering what the document's
+         * `expose` includes.
+         */
+    }
+
+    rendering asDocument : DocumentRendering[1] :> Views::renderings;
+
+    view def SpecificationDocument {
+        doc
+        /*
+         * A requirements specification: each requirement with its statement,
+         * attributes and rationale, what satisfies and verifies it, then the
+         * coverage and the gaps. Expose the requirement packages to include:
+         *
+         *   view systemSpecification : SpecificationDocument {
+         *       @DocumentInfo { title = "System specification"; version = "1.0"; }
+         *       expose SystemRequirements::*;
+         *   }
+         */
+        view requirementsChapter : RequirementsTable {
+            doc /* The requirements, by package, each with its attributes and trace. */
+        }
+        view traceabilityChapter : TraceMatrix {
+            doc /* What satisfies and what verifies each requirement, at a glance. */
+        }
+        view coverageChapter : RequirementsTraceMatrix {
+            doc /* How many requirements are satisfied and verified. */
+        }
+        view gapsChapter : RequirementGaps {
+            doc /* Requirements not yet satisfied or not yet verified. */
+        }
+        render asDocument;
+    }
+
+    view def InterfaceControlDocument {
+        doc
+        /*
+         * An interface control document: how the parts in scope connect, the
+         * interfaces and ports they connect through, and the items that flow.
+         * Expose the parts and the interface packages to include:
+         *
+         *   view droneIcd : InterfaceControlDocument {
+         *       expose DroneArchitecture::drone::*;
+         *       expose DroneInterfaces::*;
+         *   }
+         */
+        view interconnectionChapter : StandardViewDefinitions::InterconnectionView {
+            doc /* The parts and the connections between them. */
+        }
+        view connectionsChapter : ConnectionTable {
+            doc /* Every connection: which ports it joins and through which interface. */
+        }
+        view interfacesChapter : StandardViewDefinitions::GeneralView {
+            doc /* The interface definitions: their ends and what flows between them. */
+            filter @SysML::InterfaceDefinition;
+        }
+        view portsChapter : StandardViewDefinitions::GeneralView {
+            doc /* The port definitions: what goes in and what comes out. */
+            filter @SysML::PortDefinition;
+        }
+        view itemsChapter : StandardViewDefinitions::GeneralView {
+            doc /* The items that flow through the ports. */
+            filter @SysML::ItemDefinition;
+        }
+        view portUsageChapter : InterfaceTable {
+            doc /* Each part's ports, and what they are connected to. */
+        }
+        render asDocument;
     }
 }

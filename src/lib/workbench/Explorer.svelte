@@ -3,6 +3,7 @@
 		BookLock,
 		ChevronRight,
 		FileCode,
+		FileText,
 		Folder,
 		LayoutDashboard,
 		ListChecks,
@@ -19,6 +20,7 @@
 	import type { WorkbenchUi } from './ui.svelte.ts';
 	import { elementItems, modelViewItems, rank, type PaletteItem } from './palette.ts';
 	import { presentationOf, viewTitle } from './views.ts';
+	import { reportEntries } from '#lib/reports/kinds.ts';
 
 	let { workspace, ui, engine }: { workspace: Workspace; ui: WorkbenchUi; engine: Engine } =
 		$props();
@@ -84,6 +86,8 @@
 				v.name !== 'RequirementsTable'
 		)
 	);
+	/** Reports: the ones saved in the model, then the standard ones. */
+	const reports = $derived(reportEntries(workspace.views, isLibraryFile));
 	let packagesOpen = $state(false);
 
 	const needle = $derived(query.trim().toLowerCase());
@@ -324,6 +328,21 @@
 							{/each}
 						</ul>
 					{/if}
+					<h3>Reports</h3>
+					<ul class="flat">
+						{#each reports as r (r.name)}
+							<li>
+								<button
+									type="button"
+									class="item"
+									title={r.doc}
+									onclick={() => ui.open({ kind: 'view', name: r.name, title: r.title })}
+								>
+									<FileText size={14} /> <span class="label">{r.title}</span>
+								</button>
+							</li>
+						{/each}
+					</ul>
 					{#if standardViews.length}
 						<h3>Standard tables</h3>
 						<ul class="flat">

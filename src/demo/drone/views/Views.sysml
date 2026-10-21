@@ -87,4 +87,21 @@ package DroneViews {
     view fmeaWorksheet : FmeaWorksheet {
         doc /* The design FMEA as a table, highest risk priority first. */
     }
+
+    // Reports: documents to send for review, built from the views above.
+    // What each contains is defined in libraries/ModelViews.sysml.
+
+    view droneSpecification : SpecificationDocument {
+        doc /* The stakeholder needs and system requirements, with their trace to the design and the tests. */
+        @DocumentInfo { title = "Delivery drone requirements specification"; number = "DRN-SPEC-001"; status = "Draft for review"; }
+        expose StakeholderNeeds::*;
+        expose SystemRequirements::*;
+    }
+
+    view droneInterfaceControl : InterfaceControlDocument {
+        doc /* How the drone's parts connect: the power, command and signal interfaces between them. */
+        @DocumentInfo { title = "Delivery drone interface control document"; number = "DRN-ICD-001"; status = "Draft for review"; }
+        expose DroneArchitecture::drone::*;
+        expose DroneInterfaces::*;
+    }
 }

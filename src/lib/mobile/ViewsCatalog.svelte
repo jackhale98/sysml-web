@@ -15,6 +15,7 @@
 	import { isLibraryFile, type Workspace } from '#lib/project/workspace.svelte.ts';
 	import type { Tab, WorkbenchUi } from '#lib/workbench/ui.svelte.ts';
 	import { presentationOf, viewTitle } from '#lib/workbench/views.ts';
+	import { reportEntries } from '#lib/reports/kinds.ts';
 
 	/**
 	 * Everything that can be looked at, as large touch targets: the overview
@@ -43,6 +44,7 @@
 				v.name !== 'RequirementsTable'
 		)
 	);
+	const reports = $derived(reportEntries(workspace.views, isLibraryFile));
 	const packages = $derived(
 		workspace.tree.filter((n) => n.element.kind === 'package' && !isLibraryFile(n.element.file))
 	);
@@ -147,6 +149,21 @@
 			</ul>
 		</section>
 	{/if}
+
+	<section>
+		{@render heading('Reports')}
+		<ul>
+			{#each reports as r (r.name)}
+				{@render row(
+					FileText,
+					r.title,
+					{ kind: 'view', name: r.name, title: r.title },
+					r.saved ? 'Saved' : 'Standard',
+					'var(--kind-view)'
+				)}
+			{/each}
+		</ul>
+	</section>
 
 	{#if standardViews.length}
 		<section>
