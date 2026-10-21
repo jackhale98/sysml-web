@@ -15,22 +15,21 @@
 	import type { TreeNode } from '#lib/project/elements.ts';
 	import { isLibraryFile, type Workspace } from '#lib/project/workspace.svelte.ts';
 	import KindGlyph from '#lib/ui/KindGlyph.svelte';
-	import type { Engine } from '#lib/engine/client.ts';
 	import type { LibraryEntry, LibraryHit } from '#lib/engine/types.ts';
+	import { libraryIndex, librarySearch } from '#lib/library/library.ts';
 	import type { WorkbenchUi } from './ui.svelte.ts';
 	import { elementItems, modelViewItems, rank, type PaletteItem } from './palette.ts';
 	import { presentationOf, viewTitle } from './views.ts';
 	import { reportEntries } from '#lib/reports/kinds.ts';
 
-	let { workspace, ui, engine }: { workspace: Workspace; ui: WorkbenchUi; engine: Engine } =
-		$props();
+	let { workspace, ui }: { workspace: Workspace; ui: WorkbenchUi } = $props();
 
-	/** The OMG standard library, listed once it is opened (fetched from the engine). */
+	/** The OMG standard library, listed once it is opened (read in the library worker). */
 	let standardOpen = $state(false);
 	let standardIndex = $state.raw<LibraryEntry[]>([]);
 	$effect(() => {
 		if (standardOpen && !standardIndex.length) {
-			void engine.libraryIndex().then((index) => (standardIndex = index));
+			void libraryIndex().then((index) => (standardIndex = index));
 		}
 	});
 	const standardGroups = $derived.by(() => {
@@ -53,7 +52,7 @@
 			return;
 		}
 		const timer = setTimeout(() => {
-			void engine.librarySearch(q, 12).then((hits) => {
+			void librarySearch(q, 12).then((hits) => {
 				if (query.trim() === q) libraryHits = hits;
 			});
 		}, 150);

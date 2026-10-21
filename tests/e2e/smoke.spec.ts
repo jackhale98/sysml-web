@@ -158,7 +158,7 @@ test('the SysML standard library can be browsed and searched, read-only', async 
 	await page.getByText('Systems Library', { exact: true }).click();
 	await page.getByRole('button', { name: 'Ports', exact: true }).click();
 	const file = page.getByRole('region', { name: /Standard library: .*Ports\.sysml/ });
-	await expect(file).toContainText('LGPL-3.0-only');
+	await expect(file).toContainText('EPL-2.0');
 	await expect(file.locator('.cm-content')).toContainText('port def');
 	await expect(file.locator('.cm-content')).toHaveAttribute('contenteditable', 'false');
 

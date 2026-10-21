@@ -179,7 +179,7 @@
 
 	async function toggleNotice() {
 		showNotice = !showNotice;
-		if (showNotice && !license) license = await (await getEngine()).libraryLicense();
+		if (showNotice && !license) license = (await import('#lib/library/license.ts')).libraryLicense;
 	}
 </script>
 
@@ -565,12 +565,19 @@
 							>, at your choice.
 						</p>
 						<p>
-							The OMG SysML v2 and KerML standard library is included unmodified under the
+							The OMG SysML v2 and KerML standard library is included unmodified, as bundled by the
+							Open-MBEE sysml-toolkit, under the
+							<a
+								href="https://spdx.org/licenses/EPL-2.0.html"
+								target="_blank"
+								rel="noopener noreferrer">Eclipse Public License 2.0</a
+							>. Until the move to that engine is finished, the classic engine also carries an
+							earlier release of the library (February 2026) under the
 							<a
 								href="https://spdx.org/licenses/LGPL-3.0-only.html"
 								target="_blank"
 								rel="noopener noreferrer">GNU LGPL 3.0</a
-							>; you may replace it.
+							>.
 						</p>
 						<button
 							type="button"

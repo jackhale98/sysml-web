@@ -10,10 +10,6 @@ import type {
 	DiagramGraph,
 	EditResult,
 	Highlights,
-	LibraryEntry,
-	ProjectArchive,
-	LibraryHit,
-	LibraryLicense,
 	RenderedTable,
 	StateMachine,
 	StateSession,
@@ -31,7 +27,6 @@ interface Wasm {
 	listViews(files: string): string;
 	renderView(files: string, name: string): string;
 	viewLibraries(): string;
-	libraryIndex(): string;
 	elementDetails(files: string, path: string, line: number, element: string | null): string;
 	complete(files: string, path: string, offset: number): string;
 	hover(files: string, path: string, offset: number): string;
@@ -41,11 +36,6 @@ interface Wasm {
 	outline(files: string, path: string): string;
 	format(source: string): string;
 	codeActions(files: string, path: string, from: number, to: number): string;
-	readProjectArchive(bytes: Uint8Array, fallbackName: string): string;
-	writeKpar(info: string, files: string, created: string): Uint8Array;
-	libraryFile(path: string): string;
-	librarySearch(query: string, limit: number): string;
-	libraryLicense(): string;
 	stateMachines(files: string): string;
 	stateStep(
 		files: string,
@@ -90,7 +80,6 @@ const handlers: { [M in Method]: (wasm: Wasm, ...params: never[]) => unknown } =
 	renderView: (wasm, files: unknown, name: string): RenderedTable =>
 		JSON.parse(wasm.renderView(JSON.stringify(files), name)) as RenderedTable,
 	viewLibraries: (wasm): SourceFile[] => JSON.parse(wasm.viewLibraries()) as SourceFile[],
-	libraryIndex: (wasm): LibraryEntry[] => JSON.parse(wasm.libraryIndex()) as LibraryEntry[],
 	complete: (wasm, files: unknown, path: string, offset: number) =>
 		JSON.parse(wasm.complete(cachedFiles(files), path, offset)) as unknown,
 	hover: (wasm, files: unknown, path: string, offset: number) =>
@@ -108,14 +97,6 @@ const handlers: { [M in Method]: (wasm: Wasm, ...params: never[]) => unknown } =
 		JSON.parse(wasm.elementDetails(cachedFiles(files), path, line, element)) as unknown,
 	codeActions: (wasm, files: unknown, path: string, from: number, to: number) =>
 		JSON.parse(wasm.codeActions(cachedFiles(files), path, from, to)) as unknown,
-	readProjectArchive: (wasm, bytes: Uint8Array, fallbackName: string): ProjectArchive =>
-		JSON.parse(wasm.readProjectArchive(bytes, fallbackName)) as ProjectArchive,
-	writeKpar: (wasm, info: unknown, files: unknown, created: string): Uint8Array =>
-		wasm.writeKpar(JSON.stringify(info), JSON.stringify(files), created),
-	libraryFile: (wasm, path: string): SourceFile => JSON.parse(wasm.libraryFile(path)) as SourceFile,
-	librarySearch: (wasm, query: string, limit: number): LibraryHit[] =>
-		JSON.parse(wasm.librarySearch(query, limit)) as LibraryHit[],
-	libraryLicense: (wasm): LibraryLicense => JSON.parse(wasm.libraryLicense()) as LibraryLicense,
 	stateMachines: (wasm, files: unknown): StateMachine[] =>
 		JSON.parse(wasm.stateMachines(JSON.stringify(files))) as StateMachine[],
 	stateStep: (

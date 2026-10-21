@@ -1,39 +1,43 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { EditorState } from '@codemirror/state';
-	import { EditorView, lineNumbers } from '@codemirror/view';
+	import { EditorView, highlightActiveLine, lineNumbers } from '@codemirror/view';
 	import { BookLock } from '@lucide/svelte';
 	import type { Engine } from '#lib/engine/client.ts';
-	import type { LibraryLicense } from '#lib/engine/types.ts';
+	import { isStandardFile, relocate } from '#lib/library/catalog.ts';
+	import { libraryFile, licenseFor } from '#lib/library/library.ts';
 	import { editorTheme, highlightEffect, sysmlHighlighting } from '#lib/editor/sysml.ts';
 
 	/**
 	 * A file of the OMG SysML v2 standard library, read-only: the definitions
-	 * every model builds on (ISQ quantities, SI units, Parts, Ports, …).
+	 * every model builds on (ISQ quantities, SI units, Parts, Ports, …). It
+	 * opens at `line`, or at the nearest declaration of `name` when the line
+	 * comes from another release of the library.
 	 */
-	let { path, line, engine }: { path: string; line?: number; engine: Engine } = $props();
+	let { path, line, name, engine }: { path: string; line?: number; name?: string; engine: Engine } =
+		$props();
 
 	let host: HTMLDivElement;
-	let license = $state<LibraryLicense | null>(null);
+	let view = $state.raw<EditorView | undefined>();
 	let error = $state<string | null>(null);
+	const license = $derived(licenseFor(path));
+	const standard = $derived(isStandardFile(path));
 
 	onMount(() => {
-		let view: EditorView | undefined;
 		let cancelled = false;
+		let editor: EditorView | undefined;
 		void (async () => {
 			try {
-				const [file, terms] = await Promise.all([
-					engine.libraryFile(path),
-					engine.libraryLicense()
-				]);
+				const file = await libraryFile(path);
 				if (cancelled) return;
-				license = terms;
-				view = new EditorView({
+				editor = new EditorView({
 					parent: host,
 					state: EditorState.create({
 						doc: file.text,
 						extensions: [
 							lineNumbers(),
+							// Marks the line navigated to.
+							highlightActiveLine(),
 							EditorState.readOnly.of(true),
 							EditorView.editable.of(false),
 							sysmlHighlighting(),
@@ -45,26 +49,31 @@
 						]
 					})
 				});
+				view = editor;
 				const highlights = await engine.highlight(file.text);
-				if (cancelled || !view) return;
-				const effects = [highlightEffect(highlights, file.text.length)];
-				if (line && line <= view.state.doc.lines) {
-					const at = view.state.doc.line(line).from;
-					view.dispatch({
-						effects: [...effects, EditorView.scrollIntoView(at, { y: 'start', yMargin: 48 })],
-						selection: { anchor: at }
-					});
-				} else {
-					view.dispatch({ effects });
-				}
+				if (cancelled) return;
+				editor.dispatch({ effects: highlightEffect(highlights, file.text.length) });
 			} catch (e) {
-				error = e instanceof Error ? e.message : String(e);
+				if (!cancelled) error = e instanceof Error ? e.message : String(e);
 			}
 		})();
 		return () => {
 			cancelled = true;
-			view?.destroy();
+			editor?.destroy();
 		};
+	});
+
+	// Go to the line once the file is open, and again when another line is asked for.
+	$effect(() => {
+		if (!view || !line) return;
+		const doc = view.state.doc;
+		const target = relocate(doc.toString(), line, name);
+		if (target > doc.lines) return;
+		const at = doc.line(target).from;
+		view.dispatch({
+			effects: EditorView.scrollIntoView(at, { y: 'start', yMargin: 48 }),
+			selection: { anchor: at }
+		});
 	});
 </script>
 
@@ -72,13 +81,13 @@
 	<header>
 		<BookLock size={15} aria-hidden="true" />
 		<span class="path">{path}</span>
-		<span class="badge">OMG standard library · read-only</span>
-		{#if license}
-			<details class="license">
-				<summary>{license.spdx}</summary>
-				<p>{license.notice}</p>
-			</details>
-		{/if}
+		<span class="badge"
+			>{standard ? 'OMG standard library' : 'sysml-toolkit package'} · read-only</span
+		>
+		<details class="license">
+			<summary>{license.spdx}</summary>
+			<p>{license.notice}</p>
+		</details>
 	</header>
 	{#if error}<p class="error" role="alert">This file could not be opened: {error}</p>{/if}
 	<div class="code" bind:this={host}></div>
