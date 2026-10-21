@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 	import {
 		defaultKeymap,
@@ -294,6 +294,24 @@
 				source: p.code
 			}));
 		view.dispatch(setDiagnostics(view.state, diagnostics));
+	});
+
+	// Show a range asked for elsewhere (a check's claim), after the element it is in.
+	$effect(() => {
+		const request = ui.textRequest;
+		if (!view || !request || request.path !== path) return;
+		untrack(() => {
+			if (!view) return;
+			const length = view.state.doc.length;
+			const from = Math.min(request.from, length);
+			const to = Math.min(Math.max(request.to, from), length);
+			revealing = true;
+			view.dispatch({
+				selection: { anchor: from, head: to },
+				effects: EditorView.scrollIntoView(from, { y: 'center' })
+			});
+			revealing = false;
+		});
 	});
 
 	// Reveal the selected element when it was chosen somewhere else.

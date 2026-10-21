@@ -25,6 +25,7 @@
 		X
 	} from '@lucide/svelte';
 	import type { Engine } from '#lib/engine/client.ts';
+	import type { Diagnostic } from '#lib/engine/types.ts';
 	import { elementAt } from '#lib/project/elements.ts';
 	import type { Workspace } from '#lib/project/workspace.svelte.ts';
 	import OfflineBadge from '#lib/offline/OfflineBadge.svelte';
@@ -110,10 +111,17 @@
 			: null;
 	});
 
-	function openProblem(file: string, byte: number) {
+	function openProblem(problem: Diagnostic) {
+		const { file, span } = problem;
 		if (!file) return; // about the engine, not a file
+		const element = elementAt(workspace.elements, file, span.start_byte);
+		// A requirement the design doesn't meet is about a statement (the `satisfy`): show it.
+		if (problem.code === 'check' && span.from !== undefined && span.to !== undefined) {
+			if (element) ui.select(element.key, 'text');
+			ui.revealText(file, span.from, span.to);
+			return;
+		}
 		ui.open({ kind: 'file', path: file });
-		const element = elementAt(workspace.elements, file, byte);
 		if (element) ui.select(element.key, 'inspector');
 	}
 
@@ -556,11 +564,7 @@
 			<ul>
 				{#each workspace.problems.filter((p) => p.severity !== 'note') as p, i (i)}
 					<li>
-						<button
-							type="button"
-							class={p.severity}
-							onclick={() => openProblem(p.file, p.span.start_byte)}
-						>
+						<button type="button" class={p.severity} onclick={() => openProblem(p)}>
 							{#if p.severity === 'error'}<CircleAlert
 									size={14}
 								/>{:else if p.severity === 'warning'}<TriangleAlert size={14} />{:else}<Info

@@ -11,12 +11,14 @@ import { SvelteSet } from 'svelte/reactivity';
 import type { Engine } from '#lib/engine/client.ts';
 import type {
 	Analysis,
+	CheckReport,
 	Diagnostic,
 	EditRequest,
 	EditResult,
 	StateMachine,
 	ViewInfo
 } from '#lib/engine/types.ts';
+import { checkProblems } from './checks';
 import { buildTree, collectElements, type ModelElement, type TreeNode } from './elements';
 import { collectRequirements, type RequirementRow } from './requirements';
 
@@ -90,6 +92,8 @@ export class Workspace {
 	views = $state.raw<ViewInfo[]>([]);
 	/** The project's state machines, for the emulator. */
 	machines = $state.raw<StateMachine[]>([]);
+	/** Constraint checks of the latest analysis (after it: they take a moment longer). */
+	checks = $state.raw<CheckReport | null>(null);
 	/** Paths edited since the project was opened. */
 	readonly dirty = new SvelteSet<string>();
 	/** Model edits made through `transact`, newest last. */
@@ -125,7 +129,9 @@ export class Workspace {
 					message: e.message
 				})),
 				...a.diagnostics
-			])
+			]),
+			// A requirement the design doesn't meet; undecided checks are not problems.
+			...checkProblems(this.checks?.checks ?? [])
 		].sort((a, b) => severityRank(a.severity) - severityRank(b.severity))
 	);
 
@@ -153,6 +159,7 @@ export class Workspace {
 		this.info = source.info;
 		this.files = Object.fromEntries(source.files.map((f) => [f.path, f.text]));
 		this.analyses = {};
+		this.checks = null;
 		this.dirty.clear();
 		this.state = { phase: 'loading', done: 0, total: this.modelPaths.length };
 		const started = performance.now();
@@ -186,6 +193,9 @@ export class Workspace {
 				this.views = views;
 				this.machines = machines;
 			}
+			// Checks are extra: the model is usable without them.
+			const checks = await engine.checks(files).catch(() => null);
+			if (files.every((f) => this.files[f.path] === f.text)) this.checks = checks;
 		} catch (error) {
 			if (throwing) throw error;
 			this.failed(error);

@@ -504,6 +504,7 @@ describe('in the workspace', () => {
 			analyzeProject: async (f: { path: string; text: string }[]) => host.analyzeProject(f),
 			listViews: async () => [],
 			stateMachines: async () => [],
+			checks: async (f: { path: string; text: string }[]) => host.checks(f),
 			edit: async (request: EditRequest) => host.edit(request)
 		} as unknown as Engine;
 		const workspace = new Workspace();

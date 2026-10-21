@@ -187,6 +187,19 @@ export class WorkbenchUi {
 		| null
 	>(null);
 
+	/** A request to the editor of `path`: select and show this range (UTF-16 offsets). */
+	textRequest = $state.raw<{ path: string; from: number; to: number; nonce: number } | null>(null);
+
+	/**
+	 * Open a file's text at a range — a statement rather than an element (a
+	 * `satisfy` claim, a constraint), so the editor shows exactly that.
+	 */
+	revealText(path: string, from: number, to: number) {
+		this.textRequest = { path, from, to, nonce: (this.textRequest?.nonce ?? 0) + 1 };
+		if (this.phone) this.showText(path);
+		else this.open({ kind: 'file', path });
+	}
+
 	revealRow(view: string, index: number) {
 		this.tableRequest = { view, index, nonce: (this.tableRequest?.nonce ?? 0) + 1 };
 	}

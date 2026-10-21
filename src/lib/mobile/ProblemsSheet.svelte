@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { CircleAlert, CircleCheck, Info, TriangleAlert } from '@lucide/svelte';
+	import type { Diagnostic } from '#lib/engine/types.ts';
 	import { elementAt } from '#lib/project/elements.ts';
 	import type { Workspace } from '#lib/project/workspace.svelte.ts';
 	import type { WorkbenchUi } from '#lib/workbench/ui.svelte.ts';
@@ -12,10 +13,17 @@
 	const errors = $derived(shown.filter((p) => p.severity === 'error').length);
 	const warnings = $derived(shown.length - errors);
 
-	function show(file: string, byte: number) {
+	function show(problem: Diagnostic) {
+		const { file, span } = problem;
 		if (!file) return; // about the engine, not a file
 		ui.problemsSheet = false;
-		const element = elementAt(workspace.elements, file, byte);
+		const element = elementAt(workspace.elements, file, span.start_byte);
+		// A requirement the design doesn't meet is about a statement (the `satisfy`): show it.
+		if (problem.code === 'check' && span.from !== undefined && span.to !== undefined) {
+			if (element) ui.select(element.key, 'text');
+			ui.revealText(file, span.from, span.to);
+			return;
+		}
 		if (element) ui.select(element.key, 'inspector');
 		ui.showText(file);
 	}
@@ -30,7 +38,7 @@
 		<ul>
 			{#each shown as p, i (i)}
 				<li>
-					<button type="button" class={p.severity} onclick={() => show(p.file, p.span.start_byte)}>
+					<button type="button" class={p.severity} onclick={() => show(p)}>
 						{#if p.severity === 'error'}<CircleAlert
 								size={18}
 							/>{:else if p.severity === 'warning'}<TriangleAlert size={18} />{:else}<Info
