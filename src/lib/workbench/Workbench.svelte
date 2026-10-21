@@ -414,7 +414,7 @@
 							<ViewsCatalog {workspace} {ui} {engine} />
 						</div>
 					{:else}
-						<HomeView {workspace} {ui} />
+						<HomeView {workspace} {ui} {engine} />
 					{/if}
 				{:else if tab.kind === 'requirements'}
 					<ViewTable name="RequirementsTable" {workspace} {ui} {engine} />

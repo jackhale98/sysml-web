@@ -10,6 +10,7 @@
 	let {
 		workspace,
 		ui,
+		description: given,
 		tourPath,
 		architecture,
 		showcase,
@@ -17,6 +18,8 @@
 	}: {
 		workspace: Workspace;
 		ui: WorkbenchUi;
+		/** The project's description, or a stand-in for it; undefined while it is read. */
+		description?: string | null;
 		tourPath: string | null;
 		architecture: ModelElement | null;
 		showcase: TreeNode | null;
@@ -25,7 +28,7 @@
 
 	const ready = $derived(workspace.state.phase === 'ready');
 	const description = $derived(
-		workspace.info?.description ??
+		given ??
 			'A SysML v2 model. The text is the model: every diagram and table here is drawn from it, and editing a diagram edits the text.'
 	);
 	/** The first sentence leads; the rest reads as detail. */
@@ -58,8 +61,13 @@
 				>{/if}
 		</p>
 		<h2 id="project-title" class="title">{workspace.info?.name ?? 'Project'}</h2>
-		<p class="lead">{lead}</p>
-		{#if rest}<p class="description">{rest}</p>{/if}
+		{#if given === undefined}
+			<p class="lead"><span class="skeleton line"></span></p>
+			<p class="description"><span class="skeleton line short"></span></p>
+		{:else}
+			<p class="lead">{lead}</p>
+			{#if rest}<p class="description">{rest}</p>{/if}
+		{/if}
 
 		<ul class="facts" aria-label="Project facts">
 			<li>
@@ -245,6 +253,15 @@
 		border-radius: var(--radius-pill);
 		background: var(--surface-2);
 		animation: pulse 1.4s ease-in-out infinite;
+	}
+	.skeleton.line {
+		display: block;
+		width: min(24rem, 100%);
+		height: 1em;
+		margin-block: 0.2em;
+	}
+	.skeleton.short {
+		width: min(16rem, 80%);
 	}
 	@keyframes pulse {
 		50% {

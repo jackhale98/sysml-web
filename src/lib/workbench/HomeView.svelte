@@ -9,6 +9,7 @@
 		PencilLine,
 		TriangleAlert
 	} from '@lucide/svelte';
+	import type { Engine } from '#lib/engine/client.ts';
 	import type { ModelElement } from '#lib/project/elements.ts';
 	import { statusLabel, type Tone } from '#lib/project/status.ts';
 	import { isLibraryFile, type Workspace } from '#lib/project/workspace.svelte.ts';
@@ -19,13 +20,45 @@
 	import {
 		architecturePackage,
 		countFamilies,
+		describingPackage,
+		docSummary,
 		groupProblems,
 		showcaseElement
 	} from './home/model.ts';
 	import type { WorkbenchUi } from './ui.svelte.ts';
 
-	let { workspace, ui }: { workspace: Workspace; ui: WorkbenchUi } = $props();
+	let { workspace, ui, engine }: { workspace: Workspace; ui: WorkbenchUi; engine: Engine } =
+		$props();
 	const ready = $derived(workspace.state.phase === 'ready');
+
+	/** Without a project description, the main package's doc comment stands in. */
+	const describing = $derived(
+		workspace.info && !workspace.info.description
+			? describingPackage(workspace.tree, workspace.info.name)
+			: null
+	);
+	/** The doc, or undefined while it is still being read. */
+	let packageDoc = $state<string | null | undefined>(undefined);
+	let docRequest = 0;
+	const description = $derived.by(() => {
+		if (workspace.info?.description) return workspace.info.description;
+		const analysing = workspace.state.phase === 'idle' || workspace.state.phase === 'loading';
+		if (analysing && !workspace.tree.length) return undefined; // not analysed yet
+		return describing ? packageDoc : null;
+	});
+	$effect(() => {
+		const element = describing;
+		const request = ++docRequest;
+		if (!element || !ready) return;
+		void engine
+			.elementDetails(workspace.sourceFiles(), element.file, element.span.start_row, element.name)
+			.then((details) => {
+				if (request === docRequest) packageDoc = details.doc ? docSummary(details.doc) : null;
+			})
+			.catch(() => {
+				if (request === docRequest) packageDoc = null;
+			});
+	});
 
 	const tourPath = $derived(workspace.paths.find((p) => /(^|\/)tour\.md$/i.test(p)) ?? null);
 	const architecture = $derived(architecturePackage(workspace.tree));
@@ -111,7 +144,7 @@
 	<!-- Drawn once the project's files and description are known, so nothing moves when they arrive. -->
 	{#if workspace.info}
 		<div class="page" aria-busy={!ready}>
-			<Hero {workspace} {ui} {tourPath} {architecture} {showcase} {ownElements} />
+			<Hero {workspace} {ui} {description} {tourPath} {architecture} {showcase} {ownElements} />
 
 			<Glance {families} {ready} onpick={showElement} />
 

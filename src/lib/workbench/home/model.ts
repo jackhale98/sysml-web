@@ -101,6 +101,31 @@ export function architecturePackage(tree: TreeNode[]): ModelElement | null {
 	return byName(/architecture/i) ?? owner ?? byName(/system|structure/i) ?? packages[0] ?? null;
 }
 
+/**
+ * The top-level package whose doc comment can stand in for a missing project
+ * description: the only one, or the one named like the project.
+ */
+export function describingPackage(tree: TreeNode[], projectName: string): ModelElement | null {
+	const packages = tree
+		.filter((n) => n.element.kind === 'package' && !isLibraryFile(n.element.file))
+		.map((n) => n.element);
+	if (packages.length === 1) return packages[0]!;
+	const key = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+	const project = key(projectName);
+	if (!project) return null;
+	return (
+		packages.find((p) => key(p.label) === project) ??
+		packages.find((p) => key(p.label).startsWith(project) || project.startsWith(key(p.label))) ??
+		null
+	);
+}
+
+/** A doc comment as a description: its first paragraph, on one line. */
+export function docSummary(doc: string): string {
+	const paragraph = doc.trim().split(/\n\s*\n/)[0] ?? '';
+	return paragraph.replace(/\s+/g, ' ').trim();
+}
+
 /** The part with the most nested parts: the best picture of "the system". */
 export function showcaseElement(tree: TreeNode[]): TreeNode | null {
 	let best: TreeNode | null = null;
