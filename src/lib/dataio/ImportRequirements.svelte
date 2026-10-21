@@ -703,10 +703,15 @@
 			border-color var(--duration) var(--ease),
 			background var(--duration) var(--ease);
 	}
-	.drop:hover,
 	.drop.dragging {
 		border-color: var(--accent);
 		background: var(--accent-weak);
+	}
+	@media (hover: hover) {
+		.drop:hover {
+			border-color: var(--accent);
+			background: var(--accent-weak);
+		}
 	}
 	.drop:focus-within {
 		outline: 2px solid var(--focus);
@@ -754,6 +759,9 @@
 		font-family: var(--font-mono);
 		font-size: var(--text-sm);
 		resize: vertical;
+	}
+	textarea::placeholder {
+		font-family: var(--font-ui);
 	}
 	textarea:focus {
 		border-color: var(--accent);

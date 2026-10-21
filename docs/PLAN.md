@@ -739,6 +739,7 @@ Engine gaps found while authoring the demo (inputs to Phase 1):
 | 12 | Every table is a SysML view rendered by the engine (`renderView`); standard tables ship as `ModelViews.sysml`, so tables are reproducible in any conformant tool | 2026-10-21 |
 | 13 | Diagrams follow SysML v2 graphical notation strictly (definitions square, usages rounded, standard edge adornments, diagram frames); element families add colour, never replace shape | 2026-10-21 |
 | 14 | A document-centric reading of the model is offered as a *perspective* over SysML views, not as a separate data model | 2026-10-21 |
+| 15 | Spreadsheets in and out without a spreadsheet library: hand-written OOXML and a small ZIP over the browser's `CompressionStream`; imported requirements become SysML written the way the engine's own edits write it (one `insertMember` per import, checked against the engine in tests), in one undoable change | 2026-10-21 |
 | 8 | Element ids use the normative KerML 9.1 scheme for library and user models alike (project URI as base) | 2026-10-21 |
 | 6 | Engine built in the `sysml-cli` workspace (new `sysml-semantic`, `sysml-interchange`, `sysml-wasm` crates); this app consumes its WASM release | 2026-10-21 |
 

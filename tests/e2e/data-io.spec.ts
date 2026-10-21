@@ -143,6 +143,27 @@ test('requirements import from a CSV file in one undoable change', async ({ page
 	await expect(page.getByRole('button', { name: /Imported\.sysml/ })).toHaveCount(0);
 });
 
+test('an Excel workbook with several sheets imports from the sheet with requirements', async ({
+	page
+}) => {
+	await openDemo(page);
+	await page.keyboard.press('Control+k');
+	await page.getByRole('combobox', { name: /Search elements/ }).fill('import requ');
+	await page.getByRole('option', { name: /Import requirements/ }).click();
+	const dialog = page.getByRole('dialog', { name: 'Import requirements' });
+	await dialog
+		.locator('input[type=file]')
+		.setInputFiles(join(import.meta.dirname, '../../src/lib/dataio/fixtures/libreoffice.xlsx'));
+	const sheet = dialog.getByRole('combobox', { name: /^Sheet/ });
+	await expect(sheet).toHaveValue('1');
+	await expect(sheet.locator('option')).toHaveText(['Read me (1 row)', 'Requirements (4 rows)']);
+	await expect(dialog.getByRole('status')).toContainText('3 new requirements');
+	await expect(dialog.getByRole('combobox', { name: /Column H, Max mass/ })).toHaveValue('');
+	await sheet.selectOption('0');
+	await expect(dialog.getByRole('status')).toContainText('0 new requirements');
+	await expect(dialog.getByRole('button', { name: 'Import', exact: true })).toBeDisabled();
+});
+
 test('cells pasted from a spreadsheet import into an existing package', async ({ page }) => {
 	await openDemo(page);
 	await page.getByRole('button', { name: 'Drone UAV' }).click();
