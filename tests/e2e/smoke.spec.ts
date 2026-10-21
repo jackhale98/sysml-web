@@ -23,7 +23,9 @@ async function openFile(page: Page, name: RegExp) {
 
 test('landing page introduces the product and opens the demo', async ({ page }) => {
 	await page.goto('/');
-	await expect(page.getByRole('heading', { level: 1 })).toContainText('Systems engineering');
+	await expect(page.getByRole('heading', { level: 1 })).toContainText(
+		'Write it. Draw it. Understand it.'
+	);
 	await expectAccessible(page);
 	await page.getByRole('link', { name: 'Try the demo' }).click();
 	await expect(page).toHaveURL(/\/p\/demo$/);
