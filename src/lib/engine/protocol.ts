@@ -5,7 +5,12 @@ import type {
 	EditRequest,
 	EditResult,
 	Highlights,
+	LibraryEntry,
+	LibraryHit,
+	LibraryLicense,
 	RenderedTable,
+	StateMachine,
+	StateSession,
 	ViewInfo
 } from './types';
 
@@ -26,6 +31,19 @@ export interface EngineApi {
 	renderView(files: SourceFile[], name: string): RenderedTable;
 	/** The view libraries the engine bundles (`Reporting`, `ModelViews`). */
 	viewLibraries(): SourceFile[];
+	libraryIndex(): LibraryEntry[];
+	libraryFile(path: string): SourceFile;
+	librarySearch(query: string, limit: number): LibraryHit[];
+	libraryLicense(): LibraryLicense;
+	stateMachines(files: SourceFile[]): StateMachine[];
+	/** Start (null session) or advance a machine; variables override values first. */
+	stateStep(
+		files: SourceFile[],
+		machine: string,
+		session: StateSession | null,
+		event: string | null,
+		variables: Record<string, unknown> | null
+	): StateSession;
 }
 
 export type Method = keyof EngineApi;

@@ -597,7 +597,7 @@ ecosystem convention) to maximise adoption and integration.
 | `sysml-cli` workspace (engine) | GPL-3.0-or-later | Relicense to `Apache-2.0 OR MIT` (sole author) |
 | `mycelium-web` code (git, auth, shell) | GPL-3.0 because of uniorg; our own code otherwise | Reuse own code under the new licence; uniorg is not needed here |
 | `mycelium-web` worker | Apache-2.0 | Compatible |
-| OMG `sysml.library` | EPL-2.0 | Bundle unmodified as data with its licence and notice (file-level weak copyleft; compatible with an Apache/MIT app) |
+| OMG `sysml.library` | LGPL-3.0-only | Embedded unmodified in the engine as data, with its licence and notice shown in the app's standard-library browser; users can replace it (LGPL weak copyleft; compatible with an Apache/MIT app) |
 | `sysml-domain-libraries` packs | per that repo | Confirm before bundling |
 | Third-party npm/crates | various | Allowlist permissive licences in CI (`cargo deny`, `license-checker`) |
 
@@ -715,7 +715,7 @@ Engine gaps found while authoring the demo (inputs to Phase 1):
 | 1 | One shared Rust semantic engine compiled to WebAssembly (web, CLI, LSP) | 2026-10-21 |
 | 2 | Operational records (test runs, NCR, CAPA, inspections) deferred | 2026-10-21 |
 | 3 | Static app + git only; no backend holds data; stateless proxy worker; optional Systems Modeling API client | 2026-10-21 |
-| 4 | Licence `Apache-2.0 OR MIT`; relicense own grammar/core code; OMG library bundled under EPL-2.0 | 2026-10-21 |
+| 4 | Licence `Apache-2.0 OR MIT`; relicense own grammar/core code; OMG library bundled under its own licence (LGPL-3.0-only, corrected from EPL-2.0) | 2026-10-21 |
 | 5 | SvelteKit (static SPA) + Svelte 5; reuse mycelium-web's git/auth/worker code but **not** its structure or UI | 2026-10-21 |
 | 7 | ~~Object-first, spreadsheet-like UX~~ — superseded by #9 | 2026-10-21 |
 | 9 | SysML is the product: a workbench where text and diagrams are equal ways to build the model, made approachable through in-context explanation and guidance; tables are SysML views, not the editing paradigm | 2026-10-21 |

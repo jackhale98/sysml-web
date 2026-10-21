@@ -9,7 +9,14 @@
  */
 import { SvelteSet } from 'svelte/reactivity';
 import type { Engine } from '#lib/engine/client.ts';
-import type { Analysis, Diagnostic, EditRequest, EditResult, ViewInfo } from '#lib/engine/types.ts';
+import type {
+	Analysis,
+	Diagnostic,
+	EditRequest,
+	EditResult,
+	StateMachine,
+	ViewInfo
+} from '#lib/engine/types.ts';
 import { buildTree, collectElements, type ModelElement, type TreeNode } from './elements';
 import { collectRequirements, type RequirementRow } from './requirements';
 
@@ -79,6 +86,8 @@ export class Workspace {
 	engineVersion = $state<string | null>(null);
 	/** The project's views (and the standard ones the engine bundles). */
 	views = $state.raw<ViewInfo[]>([]);
+	/** The project's state machines, for the emulator. */
+	machines = $state.raw<StateMachine[]>([]);
 	/** Paths edited since the project was opened. */
 	readonly dirty = new SvelteSet<string>();
 	/** Model edits made through `transact`, newest last. */
@@ -150,7 +159,11 @@ export class Workspace {
 		if (files.some((f) => this.files[f.path] !== f.text)) return;
 		this.analyses = Object.fromEntries(files.map((f, i) => [f.path, results[i]!]));
 		const views = await engine.listViews(files);
-		if (files.every((f) => this.files[f.path] === f.text)) this.views = views;
+		const machines = await engine.stateMachines(files);
+		if (files.every((f) => this.files[f.path] === f.text)) {
+			this.views = views;
+			this.machines = machines;
+		}
 	}
 
 	text(path: string): string | undefined {

@@ -1,22 +1,62 @@
 <script lang="ts">
 	import {
+		BookLock,
 		ChevronRight,
 		FileCode,
 		Folder,
 		LayoutDashboard,
 		ListChecks,
 		Network,
+		Play,
 		Search,
 		Table2
 	} from '@lucide/svelte';
 	import type { TreeNode } from '#lib/project/elements.ts';
 	import { isLibraryFile, type Workspace } from '#lib/project/workspace.svelte.ts';
 	import KindGlyph from '#lib/ui/KindGlyph.svelte';
+	import type { Engine } from '#lib/engine/client.ts';
+	import type { LibraryEntry, LibraryHit } from '#lib/engine/types.ts';
 	import type { WorkbenchUi } from './ui.svelte.ts';
 	import { elementItems, modelViewItems, rank, type PaletteItem } from './palette.ts';
 	import { presentationOf, viewTitle } from './views.ts';
 
-	let { workspace, ui }: { workspace: Workspace; ui: WorkbenchUi } = $props();
+	let { workspace, ui, engine }: { workspace: Workspace; ui: WorkbenchUi; engine: Engine } =
+		$props();
+
+	/** The OMG standard library, listed once it is opened (fetched from the engine). */
+	let standardOpen = $state(false);
+	let standardIndex = $state.raw<LibraryEntry[]>([]);
+	$effect(() => {
+		if (standardOpen && !standardIndex.length) {
+			void engine.libraryIndex().then((index) => (standardIndex = index));
+		}
+	});
+	const standardGroups = $derived.by(() => {
+		const groups: Record<string, LibraryEntry[]> = {};
+		for (const entry of standardIndex) {
+			const folder = entry.path.includes('/')
+				? entry.path.slice(0, entry.path.lastIndexOf('/'))
+				: '';
+			(groups[folder] ??= []).push(entry);
+		}
+		return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
+	});
+
+	/** While filtering, matching definitions from the standard library too. */
+	let libraryHits = $state.raw<LibraryHit[]>([]);
+	$effect(() => {
+		const q = query.trim();
+		if (q.length < 2) {
+			libraryHits = [];
+			return;
+		}
+		const timer = setTimeout(() => {
+			void engine.librarySearch(q, 12).then((hits) => {
+				if (query.trim() === q) libraryHits = hits;
+			});
+		}, 150);
+		return () => clearTimeout(timer);
+	});
 
 	let mode = $state<'model' | 'files'>('model');
 	let query = $state('');
@@ -186,6 +226,28 @@
 						</li>
 					{/each}
 				</ul>
+				{#if libraryHits.length}
+					<h3>In the standard library</h3>
+					<ul class="flat">
+						{#each libraryHits as hit (hit.qualifiedName + hit.line)}
+							<li>
+								<button
+									type="button"
+									class="item result"
+									title={hit.doc}
+									onclick={() => ui.open({ kind: 'library', path: hit.path, line: hit.line })}
+								>
+									<KindGlyph
+										kind={hit.kind.replace(/ def$/, '').replace(/ /g, '_')}
+										isDefinition={hit.isDefinition}
+									/>
+									<span class="label">{hit.qualifiedName}</span>
+									<span class="where">{hit.kind}</span>
+								</button>
+							</li>
+						{/each}
+					</ul>
+				{/if}
 			</section>
 		{:else}
 			<section aria-labelledby="views-heading">
@@ -219,6 +281,28 @@
 											size={14}
 										/>{/if}
 									<span class="label">{viewTitle(v.info.name)}</span>
+								</button>
+							</li>
+						{/each}
+					</ul>
+				{/if}
+				{#if workspace.machines.length}
+					<h3>Simulations</h3>
+					<ul class="flat">
+						{#each workspace.machines as m (m.qualifiedName ?? m.name)}
+							<li>
+								<button
+									type="button"
+									class="item"
+									title={m.doc ?? `Run ${m.name} step by step`}
+									onclick={() =>
+										ui.open({
+											kind: 'emulator',
+											machine: m.qualifiedName ?? m.name,
+											title: m.name
+										})}
+								>
+									<Play size={14} /> <span class="label">Run {m.name}</span>
 								</button>
 							</li>
 						{/each}
@@ -272,10 +356,37 @@
 			</section>
 			{#if libraryRoots.length}
 				<details class="libraries" bind:open={librariesOpen}>
-					<summary>Libraries</summary>
+					<summary>Project libraries</summary>
 					{#if librariesOpen}{@render tree(libraryRoots, 0)}{/if}
 				</details>
 			{/if}
+			<details class="libraries" bind:open={standardOpen}>
+				<summary>SysML standard library</summary>
+				{#if standardOpen}
+					{#if !standardIndex.length}
+						<p class="empty">Reading the library…</p>
+					{/if}
+					{#each standardGroups as [folder, entries] (folder)}
+						<details class="group">
+							<summary>{folder || 'Library'}</summary>
+							<ul class="flat">
+								{#each entries as entry (entry.path)}
+									<li>
+										<button
+											type="button"
+											class="item"
+											onclick={() => ui.open({ kind: 'library', path: entry.path })}
+										>
+											<BookLock size={14} />
+											<span class="label">{entry.package}</span>
+										</button>
+									</li>
+								{/each}
+							</ul>
+						</details>
+					{/each}
+				{/if}
+			</details>
 		{/if}
 	{:else}
 		<ul class="flat files">

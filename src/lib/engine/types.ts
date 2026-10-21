@@ -130,6 +130,100 @@ export interface RenderedTable {
 	availableFields?: string[];
 }
 
+/** A file of the OMG standard library embedded in the engine. */
+export interface LibraryEntry {
+	path: string;
+	package: string;
+	kind: 'kerml' | 'sysml';
+	size: number;
+}
+
+export interface LibraryHit {
+	name: string;
+	qualifiedName: string;
+	kind: string;
+	isDefinition: boolean;
+	path: string;
+	line: number;
+	doc?: string;
+}
+
+export interface LibraryLicense {
+	spdx: string;
+	notice: string;
+	source?: string;
+	licenseUrl?: string;
+}
+
+/** A state machine, ready to draw and to emulate. */
+export interface StateMachine {
+	name: string;
+	qualifiedName?: string;
+	file: string;
+	line: number;
+	doc?: string;
+	parallel?: boolean;
+	states: {
+		/** Path for nested states, e.g. `on.motors.idle`. */
+		name: string;
+		label: string;
+		kind: 'initial' | 'state' | 'final';
+		parent?: string;
+		parallel?: boolean;
+		entry?: string;
+		do?: string;
+		exit?: string;
+		doc?: string;
+		line: number;
+	}[];
+	transitions: {
+		name?: string;
+		from: string;
+		to: string;
+		trigger?: string;
+		guard?: string;
+		effect?: string;
+		line: number;
+	}[];
+	variables: { name: string; type?: string; value?: unknown; direction?: string; doc?: string }[];
+	warnings?: string[];
+}
+
+export interface SimStep {
+	step: number;
+	from_state: string;
+	transition_name: string | null;
+	trigger: string | null;
+	guard_result: boolean | null;
+	effect: string | null;
+	to_state: string;
+	exit_action: string | null;
+	entry_action: string | null;
+}
+
+/** One emulation session: where the machine is and what can happen next. */
+export interface StateSession {
+	machine: string;
+	current: string[];
+	step: number;
+	variables: Record<string, unknown>;
+	trace: SimStep[];
+	status: 'running' | 'completed' | 'deadlocked' | 'max steps reached' | string;
+	enabled: {
+		transition: string;
+		index: number;
+		from: string;
+		to: string;
+		trigger?: string;
+		guard?: string;
+		guardResult?: boolean;
+		conditionResult?: boolean;
+		ready: boolean;
+		reason?: string;
+	}[];
+	messages?: string[];
+}
+
 /** How a table column maps back to the model. */
 export interface ColumnEdit {
 	/** `name`, `shortName`, `doc`, `feature:priority`, `metadata:StatusInfo.status`, … */

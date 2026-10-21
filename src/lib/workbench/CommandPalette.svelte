@@ -9,6 +9,7 @@
 		commandItems,
 		elementItems,
 		fileItems,
+		machineItems,
 		modelViewItems,
 		search,
 		segments,
@@ -41,7 +42,7 @@
 			)
 		],
 		files: fileItems(workspace.modelPaths),
-		commands: commandItems(theme.choice)
+		commands: [...machineItems(workspace.machines), ...commandItems(theme.choice)]
 	});
 	const results = $derived(search(sources, query));
 	const current = $derived(Math.min(active, results.length - 1));

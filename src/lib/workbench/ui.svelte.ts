@@ -7,7 +7,11 @@ export type Tab =
 	/** `raw` shows a document (Markdown) as source rather than as a page. */
 	| { kind: 'file'; path: string; raw?: boolean }
 	| { kind: 'diagram'; view: DiagramView; scope: string | null; title: string }
-	| { kind: 'view'; name: string; title: string };
+	| { kind: 'view'; name: string; title: string }
+	/** Run a state machine interactively. `machine` is its (qualified) name. */
+	| { kind: 'emulator'; machine: string; title: string }
+	/** A read-only file of the OMG standard library. */
+	| { kind: 'library'; path: string; line?: number };
 
 export type SelectionSource = 'text' | 'diagram' | 'explorer' | 'inspector' | 'table';
 
@@ -32,6 +36,10 @@ export function tabId(tab: Tab): string {
 			return `diagram:${tab.view}:${tab.scope ?? ''}`;
 		case 'view':
 			return `view:${tab.name}`;
+		case 'emulator':
+			return `emulator:${tab.machine}`;
+		case 'library':
+			return `library:${tab.path}`;
 		default:
 			return tab.kind;
 	}
@@ -48,6 +56,10 @@ export function tabTitle(tab: Tab): string {
 		case 'diagram':
 		case 'view':
 			return tab.title;
+		case 'emulator':
+			return tab.title;
+		case 'library':
+			return tab.path.split('/').pop() ?? tab.path;
 	}
 }
 

@@ -307,6 +307,25 @@ function descendants(node: TreeNode): number {
 	return node.children.reduce((sum, c) => sum + 1 + descendants(c), 0);
 }
 
+/** One command per state machine: run it in the emulator. */
+export function machineItems(
+	machines: readonly { name: string; qualifiedName?: string }[]
+): PaletteItem[] {
+	return machines.map((m) => {
+		const machine = m.qualifiedName ?? m.name;
+		return {
+			id: `emulate:${machine}`,
+			group: 'commands' as const,
+			label: `Run ${m.name}`,
+			keyword: 'state machine',
+			aliases: `simulate emulate ${machine}`,
+			kind: 'state',
+			isDefinition: true,
+			action: { type: 'open' as const, tab: { kind: 'emulator' as const, machine, title: m.name } }
+		};
+	});
+}
+
 /** The model's own views (saved diagrams and tables) and the standard tables. */
 export function modelViewItems(views: readonly ViewInfo[]): PaletteItem[] {
 	return views

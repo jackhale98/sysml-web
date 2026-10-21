@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import {
+		BookLock,
 		CircleAlert,
 		Code,
 		Eye,
@@ -12,6 +13,7 @@
 		LoaderCircle,
 		Network,
 		PanelRight,
+		Play,
 		Search,
 		TriangleAlert,
 		X
@@ -44,6 +46,18 @@
 	// only when a file or diagram is first opened.
 	const loadTextEditor = () => import('./TextEditor.svelte').then((m) => m.default);
 	const loadDiagram = () => import('#lib/diagram/DiagramCanvas.svelte').then((m) => m.default);
+	const loadEmulator = () => import('#lib/sim/StateEmulator.svelte').then((m) => m.default);
+	const loadLibraryFile = () => import('./LibraryFile.svelte').then((m) => m.default);
+
+	// Deep link: `#emulate=Package::Machine` opens the emulator once the model is read.
+	$effect(() => {
+		if (workspace.state.phase !== 'ready') return;
+		const match = /^#emulate=(.+)$/.exec(location.hash);
+		if (!match) return;
+		const machine = decodeURIComponent(match[1]!);
+		history.replaceState(null, '', location.pathname + location.search);
+		ui.open({ kind: 'emulator', machine, title: machine.split('::').pop() ?? machine });
+	});
 
 	const tab = $derived(ui.activeTab);
 	/** The package a file is about, for the diagram beside its text. */
@@ -158,7 +172,7 @@
 	<main class="panes">
 		<h1 class="visually-hidden">{workspace.info?.name ?? 'Project'}</h1>
 		<div class="pane explorer-pane">
-			<Explorer {workspace} {ui} />
+			<Explorer {workspace} {ui} {engine} />
 		</div>
 
 		<section class="pane editor-pane" aria-label="Editor">
@@ -176,6 +190,8 @@
 								{:else if t.kind === 'requirements'}<ListChecks size={14} />
 								{:else if t.kind === 'diagram'}<Network size={14} />
 								{:else if t.kind === 'view'}<Eye size={14} />
+								{:else if t.kind === 'emulator'}<Play size={14} />
+								{:else if t.kind === 'library'}<BookLock size={14} />
 								{:else}<FileCode size={14} />{/if}
 								<span>{tabTitle(t)}</span>
 								{#if t.kind === 'file' && workspace.dirty.has(t.path)}<span
@@ -257,6 +273,22 @@
 								{ui}
 								{engine}
 							/>
+						{/await}
+					{/key}
+				{:else if tab.kind === 'emulator'}
+					{#key tab.machine}
+						{#await loadEmulator()}
+							<p class="empty">Loading the emulator…</p>
+						{:then StateEmulator}
+							<StateEmulator machine={tab.machine} {workspace} {ui} {engine} />
+						{/await}
+					{/key}
+				{:else if tab.kind === 'library'}
+					{#key tab.path}
+						{#await loadLibraryFile()}
+							<p class="empty">Opening the library file…</p>
+						{:then LibraryFile}
+							<LibraryFile path={tab.path} line={tab.line} {engine} />
 						{/await}
 					{/key}
 				{:else if tab.path.endsWith('.md') && !tab.raw}

@@ -11,7 +11,7 @@
 	} from '@xyflow/svelte';
 	import '@xyflow/svelte/dist/style.css';
 	import { untrack } from 'svelte';
-	import { Pencil, Plus, Trash2 } from '@lucide/svelte';
+	import { Pencil, Play, Plus, Trash2 } from '@lucide/svelte';
 	import type { Engine } from '#lib/engine/client.ts';
 	import type { DiagramGraph, DiagramView } from '#lib/engine/types.ts';
 	import type { ModelElement } from '#lib/project/elements.ts';
@@ -77,6 +77,13 @@
 
 	/** Node ids are names, or dotted paths (`drone.battery`) for nested usages. */
 	const nameOf = (id: string) => id.slice(id.lastIndexOf('.') + 1);
+
+	/** On a state diagram, the machine it draws, so it can be run. */
+	const runnable = $derived(
+		view === 'states'
+			? workspace.machines.find((m) => m.name === scope || m.qualifiedName === scope)
+			: undefined
+	);
 
 	function elementFor(id: string): ModelElement | undefined {
 		const name = nameOf(id);
@@ -307,6 +314,22 @@
 			{/if}
 			<Panel position="top-right">
 				<div class="toolbar" role="toolbar" aria-label="Diagram tools">
+					{#if runnable}
+						<button
+							type="button"
+							class="run"
+							title="Run this state machine step by step"
+							onclick={() =>
+								runnable &&
+								ui.open({
+									kind: 'emulator',
+									machine: runnable.qualifiedName ?? runnable.name,
+									title: runnable.name
+								})}
+						>
+							<Play size={14} /> <span>Run</span>
+						</button>
+					{/if}
 					<button
 						type="button"
 						onclick={() => {
@@ -430,6 +453,10 @@
 		color: var(--text);
 		font-weight: 520;
 		cursor: pointer;
+	}
+	.toolbar .run {
+		color: var(--kind-behavior);
+		font-weight: 650;
 	}
 	.toolbar button:hover:not(:disabled) {
 		background: var(--surface-hover);

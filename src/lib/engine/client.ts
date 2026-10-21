@@ -44,6 +44,12 @@ export function startEngine(urls: Init): Engine {
 		listViews: (...params) => call('listViews', ...params),
 		renderView: (...params) => call('renderView', ...params),
 		viewLibraries: (...params) => call('viewLibraries', ...params),
+		libraryIndex: (...params) => call('libraryIndex', ...params),
+		libraryFile: (...params) => call('libraryFile', ...params),
+		librarySearch: (...params) => call('librarySearch', ...params),
+		libraryLicense: (...params) => call('libraryLicense', ...params),
+		stateMachines: (...params) => call('stateMachines', ...params),
+		stateStep: (...params) => call('stateStep', ...params),
 		terminate: () => worker.terminate()
 	};
 }

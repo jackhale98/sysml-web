@@ -45,8 +45,9 @@ from `jackhale98/sysml-cli`, built at the revision pinned in `engine.json`. Set
 ## Licence
 
 Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or
-[MIT license](LICENSE-MIT) at your option. The OMG SysML v2 standard library
-used by the engine and the ELK layout library (elkjs) are EPL-2.0, used
-unmodified.
+[MIT license](LICENSE-MIT) at your option. Third-party components keep their
+own licences and are used unmodified: the OMG SysML v2 standard library
+embedded in the engine is LGPL-3.0-only (its notice is shown in the app's
+standard-library browser), and the ELK layout library (elkjs) is EPL-2.0.
 
 SysML is a registered trademark of the Object Management Group.

@@ -10,7 +10,12 @@ import type {
 	DiagramGraph,
 	EditResult,
 	Highlights,
+	LibraryEntry,
+	LibraryHit,
+	LibraryLicense,
 	RenderedTable,
+	StateMachine,
+	StateSession,
 	ViewInfo
 } from './types';
 
@@ -25,6 +30,18 @@ interface Wasm {
 	listViews(files: string): string;
 	renderView(files: string, name: string): string;
 	viewLibraries(): string;
+	libraryIndex(): string;
+	libraryFile(path: string): string;
+	librarySearch(query: string, limit: number): string;
+	libraryLicense(): string;
+	stateMachines(files: string): string;
+	stateStep(
+		files: string,
+		machine: string,
+		session: string | null,
+		event: string | null,
+		variables: string | null
+	): string;
 }
 
 const scope = self as unknown as DedicatedWorkerGlobalScope;
@@ -51,7 +68,31 @@ const handlers: { [M in Method]: (wasm: Wasm, ...params: never[]) => unknown } =
 		JSON.parse(wasm.listViews(JSON.stringify(files))) as ViewInfo[],
 	renderView: (wasm, files: unknown, name: string): RenderedTable =>
 		JSON.parse(wasm.renderView(JSON.stringify(files), name)) as RenderedTable,
-	viewLibraries: (wasm): SourceFile[] => JSON.parse(wasm.viewLibraries()) as SourceFile[]
+	viewLibraries: (wasm): SourceFile[] => JSON.parse(wasm.viewLibraries()) as SourceFile[],
+	libraryIndex: (wasm): LibraryEntry[] => JSON.parse(wasm.libraryIndex()) as LibraryEntry[],
+	libraryFile: (wasm, path: string): SourceFile => JSON.parse(wasm.libraryFile(path)) as SourceFile,
+	librarySearch: (wasm, query: string, limit: number): LibraryHit[] =>
+		JSON.parse(wasm.librarySearch(query, limit)) as LibraryHit[],
+	libraryLicense: (wasm): LibraryLicense => JSON.parse(wasm.libraryLicense()) as LibraryLicense,
+	stateMachines: (wasm, files: unknown): StateMachine[] =>
+		JSON.parse(wasm.stateMachines(JSON.stringify(files))) as StateMachine[],
+	stateStep: (
+		wasm,
+		files: unknown,
+		machine: string,
+		session: unknown,
+		event: string | null,
+		variables: unknown
+	): StateSession =>
+		JSON.parse(
+			wasm.stateStep(
+				JSON.stringify(files),
+				machine,
+				session ? JSON.stringify(session) : null,
+				event,
+				variables ? JSON.stringify(variables) : null
+			)
+		) as StateSession
 };
 
 scope.onmessage = async (event: MessageEvent<Init | Request>) => {
