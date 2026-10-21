@@ -472,9 +472,13 @@
 </div>
 
 <style>
-	/* A link and the comma after it wrap together. */
+	/* A link and the comma after it wrap together; long names still wrap inside the link. */
 	.rd-tie {
 		white-space: nowrap;
+	}
+	.rd-tie :global(.rd-ref) {
+		white-space: normal;
+		overflow-wrap: anywhere;
 	}
 	.report-screen {
 		container: report / inline-size;
