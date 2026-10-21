@@ -18,6 +18,7 @@
 		Plus,
 		RotateCcw,
 		Settings as SettingsIcon,
+		Upload,
 		WifiOff
 	} from '@lucide/svelte';
 	import type { Engine } from '#lib/engine/client.ts';
@@ -45,13 +46,16 @@
 		session,
 		engine,
 		onopensettings,
-		onopensourcecontrol
+		onopensourcecontrol,
+		onimportrequirements
 	}: {
 		workspace: Workspace;
 		session: ProjectSession;
 		engine: Engine;
 		onopensettings?: () => void;
 		onopensourcecontrol?: () => void;
+		/** Shows "Import requirements…" when the host can open the import dialog. */
+		onimportrequirements?: () => void;
 	} = $props();
 
 	let open = $state(false);
@@ -284,6 +288,18 @@
 				<button type="button" role="menuitem" onclick={exportKpar}>
 					<Download size={15} /> Download as .kpar
 				</button>
+				{#if onimportrequirements}
+					<button
+						type="button"
+						role="menuitem"
+						onclick={() => {
+							open = false;
+							onimportrequirements();
+						}}
+					>
+						<Upload size={15} /> Import requirements… <small>xlsx, csv</small>
+					</button>
+				{/if}
 				<div role="separator"></div>
 				<a role="menuitem" href={resolve('/projects')}>
 					<FolderOpen size={15} /> All projects…

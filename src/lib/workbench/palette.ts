@@ -41,7 +41,8 @@ export type PaletteAction =
 	| { type: 'layout'; layout: FileLayout }
 	| { type: 'toggle-inspector' }
 	| { type: 'show-problems' }
-	| { type: 'switch-theme' };
+	| { type: 'switch-theme' }
+	| { type: 'import-requirements' };
 
 export interface PaletteItem {
 	/** Unique across all groups. */
@@ -439,7 +440,13 @@ export function commandItems(themeChoice: string): PaletteItem[] {
 			{ type: 'open', tab: { kind: 'home' } },
 			{ aliases: 'home' }
 		),
-		command('requirements', 'Open requirements', { type: 'open', tab: { kind: 'requirements' } })
+		command('requirements', 'Open requirements', { type: 'open', tab: { kind: 'requirements' } }),
+		command(
+			'import-requirements',
+			'Import requirements…',
+			{ type: 'import-requirements' },
+			{ aliases: 'excel xlsx csv spreadsheet paste upload' }
+		)
 	];
 }
 

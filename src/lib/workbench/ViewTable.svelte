@@ -10,8 +10,11 @@
 		FilePlus,
 		Minus,
 		Search,
-		TriangleAlert
+		TriangleAlert,
+		Upload
 	} from '@lucide/svelte';
+	import ExportMenu from '#lib/dataio/ExportMenu.svelte';
+	import type { ExportTable } from '#lib/dataio/export.ts';
 	import type { Engine } from '#lib/engine/client.ts';
 	import type { RenderedTable, ViewInfo } from '#lib/engine/types.ts';
 	import type { ModelElement } from '#lib/project/elements.ts';
@@ -48,6 +51,23 @@
 	);
 	const title = $derived(viewTitle(info?.name ?? name));
 	const isPivot = $derived(!!table && table.sources.length === 0 && table.rows.length > 0);
+	/** Rows are requirements (the requirements table and views like it): offer importing more. */
+	const listsRequirements = $derived(
+		!!table &&
+			!isPivot &&
+			['text', 'satisfiedBy', 'verifiedBy'].every((f) => table?.availableFields?.includes(f))
+	);
+
+	/** The table as shown (searched and sorted), for exporting. */
+	function exportData(): ExportTable {
+		return {
+			title,
+			project: workspace.info?.name ?? 'Project',
+			doc: info?.doc,
+			header: (table?.columns ?? []).map((c, i) => (isPivot && i > 0 ? c : heading(c))),
+			rows: rows.map((r) => r.cells)
+		};
+	}
 
 	async function refresh() {
 		const current = ++generation;
@@ -413,6 +433,26 @@
 					{/if}
 				</div>
 			{/if}
+			{#if table}
+				<div class="io">
+					<ExportMenu
+						table={exportData}
+						filtered={rows.length !== table.rows.length}
+						share={ui.phone}
+					/>
+					{#if listsRequirements}
+						<button
+							type="button"
+							class="source"
+							aria-haspopup="dialog"
+							title="Add requirements from an Excel or CSV file, or cells pasted from a spreadsheet"
+							onclick={() => (ui.importOpen = true)}
+						>
+							<Upload size={14} /> Import
+						</button>
+					{/if}
+				</div>
+			{/if}
 		</div>
 		{#if table?.warnings.length}
 			<p class="warnings"><TriangleAlert size={14} /> {table.warnings.join(' · ')}</p>
@@ -688,12 +728,23 @@
 	}
 	.count {
 		color: var(--text-2);
+		white-space: nowrap;
 		font-size: var(--text-sm);
 		font-variant-numeric: tabular-nums;
 	}
 	.columns-menu {
 		position: relative;
 		margin-left: auto;
+	}
+	/* Export and import sit at the end of the row, after Columns when it shows. */
+	.io {
+		display: flex;
+		align-items: center;
+		gap: var(--space-2);
+		margin-left: auto;
+	}
+	.columns-menu + .io {
+		margin-left: 0;
 	}
 	.columns-panel {
 		position: absolute;

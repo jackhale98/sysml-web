@@ -67,10 +67,12 @@
 	let palettePrimed = $state(false);
 	let sourceControlPrimed = $state(false);
 	let settingsPrimed = $state(false);
+	let importPrimed = $state(false);
 	$effect(() => {
 		if (ui.paletteOpen) palettePrimed = true;
 		if (ui.sourceControlOpen) sourceControlPrimed = true;
 		if (ui.settingsOpen) settingsPrimed = true;
+		if (ui.importOpen) importPrimed = true;
 	});
 	const loadEmulator = () => import('#lib/sim/StateEmulator.svelte').then((m) => m.default);
 	const loadLibraryFile = () => import('./LibraryFile.svelte').then((m) => m.default);
@@ -255,6 +257,7 @@
 				{engine}
 				onopensettings={() => (ui.settingsOpen = true)}
 				onopensourcecontrol={() => (ui.sourceControlOpen = true)}
+				onimportrequirements={() => (ui.importOpen = true)}
 			/>
 		{:else}
 			<div class="project"><strong>{workspace.info?.name ?? 'Project'}</strong></div>
@@ -636,6 +639,11 @@
 	{#if settingsPrimed}
 		{#await import('#lib/settings/Settings.svelte') then { default: SettingsDialog }}
 			<SettingsDialog {engine} bind:open={ui.settingsOpen} />
+		{/await}
+	{/if}
+	{#if importPrimed}
+		{#await import('#lib/dataio/ImportRequirements.svelte') then { default: ImportRequirements }}
+			<ImportRequirements {workspace} {ui} bind:open={ui.importOpen} />
 		{/await}
 	{/if}
 

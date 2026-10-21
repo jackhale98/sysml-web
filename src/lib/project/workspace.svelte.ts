@@ -75,6 +75,8 @@ interface UndoEntry {
 	label: string;
 	/** Text of each changed file before the edit. */
 	before: Record<string, string>;
+	/** Files the edit created; undo removes them. */
+	created?: string[];
 }
 
 export class Workspace {
@@ -230,9 +232,15 @@ export class Workspace {
 		const error = await run();
 		const changed = Object.keys(this.files).filter((p) => this.files[p] !== before[p]);
 		if (changed.length) {
+			const created = changed.filter((p) => !(p in before));
+			const kept = changed.filter((p) => p in before);
 			this.undoStack = [
 				...this.undoStack.slice(-(UNDO_LIMIT - 1)),
-				{ label, before: Object.fromEntries(changed.map((p) => [p, before[p] ?? ''])) }
+				{
+					label,
+					before: Object.fromEntries(kept.map((p) => [p, before[p]!])),
+					...(created.length ? { created } : {})
+				}
 			];
 		}
 		return error;
@@ -266,7 +274,19 @@ export class Workspace {
 		if (!entry) return null;
 		this.undoStack = this.undoStack.slice(0, -1);
 		for (const [path, text] of Object.entries(entry.before)) this.replaceText(path, text);
+		for (const path of entry.created ?? []) this.removeFile(path);
 		return entry.label;
+	}
+
+	/** Take a file out of the project (undoing the edit that created it). */
+	private removeFile(path: string) {
+		if (!(path in this.files)) return;
+		const rest = { ...this.files };
+		delete rest[path];
+		this.files = rest;
+		this.dirty.delete(path);
+		clearTimeout(this.timer);
+		this.timer = setTimeout(() => void this.analyse(), ANALYSIS_DELAY_MS);
 	}
 
 	/** Replace a file's text with one minimal change, through its editor when open. */
