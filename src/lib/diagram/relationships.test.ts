@@ -186,7 +186,9 @@ describe('statements', () => {
 		expect(p.statement).toBe('part motor : Motor;');
 		expect(p.steps[0]!.kind).toBe('patch');
 		const after = apply(p)['system/DroneArchitecture.sysml']!;
-		expect(after).toMatch(/hoverPower\), ?[^\n]*\n|endurance = HoverEndurance[^\n]*\n {8}part motor : Motor;\n {4}\}/);
+		expect(after).toContain(
+			'attribute :>> endurance = HoverEndurance(battery.usableEnergy, hoverPower);\n        part motor : Motor;\n    }'
+		);
 	});
 
 	it('satisfy is written beside the other satisfy statements', () => {

@@ -1,10 +1,11 @@
 <script lang="ts">
 	import { Handle, Position } from '@xyflow/svelte';
 	import { iconOf } from '#lib/ui/kinds.ts';
+	import { useEditing } from './editing.svelte.ts';
 	import { MAX_ROWS, notationOf } from './notation.ts';
 	import type { SysmlNodeData } from './types.ts';
 
-	let { data }: { data: SysmlNodeData } = $props();
+	let { id, data }: { id: string; data: SysmlNodeData } = $props();
 
 	const node = $derived(data.node);
 	const n = $derived(notationOf(node, data.view));
@@ -12,10 +13,70 @@
 	const vertical = $derived(data.direction === 'DOWN');
 	const left = $derived(n.ports.filter((p) => p.side === 'left'));
 	const right = $derived(n.ports.filter((p) => p.side === 'right'));
+
+	const editing = useEditing();
+	const renaming = $derived(editing?.renaming === id);
+	const editable = $derived(!!editing && data.editable);
+	let draft = $state('');
+	let saving = false;
+
+	function startRename(event: MouseEvent) {
+		if (!editable || !editing) return;
+		event.stopPropagation();
+		editing.startRename(id);
+	}
+
+	function focusInput(input: HTMLInputElement) {
+		draft = node.label;
+		input.focus();
+		input.select();
+	}
+
+	async function save() {
+		if (!editing || saving) return;
+		if (draft.trim() === node.label) {
+			editing.cancelRename();
+			return;
+		}
+		saving = true;
+		await editing.commitRename(id, draft);
+		saving = false;
+	}
+
+	function onkeydown(event: KeyboardEvent) {
+		event.stopPropagation();
+		if (event.key === 'Enter') {
+			event.preventDefault();
+			void save();
+		} else if (event.key === 'Escape') {
+			event.preventDefault();
+			editing?.cancelRename();
+			// Back to the node, so the keyboard keeps its place.
+			(event.currentTarget as HTMLElement).closest<HTMLElement>('.svelte-flow__node')?.focus();
+		}
+	}
 </script>
 
-<Handle type="target" position={vertical ? Position.Top : Position.Left} class="handle" />
-<div class="node" style:--fam="var(--kind-{n.family})" class:selected={data.selected}>
+<!-- Edge anchors first: edges without a handle id attach to the first ones. -->
+<Handle
+	type="target"
+	position={vertical ? Position.Top : Position.Left}
+	class="handle"
+	isConnectable={false}
+/>
+<Handle
+	type="source"
+	position={vertical ? Position.Bottom : Position.Right}
+	class="handle"
+	isConnectable={false}
+/>
+<div
+	class="node"
+	style:--fam="var(--kind-{n.family})"
+	class:selected={data.selected}
+	class:source={editing?.connectingFrom === id}
+	class:pickable={!!editing?.connectingFrom && editing.connectingFrom !== id}
+>
 	{#if n.shape === 'port'}
 		<div class="port-node" title="port {node.label}"></div>
 		<span class="port-label">{node.label}</span>
@@ -40,7 +101,28 @@
 					<Icon size={12} strokeWidth={2.25} aria-hidden="true" />
 					«{n.isAbstract ? 'abstract ' : ''}{n.keyword}»
 				</span>
-				<span class="name" class:abstract={n.isAbstract}>{node.label}</span>
+				{#if renaming}
+					<input
+						class="name-input nodrag nopan nowheel"
+						aria-label="New name for {node.label}"
+						bind:value={draft}
+						{@attach focusInput}
+						{onkeydown}
+						onblur={() => void save()}
+						ondblclick={(e) => e.stopPropagation()}
+					/>
+					{#if editing?.renameError}
+						<span class="rename-error" role="alert">{editing.renameError}</span>
+					{/if}
+				{:else}
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<span
+						class="name"
+						class:abstract={n.isAbstract}
+						title={editable ? 'Double-click to rename' : undefined}
+						ondblclick={startRename}>{node.label}</span
+					>
+				{/if}
 			</div>
 			{#if n.doc}
 				<div class="compartment doc"><p>{n.doc}</p></div>
@@ -71,7 +153,12 @@
 		</div>
 	{/if}
 </div>
-<Handle type="source" position={vertical ? Position.Bottom : Position.Right} class="handle" />
+{#if editable}
+	<!-- Drag from any of these onto another node to draw a relationship. -->
+	{#each [Position.Top, Position.Right, Position.Bottom, Position.Left] as side (side)}
+		<Handle type="source" id="connect-{side}" position={side} class="connect" />
+	{/each}
+{/if}
 
 <style>
 	.node {
@@ -314,5 +401,108 @@
 		min-width: 0;
 		min-height: 0;
 		border: 0;
+	}
+	/* Inline rename. */
+	.name-input {
+		width: 100%;
+		min-width: 0;
+		height: 22px;
+		padding: 0 6px;
+		border: 1.5px solid var(--accent);
+		border-radius: 4px;
+		background: var(--surface);
+		color: var(--text);
+		font: inherit;
+		font-weight: 650;
+		font-size: 13px;
+		text-align: center;
+		outline: none;
+		box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 22%, transparent);
+	}
+	.rename-error {
+		position: absolute;
+		top: calc(100% + 6px);
+		left: 50%;
+		z-index: 2;
+		translate: -50% 0;
+		width: max-content;
+		max-width: 260px;
+		padding: 4px 8px;
+		border-radius: 6px;
+		background: var(--danger);
+		color: #fff;
+		font-size: 11.5px;
+		line-height: 16px;
+		white-space: normal;
+	}
+
+	/* Connecting: the source glows, possible targets answer the pointer. */
+	.source .box,
+	.source .port-node,
+	.source .pseudo,
+	.source .decision {
+		outline: 2px solid var(--accent);
+		outline-offset: 3px;
+		animation: pulse 1.4s var(--ease) infinite;
+	}
+	.pickable {
+		cursor: crosshair;
+	}
+	.pickable:hover .box,
+	:global(.svelte-flow.connecting) .node:hover .box {
+		outline: 2px dashed var(--accent);
+		outline-offset: 3px;
+		box-shadow: var(--shadow-md);
+	}
+	@keyframes pulse {
+		50% {
+			outline-color: color-mix(in oklab, var(--accent) 35%, transparent);
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.source .box,
+		.source .port-node,
+		.source .pseudo,
+		.source .decision {
+			animation: none;
+		}
+	}
+
+	/* Connection handles: hidden until the node is hovered, focused or selected. */
+	:global(.svelte-flow .svelte-flow__handle.connect) {
+		width: 12px;
+		height: 12px;
+		min-width: 0;
+		min-height: 0;
+		border: 2px solid var(--surface);
+		border-radius: 50%;
+		background: var(--accent);
+		box-shadow: 0 0 0 1px var(--accent);
+		opacity: 0;
+		scale: 0.6;
+		cursor: crosshair;
+		transition:
+			opacity var(--duration) var(--ease),
+			scale var(--duration) var(--ease);
+	}
+	/* A larger, invisible hit area, kinder to fingers. */
+	:global(.svelte-flow .svelte-flow__handle.connect::after) {
+		content: '';
+		position: absolute;
+		inset: -10px;
+		border-radius: 50%;
+	}
+	:global(.svelte-flow__node:hover .svelte-flow__handle.connect),
+	:global(.svelte-flow__node:focus-visible .svelte-flow__handle.connect),
+	:global(.svelte-flow__node.selected .svelte-flow__handle.connect),
+	:global(.svelte-flow .svelte-flow__handle.connect.connectingfrom) {
+		opacity: 1;
+		scale: 1;
+	}
+	:global(.svelte-flow .svelte-flow__handle.connect:hover) {
+		scale: 1.25;
+	}
+	:global(.svelte-flow.connecting .svelte-flow__handle.connect:not(.connectingfrom)) {
+		opacity: 0;
 	}
 </style>
