@@ -13,7 +13,9 @@ export default ts.config(
 			'playwright-report/',
 			'test-results/',
 			'static/engine/',
-			'.cache/'
+			'.cache/',
+			'.lighthouseci/',
+			'lighthouserc.cjs'
 		]
 	},
 	js.configs.recommended,

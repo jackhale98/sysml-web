@@ -1,0 +1,55 @@
+name: Lighthouse
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lighthouse-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lighthouse:
+    name: lighthouse (${{ matrix.preset }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        preset: [mobile, desktop]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - uses: ./.github/actions/build-engine
+      - run: npm run build
+
+      - name: Install Chrome
+        id: chrome
+        uses: browser-actions/setup-chrome@v1
+        with:
+          chrome-version: stable
+
+      # Thresholds live in lighthouserc.cjs: performance >= 0.9, accessibility = 1,
+      # best-practices >= 0.95, SEO >= 0.9, three runs per URL.
+      - name: Lighthouse CI (${{ matrix.preset }})
+        run: npx lhci autorun
+        env:
+          LH_PRESET: ${{ matrix.preset }}
+          CHROME_PATH: ${{ steps.chrome.outputs.chrome-path }}
+
+      - name: Upload Lighthouse reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-${{ matrix.preset }}
+          path: .lighthouseci/${{ matrix.preset }}/
+          retention-days: 14
