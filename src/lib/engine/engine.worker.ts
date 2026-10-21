@@ -11,6 +11,7 @@ import type {
 	EditResult,
 	Highlights,
 	LibraryEntry,
+	ProjectArchive,
 	LibraryHit,
 	LibraryLicense,
 	RenderedTable,
@@ -31,6 +32,8 @@ interface Wasm {
 	renderView(files: string, name: string): string;
 	viewLibraries(): string;
 	libraryIndex(): string;
+	readProjectArchive(bytes: Uint8Array, fallbackName: string): string;
+	writeKpar(info: string, files: string, created: string): Uint8Array;
 	libraryFile(path: string): string;
 	librarySearch(query: string, limit: number): string;
 	libraryLicense(): string;
@@ -70,6 +73,10 @@ const handlers: { [M in Method]: (wasm: Wasm, ...params: never[]) => unknown } =
 		JSON.parse(wasm.renderView(JSON.stringify(files), name)) as RenderedTable,
 	viewLibraries: (wasm): SourceFile[] => JSON.parse(wasm.viewLibraries()) as SourceFile[],
 	libraryIndex: (wasm): LibraryEntry[] => JSON.parse(wasm.libraryIndex()) as LibraryEntry[],
+	readProjectArchive: (wasm, bytes: Uint8Array, fallbackName: string): ProjectArchive =>
+		JSON.parse(wasm.readProjectArchive(bytes, fallbackName)) as ProjectArchive,
+	writeKpar: (wasm, info: unknown, files: unknown, created: string): Uint8Array =>
+		wasm.writeKpar(JSON.stringify(info), JSON.stringify(files), created),
 	libraryFile: (wasm, path: string): SourceFile => JSON.parse(wasm.libraryFile(path)) as SourceFile,
 	librarySearch: (wasm, query: string, limit: number): LibraryHit[] =>
 		JSON.parse(wasm.librarySearch(query, limit)) as LibraryHit[],

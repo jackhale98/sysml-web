@@ -130,6 +130,15 @@ export interface RenderedTable {
 	availableFields?: string[];
 }
 
+/** A project read from a `.kpar` or ZIP. */
+export interface ProjectArchive {
+	info: { name: string; description?: string; version?: string } & Record<string, unknown>;
+	files: { path: string; text: string }[];
+	/** Entries that are not text (images, binaries), left out. */
+	skipped: string[];
+	warnings: string[];
+}
+
 /** A file of the OMG standard library embedded in the engine. */
 export interface LibraryEntry {
 	path: string;

@@ -45,6 +45,8 @@ export function startEngine(urls: Init): Engine {
 		renderView: (...params) => call('renderView', ...params),
 		viewLibraries: (...params) => call('viewLibraries', ...params),
 		libraryIndex: (...params) => call('libraryIndex', ...params),
+		readProjectArchive: (...params) => call('readProjectArchive', ...params),
+		writeKpar: (...params) => call('writeKpar', ...params),
 		libraryFile: (...params) => call('libraryFile', ...params),
 		librarySearch: (...params) => call('librarySearch', ...params),
 		libraryLicense: (...params) => call('libraryLicense', ...params),

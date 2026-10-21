@@ -6,6 +6,7 @@ import type {
 	EditResult,
 	Highlights,
 	LibraryEntry,
+	ProjectArchive,
 	LibraryHit,
 	LibraryLicense,
 	RenderedTable,
@@ -32,6 +33,10 @@ export interface EngineApi {
 	/** The view libraries the engine bundles (`Reporting`, `ModelViews`). */
 	viewLibraries(): SourceFile[];
 	libraryIndex(): LibraryEntry[];
+	/** A `.kpar` or any ZIP of a project, as text files. */
+	readProjectArchive(bytes: Uint8Array, fallbackName: string): ProjectArchive;
+	/** The project as a `.kpar`. `info` is its `.project.json` object. */
+	writeKpar(info: object, files: SourceFile[], created: string): Uint8Array;
 	libraryFile(path: string): SourceFile;
 	librarySearch(query: string, limit: number): LibraryHit[];
 	libraryLicense(): LibraryLicense;

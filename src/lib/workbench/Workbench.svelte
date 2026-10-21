@@ -24,7 +24,9 @@
 	import Logo from '#lib/ui/Logo.svelte';
 	import ThemeToggle from '#lib/ui/ThemeToggle.svelte';
 	import Toaster from '#lib/ui/Toaster.svelte';
+	import type { ProjectSession } from '#lib/project/session.svelte.ts';
 	import Explorer from './Explorer.svelte';
+	import ProjectMenu from './ProjectMenu.svelte';
 	import HomeView from './HomeView.svelte';
 	import Inspector from './Inspector.svelte';
 	import DocumentView from '#lib/markdown/DocumentView.svelte';
@@ -39,8 +41,12 @@
 		type WorkbenchUi
 	} from './ui.svelte.ts';
 
-	let { workspace, ui, engine }: { workspace: Workspace; ui: WorkbenchUi; engine: Engine } =
-		$props();
+	let {
+		workspace,
+		ui,
+		engine,
+		session
+	}: { workspace: Workspace; ui: WorkbenchUi; engine: Engine; session?: ProjectSession } = $props();
 
 	// The editor and diagram bring CodeMirror, Svelte Flow and ELK; load them
 	// only when a file or diagram is first opened.
@@ -130,12 +136,11 @@
 >
 	<header class="topbar">
 		<a class="brand" href={resolve('/')} aria-label="SysML Web home"><Logo size={24} /></a>
-		<div class="project">
-			<strong>{workspace.info?.name ?? 'Project'}</strong>
-			{#if workspace.dirty.size}
-				<span class="edited" title="Edited in this browser tab">{workspace.dirty.size} edited</span>
-			{/if}
-		</div>
+		{#if session}
+			<ProjectMenu {workspace} {session} {engine} />
+		{:else}
+			<div class="project"><strong>{workspace.info?.name ?? 'Project'}</strong></div>
+		{/if}
 		<button
 			type="button"
 			class="search"
@@ -388,9 +393,6 @@
 			{warnings}<span class="visually-hidden">warnings</span>
 		</button>
 		<span class="grow"></span>
-		{#if workspace.dirty.size}
-			<span class="meta edited-files">{workspace.dirty.size} edited in this tab</span>
-		{/if}
 		<span class="meta"
 			>SysML v2{workspace.engineVersion ? ` · engine ${workspace.engineVersion}` : ''}</span
 		>
@@ -551,9 +553,6 @@
 		color: var(--danger);
 	}
 	.problems-chip :global(.warn) {
-		color: var(--warn);
-	}
-	.edited-files {
 		color: var(--warn);
 	}
 	.tabbar {

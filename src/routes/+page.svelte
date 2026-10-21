@@ -13,6 +13,7 @@
 		ListPlus,
 		MonitorSmartphone,
 		PenLine,
+		Plus,
 		ServerOff,
 		WandSparkles
 	} from '@lucide/svelte';
@@ -92,16 +93,25 @@
 		['analysis', 'FMEA']
 	];
 
-	const soon = [
+	const projects = resolve('/projects');
+	const newProject = resolve('/projects#new');
+	const soon: { icon: typeof GitBranch; title: string; text: string; href?: string }[] = [
+		{
+			icon: Plus,
+			title: 'Start a new project',
+			text: 'A starter model with a first requirement, the system and saved views.',
+			href: newProject
+		},
+		{
+			icon: FolderOpen,
+			title: 'Open a folder or a .kpar',
+			text: 'Work on .sysml files from your computer or another SysML v2 tool.',
+			href: projects
+		},
 		{
 			icon: GitBranch,
 			title: 'Open a repository',
 			text: 'Work on a branch in GitHub, GitLab or Bitbucket and open a pull request.'
-		},
-		{
-			icon: FolderOpen,
-			title: 'Open a folder',
-			text: 'Edit the .sysml files on your computer, in place.'
 		},
 		{
 			icon: FileSpreadsheet,
@@ -283,13 +293,18 @@
 				</div>
 				<ul class="soon">
 					{#each soon as item (item.title)}
-						<li>
+						<li class:available={!!item.href}>
 							<span class="soon-icon"><item.icon size={18} /></span>
 							<div>
-								<h3>{item.title}</h3>
+								<h3>
+									{#if item.href}<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- hrefs above come from resolve() -->
+										<a href={item.href}>{item.title}</a>{:else}{item.title}{/if}
+								</h3>
 								<p>{item.text}</p>
 							</div>
-							<span class="tag">Coming soon</span>
+							{#if item.href}<ArrowRight size={18} class="go" />{:else}<span class="tag"
+									>Coming soon</span
+								>{/if}
 						</li>
 					{/each}
 				</ul>
@@ -884,6 +899,34 @@
 	}
 	.soon li div {
 		flex: 1;
+	}
+	/* Available options are whole-card links (the title link covers the card). */
+	.soon li.available {
+		position: relative;
+		border-style: solid;
+		border-color: color-mix(in oklab, var(--accent) 30%, var(--border));
+		background: var(--surface);
+		transition:
+			border-color var(--duration) var(--ease),
+			box-shadow var(--duration) var(--ease);
+	}
+	.soon li.available:hover {
+		border-color: var(--accent);
+		box-shadow: var(--shadow-md);
+	}
+	.soon li.available h3 a {
+		color: inherit;
+		text-decoration: none;
+	}
+	.soon li.available h3 a::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		border-radius: inherit;
+	}
+	.soon li.available :global(.go) {
+		align-self: center;
+		color: var(--accent);
 	}
 	.soon-icon {
 		display: grid;

@@ -211,3 +211,63 @@ test('the SysML standard library can be browsed and searched, read-only', async 
 	await expect(page.getByRole('region', { name: /ISQBase\.sysml/ })).toBeVisible();
 	await expectAccessible(page);
 });
+
+test('a new project is ready to use, survives a reload, and round-trips as .kpar', async ({
+	page
+}) => {
+	await page.goto('/projects');
+	await page.getByLabel('Name').fill('Test bench');
+	await page.getByLabel(/What is it/).fill('A rig for testing motors.');
+	await page.getByRole('button', { name: /Create project/ }).click();
+	await expect(page).toHaveURL(/\/p\/test-bench$/);
+	await expect(page.getByRole('status').filter({ hasText: 'Model ready' })).toBeVisible({
+		timeout: 30_000
+	});
+	await expect(page.getByRole('button', { name: /^Problems: 0 errors/ })).toBeVisible();
+
+	// The starter's requirements table lists its first requirement.
+	await page
+		.locator('section[aria-labelledby="views-heading"]')
+		.getByRole('button', { name: 'Requirements', exact: true })
+		.first()
+		.click();
+	await expect(page.locator('tbody tr').first()).toContainText('REQ-001');
+
+	// Edit the model; the change is saved and is still there after a reload.
+	await page.getByRole('tab', { name: 'Files' }).click();
+	await page
+		.locator('.explorer-pane')
+		.getByRole('button', { name: /TestBench\.sysml/ })
+		.click();
+	await page.locator('.cm-content').getByText('part system : System;').click();
+	await page.keyboard.press('End');
+	await page.keyboard.type('\n    part def Motor;');
+	await expect(page.getByText('Saved', { exact: true })).toBeVisible({ timeout: 10_000 });
+	await page.reload();
+	await page.getByRole('tab', { name: 'Files' }).click();
+	await page
+		.locator('.explorer-pane')
+		.getByRole('button', { name: /TestBench\.sysml/ })
+		.click();
+	await expect(page.locator('.cm-content')).toContainText('part def Motor;');
+
+	// Export as .kpar and import it again as a second project.
+	await page
+		.getByRole('button', { name: /Test bench/ })
+		.first()
+		.click();
+	const downloading = page.waitForEvent('download');
+	await page.getByRole('menuitem', { name: /Download as .kpar/ }).click();
+	const kpar = await (await downloading).path();
+	await page.goto('/projects');
+	await expect(page.getByText('Test bench').first()).toBeVisible();
+	await page.locator('input[type=file][accept*=kpar]').setInputFiles(kpar!);
+	await expect(page).toHaveURL(/\/p\/test-bench-2$/);
+	await page.getByRole('tab', { name: 'Files' }).click();
+	await page
+		.locator('.explorer-pane')
+		.getByRole('button', { name: /TestBench\.sysml/ })
+		.click();
+	await expect(page.locator('.cm-content')).toContainText('part def Motor;');
+	await expectAccessible(page);
+});
