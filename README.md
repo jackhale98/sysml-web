@@ -18,6 +18,7 @@ Requires Node 22.17+, and to build the engine: Rust with the
 ```sh
 npm install
 scripts/build-engine.sh   # builds the SysML engine into static/engine/
+scripts/fetch-toolkit.sh  # the sysml-toolkit and its standard library into static/toolkit/
 npm run dev               # http://localhost:5173
 npm test                  # unit tests (Vitest)
 npm run check && npm run lint
@@ -46,8 +47,10 @@ from `jackhale98/sysml-cli`, built at the revision pinned in `engine.json`. Set
 
 Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or
 [MIT license](LICENSE-MIT) at your option. Third-party components keep their
-own licences and are used unmodified: the OMG SysML v2 standard library
-embedded in the engine is LGPL-3.0-only (its notice is shown in the app's
-standard-library browser), and the ELK layout library (elkjs) is EPL-2.0.
+own licences and are used unmodified: the OMG SysML v2 standard library,
+served from the [sysml-toolkit](https://github.com/Open-MBEE/sysml-toolkit)'s
+bundle, is EPL-2.0 (its notice is shown in the app's standard-library browser
+and in Settings → About; the older release our current engine still embeds is
+LGPL-3.0-only), and the ELK layout library (elkjs) is EPL-2.0.
 
 SysML is a registered trademark of the Object Management Group.

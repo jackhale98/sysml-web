@@ -60,7 +60,16 @@ worker crashes, restart once, then route everything to the current engine.
    retarget), composed where it has no single operation.
 5. **Diagrams** — the seven diagram graphs in TypeScript over the model.
 6. **The rest** — state machine emulator, `.kpar` read/write, library
-   browser.
+   browser. *Done for `.kpar` and the library:* `.kpar`/ZIP read and write
+   are TypeScript (`src/lib/interchange/kpar.ts`, over `dataio/zip.ts`,
+   round-trip tested against our engine's output both ways), and the
+   library browser and search read the toolkit's library bundle
+   (`static/toolkit/stdlib/sysml-library.json.gz`) in a worker with a
+   TypeScript declaration scanner (`src/lib/library/`); neither goes
+   through `EngineApi` any more. Library paths are the toolkit's unit names
+   (the same as ours); a library tab opened from our engine's
+   go-to-definition finds the name near the given line, since the lines
+   come from the older library release that engine embeds.
 7. **Switch** — after parity (the whole e2e suite green on the toolkit)
    and a real-iPhone test of memory: make the toolkit the default, keep
    the fallback one release, then remove the current engine and its
@@ -653,7 +662,7 @@ ecosystem convention) to maximise adoption and integration.
 | `sysml-cli` workspace (engine) | GPL-3.0-or-later | Relicense to `Apache-2.0 OR MIT` (sole author) |
 | `mycelium-web` code (git, auth, shell) | GPL-3.0 because of uniorg; our own code otherwise | Reuse own code under the new licence; uniorg is not needed here |
 | `mycelium-web` worker | Apache-2.0 | Compatible |
-| OMG `sysml.library` | LGPL-3.0-only | Embedded unmodified in the engine as data, with its licence and notice shown in the app's standard-library browser; users can replace it (LGPL weak copyleft; compatible with an Apache/MIT app) |
+| OMG `sysml.library` | EPL-2.0 (SysML v2 Release 2026-05 and later) | Served unmodified from the sysml-toolkit's bundle (`static/toolkit/stdlib/`, with the toolkit's `LICENSE-EPL-2.0` and `THIRD-PARTY-NOTICES.md` next to it); its licence and notice are shown in the app's standard-library browser and in Settings → About. Our current engine still embeds the 2026-02 release under LGPL-3.0-only until it is removed (decision #16) |
 | `sysml-domain-libraries` packs | per that repo | Confirm before bundling |
 | Third-party npm/crates | various | Allowlist permissive licences in CI (`cargo deny`, `license-checker`) |
 
@@ -771,7 +780,7 @@ Engine gaps found while authoring the demo (inputs to Phase 1):
 | 1 | One shared Rust semantic engine compiled to WebAssembly (web, CLI, LSP) | 2026-10-21 |
 | 2 | Operational records (test runs, NCR, CAPA, inspections) deferred | 2026-10-21 |
 | 3 | Static app + git only; no backend holds data; stateless proxy worker; optional Systems Modeling API client | 2026-10-21 |
-| 4 | Licence `Apache-2.0 OR MIT`; relicense own grammar/core code; OMG library bundled under its own licence (LGPL-3.0-only, corrected from EPL-2.0) | 2026-10-21 |
+| 4 | Licence `Apache-2.0 OR MIT`; relicense own grammar/core code; OMG library bundled under its own licence (EPL-2.0 for the 2026-05+ release the toolkit bundles; the 2026-02 release our engine embeds is LGPL-3.0-only) | 2026-10-21 |
 | 5 | SvelteKit (static SPA) + Svelte 5; reuse mycelium-web's git/auth/worker code but **not** its structure or UI | 2026-10-21 |
 | 7 | ~~Object-first, spreadsheet-like UX~~ — superseded by #9 | 2026-10-21 |
 | 9 | SysML is the product: a workbench where text and diagrams are equal ways to build the model, made approachable through in-context explanation and guidance; tables are SysML views, not the editing paradigm | 2026-10-21 |
