@@ -88,6 +88,8 @@ export class WorkbenchUi {
 	settingsOpen = $state(false);
 	/** The source control (git) panel (mounted by the host when it exists). */
 	sourceControlOpen = $state(false);
+	/** The "import requirements from a spreadsheet" dialog (mounted by the host). */
+	importOpen = $state(false);
 
 	// ── Phone layout ──────────────────────────────────────────────────────────
 	#pane = $state<MobilePane>('home');

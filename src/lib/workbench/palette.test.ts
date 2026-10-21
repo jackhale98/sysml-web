@@ -149,7 +149,9 @@ describe('search', () => {
 		const results = search(all, '  ');
 		expect(results.filter((r) => r.item.group === 'views')).toHaveLength(6);
 		expect(results[0]?.item.label).toBe('Pkg7');
-		expect(results.filter((r) => r.item.group === 'commands')).toHaveLength(8);
+		expect(results.filter((r) => r.item.group === 'commands')).toHaveLength(
+			commandItems('system').length
+		);
 		expect(results.every((r) => r.match === null)).toBe(true);
 	});
 

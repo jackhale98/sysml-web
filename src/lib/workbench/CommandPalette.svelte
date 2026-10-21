@@ -109,6 +109,9 @@
 			case 'switch-theme':
 				theme.next();
 				break;
+			case 'import-requirements':
+				ui.importOpen = true;
+				break;
 		}
 	}
 

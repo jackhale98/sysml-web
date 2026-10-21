@@ -1,0 +1,6 @@
+Req ID,Title,Requirement text,Priority,Verification method,Status,Owner,Rationale,Derived from
+SYS-101,Landing light,"The drone shall show a light visible from 50 m when it lands or takes off, by day and by night.",High,T/I,Open,Zoë Åberg,People near the drop point need to see the drone coming.,STK-002
+SYS-102,Abort switch,The pilot shall be able to abort a delivery and send the drone home at any moment of the flight.,Must,Demonstration,TBD,R. Tanaka,,STK-002
+SYS-103,Parcel temperature,"The parcel compartment shall stay between 2 °C and 30 °C during a 20 minute flight,
+whatever the weather.",Medium,Analysis; Test,Draft,K. Novak,Medicine deliveries need a cool box.,STK-001
+SYS-001,Flight endurance,The drone shall fly for at least 25 minutes.,High,,,,,
