@@ -34,9 +34,8 @@ describe('composeEngine', () => {
 		const engine = composeEngine(classic, toolkit);
 		await expect(engine.analyzeProject([])).resolves.toBe('toolkit:analyzeProject');
 		await expect(engine.listViews([])).resolves.toBe('classic:listViews');
-		// The classic engine starts alongside the toolkit, for the methods it still serves.
-		expect(classic.version).toHaveBeenCalledTimes(1);
 		await engine.version();
+		expect(classic.version).not.toHaveBeenCalled();
 		expect(toolkit.call).toHaveBeenCalledWith('version');
 	});
 

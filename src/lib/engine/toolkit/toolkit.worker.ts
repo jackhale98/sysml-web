@@ -69,6 +69,7 @@ async function boot(i: ToolkitInit): Promise<ToolkitHost> {
 	const tk = await glue;
 	({ memory } = await tk.default({ module_or_path: await compiled }));
 	tk.install_panic_hook?.();
+	post({ type: 'loaded' });
 	const bundle = new TextDecoder().decode(await gunzipMaybe(await bundleBytes));
 	const libraryStart = performance.now();
 	let library: ToolkitHost['library'] | undefined;

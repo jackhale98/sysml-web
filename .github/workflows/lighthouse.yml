@@ -30,6 +30,15 @@ jobs:
 
       - run: npm ci
       - uses: ./.github/actions/build-engine
+
+      # The sysml-toolkit engine (pinned in toolkit.json): the app's engine, and the unit tests'.
+      - name: Cache toolkit download
+        uses: actions/cache@v4
+        with:
+          path: .cache/toolkit
+          key: toolkit-${{ hashFiles('toolkit.json') }}
+      - name: Fetch toolkit
+        run: scripts/fetch-toolkit.sh
       - run: npm run build
 
       - name: Install Chrome

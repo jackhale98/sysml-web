@@ -27,6 +27,8 @@ export interface ToolkitClient {
 }
 
 export interface ToolkitOptions {
+	/** The module has downloaded (the library loads next): the network is free again. */
+	onLoaded?: () => void;
 	onReady?: (stats: ToolkitStats) => void;
 	/** The toolkit could not be started (after one restart): the reason. */
 	onFailure?: (reason: string) => void;
@@ -74,6 +76,9 @@ export function startToolkit(
 	function receive(from: Worker, message: ToolkitOutbound) {
 		if (from !== worker) return;
 		switch (message.type) {
+			case 'loaded':
+				options.onLoaded?.();
+				return;
 			case 'ready':
 				stats = message.stats;
 				options.onReady?.(message.stats);

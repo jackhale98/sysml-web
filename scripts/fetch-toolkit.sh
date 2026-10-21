@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# TEST BUILD: download the sysml-toolkit browser package pinned in toolkit.json,
+# Download the sysml-toolkit browser package (the app's engine) pinned in toolkit.json,
 # check its SHA-256, and unpack what the app serves into static/toolkit/.
 set -euo pipefail
 cd "$(dirname "$0")/.."

@@ -45,7 +45,7 @@ Pieces the toolkit doesn't provide are written in TypeScript over its model
 (tables, diagrams, emulator, `.kpar`, library browser); those that don't
 need a model run in parallel with the foundation.
 
-1. **Foundation** — toolkit worker and client as the default engine;
+1. ✅ **Foundation** (done; see `docs/engine.md`) — toolkit worker and client as the default engine;
    release pinned in `toolkit.json` and fetched in every workflow; byte ↔
    UTF-16 offsets; start-up without a snapshot, prepared snapshot fetched
    in the background for later visits; analysis and the model adapter

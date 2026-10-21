@@ -7,6 +7,7 @@ import type { EngineApi } from '../protocol';
 
 /** The `EngineApi` methods the toolkit implements (the composite routes them here). */
 export const TOOLKIT_METHODS = [
+	// Phase 1: analysis and the model.
 	'version',
 	'analyze',
 	'analyzeProject',
@@ -56,6 +57,8 @@ export interface ToolkitStats {
 }
 
 export type ToolkitOutbound =
+	/** The module is downloaded and compiled; the library loads next (CPU, not network). */
+	| { type: 'loaded' }
 	| { type: 'ready'; stats: ToolkitStats }
 	/** Booting failed, or the instance trapped: the worker can't be used again. */
 	| { type: 'fatal'; error: string }
