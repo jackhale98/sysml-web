@@ -26,6 +26,8 @@ export const TOOLKIT_METHODS = [
 	'listViews',
 	'renderView',
 	'viewLibraries',
+	// Phase 5: diagrams.
+	'diagram',
 	// Phase 6: state machines for the emulator.
 	'stateMachines'
 ] as const satisfies readonly (keyof EngineApi)[];

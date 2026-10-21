@@ -10,6 +10,7 @@
  * phone: 2.6 s to ready instead of 8.2 s, and 105 MB of memory instead of 160).
  */
 import type { SourceFile } from '../protocol';
+import type { DiagramView } from '../types';
 import type { Toolkit } from './api';
 import { ToolkitHost } from './host';
 import { SyntaxServices } from './language';
@@ -155,6 +156,8 @@ const handlers: { [M in ToolkitMethod]: Handler } = {
 	outline: (host, files: SourceFile[], path: string) => host.outline(files, path),
 	codeActions: (host, files: SourceFile[], path: string, from: number, to: number) =>
 		host.codeActions(files, path, from, to),
+	diagram: (host, view: DiagramView, files: SourceFile[], scope: string | null) =>
+		host.diagram(view, files, scope),
 	listViews: (host, files: SourceFile[]) => host.listViews(files),
 	renderView: (host, files: SourceFile[], name: string) => host.renderView(files, name),
 	viewLibraries: (host) => host.viewLibraries()

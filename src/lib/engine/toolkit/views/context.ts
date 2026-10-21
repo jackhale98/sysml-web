@@ -130,7 +130,7 @@ export class ViewContext {
 		while (queue.length && out.length < 256) {
 			const record = this.byId.get(queue.shift()!);
 			if (!record) continue;
-			for (const next of [...(record.typeId ? [record.typeId] : []), ...this.generalsOf(record)]) {
+			for (const next of [...record.typeIds, ...this.generalsOf(record)]) {
 				if (seen.has(next)) continue;
 				seen.add(next);
 				out.push(next);
@@ -160,7 +160,7 @@ export class ViewContext {
 
 	/** The definition a usage's features come from: its type, or a subsetted usage's. */
 	effectiveType(record: ElementRecord, depth = 0): string | null {
-		if (record.typeId) return record.typeId;
+		if (record.typeIds[0]) return record.typeIds[0];
 		if (depth > 16) return null;
 		for (const general of this.generalsOf(record)) {
 			const target = this.byId.get(general);

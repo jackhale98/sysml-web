@@ -194,7 +194,7 @@ export class ColumnEdits {
 				.map((r) => ({
 					name: r.name!,
 					isAttribute: r.kind === 'attribute',
-					typeId: r.typeId,
+					typeId: r.typeIds[0] ?? null,
 					many: isMany(multiplicityOf(r.header))
 				}));
 		} else {

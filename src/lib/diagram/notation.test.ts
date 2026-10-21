@@ -40,6 +40,34 @@ describe('notationOf', () => {
 		]);
 	});
 
+	it("lists a state's entry, do and exit actions, and a view's exposes and filters", () => {
+		const state = notationOf(
+			node({
+				kind: 'state',
+				attributes: [
+					['entry', 'alertOperator'],
+					['do', 'followFlightPlan']
+				]
+			}),
+			'states'
+		);
+		expect(state.compartments).toEqual([
+			{ title: 'actions', rows: ['entry / alertOperator', 'do / followFlightPlan'] }
+		]);
+		const view = notationOf(
+			node({
+				stereotype: '<<view>>',
+				attributes: [
+					['expose', 'DroneComponents::*'],
+					['filter', '@SysML::PartDefinition'],
+					['render', 'asTreeDiagram']
+				]
+			}),
+			'general'
+		);
+		expect(view.compartments.map((c) => c.title)).toEqual(['exposes', 'filters', 'rendering']);
+	});
+
 	it('treats a "def" stereotype as a definition even when the flag is unset', () => {
 		const n = notationOf(node({ stereotype: '<<requirement def>>' }), 'packages');
 		expect(n.isDefinition).toBe(true);

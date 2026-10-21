@@ -72,7 +72,7 @@ export async function diagramSvg(
 	const children = nodes.map((n) => {
 		const [name = n.label, type = ''] = n.label.split(' : ');
 		const ports = n.attributes
-			.filter(([keyword]) => keyword === 'port')
+			.filter(([keyword]) => /(^|\s)port$/.test(keyword))
 			.map(([, text]) => text.split(' : ')[0]!.trim());
 		return {
 			id: n.id,

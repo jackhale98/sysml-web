@@ -50,7 +50,7 @@ export interface TkSession {
 	unresolvedCount(): number;
 	/** Whether `e` reaches `ancestor` through the explicit specialization closure. */
 	conforms(e: TkElement, ancestor: TkElement): boolean;
-	/** A view usage's rendering, exposed elements (filters applied), subviews and metadata, JSON. */
+	/** JSON `{qualifiedName, id, rendering, exposed: [{id, qualifiedName, metaclass}], …}` of a view usage (its filters applied to `exposed`). */
 	viewInfo(qualifiedName: string): string;
 }
 

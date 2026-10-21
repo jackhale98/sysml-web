@@ -5,7 +5,7 @@
  * `scripts/build-engine.sh`, so it is not part of the app bundle.
  */
 import type { ClassicMethod, Init, Request, Response } from './protocol';
-import type { Analysis, DiagramGraph, EditResult, Highlights } from './types';
+import type { Analysis, EditResult, Highlights } from './types';
 
 interface Wasm {
 	default(options: { module_or_path: string }): Promise<unknown>;
@@ -13,7 +13,6 @@ interface Wasm {
 	analyze(path: string, source: string): string;
 	analyzeProject(files: string): string;
 	highlight(source: string): string;
-	diagram(view: string, files: string, scope: string | null): string;
 	edit(request: string): string;
 	elementDetails(files: string, path: string, line: number, element: string | null): string;
 	complete(files: string, path: string, offset: number): string;
@@ -51,8 +50,6 @@ const handlers: { [M in ClassicMethod]: (wasm: Wasm, ...params: never[]) => unkn
 	analyzeProject: (wasm, files: unknown): Analysis[] =>
 		JSON.parse(wasm.analyzeProject(JSON.stringify(files))) as Analysis[],
 	highlight: (wasm, source: string): Highlights => JSON.parse(wasm.highlight(source)) as Highlights,
-	diagram: (wasm, view: string, files: unknown, scope: string | null): DiagramGraph =>
-		JSON.parse(wasm.diagram(view, JSON.stringify(files), scope)) as DiagramGraph,
 	edit: (wasm, request: unknown): EditResult =>
 		JSON.parse(wasm.edit(JSON.stringify(request))) as EditResult,
 	complete: (wasm, files: unknown, path: string, offset: number) =>

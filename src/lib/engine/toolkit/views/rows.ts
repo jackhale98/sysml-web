@@ -36,6 +36,8 @@ const row = (fields: [string, string][], anchors: string[], element = ''): Row =
 	element
 });
 
+/** The type a usage is declared with (`: T`; for `~T`, T). */
+const typeOf = (r: ElementRecord) => r.typeIds[0] ?? null;
 const line = (r: ElementRecord) => String(r.span.start_row);
 const nameOf = (r: ElementRecord | undefined) => r?.name ?? '';
 const writtenOf = (r: ElementRecord | undefined) => r?.written ?? r?.name ?? '';
@@ -113,15 +115,16 @@ function typedRows(ctx: ViewContext, type: string): Row[] {
 	const simple = unquoteName(simpleName(type));
 	const rows: Row[] = [];
 	for (const u of contentRecords(ctx)) {
-		if (u.isDefinition || !u.name || !u.typeId) continue;
+		const typeId = typeOf(u);
+		if (u.isDefinition || !u.name || !typeId) continue;
 		const typed = target
-			? ctx.conforms(u.typeId, target)
+			? ctx.conforms(typeId, target)
 			: unquoteName(simpleName(u.type ?? '')) === simple;
 		if (!typed) continue;
 		const r = row(
 			[
 				['element', writtenOf(u)],
-				['type', ctx.nameOf(u.typeId) ?? unquoteName(simpleName(u.type ?? ''))],
+				['type', ctx.nameOf(typeId) ?? unquoteName(simpleName(u.type ?? ''))],
 				['kind', u.kind],
 				['parent', u.parentId ? writtenOf(ctx.byId.get(u.parentId)) : ''],
 				['file', u.path],
@@ -130,7 +133,7 @@ function typedRows(ctx: ViewContext, type: string): Row[] {
 			[u.id],
 			u.qualifiedName ?? ''
 		);
-		r.typeId = u.typeId;
+		r.typeId = typeId;
 		for (const c of ctx.ownedBy(u.id))
 			if (c.name && c.value !== null && !c.isDefinition) r.fields.set(c.name, unquote(c.value));
 		rows.push(r);
@@ -170,7 +173,7 @@ function kindRows(ctx: ViewContext, kind: string): Row[] {
 			[u.id],
 			u.qualifiedName ?? ''
 		);
-		r.typeId = u.typeId;
+		r.typeId = typeOf(u);
 		rows.push(r);
 	}
 	return rows;
@@ -179,10 +182,11 @@ function kindRows(ctx: ViewContext, kind: string): Row[] {
 /** Declared direction, else the one the usage's type implies (flipped when conjugated). */
 function directionOf(ctx: ViewContext, u: ElementRecord): string {
 	if (u.direction) return u.direction;
-	if (!u.typeId) return '';
+	const typeId = typeOf(u);
+	if (!typeId) return '';
 	let hasIn = false;
 	let hasOut = false;
-	for (const type of [u.typeId, ...ctx.supers(u.typeId)]) {
+	for (const type of [typeId, ...ctx.supers(typeId)]) {
 		for (const f of ctx.ownedBy(type)) {
 			if (f.isDefinition) continue;
 			if (f.direction === 'in') hasIn = true;
@@ -256,9 +260,13 @@ function relationRows(ctx: ViewContext, relation: string): Row[] {
 function typeMatcher(ctx: ViewContext, type: string): (r: ElementRecord) => boolean {
 	const target = ctx.definitionNamed(type);
 	const simple = unquoteName(simpleName(type));
-	return (r) =>
-		!!r.typeId &&
-		(target ? ctx.conforms(r.typeId, target) : unquoteName(simpleName(r.type ?? '')) === simple);
+	return (r) => {
+		const typeId = typeOf(r);
+		return (
+			!!typeId &&
+			(target ? ctx.conforms(typeId, target) : unquoteName(simpleName(r.type ?? '')) === simple)
+		);
+	};
 }
 
 function allocationRows(ctx: ViewContext): Row[] {
@@ -400,9 +408,10 @@ function requirementRows(ctx: ViewContext): Row[] {
 	const verified = closure(verifiedBy);
 	const classifiers = new Set<string>();
 	for (const u of ctx.records) {
-		if (!isRequirementUsage(u) || !u.typeId) continue;
-		classifiers.add(u.typeId);
-		for (const s of ctx.supers(u.typeId)) classifiers.add(s);
+		const typeId = typeOf(u);
+		if (!isRequirementUsage(u) || !typeId) continue;
+		classifiers.add(typeId);
+		for (const s of ctx.supers(typeId)) classifiers.add(s);
 	}
 
 	const rows: Row[] = [];
@@ -411,7 +420,7 @@ function requirementRows(ctx: ViewContext): Row[] {
 		if (!usage && !(isRequirementDef(r) && !classifiers.has(r.id))) continue;
 		const sat = satisfiedBy.get(r.id) ?? [];
 		const ver = verifiedBy.get(r.id) ?? [];
-		const typeId = usage ? r.typeId : (r.generalIds[0] ?? null);
+		const typeId = usage ? typeOf(r) : (r.generalIds[0] ?? null);
 		const type = typeId
 			? (ctx.nameOf(typeId) ?? '')
 			: unquoteName(simpleName((usage ? r.type : r.specializes[0]) ?? ''));
@@ -574,7 +583,7 @@ function compositionRows(ctx: ViewContext, root: string | null): Row[] {
 		if (found) start(found);
 		return rows;
 	}
-	const used = new Set(ctx.records.map((r) => r.typeId).filter((t): t is string => !!t));
+	const used = new Set(ctx.records.flatMap((r) => r.typeIds));
 	for (const r of contentRecords(ctx)) {
 		const top =
 			r.kind === 'package' || r.metaclass === 'PartDefinition' || r.metaclass === 'ItemDefinition';

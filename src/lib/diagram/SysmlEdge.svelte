@@ -34,10 +34,12 @@
 	const kind = $derived(data?.kind ?? 'dependency');
 	/**
 	 * SysML v2 notation per relationship kind: specialization ends in a hollow
-	 * triangle at the general end; composition has a filled diamond at the
+	 * triangle at the general end, typing ("defined by") in a hollow triangle
+	 * after two dots; composition has a filled diamond at the
 	 * owner; membership a circled plus at the owner; satisfy, verify, allocate
 	 * and dependencies are dashed with an open arrow; flows and transitions
-	 * end in a filled arrow; connections and bindings are plain lines.
+	 * end in a filled arrow; connections are plain lines, bindings plain
+	 * lines marked `=`.
 	 */
 	const style = $derived.by((): EdgeStyle => {
 		switch (kind) {
@@ -57,7 +59,10 @@
 			case 'transition':
 			case 'message':
 				return { end: 'url(#sysml-arrow)' };
+			case 'typing':
+				return { end: 'url(#sysml-typing)' };
 			case 'constraint_binding':
+			case 'binding':
 				return { keyword: '=' };
 			default:
 				return {};
@@ -70,8 +75,8 @@
 
 <BaseEdge
 	path={geometry[0]}
-	markerStart={style.start}
-	markerEnd={style.end}
+	markerStart={data?.reversed ? style.end : style.start}
+	markerEnd={data?.reversed ? style.start : style.end}
 	class={style.dashed ? 'sysml-edge dashed' : 'sysml-edge'}
 />
 {#if text}

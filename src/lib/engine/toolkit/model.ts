@@ -74,18 +74,30 @@ export interface ElementRecord {
 	derived: boolean;
 	end: boolean;
 	membership: string | null;
-	/** The resolved type (`: T`; for `~T`, the port def `T`), when it is typed explicitly. */
-	typeId: string | null;
-	/** Resolved specializations the tree graph draws (definitions and part-like usages). */
+	/** Ids of the explicit types (`: T`), resolved; for `~T`, the port def T (with `conjugated`). */
+	typeIds: string[];
+	/** Ids of the specializations (`:>`) the tree graph resolves (definitions and part-like usages). */
 	generalIds: string[];
 	/** The feature this one redefines, through its redefinitions (`redefinitionRoot`). */
 	rootId: string | null;
+}
+
+/** A satisfy or verify link with its resolved ends, by element id. */
+export interface TraceRecord {
+	kind: 'satisfy' | 'verify';
+	/** The `satisfy` usage, or the verification case's objective member. */
+	at: ElementRecord;
+	requirementId: string | null;
+	/** The satisfying feature, or the verification case. */
+	byId: string | null;
 }
 
 export interface ExtractedModel {
 	models: Map<string, Model>;
 	elements: ElementRecord[];
 	byId: Map<string, ElementRecord>;
+	/** Satisfy and verify links by id (the diagrams draw them). */
+	traces: TraceRecord[];
 }
 
 const ELEMENT_FIELDS = [
@@ -300,7 +312,8 @@ export function extractModel(
 			derived: row['property:isDerived'] === true,
 			end: row['property:isEnd'] === true,
 			membership,
-			typeId: typeTarget ?? null,
+			// For `~T`, the port def T (the toolkit types it by the conjugate it makes in T).
+			typeIds: (typingsOf.get(id) ?? []).map((t, i) => (i === 0 && typeTarget ? typeTarget : t)),
 			generalIds: generals ?? [],
 			rootId: rootOf.get(id) ?? null
 		};
@@ -376,6 +389,7 @@ export function extractModel(
 	}
 
 	// Satisfy and verify links, with the toolkit's resolved ends.
+	const traces: TraceRecord[] = [];
 	const traceName = (id: string | null): string | null => {
 		if (!id) return null;
 		const record = byId.get(id);
@@ -404,6 +418,12 @@ export function extractModel(
 		const requirementId = ref(row?.['derived:satisfiedRequirement']);
 		const requirement = traceName(requirementId);
 		const by = featurePath(ref(row?.['derived:satisfyingFeature']));
+		traces.push({
+			kind: 'satisfy',
+			at: record,
+			requirementId,
+			byId: ref(row?.['derived:satisfyingFeature'])
+		});
 		if (!requirement || !by) continue;
 		const link: TraceLink = {
 			requirement,
@@ -424,6 +444,7 @@ export function extractModel(
 		let owner = record.ownerId ? byId.get(record.ownerId) : undefined;
 		while (owner && !/^VerificationCase/.test(owner.metaclass))
 			owner = owner.ownerId ? byId.get(owner.ownerId) : undefined;
+		traces.push({ kind: 'verify', at: record, requirementId, byId: owner?.id ?? null });
 		if (!requirement || !owner?.written) continue;
 		modelOf(record.path).verifications.push({
 			requirement,
@@ -467,7 +488,7 @@ export function extractModel(
 		if (annotation) modelOf(record.path).annotations!.push(annotation);
 	}
 
-	return { models, elements: records, byId };
+	return { models, elements: records, byId, traces };
 }
 
 /** Metaclasses of expressions and multiplicities: values, not model elements to list. */

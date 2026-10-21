@@ -69,7 +69,6 @@ export function startEngine(
 		analyze: (...params) => call('analyze', ...params),
 		analyzeProject: (...params) => call('analyzeProject', ...params),
 		highlight: (...params) => call('highlight', ...params),
-		diagram: (...params) => call('diagram', ...params),
 		edit: (...params) => call('edit', ...params),
 		complete: (...params) => call('complete', ...params),
 		hover: (...params) => call('hover', ...params),

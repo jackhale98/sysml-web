@@ -60,7 +60,7 @@ function endsWith(path: string[], suffix: string[]): boolean {
 
 /** The view def a view is typed by (usage) or specializes (def), if it is in the model. */
 function nextInChain(ctx: ViewContext, view: ElementRecord): ElementRecord | undefined {
-	const candidates = view.isDefinition ? view.generalIds : [view.typeId, ...view.generalIds];
+	const candidates = view.isDefinition ? view.generalIds : [...view.typeIds, ...view.generalIds];
 	for (const id of candidates) {
 		const record = id ? ctx.byId.get(id) : undefined;
 		if (record?.metaclass === 'ViewDefinition') return record;
