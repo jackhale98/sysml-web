@@ -440,6 +440,13 @@ SysML. A neutral palette with one accent; colour encodes element kind and
 status consistently across text, diagrams and inspector, always paired with a
 label or shape. Light, dark and high-contrast themes; reduced motion respected.
 
+Element families — structure, interface, behaviour, requirement, analysis,
+package, view — each have a colour token (`--kind-*`) used for diagram node
+headers, explorer and inspector glyphs. Glyph corners repeat the SysML
+definition/usage distinction (square vs round). Delight comes from craft:
+live text ⇄ diagram sync, every edit revealed in the text, undo on every
+gesture, ⌘K to reach anything, and motion that is quick and optional.
+
 ## 8. Engineering practice on the model
 
 The app supports the practices systems and quality engineers already have by
@@ -462,6 +469,25 @@ On-ramps for existing material (later phases): import a requirements
 spreadsheet or document outline into `requirement` elements with a preview of
 the generated SysML; export any Grid view to CSV/XLSX and reports to
 Markdown/PDF for people outside the tool.
+
+### 8.1 Perspectives: one model, two ways to read it
+
+Some people think in models and diagrams; others think in documents — a
+requirements specification, an ICD, a test plan. Rather than two products,
+the workbench offers **perspectives** over the same SysML:
+
+- **Model** (default): explorer, text, diagrams and inspector, as today.
+- **Document** (later phase): the model read as a living specification.
+  Chapters are SysML views (`view` usages with `expose` and
+  `@TableRendering`/`render`), so the document's outline is itself part of
+  the model and travels to other tools. Paragraphs are element `doc`s and
+  requirement texts; tables are the same engine-rendered views; editing a
+  sentence or a cell writes SysML through the same minimal-patch edits. A
+  toggle switches perspective without changing the selection.
+
+Nothing in the document perspective is stored outside the model, so it
+cannot drift from it, and anyone using the model perspective sees the same
+changes as SysML.
 
 ### Deferred: operational records
 Test executions and verdicts, NCRs, CAPAs and inspection results are out of
@@ -695,6 +721,9 @@ Engine gaps found while authoring the demo (inputs to Phase 1):
 | 9 | SysML is the product: a workbench where text and diagrams are equal ways to build the model, made approachable through in-context explanation and guidance; tables are SysML views, not the editing paradigm | 2026-10-21 |
 | 10 | Mobile and desktop are both first-class; Lighthouse ≥ 0.9 (a11y 1.0) enforced in CI | 2026-10-21 |
 | 11 | The demo model is authored and reviewed with the highest-capability model; it is the primary onboarding surface | 2026-10-21 |
+| 12 | Every table is a SysML view rendered by the engine (`renderView`); standard tables ship as `ModelViews.sysml`, so tables are reproducible in any conformant tool | 2026-10-21 |
+| 13 | Diagrams follow SysML v2 graphical notation strictly (definitions square, usages rounded, standard edge adornments, diagram frames); element families add colour, never replace shape | 2026-10-21 |
+| 14 | A document-centric reading of the model is offered as a *perspective* over SysML views, not as a separate data model | 2026-10-21 |
 | 8 | Element ids use the normative KerML 9.1 scheme for library and user models alike (project URI as base) | 2026-10-21 |
 | 6 | Engine built in the `sysml-cli` workspace (new `sysml-semantic`, `sysml-interchange`, `sysml-wasm` crates); this app consumes its WASM release | 2026-10-21 |
 
