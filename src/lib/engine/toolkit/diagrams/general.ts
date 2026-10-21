@@ -16,7 +16,7 @@
  * - nothing: every definition of the project.
  */
 import type { DiagramGraph } from '../../types';
-import type { ElementRecord } from '../model';
+import { isReference, type ElementRecord } from '../model';
 import {
 	CONNECTORS,
 	DiagramContext,
@@ -104,7 +104,8 @@ class General {
 	}
 
 	view(v: ElementRecord) {
-		const exposed = viewExposed(this.ctx, v);
+		// A reference (`ref part rotors = (…)`) is a row of its owner, not a box composed into it.
+		const exposed = viewExposed(this.ctx, v).filter((r) => r.isDefinition || !isReference(r));
 		const ids = new Set(exposed.map((r) => r.id));
 		for (const r of exposed) {
 			if (CONNECTORS.test(r.metaclass)) {
@@ -257,7 +258,9 @@ class General {
 	}
 }
 
-const isPart = (r: ElementRecord) => r.kind === 'part' && !CONNECTORS.test(r.metaclass);
+/** A part it is made of (not a connector, and not a `ref part` to parts owned elsewhere). */
+const isPart = (r: ElementRecord) =>
+	r.kind === 'part' && !CONNECTORS.test(r.metaclass) && !isReference(r);
 
 const isView = (r: ElementRecord) => /^View(Usage|Definition)$/.test(r.metaclass);
 

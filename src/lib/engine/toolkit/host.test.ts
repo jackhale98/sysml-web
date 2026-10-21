@@ -124,7 +124,9 @@ describe('the demo, analysed by the toolkit', () => {
 	it('gives spans as bytes, UTF-16 offsets and lines of the whole declaration', () => {
 		const rotors = element('system/DroneArchitecture.sysml', 'rotors')!;
 		const source = text('system/DroneArchitecture.sysml');
-		expect(source.slice(rotors.span.from, rotors.span.to)).toBe('part rotors : Rotor[4];');
+		expect(source.slice(rotors.span.from, rotors.span.to)).toBe(
+			'ref part rotors : Rotor[4] = (frontLeft, frontRight, rearLeft, rearRight);'
+		);
 		expect(rotors.span.start_row).toBe(source.slice(0, rotors.span.from).split('\n').length);
 	});
 

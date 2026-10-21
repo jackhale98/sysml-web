@@ -40,8 +40,9 @@ Diagram: **`DroneViews::componentCatalogue`**.
 
 ## 5. A usage: `DroneArchitecture::drone`
 
-The design is built from usages of the catalogue definitions. `part rotors : Rotor[4]`
-says "four rotors". Compare it with `DroneArchitecture::DeliveryDrone`, the definition
+The design is built from usages of the catalogue definitions. The four rotors are named
+by where they sit (`frontLeft`, …), because diagonal pairs spin opposite ways, and
+`ref part rotors : Rotor[4]` refers to all four: `[4]` is a multiplicity. Compare it with `DroneArchitecture::DeliveryDrone`, the definition
 that says what any delivery drone must offer. At the end, `emptyMass` is a mass roll-up,
 like a spreadsheet formula that lives in the model.
 Diagram: **`DroneViews::droneBreakdown`**.
@@ -94,8 +95,7 @@ subject to `drone`, so `drone.endurance >= 25 [min]` is evaluated with the drone
 216 W·h × 0.85 / 400 W = 27.5 minutes, so it is **satisfied**, with 2.5 minutes to spare.
 Change `hoverPower` in `DroneArchitecture::drone` to `450 [W]` and the check turns
 **violated** and shows up under Problems; Undo puts it back. The take-off mass check is
-met with 0.23 kg to spare (3.77 kg of 4 kg). The engine cannot yet add up `rotors.mass`
-over four rotors, so the app adds them up itself and says so. Tables: **`DroneViews::droneMassBudget`** adds up what each part weighs (2.77 kg
+met with 0.23 kg to spare (3.77 kg of 4 kg). Tables: **`DroneViews::droneMassBudget`** adds up what each part weighs (2.77 kg
 empty) and **`DroneViews::dronePowerBudget`** what each part draws in hover (397 W).
 
 ## 12. Proving it: `DroneVerification::enduranceFlightTest`

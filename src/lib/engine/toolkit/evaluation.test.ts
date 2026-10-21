@@ -71,23 +71,20 @@ describe('the demo’s checks', () => {
 		expect(payload.margin).toEqual({ value: 0, unit: 'kg', ratio: 0 });
 	});
 
-	it('decides the take-off mass with the rotors added up by the app', () => {
+	it('decides the take-off mass over the four named rotors', () => {
 		const mass = byId(host.checks(files).checks, 'SYS-003');
-		const byApp =
-			'the app added up the 4 `rotors` itself, as the engine cannot yet evaluate a value over a collection of parts';
 		expect(mass).toMatchObject({
 			status: 'satisfied',
-			byApp,
 			limit: { feature: 'drone.takeOffMass', operator: '<=', value: 4, unit: 'kg' },
-			values: [
-				{ feature: 'drone.takeOffMass', value: { kind: 'number', value: 3770, unit: 'g', byApp } }
-			],
-			explanation: `Met: drone.takeOffMass = 3.77 kg (needs ≤ 4 kg). T${byApp.slice(1)}.`
+			values: [{ feature: 'drone.takeOffMass', value: { kind: 'number', value: 3770, unit: 'g' } }],
+			explanation: 'Met: drone.takeOffMass = 3.77 kg (needs ≤ 4 kg).'
 		});
+		// The toolkit adds the rotors up itself: `rotors` refers to four parts.
+		expect(mass.byApp).toBeUndefined();
 		expect(mass.margin!.value).toBeCloseTo(0.23);
 		expect(mass.margin!.ratio).toBeCloseTo(0.0575);
 
-		// Heavier motors (190 g): 4 rotors of 250 g put the drone at 4.05 kg.
+		// Heavier motors (190 g): four rotors of 250 g put the drone at 4.05 kg.
 		const edited = edit('system/Components.sysml', 'mass = 120 [g]', 'mass = 190 [g]');
 		host.analyzeProject(edited);
 		const heavy = byId(host.checks(edited).checks, 'SYS-003');
@@ -225,7 +222,7 @@ describe('checks on small models', () => {
 		});
 		// When this fails because `byApp` is gone, the toolkit sums over collections itself:
 		// remove the app's sums from evaluation.ts (and this test's expectation of them).
-		expect(check!.byApp).toMatch(/^the app added up the 4 `wheels` itself/);
+		expect(check!.byApp).toBe('the app added up the 4 `wheels`');
 		host.analyzeProject(demoFiles());
 	});
 
@@ -291,15 +288,15 @@ describe('the budget and checks tables', () => {
 			'2770 g',
 			'100 %'
 		]);
-		expect(row('drone.rotors').slice(0, 6)).toEqual([
-			'drone.rotors',
+		expect(row('drone.frontLeft').slice(0, 6)).toEqual([
+			'drone.frontLeft',
 			'Rotor',
-			'4',
+			'1',
 			'180 g',
-			'720 g',
-			'26 %'
+			'180 g',
+			'6.5 %'
 		]);
-		expect(row('drone.rotors.motor').slice(2, 5)).toEqual(['1', '120 g', '480 g']);
+		expect(row('drone.frontLeft.motor').slice(2, 5)).toEqual(['1', '120 g', '120 g']);
 		expect(row('drone.payloadCapacity').slice(4)).toEqual([
 			'1 kg',
 			'',
@@ -339,17 +336,19 @@ describe('the budget and checks tables', () => {
 		});
 		const takeOff = table.rowInfo![table.rows.findIndex((r) => r[0] === 'drone.takeOffMass')]!;
 		expect(takeOff.role).toBe('attribute');
-		expect(takeOff.notes![4]).toMatch(/^the app added up the 4 `rotors` itself/);
+		expect(takeOff.notes).toBeUndefined();
 	});
 
 	it('leaves parts that draw no power out of the power budget', () => {
 		const table = host.renderView(files, 'dronePowerBudget');
 		const paths = table.rows.map((r) => r[0]);
 		expect(paths).not.toContain('drone.airframe');
-		expect(paths).not.toContain('drone.rotors.propeller');
+		expect(paths).not.toContain('drone.frontLeft.propeller');
+		// `rotors` refers to the four rotors: they are counted once, where they are owned.
+		expect(paths).not.toContain('drone.rotors');
 		const row = (path: string) => table.rows.find((r) => r[0] === path)!;
 		expect(row('drone').slice(3, 5)).toEqual(['397 W', '397 W']);
-		expect(row('drone.rotors').slice(2, 5)).toEqual(['4', '95 W', '380 W']);
+		expect(row('drone.rearRight').slice(2, 5)).toEqual(['1', '95 W', '95 W']);
 		expect(row('drone.hoverPower')[4]).toBe('400 W');
 	});
 

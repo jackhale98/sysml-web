@@ -789,6 +789,13 @@ export function connectionEnds(header: string): [string, string] | null {
 }
 
 /** The multiplicity as written (`4`, `0..*`), from a declaration header. */
+/** `ref part rotors = (…)`: a usage that refers to parts owned elsewhere, not a part of its own. */
+export function isReference(r: ElementRecord): boolean {
+	return /^\s*(?:(?:in|out|inout|abstract|variation|readonly|derived|constant|end)\s+)*ref\b/.test(
+		r.header
+	);
+}
+
 export function multiplicityOf(header: string): string | null {
 	// Only before the value: `= 650 [g]` has a unit in brackets, not a multiplicity.
 	const declaration = header.split(/\s(?:=|:=|default)\s/)[0] ?? header;

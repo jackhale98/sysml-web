@@ -762,7 +762,7 @@ describe('the demo’s tables', () => {
 
 	it('connections, allocations and the FMEA', () => {
 		const connections = table('ConnectionTable');
-		expect(shape(connections)).toEqual([11, 2]);
+		expect(shape(connections)).toEqual([14, 2]);
 		expect(connections.rows[0]).toEqual(['battery.powerOut', 'powerDistribution.powerIn']);
 		// A named connection is the element behind its row (the earlier engine gave none).
 		expect(connections.sources[0]!.element).toBe('DroneArchitecture::drone::batteryPower');
@@ -810,25 +810,27 @@ describe('the demo’s tables', () => {
 
 	it('the bill of materials follows the toolkit’s types and SysML’s `::**`', () => {
 		const bom = table('BillOfMaterials');
-		expect(shape(bom)).toEqual([32, 5]);
+		expect(shape(bom)).toEqual([56, 5]);
 		// `part drone :> DroneArchitecture::drone` is a DeliveryDrone (the earlier engine said `drone`).
 		expect(bom.rows[1]!.slice(0, 2)).toEqual(['deliveryService.drone', 'DeliveryDrone']);
-		expect(bom.rows[13]).toEqual([
-			'deliveryService.drone.rotors.motor',
+		expect(bom.rows[8]).toEqual([
+			'deliveryService.drone.frontLeft.motor',
 			'Motor',
 			'1',
-			'4',
+			'1',
 			'Brushless outrunner motor.'
 		]);
 		// A row's element is the model element, not a path through the tree.
-		expect(bom.sources[13]).toEqual({
+		expect(bom.sources[8]).toEqual({
 			element: 'DroneComponents::Rotor::motor',
 			file: 'system/Components.sysml',
-			line: 60
+			line: 61
 		});
+		// `ref part rotors` refers to the four rotors: they are counted once, where they are owned.
+		expect(col(bom, 'path')).not.toContain('deliveryService.drone.rotors');
 		const drone = table('droneBillOfMaterials');
-		// `expose DroneArchitecture::drone::**` exposes the drone too (13 rows before).
-		expect(shape(drone)).toEqual([14, 5]);
+		// `expose DroneArchitecture::drone::**` exposes the drone too.
+		expect(shape(drone)).toEqual([26, 5]);
 		expect(drone.rows[0]!.slice(0, 4)).toEqual(['drone', 'DeliveryDrone', '1', '1']);
 		expect(col(drone, 'path')).not.toContain('deliveryService.drone.battery');
 	});
@@ -857,9 +859,9 @@ describe('the demo’s tables', () => {
 		const row = (kind: string) => stats.rows.find((r) => r[0] === kind);
 		expect(row('part def')).toEqual(['part def', '19', '0']);
 		expect(row('requirement')).toEqual(['requirement', '0', '20']);
-		expect(row('attribute')).toEqual(['attribute', '0', '169']);
+		expect(row('attribute')).toEqual(['attribute', '0', '174']);
 		// Enum literals count as usages, metadata annotations are anonymous.
-		expect(row('enum')).toEqual(['enum', '0', '31']);
+		expect(row('enum')).toEqual(['enum', '0', '33']);
 		expect(row('metadata')).toBeUndefined();
 	});
 
@@ -868,7 +870,7 @@ describe('the demo’s tables', () => {
 			20, 11
 		]);
 		expect(shape(table('ModelViews::InterfaceControlDocument::connectionsChapter'))).toEqual([
-			11, 2
+			14, 2
 		]);
 		expect(() => table('ModelViews::SpecificationDocument')).toThrow(/no @TableRendering/);
 	});

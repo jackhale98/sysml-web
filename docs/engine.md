@@ -266,18 +266,28 @@ ask and cached with it):
   unit, text, none, or undecided with the reason). An undecided value says
   why, followed through what its expression refers to: a collection of
   parts on the way (`rotors : Rotor[4]`), or a feature without a value.
-- **Sums over collections, by the app.** While the toolkit can't evaluate a
-  value over a collection of parts (upstream request 2 below), `Evaluation`
-  works such a value out itself: the feature's expression is evaluated with
-  `sim/expr.ts`, `sum(parts.x)` over a fixed-size collection (`[4]`) counts
-  each part's `x` (as the collection or its definition gives it) once per
-  part, and every other value comes from the toolkit. It only fills in what
-  the toolkit leaves undecided, and only when a collection was summed on
-  the way, so it steps aside by itself once the toolkit evaluates these.
-  Such values and verdicts carry `byApp` (why, in words), which the
-  inspector, the checks and the budget tables show. `evaluation.test.ts`
-  ("adds up a value over a collection of parts only while the toolkit
-  cannot") fails when the toolkit decides it, so the code can go.
+- **Sums over collections, by the app.** The toolkit doesn't evaluate a
+  value over a collection of parts whose members aren't given (request 2
+  below), so `Evaluation` works such a value out itself: the feature's
+  expression is evaluated with `sim/expr.ts`, `sum(parts.x)` over a
+  fixed-size collection (`part rotors : Rotor[4]`) counts each part's `x`
+  (as the collection or its definition gives it) once per part, and every
+  other value comes from the toolkit. It only fills in what the toolkit
+  leaves undecided, and only when a collection was summed on the way, so it
+  steps aside by itself once the toolkit evaluates these; such values carry
+  `byApp` (internal, not shown to people). `evaluation.test.ts` ("adds up a
+  value over a collection of parts only while the toolkit cannot") fails
+  when the toolkit decides it, so the code can go. The same evaluation
+  gives an attribute a usage inherits from its definition
+  (`takeOffMass = emptyMass + payloadCapacity` in `DeliveryDrone`) its
+  value in the usage, since `evaluate` on the definition's feature sees no
+  usage values.
+- **The demo writes its rotors so the toolkit decides it.** Four named
+  rotors (`frontLeft`, …) and `ref part rotors : Rotor[4] = (frontLeft, …)`,
+  summed as `sum(rotors->collect { in r : Rotor; r.mass })`. `collect`
+  rather than `sum(rotors.mass)`, because the toolkit reads a dot chain as
+  a set (request 3). Tables and diagrams treat a `ref part` as a reference:
+  its parts are counted once, where they are owned.
 - **The evaluation session.** The toolkit refuses the values a part
   inherits from its definition when metadata annotates the part (see
   below). Metadata takes no part in evaluating values, so `Evaluation`
@@ -375,21 +385,21 @@ Found while making the drone demo's budgets and checks (sysml-toolkit
    FMEA line of the demo annotates a part this way. Worked around by the
    evaluation session (above); `evaluation.test.ts` fails when the toolkit
    is fixed, so the workaround can go.
-2. **Values over a collection of parts.** `sum(rotors.mass)` with
-   `part rotors : Rotor[4]` (no binding; `Rotor` binds `mass`) is
-   indeterminate, and so is every form over it (`rotors.mass`,
-   `size(rotors) * rotors.mass`, `collect`, `#(1)`): by design, an unbound
-   collection never materialises as instances. Each of the four has the
-   mass `Rotor` binds, so the sum is determined. Until it is fixed the app
-   adds such sums up itself (above), so the demo's take-off mass check is
-   decided.
-3. **`sum(x.mass)` and uniqueness.** The toolkit reads a dot chain over
-   several values as a set (`sum(concrete.mass)` of four equal masses is one
-   mass; its tests say so), while the specification's own mass roll-up
-   examples write `sum(subcomponents.totalMass)`. The idiom and the
-   semantics disagree; one of them should change, or the toolkit could warn.
-4. **`collect` with a typed parameter** (`rotors->collect { in r : Rotor;
-   r.mass }`) is "unsupported for evaluation: control function `collect`".
+2. **Values over a collection of parts whose members aren't given.**
+   `sum(rotors.mass)` with `part rotors : Rotor[4]` (no binding; `Rotor`
+   binds `mass`) is indeterminate, and so is every form over it. This is
+   deliberate: the toolkit's test `unbound_collections_never_materialize_as_single_instances`
+   asserts it. Each of the four has the mass `Rotor` binds, so the sum is
+   arguably determined, and `part x : T[n]` with `sum(x.y)` is how the
+   specification's own roll-up examples are written. A design question for
+   the maintainers rather than a bug. Binding the collection to named parts
+   (as the demo does) is decided today.
+3. **`sum(x.mass)` reads `x.mass` as a set** (`sum(concrete.mass)` of four
+   equal masses is one mass; documented in the toolkit's tests), while the
+   specification's roll-up examples write `sum(subcomponents.totalMass)`.
+   Also a design question; `collect` sums every value.
+4. **`collect` over a collection whose members aren't given** is
+   unsupported ("control function `collect`"), as in request 2.
 5. **`verify` bindings for satisfied constraints** are empty; the values a
    verdict rests on are worth reporting either way (the app evaluates them
    itself).

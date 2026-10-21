@@ -245,7 +245,7 @@ export interface Check {
 	span: Span;
 	/** Where the constraint is written, when that is elsewhere (a `satisfy`'s requirement). */
 	constraintAt?: { file: string; span: Span };
-	/** Set when the app decided the verdict with values the engine cannot yet work out: why. */
+	/** Set when the verdict rests on a value the app added up (`evaluation.ts`). Internal, not shown. */
 	byApp?: string;
 }
 
@@ -268,8 +268,8 @@ export type Evaluated =
 			value: number;
 			unit: string | null;
 			/**
-			 * Set when the app worked the value out because the engine cannot
-			 * yet (a sum over a collection of parts): why, in plain words.
+			 * Set when the app added up a collection of parts the engine leaves
+			 * undecided (`evaluation.ts`): which. Internal, not shown.
 			 */
 			byApp?: string;
 	  }

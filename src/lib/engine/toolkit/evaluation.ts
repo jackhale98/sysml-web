@@ -23,16 +23,19 @@
  *   so every position is unchanged; element ids are the same). It costs
  *   about 25 ms on the demo in Node, once per analysis, and only when asked.
  *
- * - **Sums over collections, by the app.** The toolkit 0.10 doesn't evaluate
- *   a value over a collection of parts (`sum(rotors.mass)` with `part rotors
- *   : Rotor[4]`; reported upstream). While it can't, the app works such a
- *   value out itself: the expression is evaluated with `sim/expr.ts`, a
- *   `sum` over a fixed-size collection counts each part's value as many
- *   times as there are parts, and every other value comes from the toolkit.
- *   This only ever fills in a value the toolkit leaves undecided and only
- *   when a collection was the reason, so it stops by itself once the
- *   toolkit evaluates these; a test fails then, to remove it. Values and
- *   verdicts worked out this way carry `byApp`.
+ * - **Values the app works out.** The toolkit 0.10 doesn't evaluate a
+ *   value over a collection of parts whose members aren't given
+ *   (`sum(rotors.mass)` with `part rotors : Rotor[4]`; deliberate, see
+ *   docs/engine.md). While it doesn't, the app works such a value out
+ *   itself: the expression is evaluated with `sim/expr.ts`, a `sum` over a
+ *   fixed-size collection counts each part's value as many times as there
+ *   are parts, and every other value comes from the toolkit. This only
+ *   fills in a value the toolkit leaves undecided and only when a
+ *   collection was the reason, so it stops by itself once the toolkit
+ *   evaluates these; a test fails then, to remove it. Such values and
+ *   verdicts carry `byApp` (internal). The same evaluation gives an
+ *   attribute a usage inherits from its definition its value in the usage
+ *   (`evaluate` on the definition's feature sees no usage values).
  *
  * Everything is cached per analysis (one `Evaluation` per built session).
  */
@@ -201,7 +204,7 @@ export class Evaluation {
 			const record = this.recordAt(`${scope}::${segment}`);
 			const many = record && record.value === null ? collectionSize(record.header) : null;
 			if (many)
-				return `\`${segment}\` is a collection of ${many} parts (\`${record!.header.replace(/\s+/g, ' ').trim()}\`), and the engine cannot yet evaluate a value over a collection (\`${feature}\`)`;
+				return `\`${segment}\` stands for ${many} parts (\`${record!.header.replace(/\s+/g, ' ').trim()}\`), so \`${feature}\` has no single value`;
 			scope = `${scope}::${segment}`;
 		}
 		const name = segments[segments.length - 1]!;
@@ -228,31 +231,27 @@ export class Evaluation {
 
 	/** `feature`'s value in `context`, worked out by the app, or null when it can't or needn't. */
 	private byApp(context: string, feature: string): Evaluated | null {
-		const over: Collection[] = [];
-		const value = this.appValue(context, feature, 0, over);
-		if (value === null || !over.length) return null;
+		const trace: Trace = { over: [], inherited: false };
+		const value = this.appValue(context, feature, 0, trace);
+		if (value === null || (!trace.over.length && !trace.inherited)) return null;
 		const result = fromValue(value);
 		if (!result) return null;
-		const parts = [...new Map(over.map((c) => [c.name, c])).values()]
+		if (!trace.over.length) return result;
+		const parts = [...new Map(trace.over.map((c) => [c.name, c])).values()]
 			.map((c) => `${c.count} \`${c.name}\``)
 			.join(' and ');
-		return {
-			...result,
-			byApp: `the app added up the ${parts} itself, as the engine cannot yet evaluate a value over a collection of parts`
-		};
+		return { ...result, byApp: `the app added up the ${parts}` };
 	}
 
 	/**
 	 * The value of `feature` (a name or a chain) in `context`: the toolkit's,
 	 * else its expression evaluated here. Collections summed on the way are
-	 * added to `over`; null when it can't be worked out.
+	 * added to `trace.over`, and `trace.inherited` notes an expression a
+	 * usage inherits from its definition (which `evaluate` on the
+	 * definition's feature sees without the usage's values); null when it
+	 * can't be worked out.
 	 */
-	private appValue(
-		context: string,
-		feature: string,
-		depth: number,
-		over: Collection[]
-	): Value | null {
+	private appValue(context: string, feature: string, depth: number, trace: Trace): Value | null {
 		if (depth > 8) return null;
 		const path = `${context}::${feature.replace(/\./g, '::')}`;
 		const known = this.rawValueAt(path);
@@ -269,15 +268,17 @@ export class Evaluation {
 		}
 		const record = this.recordAt(path);
 		if (!record?.value) return null;
+		const owner = record.ownerId ? this.source.extracted.byId.get(record.ownerId) : undefined;
+		if (owner?.qualifiedName !== scope) trace.inherited = true;
 		let expr: Expr;
 		try {
-			expr = this.withSums(parseExpr(record.value), scope, depth, over);
+			expr = this.withSums(parseExpr(record.value), scope, depth, trace);
 		} catch {
 			return null;
 		}
 		try {
 			return evaluateExpr(expr, {
-				get: (name) => this.appValue(scope, name, depth + 1, over) ?? undefined
+				get: (name) => this.appValue(scope, name, depth + 1, trace) ?? undefined
 			});
 		} catch (error) {
 			if (error instanceof EvalError) return null;
@@ -286,13 +287,13 @@ export class Evaluation {
 	}
 
 	/** `expr` with every `sum(parts.x)` over a fixed-size collection replaced by its total. */
-	private withSums(expr: Expr, scope: string, depth: number, over: Collection[]): Expr {
+	private withSums(expr: Expr, scope: string, depth: number, trace: Trace): Expr {
 		const walk = (e: Expr): Expr => {
 			switch (e.kind) {
 				case 'call': {
 					const [arg] = e.args;
 					if (e.name.split('::').pop() === 'sum' && e.args.length === 1 && arg?.kind === 'name') {
-						const total = this.collectionSum(arg.name, scope, depth, over);
+						const total = this.collectionSum(arg.name, scope, depth, trace);
 						if (total !== null) return { kind: 'literal', value: total };
 					}
 					return { ...e, args: e.args.map(walk) };
@@ -312,24 +313,19 @@ export class Evaluation {
 	}
 
 	/** `parts.x` summed over a collection of exactly n parts: n × each part's `x`. */
-	private collectionSum(
-		chain: string,
-		scope: string,
-		depth: number,
-		over: Collection[]
-	): Value | null {
+	private collectionSum(chain: string, scope: string, depth: number, trace: Trace): Value | null {
 		const [first, ...rest] = chain.split('.');
 		if (!first || !rest.length) return null;
 		const record = this.recordAt(`${scope}::${first}`);
 		const count = record ? collectionCount(record.header) : null;
 		if (!record || count === null) return null;
 		// Each part's value: as the collection gives it, else as its definition does.
-		let each = this.appValue(`${scope}::${first}`, rest.join('.'), depth + 1, over);
+		let each = this.appValue(`${scope}::${first}`, rest.join('.'), depth + 1, trace);
 		const type = record.typeIds[0] ? this.source.extracted.byId.get(record.typeIds[0]) : undefined;
 		if (each === null && type?.qualifiedName)
-			each = this.appValue(type.qualifiedName, rest.join('.'), depth + 1, over);
+			each = this.appValue(type.qualifiedName, rest.join('.'), depth + 1, trace);
 		if (each === null) return null;
-		over.push({ name: first, count });
+		trace.over.push({ name: first, count });
 		if (each instanceof ExprQuantity) return new ExprQuantity(each.value * count, each.unit);
 		return typeof each === 'number' ? each * count : null;
 	}
@@ -640,6 +636,13 @@ interface Collection {
 	count: number;
 }
 
+interface Trace {
+	/** Collections summed by the app. */
+	over: Collection[];
+	/** Whether an expression was inherited from a definition. */
+	inherited: boolean;
+}
+
 /** How many parts a usage stands for when it is a collection of a fixed size (`[4]`), else null. */
 function collectionCount(header: string): number | null {
 	const text = multiplicityOf(header);
@@ -819,13 +822,12 @@ function explain(check: Check, vacuous: boolean): string {
 	const needs = check.limit
 		? ` (needs ${SYMBOL[check.limit.operator] ?? check.limit.operator} ${formatQuantity(check.limit)})`
 		: '';
-	const byApp = check.byApp ? ` ${check.byApp[0]!.toUpperCase()}${check.byApp.slice(1)}.` : '';
 	switch (check.status) {
 		case 'satisfied':
 			if (vacuous) return 'Met only because an assumption of the requirement does not hold.';
-			return (valueText ? `Met: ${valueText}${needs}.` : 'Met.') + byApp;
+			return valueText ? `Met: ${valueText}${needs}.` : 'Met.';
 		case 'violated':
-			return (valueText ? `Not met: ${valueText}${needs}.` : 'Not met.') + byApp;
+			return valueText ? `Not met: ${valueText}${needs}.` : 'Not met.';
 		case 'undecided': {
 			const unresolved = /unresolved reference `([^`]+)`/.exec(check.detail);
 			if (unresolved)

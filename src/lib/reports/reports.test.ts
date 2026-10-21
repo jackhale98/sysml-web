@@ -240,7 +240,10 @@ describe('interface control document', () => {
 		const model = icdModel(ctx);
 		expect(model.connections.map((c) => c.name)).toEqual([
 			'batteryPower',
-			'rotorPower',
+			'frontLeftPower',
+			'frontRightPower',
+			'rearLeftPower',
+			'rearRightPower',
 			'avionicsPower',
 			'radioCable'
 		]);
@@ -253,7 +256,7 @@ describe('interface control document', () => {
 		expect(power.flows).toMatchObject([
 			{ item: 'ElectricPower', from: 'supply.power', to: 'load.power' }
 		]);
-		expect(power.usedBy).toHaveLength(3);
+		expect(power.usedBy).toHaveLength(6);
 		expect(model.portDefinitions.map((p) => p.element.label)).toContain('CommandLinkPort');
 		const link = model.portDefinitions.find((p) => p.element.label === 'CommandLinkPort')!;
 		expect(link.features.map((f) => `${f.direction} ${f.element.label}`)).toEqual([
@@ -294,7 +297,7 @@ describe('interface control document', () => {
 			expect.any(String)
 		]);
 		expect(doc.summary).toEqual([
-			{ label: 'Connections', value: '4' },
+			{ label: 'Connections', value: '7' },
 			{ label: 'Interfaces', value: '2' },
 			{ label: 'Port definitions', value: '6' },
 			{ label: 'Items', value: expect.any(String) }

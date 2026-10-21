@@ -43,22 +43,28 @@ describe('general view', () => {
 			'drone.battery',
 			'drone.camera',
 			'drone.flightController',
+			'drone.frontLeft',
+			'drone.frontRight',
 			'drone.gnss',
 			'drone.payloadRelease',
 			'drone.powerDistribution',
 			'drone.radio',
-			'drone.rotors'
+			'drone.rearLeft',
+			'drone.rearRight'
 		]);
 		expect(edges(tk, 'composition')).toEqual([
 			'drone -composition-> drone.airframe',
 			'drone -composition-> drone.battery',
 			'drone -composition-> drone.camera',
 			'drone -composition-> drone.flightController',
+			'drone -composition-> drone.frontLeft',
+			'drone -composition-> drone.frontRight',
 			'drone -composition-> drone.gnss',
 			'drone -composition-> drone.payloadRelease',
 			'drone -composition-> drone.powerDistribution',
 			'drone -composition-> drone.radio',
-			'drone -composition-> drone.rotors'
+			'drone -composition-> drone.rearLeft',
+			'drone -composition-> drone.rearRight'
 		]);
 		// The usage is "defined by" its definition.
 		expect(edges(tk, 'typing')).toEqual(['drone -typing-> DeliveryDrone']);
@@ -75,7 +81,9 @@ describe('general view', () => {
 		expect(node(tk, 'drone').attributes).toEqual(
 			expect.arrayContaining([
 				['attribute', 'payloadCapacity = 1 [kg]'],
-				['attribute', 'emptyMass']
+				['attribute', 'emptyMass'],
+				// The reference to the four rotors is a row, not a box.
+				['ref part', 'rotors : Rotor [4]']
 			])
 		);
 	});
@@ -94,6 +102,7 @@ describe('general view', () => {
 			'PowerDistributionBoard',
 			'Propeller',
 			'Rotor',
+			'RotorSpin',
 			'SpeedController',
 			'TelemetryRadio'
 		]);
@@ -142,7 +151,9 @@ describe('general view', () => {
 
 	it('draws a usage as its part tree, with dotted ids', () => {
 		const tk = toolkit('general', 'drone');
-		expect(tk.nodes).toHaveLength(10);
+		// The drone and its 12 parts; `rotors` refers to four of them and is not a part of its own.
+		expect(tk.nodes).toHaveLength(13);
+		expect(ids(tk)).not.toContain('drone.rotors');
 		expect(edges(tk, 'composition')).toContain('drone -composition-> drone.battery');
 	});
 
@@ -151,7 +162,9 @@ describe('general view', () => {
 		// `filter @SysML::PartDefinition`: the part definitions only, not the package.
 		expect(catalogue.nodes.every((n) => n.stereotype === '<<part def>>')).toBe(true);
 		expect(ids(catalogue)).toEqual(
-			ids(toolkit('general', 'DroneComponents')).filter((id) => !/^DroneComponents$/.test(id))
+			ids(toolkit('general', 'DroneComponents')).filter(
+				(id) => id !== 'DroneComponents' && id !== 'RotorSpin'
+			)
 		);
 		expect(catalogue.title).toBe('gv [componentCatalogue]');
 
@@ -194,7 +207,7 @@ describe('general view', () => {
 			.filter((d) => d.kind !== 'package')
 			.map((d) => d.name)
 			.sort();
-		expect(definitions).toHaveLength(93);
+		expect(definitions).toHaveLength(94);
 		expect(ids(tk)).toEqual(definitions);
 		expect(edges(tk, 'specialization')).toEqual([
 			'Airframe -specialization-> Component',
@@ -245,7 +258,10 @@ describe('interconnection view', () => {
 				'rotorPower : PowerPort',
 				'avionicsPower : PowerPort'
 			],
-			rotors: ['powerIn : ~PowerPort', 'control : ~MotorControlPort'],
+			frontLeft: ['powerIn : ~PowerPort', 'control : ~MotorControlPort'],
+			frontRight: ['powerIn : ~PowerPort', 'control : ~MotorControlPort'],
+			rearLeft: ['powerIn : ~PowerPort', 'control : ~MotorControlPort'],
+			rearRight: ['powerIn : ~PowerPort', 'control : ~MotorControlPort'],
 			flightController: [
 				'powerIn : ~PowerPort',
 				'motorControl : MotorControlPort',
@@ -267,17 +283,24 @@ describe('interconnection view', () => {
 		expect(edges(tk, 'connection')).toEqual([
 			'battery -connection-> powerDistribution (batteryPower)',
 			'powerDistribution -connection-> flightController (avionicsPower)',
-			'powerDistribution -connection-> rotors (rotorPower)',
+			'powerDistribution -connection-> frontLeft (frontLeftPower)',
+			'powerDistribution -connection-> frontRight (frontRightPower)',
+			'powerDistribution -connection-> rearLeft (rearLeftPower)',
+			'powerDistribution -connection-> rearRight (rearRightPower)',
 			'radio -connection-> flightController (radioCable)'
 		]);
 		// The drone's own port, inherited from DeliveryDrone, bound to the radio's.
 		expect(node(tk, 'commandLink')).toMatchObject({ kind: 'port' });
 		expect(edges(tk, 'binding')).toEqual(['commandLink -binding-> radio']);
-		// The four item flows, whose ends are feature chains.
+		// The item flows, whose ends are feature chains; `rotors`, which nothing connects, is left out.
+		expect(ids(tk)).not.toContain('rotors');
 		expect(edges(tk, 'flow')).toEqual([
 			'camera -flow-> flightController (Image)',
+			'flightController -flow-> frontLeft (MotorCommand)',
+			'flightController -flow-> frontRight (MotorCommand)',
 			'flightController -flow-> payloadRelease (ReleaseCommand)',
-			'flightController -flow-> rotors (MotorCommand)',
+			'flightController -flow-> rearLeft (MotorCommand)',
+			'flightController -flow-> rearRight (MotorCommand)',
 			'gnss -flow-> flightController (PositionFix)'
 		]);
 	});

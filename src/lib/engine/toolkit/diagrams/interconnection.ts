@@ -11,7 +11,7 @@
  * ports are listed as `esc.powerIn`, and their connections attach to it.
  */
 import type { DiagramGraph, EdgeKind } from '../../types';
-import { connectionEnds, type ElementRecord } from '../model';
+import { connectionEnds, isReference, type ElementRecord } from '../model';
 import { CONNECTORS, type DiagramContext, GraphBuilder, squash, usageLabel } from './context';
 import { labelName, toGraph, TkTree, type TkGraphNode } from './tkgraph';
 
@@ -46,7 +46,15 @@ export function interconnectionView(ctx: DiagramContext, scope: string): Diagram
 		return typed < 0 ? nameOf(n) : nameOf(n) + n.label.slice(typed);
 	};
 
+	// What connectors touch, and the parts they are in.
+	const touched = new Set(graph.edges.flatMap((e) => [e.source, e.target]));
+	const connected = (n: TkGraphNode): boolean =>
+		touched.has(n.id) || tree.children(n.id).some(connected);
+
 	for (const top of tree.children(root.id)) {
+		// A `ref part` shows only when something connects to it: the parts it refers to are drawn.
+		const record = ctx.byId.get(top.id);
+		if (record && isReference(record) && !connected(top)) continue;
 		if (top.kind === 'port') {
 			const id = g.freeId(nameOf(top));
 			g.add(

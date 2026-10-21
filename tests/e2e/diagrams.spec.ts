@@ -31,7 +31,7 @@ test('an interconnection view shows inherited ports, flows and bindings', async 
 	const diagram = await openView(page, 'Drone interconnection');
 	// The drone's own port comes from DeliveryDrone; it is bound to the radio's.
 	await expect(diagram.getByText('commandLink : ~CommandLinkPort').first()).toBeVisible();
-	await expect(diagram.getByText('MotorCommand')).toBeVisible();
+	await expect(diagram.getByText('MotorCommand')).toHaveCount(4);
 	await expect(diagram.getByText('batteryPower')).toBeVisible();
 	// Nodes map to the elements they draw.
 	await diagram.getByText('battery : Battery', { exact: true }).click();

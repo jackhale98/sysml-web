@@ -93,10 +93,8 @@ export function budgetRows(ctx: ViewContext, attribute: string): Row[] {
 		const children = childrenOf(line).filter((c) => included.has(c));
 		if (own) {
 			const value = evaluation?.valueOf(own.id) ?? null;
-			if (value?.kind === 'number') {
-				line.each = { value: value.value, unit: value.unit };
-				if (value.byApp) line.note = value.byApp;
-			} else line.note = noteOf(value);
+			if (value?.kind === 'number') line.each = { value: value.value, unit: value.unit };
+			else line.note = noteOf(value);
 		}
 		if (!line.each && children.length) {
 			const parts = children.filter((c) => c.each);
@@ -226,7 +224,6 @@ function rootAttributes(
 		]);
 		const notes: Record<string, string> = {};
 		if (value?.kind !== 'number') notes.total = noteOf(value) ?? 'not evaluated';
-		else if (value.byApp) notes.total = value.byApp;
 		const row: Row = {
 			fields,
 			anchors: [a.id],

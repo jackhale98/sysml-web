@@ -270,10 +270,7 @@
 											>?<span class="visually-hidden">: not computed, {v.reason}</span></span
 										>
 									{:else if shown}
-										<span
-											class="child-value"
-											title={v.kind === 'number' && v.byApp ? v.byApp : undefined}>{shown}</span
-										>
+										<span class="child-value">{shown}</span>
 									{/if}
 								{/if}
 							</button>

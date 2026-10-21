@@ -19,7 +19,7 @@ async function openDemo(page: Page) {
 
 async function openFile(page: Page, name: RegExp) {
 	await page.getByRole('tab', { name: 'Files' }).click();
-	await page.getByRole('button', { name }).click();
+	await page.getByRole('navigation', { name: 'Explorer' }).getByRole('button', { name }).click();
 	await expect(page.locator('.cm-content')).toBeVisible();
 }
 

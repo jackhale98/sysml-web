@@ -73,11 +73,11 @@ const pinned: [string, Request][] = [
 	['renames a definition in its file', { op: 'rename', path: C, from: 'Propeller', to: 'Prop' }],
 	[
 		'changes a multiplicity written after the type',
-		{ op: 'setDeclaration', path: A, element: 'rotors', line: 37, set: { multiplicity: '6' } }
+		{ op: 'setDeclaration', path: A, element: 'rotors', line: 44, set: { multiplicity: '6' } }
 	],
 	[
 		'adds a multiplicity after the name',
-		{ op: 'setDeclaration', path: A, element: 'battery', line: 35, set: { multiplicity: '2' } }
+		{ op: 'setDeclaration', path: A, element: 'battery', line: 36, set: { multiplicity: '2' } }
 	],
 	[
 		'changes a direction',
@@ -311,7 +311,7 @@ const pinned: [string, Request][] = [
 	],
 	[
 		'removes a type, keeping the multiplicity',
-		{ op: 'setDeclaration', path: A, element: 'airframe', line: 34, set: { type: null } }
+		{ op: 'setDeclaration', path: A, element: 'airframe', line: 35, set: { type: null } }
 	]
 ];
 
@@ -394,12 +394,12 @@ describe('edits the app makes although references break', () => {
 			op: 'setDeclaration',
 			path: A,
 			element: 'camera',
-			line: 41,
+			line: 48,
 			set: { type: 'Motor' }
 		});
 		expect(text).toContain('part camera : Motor;');
 		expect(result.warning).toBe(
-			'Some references no longer resolve as before: imageOut (line 57), image (line 57), mass (line 64).'
+			'Some references no longer resolve as before: imageOut (line 70), image (line 70), mass (line 77).'
 		);
 	});
 });
@@ -460,10 +460,10 @@ describe('what the toolkit refuses', () => {
 			op: 'setDeclaration',
 			path: A,
 			element: 'rotors',
-			line: 37,
+			line: 44,
 			set: { multiplicity: '6' }
 		});
-		expect('files' in other && other.files[A]).toContain('part rotors : Rotor[6];');
+		expect('files' in other && other.files[A]).toContain('ref part rotors : Rotor[6] = (');
 	});
 });
 
@@ -481,7 +481,7 @@ describe('addressing', () => {
 			id,
 			set: { multiplicity: '8' }
 		});
-		expect(text).toContain('part rotors : Rotor[8];');
+		expect(text).toContain('ref part rotors : Rotor[8] = (');
 	});
 
 	it('picks the element declared on the given line among same-named ones', () => {

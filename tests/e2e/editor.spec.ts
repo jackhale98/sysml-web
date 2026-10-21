@@ -37,7 +37,8 @@ test('the editor is coloured by the toolkit and hovers explain names', async ({ 
 	await expect(editor.locator('.tok-keyword').first()).toHaveText('package');
 	await expect(editor.locator('.tok-type-definition').first()).toBeVisible();
 	await expect(editor.locator('.tok-comment-documentation').first()).toBeVisible();
-	// Hover the `Battery` in `part battery : Battery;`.
+	// Hover the `Battery` in `part battery : Battery;` (the editor draws only the lines in view).
+	await page.locator('.cm-scroller').evaluate((el) => el.scrollTo(0, 400));
 	const battery = editor.getByText('Battery', { exact: true }).first();
 	await battery.hover();
 	await expect(page.locator('.cm-tooltip-hover')).toContainText('DroneComponents::Battery');

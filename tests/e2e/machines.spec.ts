@@ -41,7 +41,10 @@ test('a state machine typed into the model is listed and runs, its regions in pa
 	await expect(simulations.getByRole('button', { name: 'Run FlightModes' })).toBeVisible();
 
 	await page.getByRole('tab', { name: 'Files' }).click();
-	await page.getByRole('button', { name: 'FlightControl.sysml behaviour' }).click();
+	await page
+		.getByRole('navigation', { name: 'Explorer' })
+		.getByRole('button', { name: 'FlightControl.sysml', exact: true })
+		.click();
 	await page.locator('.cm-content').getByText('private import DroneInterfaces::*;').click();
 	await page.keyboard.press('End');
 	await page.keyboard.insertText(PAYLOAD);

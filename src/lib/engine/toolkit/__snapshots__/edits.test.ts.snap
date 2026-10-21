@@ -41,8 +41,8 @@ exports[`edits > changes a direction 1`] = `
 `;
 
 exports[`edits > changes a multiplicity written after the type 1`] = `
-"-         part rotors : Rotor[4];
-+         part rotors : Rotor[6];"
+"-         ref part rotors : Rotor[4] = (frontLeft, frontRight, rearLeft, rearRight);
++         ref part rotors : Rotor[6] = (frontLeft, frontRight, rearLeft, rearRight);"
 `;
 
 exports[`edits > changes a one-line doc comment 1`] = `
@@ -151,6 +151,12 @@ exports[`edits > renames a definition in its file 1`] = `
 -         connect motor to propeller;     // shaft and hub
 -     }
 - 
+-     enum def RotorSpin {
+-         doc /* Which way a rotor turns, seen from above. Opposite spins cancel each other's torque. */
+-         clockwise;
+-         counterClockwise;
+-     }
+- 
 -     part def SpeedController :> Component {
 -         doc /* Turns battery power into motor current at the commanded speed. */
 -         attribute :>> mass = 35 [g];
@@ -173,6 +179,12 @@ exports[`edits > renames a definition in its file 1`] = `
 +         bind control = esc.control;
 +         connect esc to motor;           // three motor phase wires
 +         connect motor to propeller;     // shaft and hub
++     }
++ 
++     enum def RotorSpin {
++         doc /* Which way a rotor turns, seen from above. Opposite spins cancel each other's torque. */
++         clockwise;
++         counterClockwise;
 +     }
 + 
 +     part def SpeedController :> Component {

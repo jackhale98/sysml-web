@@ -287,7 +287,7 @@ describe('removing a drawn relationship', () => {
 			ctx
 		)['system/DroneArchitecture.sysml']!;
 		expect(after).not.toContain('batteryPower');
-		expect(after).toContain('interface rotorPower');
+		expect(after).toContain('interface frontLeftPower');
 	});
 
 	it('removes a specialization and a composed part', () => {

@@ -66,7 +66,7 @@ test('on a phone, every main screen fits the width without panning sideways', as
 test('on a phone, the budgets and the checks are cards that fit the width', async ({ page }) => {
 	await openDemo(page);
 	for (const [view, card] of [
-		['Drone mass budget', '720 g'],
+		['Drone mass budget', '180 g'],
 		['Drone power budget', '397 W'],
 		['Design checks', 'Satisfied']
 	] as const) {

@@ -48,7 +48,7 @@ test('the mass budget adds up the parts tree, with units and the limit a require
 }) => {
 	await openDemo(page);
 	const table = await openView(page, 'Drone mass budget');
-	await expect(table.getByText('16 rows')).toBeVisible({ timeout: 15_000 });
+	await expect(table.getByText('28 rows')).toBeVisible({ timeout: 15_000 });
 	const row = (path: string) =>
 		table
 			.locator('tbody tr')
@@ -56,13 +56,13 @@ test('the mass budget adds up the parts tree, with units and the limit a require
 	// The drone has no mass of its own: its row adds up its parts.
 	await expect(row('drone')).toContainText('2770 g');
 	await expect(row('drone')).toContainText('100 %');
-	await expect(row('drone.rotors').locator('td')).toHaveText([
-		'rotors',
+	await expect(row('drone.frontLeft').locator('td')).toHaveText([
+		'frontLeft',
 		'Rotor',
-		'4',
+		'1',
 		'180 g',
-		'720 g',
-		'26 %',
+		'180 g',
+		'6.5 %',
 		'',
 		'',
 		''
@@ -92,7 +92,7 @@ test('the checks view says which requirements the design meets, and shows the cl
 	const mass = rows.filter({ hasText: 'SYS-003' });
 	await expect(mass).toContainText('Satisfied');
 	await expect(mass).toContainText('0.23 kg (5.8 %)');
-	await expect(mass).toContainText('The app added up the 4 rotors itself');
+	await expect(mass).toContainText('Met: drone.takeOffMass = 3.77 kg (needs ≤ 4 kg).');
 	const endurance = rows.filter({ hasText: 'SYS-001' });
 	await expect(endurance).toContainText('Satisfied');
 	await expect(endurance).toContainText('2.54 min (10 %)');
@@ -150,12 +150,10 @@ test('the inspector shows what an expression comes to, and why when it cannot', 
 	);
 	await expect(endurance.getByText('= 27.54 min')).toBeVisible({ timeout: 10_000 });
 
-	// The rotors are a collection the engine cannot sum yet: the app adds them up, and says so.
+	// The roll-up over the parts, the four rotors included.
 	const empty = await select(page, 'emptyMass', 'attribute', 1);
 	await expect(empty.getByText('= 2.77 kg')).toBeVisible({ timeout: 10_000 });
-	await expect(empty.getByText('Added up by the app.')).toBeVisible();
-	await empty.getByRole('button', { name: 'Why?' }).click();
-	await expect(empty).toContainText('The app added up the 4 `rotors` itself');
+	await expect(empty.getByRole('button', { name: 'Why?' })).toHaveCount(0);
 
 	// What nothing gives a value stays unknown, with the reason.
 	const takeOff = await select(page, 'takeOffMass', 'attribute');

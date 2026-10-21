@@ -20,7 +20,7 @@ async function openDemo(page: Page) {
 
 async function openFile(page: Page, name: RegExp) {
 	await page.getByRole('tab', { name: 'Files' }).click();
-	await page.getByRole('button', { name }).click();
+	await page.getByRole('navigation', { name: 'Explorer' }).getByRole('button', { name }).click();
 	await expect(page.locator('.cm-content')).toBeVisible();
 }
 
@@ -53,7 +53,7 @@ test('the inspector edits the declaration, says what a type change breaks, and u
 	const howMany = rotors.getByLabel('How many');
 	await howMany.fill('6');
 	await howMany.press('Enter');
-	await expect(text).toContainText('part rotors : Rotor[6];');
+	await expect(text).toContainText('ref part rotors : Rotor[6] = (');
 	await expect(toasts(page)).toContainText('Set the multiplicity of rotors to 6');
 
 	const camera = await select(page, 'camera');
@@ -61,7 +61,7 @@ test('the inspector edits the declaration, says what a type change breaks, and u
 	await type.fill('Motor');
 	await type.press('Enter');
 	await expect(text).toContainText('part camera : Motor;');
-	await expect(toasts(page)).toContainText('no longer resolve as before: imageOut (line 57)');
+	await expect(toasts(page)).toContainText('no longer resolve as before: imageOut (line 70)');
 
 	await toasts(page).getByRole('button', { name: 'Undo' }).last().click();
 	await expect(text).toContainText('part camera : Camera;');
@@ -81,9 +81,11 @@ test('renaming updates references in every file; deleting says what no longer re
 	// The part in DroneArchitecture.sysml is retyped too.
 	await page.getByRole('tab', { name: 'Files' }).click();
 	await page
+		.getByRole('navigation', { name: 'Explorer' })
 		.getByRole('button', { name: /^DroneArchitecture\.sysml/ })
-		.first()
 		.click();
+	// The editor draws only the lines in view.
+	await page.locator('.cm-scroller').evaluate((el) => el.scrollTo(0, 400));
 	await expect(text).toContainText('part battery : PowerPack;');
 
 	const motor = await select(page, 'Motor');

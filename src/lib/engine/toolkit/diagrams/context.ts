@@ -13,7 +13,7 @@
  */
 import type { DiagramEdge, DiagramGraph, DiagramNode, EdgeKind, NodeKind } from '../../types';
 import type { TkSession, Toolkit } from '../api';
-import type { ElementRecord, ExtractedModel, UnitInfo } from '../model';
+import { isReference, type ElementRecord, type ExtractedModel, type UnitInfo } from '../model';
 
 export interface DiagramInput {
 	tk: Toolkit;
@@ -217,10 +217,10 @@ const UNDIRECTED = new Set(['subject', 'actor', 'stakeholder', 'objective', 'ret
 
 /** A compartment row for a feature: `[keyword, text]` with its direction (`in port`). */
 export function featureRow(r: ElementRecord): [string, string] {
-	const keyword = r.kind.replace(/_/g, ' ');
+	const keyword = `${r.kind !== 'attribute' && isReference(r) ? 'ref ' : ''}${r.kind.replace(/_/g, ' ')}`;
 	const directed = r.direction && !UNDIRECTED.has(r.kind) ? `${r.direction} ${keyword}` : keyword;
 	let text = usageLabel(r);
-	if (r.value && r.value.length <= 24 && !/\n/.test(r.value)) text += ` = ${r.value}`;
+	if (r.value && r.value.length <= 32 && !/\n/.test(r.value)) text += ` = ${r.value}`;
 	return [directed, text];
 }
 

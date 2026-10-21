@@ -7,7 +7,7 @@
  * everything else in the session are resolution context.
  */
 import type { ElementRecord } from '../model';
-import { connectionEnds, multiplicityOf } from '../model';
+import { connectionEnds, isReference, multiplicityOf } from '../model';
 import { budgetRows, checkRows } from './budget';
 import type { Annotation, Link, ViewContext } from './context';
 import {
@@ -616,9 +616,13 @@ export function compositionRows(ctx: ViewContext, root: string | null): Row[] {
 	return rows;
 }
 
-/** Part and item usages in a definition or usage: its own, then inherited ones it doesn't redefine. */
+/**
+ * Part and item usages a definition or usage is made of: its own, then
+ * inherited ones it doesn't redefine. References (`ref part`) are left
+ * out: what they refer to is counted where it is owned.
+ */
 function compositionChildren(ctx: ViewContext, node: ElementRecord): ElementRecord[] {
-	const out = ctx.membersOf(node.id).filter(isContentUsage);
+	const out = ctx.membersOf(node.id).filter((r) => isContentUsage(r) && !isReference(r));
 	const names = new Set(out.map((c) => c.name));
 	const replaced = new Set(out.flatMap((c) => (c.rootId ? [c.rootId] : [])));
 	const from = node.isDefinition

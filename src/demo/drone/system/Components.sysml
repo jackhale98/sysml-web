@@ -53,6 +53,7 @@ package DroneComponents {
              * Its mass and its power draw add up those of its own parts. */
         attribute :>> mass = esc.mass + motor.mass + propeller.mass;
         attribute :>> powerDraw = esc.powerDraw + motor.powerDraw;
+        attribute spin : RotorSpin;
         port powerIn : ~PowerPort;
         port control : ~MotorControlPort;
 
@@ -64,6 +65,12 @@ package DroneComponents {
         bind control = esc.control;
         connect esc to motor;           // three motor phase wires
         connect motor to propeller;     // shaft and hub
+    }
+
+    enum def RotorSpin {
+        doc /* Which way a rotor turns, seen from above. Opposite spins cancel each other's torque. */
+        clockwise;
+        counterClockwise;
     }
 
     part def SpeedController :> Component {

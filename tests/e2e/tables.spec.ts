@@ -25,10 +25,10 @@ test('the bill of materials walks the parts tree the toolkit resolved', async ({
 	await views(page).getByRole('button', { name: 'Drone bill of materials' }).click();
 	const table = page.getByRole('region', { name: 'Drone bill of materials view' });
 	// `expose DroneArchitecture::drone::**` takes in the drone itself and its parts, nested.
-	await expect(table.getByText('14 rows')).toBeVisible({ timeout: 15_000 });
-	const motor = table.locator('tbody tr').filter({ hasText: 'drone.rotors.motor' });
+	await expect(table.getByText('26 rows')).toBeVisible({ timeout: 15_000 });
+	const motor = table.locator('tbody tr').filter({ hasText: 'drone.frontLeft.motor' });
 	await expect(motor).toContainText('Motor');
-	await expect(motor.locator('td').nth(3)).toHaveText('4');
+	await expect(motor.locator('td').nth(3)).toHaveText('1');
 	await expectAccessible(page);
 });
 
