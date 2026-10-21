@@ -205,9 +205,16 @@
 	});
 
 	/** Text after a name, kept on its line when it starts with punctuation (", "). */
-	function glued(text: Text, i: number): string {
+	/** Punctuation right after a link, kept on the link's line ("A, B"). */
+	const PUNCTUATION = /^[,;.)]+/;
+	function trailing(text: Text, i: number): string {
+		const next = text[i + 1];
+		return next && !next.ref && !next.code ? (next.text.match(PUNCTUATION)?.[0] ?? '') : '';
+	}
+	/** A plain run without the punctuation its preceding link already shows. */
+	function rest(text: Text, i: number): string {
 		const run = text[i]!;
-		return i > 0 && text[i - 1]!.ref && /^[,;.)]/.test(run.text) ? `\u2060${run.text}` : run.text;
+		return i > 0 && text[i - 1]!.ref ? run.text.replace(PUNCTUATION, '') : run.text;
 	}
 
 	const tones = new Set(['ok', 'warn', 'bad']);
@@ -229,11 +236,10 @@
 	);
 </script>
 
-{#snippet runs(text: Text)}{#each text as run, i (i)}{#if run.ref}<button
-				type="button"
-				class="rd-ref"
-				onclick={() => select(run.ref!)}>{run.text}</button
-			>{:else if run.code}<code>{run.text}</code>{:else}{glued(text, i)}{/if}{/each}{/snippet}
+{#snippet runs(text: Text)}{#each text as run, i (i)}{#if run.ref}<span class="rd-tie"
+				><button type="button" class="rd-ref" onclick={() => select(run.ref!)}>{run.text}</button
+				>{trailing(text, i)}</span
+			>{:else if run.code}<code>{run.text}</code>{:else}{rest(text, i)}{/if}{/each}{/snippet}
 
 {#snippet tree(items: TreeItem[])}
 	{#each items as item, i (i)}
@@ -466,6 +472,10 @@
 </div>
 
 <style>
+	/* A link and the comma after it wrap together. */
+	.rd-tie {
+		white-space: nowrap;
+	}
 	.report-screen {
 		container: report / inline-size;
 		height: 100%;
