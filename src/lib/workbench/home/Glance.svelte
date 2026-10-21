@@ -35,8 +35,11 @@
 					style:--fam="var(--kind-{f.family})"
 					aria-pressed={chosen === f.family}
 					aria-controls="glance-panel"
-					disabled={!ready}
-					onclick={() => (chosen = chosen === f.family ? null : f.family)}
+					aria-disabled={!ready}
+					onclick={() => {
+						// Not `disabled`: the strip scrolls, so its tiles stay focusable.
+						if (ready) chosen = chosen === f.family ? null : f.family;
+					}}
 				>
 					<KindGlyph kind={f.glyph} isDefinition={true} size={26} />
 					<span class="count">
@@ -167,7 +170,7 @@
 		opacity: 0;
 		transition: opacity var(--duration) var(--ease);
 	}
-	.tile:hover:not(:disabled) {
+	.tile:hover:not([aria-disabled='true']) {
 		border-color: color-mix(in oklab, var(--fam) 45%, var(--border));
 		box-shadow: var(--shadow-md);
 		transform: translateY(-1px);
@@ -181,7 +184,7 @@
 	.tile[aria-pressed='true']::after {
 		opacity: 1;
 	}
-	.tile:disabled {
+	.tile[aria-disabled='true'] {
 		cursor: default;
 	}
 	.count {
@@ -326,7 +329,7 @@
 		.panel-inner {
 			animation: none;
 		}
-		.tile:hover:not(:disabled) {
+		.tile:hover:not([aria-disabled='true']) {
 			transform: none;
 		}
 	}

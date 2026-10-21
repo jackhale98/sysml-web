@@ -64,7 +64,8 @@ test('library search finds definitions and opens them at their line', async ({ p
 test('go to definition opens a library type in the library file', async ({ page }) => {
 	await openDemo(page);
 	await page.getByRole('tab', { name: 'Files' }).click();
-	await page.getByRole('button', { name: /FlightControl\.sysml/ }).click();
+	// Exact: the overview may list the file too (among the files with most elements).
+	await page.getByRole('button', { name: 'FlightControl.sysml', exact: true }).click();
 	await page.getByRole('button', { name: 'Text', exact: true }).click();
 	await expect(page.locator('.cm-content')).toContainText('returnThreshold : Real');
 	// Ctrl-click the `Real` in `attribute returnThreshold : Real`.

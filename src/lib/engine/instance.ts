@@ -44,7 +44,12 @@ export function getEngine(): Engine {
 				if (stats.library === 'source')
 					whenIdle(() => wantsSnapshot() && toolkit?.prefetchSnapshot());
 			},
-			onFailure: (reason) => toasts.show(reason, { tone: 'error', duration: 0 })
+			// Once, plainly; the problems list has the reason.
+			onFailure: () =>
+				toasts.show('The SysML engine stopped working. Reload the page to try again.', {
+					tone: 'error',
+					duration: 0
+				})
 		}
 	);
 	engine = composeEngine(classic, toolkit);
