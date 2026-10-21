@@ -6,6 +6,7 @@ import {
 	matchItem,
 	search,
 	segments,
+	tableRowItems,
 	viewItems,
 	MAX_ELEMENTS,
 	MAX_RESULTS,
@@ -202,5 +203,48 @@ describe('search', () => {
 
 	it('returns nothing when nothing matches', () => {
 		expect(search(sources([element('Battery')], ['a.sysml']), 'qqqq')).toEqual([]);
+	});
+});
+
+describe('table rows', () => {
+	const columns = ['ID', 'Title', 'Text', 'Priority'];
+	const rows = [
+		['SYS-001', 'Flight endurance', 'The drone shall fly 25 min.', 'high'],
+		['SYS-007', 'Geofencing', 'The drone shall not leave the geofence.', 'high'],
+		['SYS-008', 'Return home', 'Return to base when the geofence is lost.', 'low']
+	];
+	const items = tableRowItems('RequirementsTable', 'Requirements', columns, rows);
+
+	it('names rows by their title column and finds them by any cell', () => {
+		expect(items[1]).toMatchObject({ label: 'Geofencing', shortId: 'SYS-007', group: 'rows' });
+		const s: PaletteSources = {
+			...sources(),
+			rows: items,
+			table: { view: 'RequirementsTable', title: 'Requirements', count: () => 2 }
+		};
+		const results = search(s, 'geofence');
+		expect(
+			results
+				.slice(0, 2)
+				.map((r) => r.item.label)
+				.sort()
+		).toEqual(['Geofencing', 'Return home']);
+		expect(results[2]?.item.action).toEqual({
+			type: 'filter',
+			view: 'RequirementsTable',
+			query: 'geofence'
+		});
+	});
+
+	it('finds rows by ID and offers no filter for a single hit', () => {
+		const s: PaletteSources = {
+			...sources(),
+			rows: items,
+			table: { view: 'RequirementsTable', title: 'Requirements', count: () => 1 }
+		};
+		const results = search(s, 'SYS-001').filter((r) => r.item.group === 'rows');
+		expect(results.map((r) => r.item.action)).toEqual([
+			{ type: 'row', view: 'RequirementsTable', index: 0 }
+		]);
 	});
 });

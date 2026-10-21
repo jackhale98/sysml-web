@@ -11,12 +11,13 @@ import { viewTitle } from './views.ts';
 /** A half-open `[start, end)` range of UTF-16 offsets into a string. */
 export type Range = readonly [start: number, end: number];
 
-export type PaletteGroup = 'elements' | 'views' | 'files' | 'commands';
+export type PaletteGroup = 'rows' | 'elements' | 'views' | 'files' | 'commands';
 
 /** Display order of the groups. */
-export const GROUPS: readonly PaletteGroup[] = ['elements', 'views', 'files', 'commands'];
+export const GROUPS: readonly PaletteGroup[] = ['rows', 'elements', 'views', 'files', 'commands'];
 
 export const GROUP_HEADINGS: Record<PaletteGroup, string> = {
+	rows: 'In this table',
 	elements: 'Elements',
 	views: 'Views',
 	files: 'Files',
@@ -24,12 +25,18 @@ export const GROUP_HEADINGS: Record<PaletteGroup, string> = {
 };
 
 export const MAX_ELEMENTS = 8;
+/** Rows of the open table offered before everything else. */
+export const MAX_ROWS = 6;
 export const MAX_RESULTS = 50;
 /** Views offered before the person types anything. */
 export const DEFAULT_VIEWS = 6;
 
 export type PaletteAction =
 	| { type: 'element'; key: string; file: string }
+	/** Go to a row of the open table (`index` into its rendered rows). */
+	| { type: 'row'; view: string; index: number }
+	/** Show only the open table's rows that match `query`. */
+	| { type: 'filter'; view: string; query: string }
 	| { type: 'open'; tab: Tab }
 	| { type: 'layout'; layout: FileLayout }
 	| { type: 'toggle-inspector' }
@@ -76,6 +83,10 @@ export interface PaletteSources {
 	views: readonly PaletteItem[];
 	files: readonly PaletteItem[];
 	commands: readonly PaletteItem[];
+	/** Rows of the table on screen, when one is. */
+	rows?: readonly PaletteItem[];
+	/** That table, to offer filtering it: `count` is how many rows its own search keeps. */
+	table?: { view: string; title: string; count: (query: string) => number };
 }
 
 // ---------------------------------------------------------------------------
@@ -432,6 +443,37 @@ export function commandItems(themeChoice: string): PaletteItem[] {
 	];
 }
 
+/**
+ * The rows of a rendered table as palette items: found by any cell, named by
+ * the table's title (or name) column, with its ID column as the short id.
+ */
+export function tableRowItems(
+	view: string,
+	title: string,
+	columns: readonly string[],
+	rows: readonly (readonly string[])[]
+): PaletteItem[] {
+	const find = (pattern: RegExp) => columns.findIndex((c) => pattern.test(c.trim()));
+	const id = find(/^(id|short ?name|req(uirement)? ?id|number)$/i);
+	let name = find(/^(title|name|element)$/i);
+	if (name < 0) name = columns.findIndex((_, i) => i !== id);
+	return rows.map((cells, index) => {
+		const label = cells[name] || cells.find(Boolean) || `Row ${index + 1}`;
+		return {
+			id: `row:${view}:${index}`,
+			group: 'rows' as const,
+			label,
+			shortId: id >= 0 ? cells[id] || null : null,
+			detail: title,
+			aliases: cells
+				.filter((_, i) => i !== name && i !== id)
+				.join(' · ')
+				.slice(0, 400),
+			action: { type: 'row' as const, view, index }
+		};
+	});
+}
+
 // ---------------------------------------------------------------------------
 // Search
 
@@ -473,7 +515,25 @@ export function search(sources: PaletteSources, query: string): PaletteResult[] 
 		);
 	}
 
-	return [...elements.slice(0, MAX_ELEMENTS), ...views, ...files, ...commands].slice(
+	// In a table, its rows come first, with a way to show only the ones that match.
+	const rowHits = rank(sources.rows ?? [], q);
+	const rows: PaletteResult[] = rowHits.slice(0, MAX_ROWS);
+	const kept = sources.table?.count(q) ?? 0;
+	if (sources.table && kept > 1) {
+		const { view, title } = sources.table;
+		rows.push({
+			item: {
+				id: `filter:${view}`,
+				group: 'rows',
+				label: `Show only the ${kept} rows matching “${q}”`,
+				detail: title,
+				action: { type: 'filter', view, query: q }
+			},
+			match: null
+		});
+	}
+
+	return [...rows, ...elements.slice(0, MAX_ELEMENTS), ...views, ...files, ...commands].slice(
 		0,
 		MAX_RESULTS
 	);

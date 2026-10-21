@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import {
 		ArrowDown,
 		ArrowUp,
@@ -112,6 +112,80 @@
 			inFile.find((e) => e.span.start_row === source.line || e.span.start_row + 1 === source.line)
 		);
 	}
+
+	// While it is on screen, search can find this table's rows and take you to one.
+	$effect(() => {
+		const t = table;
+		if (!t) return;
+		ui.table = { view: name, title, columns: t.columns, rows: t.rows };
+		return () => {
+			if (untrack(() => ui.table)?.view === name) ui.table = null;
+		};
+	});
+
+	/** The row just jumped to, briefly highlighted. */
+	let flash = $state<number | null>(null);
+	let flashTimer: ReturnType<typeof setTimeout> | undefined;
+
+	/** The nearest ancestor that scrolls vertically. */
+	function scrollParent(node: HTMLElement): HTMLElement | null {
+		for (let el = node.parentElement; el; el = el.parentElement) {
+			const { overflowY } = getComputedStyle(el);
+			if ((overflowY === 'auto' || overflowY === 'scroll') && el.scrollHeight > el.clientHeight)
+				return el;
+		}
+		return null;
+	}
+
+	/** Scroll a row into view and highlight it, clearing a search that hides it. */
+	async function reveal(index: number) {
+		if (!rows.some((r) => r.index === index)) query = '';
+		await tick();
+		const target = document.querySelector<HTMLElement>(
+			`[data-table="${CSS.escape(name)}"] [data-row="${index}"]`
+		);
+		const scroller = target && scrollParent(target);
+		if (target && scroller) {
+			// Scroll only the rows' own container: moving the page around it would
+			// leave the table short of the screen's bottom.
+			const offset =
+				target.getBoundingClientRect().top -
+				scroller.getBoundingClientRect().top +
+				scroller.scrollTop;
+			const top = ui.phone
+				? offset - 12
+				: offset - Math.max(0, (scroller.clientHeight - target.offsetHeight) / 2);
+			const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+			scroller.scrollTo({ top: Math.max(0, top), behavior: reduce ? 'auto' : 'smooth' });
+		}
+		flash = index;
+		clearTimeout(flashTimer);
+		flashTimer = setTimeout(() => (flash = null), 2600);
+	}
+
+	$effect(() => {
+		const request = ui.tableRequest;
+		if (!request || request.view !== name) return;
+		untrack(() => {
+			if ('query' in request) {
+				query = request.query;
+				return;
+			}
+			void reveal(request.index);
+			const element = elementFor(request.index);
+			if (element && !ui.phone) ui.select(element.key, 'table');
+		});
+	});
+
+	// Choosing an element elsewhere (search, explorer, a diagram) finds its row here.
+	$effect(() => {
+		const selection = ui.selection;
+		if (!selection || selection.source === 'table') return;
+		untrack(() => {
+			const index = table?.sources.findIndex((_, i) => elementFor(i)?.key === selection.key);
+			if (index !== undefined && index >= 0) void reveal(index);
+		});
+	});
 
 	function openRow(index: number) {
 		const element = elementFor(index);
@@ -356,12 +430,14 @@
 	{:else if ui.phone}
 		<!-- Phones: one card per row, full width, scrolling down rather than sideways. -->
 		{@const subtitled = !isPivot && table.columns.length > 2 && !table.editable?.[1]}
-		<div class="scroll cards-scroll">
+		<div class="scroll cards-scroll" data-table={name}>
 			<ul class="cards" aria-label="{title} rows">
 				{#each rows as row (row.index)}
 					{@const selectable = !isPivot && !!table.sources[row.index]}
 					<li
 						class="card"
+						data-row={row.index}
+						class:flash={flash === row.index}
 						class:selected={selectable &&
 							!!ui.selection &&
 							elementFor(row.index)?.key === ui.selection.key}
@@ -416,7 +492,7 @@
 			</ul>
 		</div>
 	{:else}
-		<div class="scroll">
+		<div class="scroll" data-table={name}>
 			<table class:pivot={isPivot}>
 				<thead>
 					<tr>
@@ -442,6 +518,8 @@
 						{@const selectable = !isPivot && !!table.sources[row.index]}
 						<!-- The first cell's button is the keyboard way to open a row. -->
 						<tr
+							data-row={row.index}
+							class:flash={flash === row.index}
 							class:selected={selectable &&
 								elementFor(row.index)?.key === ui.selection?.key &&
 								!!ui.selection}
@@ -496,6 +574,26 @@
 </section>
 
 <style>
+	/* A row search jumped to: a brief glow that fades. */
+	.flash,
+	.flash > :global(td) {
+		animation: found 2.6s var(--ease);
+	}
+	/* No end frame: the row fades back to its own background. */
+	@keyframes found {
+		0%,
+		55% {
+			background: color-mix(in oklab, var(--accent) 22%, var(--surface));
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.flash,
+		.flash > :global(td) {
+			animation: none;
+			background: color-mix(in oklab, var(--accent) 14%, var(--surface));
+		}
+	}
+
 	.view-table {
 		display: flex;
 		flex-direction: column;

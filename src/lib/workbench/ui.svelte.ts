@@ -172,6 +172,25 @@ export class WorkbenchUi {
 		if (this.active >= index) this.active = Math.max(0, this.active - 1);
 	}
 
+	/** The table on screen, so search can find its rows. */
+	table = $state.raw<{ view: string; title: string; columns: string[]; rows: string[][] } | null>(
+		null
+	);
+	/** A request to the table on screen: go to a row, or filter it. */
+	tableRequest = $state.raw<
+		| { view: string; index: number; nonce: number }
+		| { view: string; query: string; nonce: number }
+		| null
+	>(null);
+
+	revealRow(view: string, index: number) {
+		this.tableRequest = { view, index, nonce: (this.tableRequest?.nonce ?? 0) + 1 };
+	}
+
+	filterTable(view: string, query: string) {
+		this.tableRequest = { view, query, nonce: (this.tableRequest?.nonce ?? 0) + 1 };
+	}
+
 	select(key: string | null, source: SelectionSource) {
 		this.selection = key ? { key, source, nonce: (this.selection?.nonce ?? 0) + 1 } : null;
 		// On a phone, choosing an element (not moving the text cursor) shows its details.

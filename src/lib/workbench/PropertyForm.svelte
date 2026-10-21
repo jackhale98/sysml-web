@@ -4,6 +4,7 @@
 	import type { ModelElement } from '#lib/project/elements.ts';
 	import type { Workspace } from '#lib/project/workspace.svelte.ts';
 	import { toasts } from '#lib/ui/toasts.svelte.ts';
+	import TypePicker from './TypePicker.svelte';
 
 	/**
 	 * The editable parts of an element's declaration — ID, type,
@@ -46,34 +47,58 @@
 	);
 	const hasValue = $derived(typed && ['attribute', 'ref', 'part', 'item'].includes(kind));
 
-	/** Names to suggest for a type: definitions of the matching kind, then common value types. */
-	const typeOptions = $derived.by(() => {
-		const wanted = kind === 'attribute' ? ['attribute', 'enum'] : [kind];
-		const names = workspace.elements
-			.filter((e) => e.isDefinition && wanted.includes(e.kind))
-			.map((e) => e.name);
-		if (kind === 'attribute')
-			names.push(
-				'Real',
-				'Integer',
-				'Boolean',
-				'String',
-				'ISQ::mass',
-				'ISQ::length',
-				'ISQ::duration',
-				'ISQ::power'
-			);
-		return [...new Set(names)].sort((a, b) => a.localeCompare(b));
-	});
-	const specializeOptions = $derived(
-		[
-			...new Set(
-				workspace.elements
-					.filter((e) => e.isDefinition && e.kind === kind && e.name !== element.name)
-					.map((e) => e.name)
+	const uid = $props.id();
+	const fileText = $derived(workspace.text(element.file) ?? '');
+
+	/** The package an element sits in: where a new definition for it goes. */
+	const owningPackage = $derived(
+		workspace.elements
+			.filter(
+				(e) =>
+					e.kind === 'package' &&
+					e.file === element.file &&
+					e.span.start_byte <= element.span.start_byte &&
+					e.span.end_byte >= element.span.end_byte
 			)
-		].sort()
+			.sort((a, b) => b.span.start_byte - a.span.start_byte)[0]
 	);
+
+	/** Type the element by a new definition, created in its package: one undoable change. */
+	async function createType(name: string) {
+		const pkg = owningPackage;
+		if (!pkg) {
+			toasts.show('Add a package to this file to hold the new definition.', { tone: 'error' });
+			return;
+		}
+		const label = `Added ${kind} def ${name} and typed ${element.label} by it`;
+		const before = workspace.undoStack.length;
+		const error = await workspace.transact(label, async () => {
+			const source = workspace.text(element.file);
+			if (source === undefined) return `${element.file} is not open.`;
+			const typed = await workspace.edit(element.file, {
+				op: 'setDeclaration',
+				path: element.file,
+				source,
+				element: element.name,
+				line: element.span.start_row,
+				set: { type: name }
+			});
+			if (typed) return typed;
+			return workspace.edit(element.file, {
+				op: 'insertMember',
+				path: element.file,
+				source: workspace.text(element.file) ?? source,
+				parent: pkg.name,
+				text: `${kind} def ${name} {\n}`
+			});
+		});
+		if (error) toasts.show(error, { tone: 'error' });
+		else if (workspace.undoStack.length > before)
+			toasts.show(label, {
+				tone: 'success',
+				action: { label: 'Undo', run: () => workspace.undo() }
+			});
+	}
 
 	async function apply(set: DeclarationSet, label: string) {
 		const source = workspace.text(element.file);
@@ -118,8 +143,6 @@
 			(event.currentTarget as HTMLInputElement).blur();
 		}
 	}
-
-	let newSuper = $state('');
 </script>
 
 {#if error}
@@ -139,19 +162,27 @@
 		{/if}
 
 		{#if typed}
-			<label>
-				<span>Type <small>({kind === 'port' ? 'port def' : `${kind} def`})</small></span>
-				<input
-					list="type-options"
+			<div class="field">
+				<label class="label" for="{uid}-type"
+					>Type <small>({kind === 'attribute' ? 'a value type' : `a ${kind} def`})</small></label
+				>
+				<TypePicker
+					id="{uid}-type"
 					value={details.type ?? ''}
+					{kind}
+					file={fileText}
+					{workspace}
+					{engine}
 					placeholder="Choose or type a definition"
-					onblur={(e) => commit('type', e.currentTarget.value, details?.type, 'the type')}
-					{onkeydown}
+					create={owningPackage
+						? {
+								label: (name) => `New ${kind} def ${name}`,
+								run: (name) => void createType(name)
+							}
+						: undefined}
+					oncommit={(next) => commit('type', next, details?.type, 'the type')}
 				/>
-				<datalist id="type-options">
-					{#each typeOptions as option (option)}<option value={option}></option>{/each}
-				</datalist>
-			</label>
+			</div>
 			<div class="row">
 				<label>
 					<span>How many</span>
@@ -218,25 +249,25 @@
 							>
 						</span>
 					{/each}
-					<input
-						list="specialize-options"
-						bind:value={newSuper}
-						placeholder="Add a more general definition"
-						aria-label="Add a more general definition"
-						onkeydown={(e) => {
-							if (e.key === 'Enter' && newSuper.trim()) {
-								e.preventDefault();
+					<div class="add-super">
+						<TypePicker
+							id="{uid}-specializes"
+							value=""
+							{kind}
+							file={fileText}
+							{workspace}
+							{engine}
+							label="Add a more general definition"
+							placeholder="Add a more general definition"
+							exclude={[element.name, ...details.specializes]}
+							clearOnCommit
+							oncommit={(general) =>
 								void apply(
-									{ specializes: [...details!.specializes, newSuper.trim()] },
-									`${element.label} now specializes ${newSuper.trim()}`
-								);
-								newSuper = '';
-							}
-						}}
-					/>
-					<datalist id="specialize-options">
-						{#each specializeOptions as option (option)}<option value={option}></option>{/each}
-					</datalist>
+									{ specializes: [...details!.specializes, general] },
+									`${element.label} now specializes ${general}`
+								)}
+						/>
+					</div>
 				</div>
 			</div>
 			<label class="check">
@@ -352,9 +383,13 @@
 		color: var(--text-2);
 		cursor: pointer;
 	}
-	.chips input {
-		flex: 1;
-		min-width: 10rem;
+	.add-super {
+		flex: 1 1 100%;
+		min-width: 0;
+	}
+	.label {
+		color: var(--text-2);
+		font-size: var(--text-sm);
 	}
 	.error {
 		color: var(--danger);

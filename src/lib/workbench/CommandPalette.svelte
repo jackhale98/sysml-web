@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Command, FileCode, Network, Search } from '@lucide/svelte';
+	import { Command, FileCode, Network, Search, Table as TableIcon } from '@lucide/svelte';
 	import { tick } from 'svelte';
 	import { isLibraryFile, type Workspace } from '#lib/project/workspace.svelte.ts';
 	import KindGlyph from '#lib/ui/KindGlyph.svelte';
@@ -13,6 +13,7 @@
 		modelViewItems,
 		search,
 		segments,
+		tableRowItems,
 		viewItems,
 		type PaletteGroup,
 		type PaletteResult,
@@ -42,9 +43,25 @@
 			)
 		],
 		files: fileItems(workspace.modelPaths),
-		commands: [...machineItems(workspace.machines), ...commandItems(theme.choice)]
+		commands: [...machineItems(workspace.machines), ...commandItems(theme.choice)],
+		...(ui.table
+			? {
+					rows: tableRowItems(ui.table.view, ui.table.title, ui.table.columns, ui.table.rows),
+					table: {
+						view: ui.table.view,
+						title: ui.table.title,
+						count: (q: string) => countRows(ui.table?.rows ?? [], q)
+					}
+				}
+			: {})
 	});
 	const results = $derived(search(sources, query));
+
+	/** Rows a table's own search keeps: any cell containing the text. */
+	function countRows(rows: readonly string[][], q: string): number {
+		const needle = q.toLowerCase();
+		return rows.filter((cells) => cells.some((c) => c.toLowerCase().includes(needle))).length;
+	}
 	const current = $derived(Math.min(active, results.length - 1));
 
 	/** Results in consecutive runs per group, each with its index overall. */
@@ -90,6 +107,12 @@
 				break;
 			case 'open':
 				ui.open(action.tab);
+				break;
+			case 'row':
+				ui.revealRow(action.view, action.index);
+				break;
+			case 'filter':
+				ui.filterTable(action.view, action.query);
 				break;
 			case 'layout':
 				ui.layout = action.layout;
@@ -205,6 +228,8 @@
 									<KindGlyph kind={item.kind} isDefinition={item.isDefinition ?? false} size={20} />
 								{:else if item.group === 'files'}
 									<FileCode size={16} aria-hidden="true" />
+								{:else if item.group === 'rows'}
+									<TableIcon size={16} aria-hidden="true" />
 								{:else if item.group === 'views'}
 									<Network size={16} aria-hidden="true" />
 								{:else}
