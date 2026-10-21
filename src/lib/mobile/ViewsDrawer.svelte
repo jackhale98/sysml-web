@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { Check, X } from '@lucide/svelte';
-	import type { Engine } from '#lib/engine/client.ts';
 	import type { Workspace } from '#lib/project/workspace.svelte.ts';
 	import { tabId, tabTitle, type WorkbenchUi } from '#lib/workbench/ui.svelte.ts';
 	import Sheet from './Sheet.svelte';
@@ -8,8 +7,7 @@
 	import ViewsCatalog from './ViewsCatalog.svelte';
 
 	/** The phone's tab strip: open views to switch between or close, then everything else. */
-	let { workspace, ui, engine }: { workspace: Workspace; ui: WorkbenchUi; engine: Engine } =
-		$props();
+	let { workspace, ui }: { workspace: Workspace; ui: WorkbenchUi } = $props();
 
 	function choose(index: number) {
 		const tab = ui.tabs[index];
@@ -52,7 +50,7 @@
 		</ul>
 	</section>
 	<div class="go">
-		<ViewsCatalog {workspace} {ui} {engine} headingLevel={3} />
+		<ViewsCatalog {workspace} {ui} headingLevel={3} />
 	</div>
 </Sheet>
 

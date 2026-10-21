@@ -63,7 +63,6 @@ export function startEngine(
 		listViews: (...params) => call('listViews', ...params),
 		renderView: (...params) => call('renderView', ...params),
 		viewLibraries: (...params) => call('viewLibraries', ...params),
-		libraryIndex: (...params) => call('libraryIndex', ...params),
 		complete: (...params) => call('complete', ...params),
 		hover: (...params) => call('hover', ...params),
 		definition: (...params) => call('definition', ...params),
@@ -73,11 +72,6 @@ export function startEngine(
 		format: (...params) => call('format', ...params),
 		elementDetails: (...params) => call('elementDetails', ...params),
 		codeActions: (...params) => call('codeActions', ...params),
-		readProjectArchive: (...params) => call('readProjectArchive', ...params),
-		writeKpar: (...params) => call('writeKpar', ...params),
-		libraryFile: (...params) => call('libraryFile', ...params),
-		librarySearch: (...params) => call('librarySearch', ...params),
-		libraryLicense: (...params) => call('libraryLicense', ...params),
 		stateMachines: (...params) => call('stateMachines', ...params),
 		terminate: () => started?.terminate()
 	};

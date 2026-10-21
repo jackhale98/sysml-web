@@ -1,8 +1,9 @@
 /**
  * A small ZIP reader and writer for spreadsheets (an `.xlsx` is a ZIP of XML
- * files). Deflate uses the platform's `CompressionStream` /
- * `DecompressionStream` (`deflate-raw`), so no compression library ships
- * with the app. Only what OOXML needs: no ZIP64, no encryption, no spanning.
+ * files) and project archives (`.kpar`, or a ZIP of a repository). Deflate
+ * uses the platform's `CompressionStream` / `DecompressionStream`
+ * (`deflate-raw`), so no compression library ships with the app. No ZIP64,
+ * no encryption, no spanning.
  */
 
 export interface ZipEntry {
@@ -39,8 +40,11 @@ async function transform(data: Uint8Array, stream: CompressionStream | Decompres
 	return new Uint8Array(await new Response(output).arrayBuffer());
 }
 
-/** Read every file in a ZIP archive. Throws a readable error for anything else. */
-export async function unzip(bytes: Uint8Array): Promise<ZipEntry[]> {
+/**
+ * Read every file in a ZIP archive (folders are left out). Throws a readable
+ * error for anything else; `hint` is added to the "not a ZIP" message.
+ */
+export async function unzip(bytes: Uint8Array, hint = ''): Promise<ZipEntry[]> {
 	const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 	let end = -1;
 	for (let i = bytes.length - 22; i >= Math.max(0, bytes.length - 22 - 0xffff); i--) {
@@ -49,7 +53,7 @@ export async function unzip(bytes: Uint8Array): Promise<ZipEntry[]> {
 			break;
 		}
 	}
-	if (end < 0) throw new Error('This is not a ZIP file (an .xlsx file is one).');
+	if (end < 0) throw new Error(`This is not a ZIP file${hint ? ` (${hint})` : ''}.`);
 	const count = view.getUint16(end + 10, true);
 	let at = view.getUint32(end + 16, true);
 	const names = new TextDecoder();
@@ -79,8 +83,15 @@ export async function unzip(bytes: Uint8Array): Promise<ZipEntry[]> {
 	return entries;
 }
 
-/** Write a ZIP archive, deflating each file. */
-export async function zip(entries: { path: string; data: Uint8Array | string }[]) {
+/**
+ * Write a ZIP archive, deflating each file (or, with `store`, keeping every
+ * file as it is, as `.kpar` writers do). Times are the DOS epoch, so the same
+ * content always gives the same bytes.
+ */
+export async function zip(
+	entries: { path: string; data: Uint8Array | string }[],
+	options: { store?: boolean } = {}
+) {
 	const encoder = new TextEncoder();
 	const parts: Uint8Array[] = [];
 	const central: Uint8Array[] = [];
@@ -91,8 +102,10 @@ export async function zip(entries: { path: string; data: Uint8Array | string }[]
 	for (const entry of entries) {
 		const data = typeof entry.data === 'string' ? encoder.encode(entry.data) : entry.data;
 		const name = encoder.encode(entry.path);
-		const deflated = await transform(data, new CompressionStream('deflate-raw'));
-		const stored = deflated.length >= data.length;
+		const deflated = options.store
+			? data
+			: await transform(data, new CompressionStream('deflate-raw'));
+		const stored = options.store || deflated.length >= data.length;
 		const body = stored ? data : deflated;
 		const crc = crc32(data);
 

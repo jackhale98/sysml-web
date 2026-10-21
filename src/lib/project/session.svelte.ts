@@ -3,7 +3,6 @@
  * browser, saving back to its folder or its git repository (`git`), and
  * exporting it as a `.kpar`.
  */
-import type { Engine } from '#lib/engine/client.ts';
 import { GitConnection } from '#lib/git/connection.svelte.ts';
 import { demoProject } from './demo.ts';
 import { download, writeToFolder } from './sources.ts';
@@ -125,9 +124,10 @@ export class ProjectSession {
 	}
 
 	/** Download the project as a `.kpar` (KerML 10.3 project interchange). */
-	async exportKpar(engine: Engine) {
+	async exportKpar() {
 		const info = this.workspace.info ?? this.record?.info ?? { name: 'project' };
-		const bytes = await engine.writeKpar(info, this.files(), timestamp());
+		const { writeKpar } = await import('#lib/interchange/kpar.ts');
+		const bytes = await writeKpar(info, this.files(), timestamp());
 		const name = (info.name || 'project').replace(/[^\w.-]+/g, '-');
 		download(`${name}.kpar`, bytes, 'application/zip');
 	}
