@@ -8,6 +8,7 @@
 		Columns3,
 		FileCode,
 		FilePlus,
+		Info,
 		Minus,
 		Search,
 		TriangleAlert,
@@ -16,8 +17,9 @@
 	import ExportMenu from '#lib/dataio/ExportMenu.svelte';
 	import type { ExportTable } from '#lib/dataio/export.ts';
 	import type { Engine } from '#lib/engine/client.ts';
-	import type { RenderedTable, ViewInfo } from '#lib/engine/types.ts';
-	import type { ModelElement } from '#lib/project/elements.ts';
+	import type { CheckStatus, RenderedTable, RowInfo, ViewInfo } from '#lib/engine/types.ts';
+	import { byteToUtf16, elementAt, type ModelElement } from '#lib/project/elements.ts';
+	import CheckChip from '#lib/ui/CheckChip.svelte';
 	import type { Workspace } from '#lib/project/workspace.svelte.ts';
 	import KindGlyph from '#lib/ui/KindGlyph.svelte';
 	import { toasts } from '#lib/ui/toasts.svelte.ts';
@@ -51,6 +53,8 @@
 	);
 	const title = $derived(viewTitle(info?.name ?? name));
 	const isPivot = $derived(!!table && table.sources.length === 0 && table.rows.length > 0);
+	/** Rows are a tree (a budget): indented by depth, in the tree's order (not sortable). */
+	const isTree = $derived(!!table?.columnKinds?.includes('tree'));
 	/** Rows are requirements (the requirements table and views like it): offer importing more. */
 	const listsRequirements = $derived(
 		!!table &&
@@ -208,9 +212,42 @@
 	});
 
 	function openRow(index: number) {
+		if (table?.opensText) {
+			showInText(index);
+			return;
+		}
 		const element = elementFor(index);
 		if (element) ui.select(element.key, 'table');
 	}
+
+	/** A row about a statement (a check's claim): show that line in the text. */
+	function showInText(index: number) {
+		const source = table?.sources[index];
+		const text = source ? workspace.text(source.file) : undefined;
+		if (!source || source.byte === undefined || text === undefined) return;
+		const from = byteToUtf16(text, source.byte);
+		const end = text.indexOf('\n', from);
+		const element = elementAt(workspace.elements, source.file, source.byte);
+		// The element around it, for the inspector; the editor shows the line itself.
+		if (element) ui.select(element.key, 'text');
+		ui.revealText(source.file, from, end < 0 ? text.length : end);
+	}
+
+	function infoOf(index: number): RowInfo {
+		return table?.rowInfo?.[index] ?? {};
+	}
+
+	/** The last segment of a tree path (`drone.rotors.esc` → `esc`) and what comes before it (the button's name has the whole path). */
+	function splitTreePath(path: string): [string, string] {
+		const at = path.lastIndexOf('.');
+		return at < 0 ? ['', path] : [path.slice(0, at + 1), path.slice(at + 1)];
+	}
+
+	const isVerdict = (value: string): value is CheckStatus =>
+		value === 'satisfied' || value === 'violated' || value === 'undecided';
+
+	/** `23 %` → 0.23, for the share bar. */
+	const shareOf = (value: string) => Math.max(0, Math.min(1, (parseFloat(value) || 0) / 100));
 
 	/** Copy the bundled view libraries into the project so they can be edited. */
 	async function addToModel() {
@@ -292,10 +329,37 @@
 		if (error) toasts.show(error, { tone: 'error' });
 	}
 
-	type CellKind = 'id' | 'flag' | 'status' | 'list' | 'number' | 'mark' | 'text' | 'long';
-	function cellKind(column: string, value: string): CellKind {
+	type CellKind =
+		| 'id'
+		| 'flag'
+		| 'status'
+		| 'list'
+		| 'number'
+		| 'mark'
+		| 'text'
+		| 'long'
+		| 'quantity'
+		| 'percent'
+		| 'verdict'
+		| 'verdictIcon'
+		| 'tree';
+	function cellKind(column: string, value: string, index?: number): CellKind {
 		const c = column.toLowerCase();
 		if (isPivot) return 'mark';
+		// What the row provider says the column holds.
+		switch (index === undefined ? null : table?.columnKinds?.[index]) {
+			case 'quantity':
+				return 'quantity';
+			case 'percent':
+				return 'percent';
+			case 'number':
+				return 'number';
+			case 'tree':
+				return 'tree';
+			case 'check':
+				// A `check` column beside others says it with an icon; a checks list in words.
+				return isVerdict(value) ? (c === 'check' ? 'verdictIcon' : 'verdict') : 'text';
+		}
 		if (c === 'id' || c === 'shortname') return 'id';
 		if ((c === 'satisfied' || c === 'verified') && (value === '0' || value === '1')) return 'flag';
 		if (c === 'status' || c === 'state') return 'status';
@@ -332,10 +396,50 @@
 			></span>{:else}{value}{/if}
 	{:else if kind === 'status' && value}
 		<span class="chip {STATUS_TONE[value.toLowerCase()] ?? 'plain'}">{value}</span>
+	{:else if (kind === 'verdict' || kind === 'verdictIcon') && isVerdict(value)}
+		<CheckChip status={value} compact={kind === 'verdictIcon'} />
+	{:else if kind === 'percent' && value}
+		<span class="share"
+			><span class="bar" aria-hidden="true"
+				><span style:width="{Math.round(shareOf(value) * 100)}%"></span></span
+			>{value}</span
+		>
 	{:else if kind === 'list' && value}
 		{#each value.split(/,\s*/) as item, i (i)}<span class="ref">{item}</span>{/each}
+	{:else if (kind === 'long' || kind === 'text') && value.includes('`')}
+		<!-- An explanation names SysML as `code`. -->
+		{#each value.split(/`([^`]+)`/) as part, i (i)}{#if i % 2}<code class="inline">{part}</code
+				>{:else}{part}{/if}{/each}
 	{:else}
 		{value}
+	{/if}
+{/snippet}
+
+<!-- A cell's value with what the provider says about it (why it is empty, that it adds up its parts). -->
+{#snippet cell(kind: CellKind, value: string, note: string | undefined, rollup: boolean)}
+	{#if value === '' && note}
+		<span class="none" title={note}
+			>—<Info size={12} aria-hidden="true" /><span class="visually-hidden">{note}</span></span
+		>
+	{:else if note && rollup && kind === 'quantity'}
+		<span class="sum" title={note}
+			><span aria-hidden="true">Σ</span>{@render display(kind, value)}<span class="visually-hidden"
+				>({note})</span
+			></span
+		>
+	{:else}
+		{@render display(kind, value)}
+	{/if}
+{/snippet}
+
+<!-- The first cell's text: a tree path's last segment (the rest for screen readers), a verdict chip. -->
+{#snippet first(kind: CellKind, value: string)}
+	{#if kind === 'tree'}
+		{splitTreePath(value)[1] || '—'}
+	{:else if kind === 'verdict'}
+		{@render display(kind, value)}
+	{:else}
+		{value || '—'}
 	{/if}
 {/snippet}
 
@@ -474,6 +578,7 @@
 			<ul class="cards" aria-label="{title} rows">
 				{#each rows as row (row.index)}
 					{@const selectable = !isPivot && !!table.sources[row.index]}
+					{@const kind0 = cellKind(table.columns[0] ?? '', row.cells[0] ?? '', 0)}
 					<li
 						class="card"
 						data-row={row.index}
@@ -482,23 +587,54 @@
 							!!ui.selection &&
 							elementFor(row.index)?.key === ui.selection.key}
 					>
-						<div class="card-title">
+						<div class="card-title" class:verdict-title={kind0 === 'verdict'}>
 							{#if selectable}
-								<button type="button" class="open" onclick={() => openRow(row.index)}
-									>{row.cells[0] || '—'}</button
+								<button
+									type="button"
+									class="open"
+									aria-label={table.opensText
+										? `${row.cells[0]}: ${row.cells.slice(1, 3).filter(Boolean).join(' ')}, show in the text`
+										: undefined}
+									onclick={() => openRow(row.index)}
+									>{#if kind0 === 'verdict'}{@render display(kind0, row.cells[0] ?? '')}{:else}{row
+											.cells[0] || '—'}{/if}</button
 								>
 							{:else}
 								<strong>{row.cells[0] || '—'}</strong>
 							{/if}
 							{#if subtitled && row.cells[1]}<span class="subtitle">{row.cells[1]}</span>{/if}
 						</div>
+						{#if isTree}
+							{@const columns = table.columns}
+							{@const at = (field: string) => columns.indexOf(field)}
+							{@const [q, each, total, share] = ['quantity', 'each', 'total', 'share'].map((f) =>
+								at(f) >= 0 ? (row.cells[at(f)] ?? '') : ''
+							)}
+							{@const note =
+								infoOf(row.index).notes?.[at('each')] ?? infoOf(row.index).notes?.[at('total')]}
+							{#if total || each || note}
+								<p class="budget-line">
+									{#if total}
+										{#if q && q !== '1' && each}<span class="times">{q} × {each} =</span>{/if}
+										<strong>{total}</strong>
+										{#if share}<span class="of">{share}</span>{/if}
+									{:else}
+										<span class="none">—</span>
+									{/if}
+									{#if note}<span class="card-note">{note}</span>{/if}
+								</p>
+							{/if}
+						{/if}
 						<dl>
 							{#each row.cells as value, c (c)}
 								{@const column = table.columns[c] ?? ''}
-								{@const kind = cellKind(column, value)}
+								{@const kind = cellKind(column, value, c)}
 								{@const edit = table.editable?.[c] ?? null}
 								{@const canEdit = selectable && !!edit}
-								{#if c > 0 && !(subtitled && c === 1) && (canEdit || (value !== '' && !(isPivot && value === '0')))}
+								{@const note = infoOf(row.index).notes?.[c]}
+								{@const inLine =
+									isTree && ['quantity', 'each', 'total', 'share', 'extended'].includes(column)}
+								{#if c > 0 && !inLine && !(subtitled && c === 1) && (canEdit || note || (value !== '' && !(isPivot && value === '0')))}
 									<div class="pair {kind}">
 										<dt>{isPivot ? column : heading(column)}</dt>
 										<dd>
@@ -519,6 +655,8 @@
 													>{@render display(kind, value)}{#if !value}<span class="empty">Add</span
 														>{/if}</button
 												>
+											{:else if note && (value === '' || infoOf(row.index).role === 'rollup')}
+												{value || '—'}<span class="card-note">{note}</span>
 											{:else}
 												{@render display(kind, value)}
 											{/if}
@@ -537,18 +675,26 @@
 				<thead>
 					<tr>
 						{#each table.columns as column, c (c)}
+							{@const declared = table.columnKinds?.[c]}
 							<th
 								scope="col"
+								class:end={declared === 'quantity' ||
+									declared === 'percent' ||
+									declared === 'number'}
 								aria-sort={sortColumn === c ? (descending ? 'descending' : 'ascending') : undefined}
 							>
-								<button type="button" onclick={() => sortBy(c)}>
-									{isPivot && c > 0 ? column : heading(column)}
-									{#if sortColumn === c}
-										{#if descending}<ArrowDown size={12} />{:else}<ArrowUp size={12} />{/if}
-									{:else}
-										<ChevronsUpDown size={12} class="idle" />
-									{/if}
-								</button>
+								{#if isTree}
+									<span class="th">{heading(column)}</span>
+								{:else}
+									<button type="button" onclick={() => sortBy(c)}>
+										{isPivot && c > 0 ? column : heading(column)}
+										{#if sortColumn === c}
+											{#if descending}<ArrowDown size={12} />{:else}<ArrowUp size={12} />{/if}
+										{:else}
+											<ChevronsUpDown size={12} class="idle" />
+										{/if}
+									</button>
+								{/if}
 							</th>
 						{/each}
 					</tr>
@@ -556,28 +702,39 @@
 				<tbody>
 					{#each rows as row (row.index)}
 						{@const selectable = !isPivot && !!table.sources[row.index]}
+						{@const info = infoOf(row.index)}
 						<!-- The first cell's button is the keyboard way to open a row. -->
 						<tr
 							data-row={row.index}
 							class:flash={flash === row.index}
+							class:rollup={info.role === 'rollup'}
+							class:own={info.role === 'attribute'}
+							class:first-own={info.role === 'attribute' &&
+								infoOf(rows[rows.indexOf(row) - 1]?.index ?? -1).role !== 'attribute'}
+							class:checks={table.opensText}
 							class:selected={selectable &&
 								elementFor(row.index)?.key === ui.selection?.key &&
 								!!ui.selection}
 							onclick={() => selectable && openRow(row.index)}
 						>
 							{#each row.cells as value, c (c)}
-								{@const kind = cellKind(table.columns[c] ?? '', value)}
+								{@const kind = cellKind(table.columns[c] ?? '', value, c)}
 								{@const edit = table.editable?.[c] ?? null}
 								{@const canEdit = selectable && !!edit}
-								<td class={kind}>
+								<td class={kind} style:--depth={kind === 'tree' ? (info.depth ?? 0) : undefined}>
 									{#if c === 0 && selectable}
 										<button
 											type="button"
 											class="open"
+											aria-label={table.opensText
+												? `${value}: ${row.cells.slice(1, 3).filter(Boolean).join(' ')}, show in the text`
+												: kind === 'tree'
+													? value
+													: undefined}
 											onclick={(e) => {
 												e.stopPropagation();
 												openRow(row.index);
-											}}>{value || '—'}</button
+											}}>{@render first(kind, value)}</button
 										>
 									{:else if editing?.row === row.index && editing.column === c && edit}
 										<CellEditor
@@ -601,7 +758,7 @@
 												>{/if}</button
 										>
 									{:else}
-										{@render display(kind, value)}
+										{@render cell(kind, value, info.notes?.[c], info.role === 'rollup')}
 									{/if}
 								</td>
 							{/each}
@@ -976,19 +1133,110 @@
 		min-width: 9rem;
 	}
 	td.list {
-		min-width: 10rem;
+		min-width: 6rem;
 	}
 	td.number {
 		font-variant-numeric: tabular-nums;
 		text-align: right;
 	}
 	td.long {
-		min-width: 18rem;
+		min-width: 16rem;
 		max-width: 36rem;
 		color: var(--text-2);
 	}
-	td.flag {
+	td.flag,
+	td.verdictIcon {
 		text-align: center;
+	}
+	/* Quantities and shares: right-aligned, figures of one width, never wrapped. */
+	td.quantity,
+	td.percent {
+		font-variant-numeric: tabular-nums;
+		text-align: right;
+		white-space: nowrap;
+	}
+	th.end button,
+	th.end .th {
+		justify-content: flex-end;
+		text-align: right;
+	}
+	.th {
+		display: flex;
+		align-items: center;
+		height: 2.25rem;
+		padding: 0 var(--space-3);
+		color: var(--text-2);
+		font-size: var(--text-xs);
+		font-weight: 650;
+		letter-spacing: 0.02em;
+	}
+	/* A tree's path column: the last segment, indented by depth. */
+	td.tree {
+		padding-left: calc(var(--space-3) + var(--depth, 0) * 1.25rem);
+		white-space: nowrap;
+	}
+	td.tree .open {
+		font-family: var(--font-mono);
+		font-size: var(--text-sm);
+		font-weight: 500;
+		color: var(--text);
+	}
+	td.tree .open:hover {
+		color: var(--accent);
+	}
+	tr.rollup td.tree .open,
+	tr.rollup td.quantity {
+		font-weight: 650;
+	}
+	/* The root's own values after its parts (empty mass, payload, take-off mass). */
+	tr.own td {
+		background: color-mix(in oklab, var(--surface-2) 55%, var(--surface));
+	}
+	tr.own td.tree .open {
+		color: var(--text-2);
+		font-style: italic;
+	}
+	tr.first-own td {
+		border-top: 1px solid var(--border-strong);
+	}
+	tr.checks {
+		cursor: pointer;
+	}
+	.none {
+		display: inline-flex;
+		align-items: center;
+		gap: 3px;
+		color: var(--text-3);
+		cursor: help;
+	}
+	.sum {
+		display: inline-flex;
+		align-items: baseline;
+		gap: 0.3em;
+		cursor: help;
+	}
+	.sum > [aria-hidden='true'] {
+		color: var(--text-3);
+		font-weight: 500;
+	}
+	.share {
+		display: inline-flex;
+		align-items: center;
+		justify-content: flex-end;
+		gap: var(--space-2);
+	}
+	.share .bar {
+		width: 2.5rem;
+		height: 0.3rem;
+		border-radius: var(--radius-pill);
+		background: var(--surface-2);
+		overflow: hidden;
+	}
+	.share .bar span {
+		display: block;
+		height: 100%;
+		border-radius: inherit;
+		background: color-mix(in oklab, var(--accent) 70%, var(--surface));
 	}
 	td :global(.yes) {
 		color: var(--ok);
@@ -1021,6 +1269,13 @@
 	.chip.bad {
 		background: color-mix(in oklab, var(--danger) 16%, var(--surface));
 		color: var(--text);
+	}
+	code.inline {
+		padding: 0 3px;
+		border-radius: 4px;
+		background: var(--surface-2);
+		font-family: var(--font-mono);
+		font-size: 0.92em;
 	}
 	.ref {
 		display: inline-block;
@@ -1168,8 +1423,41 @@
 		.pair.long dd {
 			color: var(--text-2);
 		}
-		.pair.number dd {
+		.pair.number dd,
+		.pair.quantity dd,
+		.pair.percent dd {
 			font-variant-numeric: tabular-nums;
+		}
+		.budget-line {
+			display: flex;
+			flex-wrap: wrap;
+			align-items: baseline;
+			gap: 2px var(--space-2);
+			margin: 0 0 var(--space-1);
+			font-variant-numeric: tabular-nums;
+		}
+		.budget-line strong {
+			font-size: var(--text-lg);
+			font-weight: 650;
+		}
+		.budget-line .times,
+		.budget-line .of {
+			color: var(--text-2);
+		}
+		.budget-line .card-note {
+			flex-basis: 100%;
+		}
+		.card-note {
+			display: block;
+			margin-top: 2px;
+			color: var(--text-3);
+			font-size: var(--text-xs);
+		}
+		.verdict-title {
+			align-items: center;
+		}
+		.verdict-title .open {
+			font-family: inherit;
 		}
 		.pair .cell {
 			min-height: 2.25rem;

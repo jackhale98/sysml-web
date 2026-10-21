@@ -63,7 +63,9 @@ package Reporting {
      *                           satisfied, violated or undecided; id,
      *                           requirement, by, constraint, values,
      *                           limit, margin, detail; checkable = 0 for a
-     *                           requirement stated in words only)
+     *                           requirement stated in words only). The
+     *                           "requirements" rows have the worst verdict
+     *                           of their claims as `check`.
      *   "uncertainty"           evaluated uncertainty analyses (case,
      *                           critical, target limits, worst-case
      *                           range, margin, cp, cpk, result)

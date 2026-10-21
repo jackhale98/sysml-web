@@ -426,6 +426,17 @@ function requirementRows(ctx: ViewContext): Row[] {
 		for (const s of ctx.supers(typeId)) classifiers.add(s);
 	}
 
+	// The verdict of the claims that satisfy each requirement (the worst of them).
+	const verdicts = new Map<string, string>();
+	const rank = ['satisfied', 'undecided', 'violated'];
+	for (const check of ctx.evaluation?.checks().checks ?? []) {
+		const id = check.requirement?.elementId;
+		if (!id || !check.checkable) continue;
+		const current = verdicts.get(id);
+		if (!current || rank.indexOf(check.status) > rank.indexOf(current))
+			verdicts.set(id, check.status);
+	}
+
 	const rows: Row[] = [];
 	for (const r of contentRecords(ctx)) {
 		const usage = isRequirementUsage(r);
@@ -462,6 +473,7 @@ function requirementRows(ctx: ViewContext): Row[] {
 				['issues', issues.join('; ')],
 				['satisfiedBy', sat.join(', ')],
 				['verifiedBy', ver.join(', ')],
+				['check', verdicts.get(r.id) ?? ''],
 				['satisfied', sat.length || satisfied.has(r.id) ? '1' : '0'],
 				['verified', ver.length || verified.has(r.id) ? '1' : '0'],
 				['file', r.path],

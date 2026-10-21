@@ -97,6 +97,7 @@ export class ColumnEdits {
 				case 'verifiedBy':
 				case 'satisfied':
 				case 'verified':
+				case 'check':
 				case 'file':
 				case 'line':
 					return null;

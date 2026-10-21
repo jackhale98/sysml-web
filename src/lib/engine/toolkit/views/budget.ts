@@ -41,6 +41,7 @@ export function fieldKinds(spec: string): Record<string, ColumnKind> {
 			check: 'check'
 		};
 	if (spec === 'checks') return { status: 'check', limit: 'quantity', margin: 'quantity' };
+	if (spec === 'requirements' || spec === 'trace') return { check: 'check' };
 	return {};
 }
 

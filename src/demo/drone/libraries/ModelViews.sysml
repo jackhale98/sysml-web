@@ -27,10 +27,10 @@ library package ModelViews {
     private import Reporting::*;
 
     view def RequirementsTable {
-        doc /* Every requirement with its ID, statement, classification, status and trace links. */
+        doc /* Every requirement with its ID, statement, classification, status, trace links and whether the design meets it. */
         @TableRendering {
             rows = "requirements";
-            columns = "id; title; text; kind; priority; verificationMethod; status; owner; satisfiedBy; verifiedBy";
+            columns = "id; title; text; kind; priority; verificationMethod; status; owner; satisfiedBy; check; verifiedBy";
             sortBy = "id";
         }
     }
@@ -108,7 +108,7 @@ library package ModelViews {
          */
         @TableRendering {
             rows = "checks";
-            columns = "status; id; requirement; by; values; margin; detail";
+            columns = "status; id; requirement; by; margin; detail";
             where = "checkable == 1";
             sortBy = "-status";
         }

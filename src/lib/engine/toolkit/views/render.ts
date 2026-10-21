@@ -52,6 +52,7 @@ const REQUIREMENT_FIELDS = [
 	'issues',
 	'satisfiedBy',
 	'verifiedBy',
+	'check',
 	'satisfied',
 	'verified',
 	'file',

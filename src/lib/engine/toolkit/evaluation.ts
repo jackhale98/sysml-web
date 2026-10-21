@@ -25,7 +25,7 @@
  *
  * Everything is cached per analysis (one `Evaluation` per built session).
  */
-import { convert, parseLiteral, readable, type Quantity } from '../quantity';
+import { convert, formatQuantity, parseLiteral, readable, type Quantity } from '../quantity';
 import type { Check, CheckReport, CheckStatus, CheckValue, Evaluated, Span } from '../types';
 import type { TkElement, TkLibrary, TkSession, TkSite, Toolkit } from './api';
 import { multiplicityOf, type ElementRecord, type ExtractedModel, type UnitInfo } from './model';
@@ -629,12 +629,15 @@ function explain(check: Check, vacuous: boolean): string {
 	const known = check.values.filter((v) => v.value.kind === 'number' || v.value.kind === 'text');
 	const unknown = check.values.filter((v) => v.value.kind === 'undecided');
 	const valueText = known.map((v) => `${v.feature} = ${show(v.value)}`).join(', ');
+	const needs = check.limit
+		? ` (needs ${SYMBOL[check.limit.operator] ?? check.limit.operator} ${formatQuantity(check.limit)})`
+		: '';
 	switch (check.status) {
 		case 'satisfied':
 			if (vacuous) return 'Met only because an assumption of the requirement does not hold.';
-			return valueText ? `Met: ${valueText}.` : 'Met.';
+			return valueText ? `Met: ${valueText}${needs}.` : 'Met.';
 		case 'violated':
-			return valueText ? `Not met: ${valueText}.` : 'Not met.';
+			return valueText ? `Not met: ${valueText}${needs}.` : 'Not met.';
 		case 'undecided': {
 			const unresolved = /unresolved reference `([^`]+)`/.exec(check.detail);
 			if (unresolved)
@@ -651,12 +654,11 @@ function explain(check: Check, vacuous: boolean): string {
 	}
 }
 
+const SYMBOL: Record<string, string> = { '<=': '≤', '>=': '≥', '<': '<', '>': '>', '==': '=' };
+
 function show(value: Evaluated): string {
-	if (value.kind === 'number') {
-		const q = readable({ value: value.value, unit: value.unit });
-		const rounded = Number(q.value.toPrecision(4));
-		return q.unit ? `${rounded} ${q.unit.replace(/\*/g, '·')}` : String(rounded);
-	}
+	if (value.kind === 'number')
+		return formatQuantity(readable({ value: value.value, unit: value.unit }));
 	return value.kind === 'text' ? value.text : '?';
 }
 

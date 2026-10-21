@@ -647,7 +647,7 @@ describe('the demo’s tables', () => {
 
 	it('requirements: the same rows, cells, sources and editing', () => {
 		const t = table('ModelViews::RequirementsTable');
-		expect(shape(t)).toEqual([20, 10]);
+		expect(shape(t)).toEqual([20, 11]);
 		expect(col(t, 'id').slice(0, 4)).toEqual(['RC-001', 'RC-002', 'RC-003', 'STK-001']);
 		expect(record(t, 9)).toEqual({
 			id: 'SYS-001',
@@ -659,6 +659,8 @@ describe('the demo’s tables', () => {
 			status: 'done',
 			owner: 'J. Hale',
 			satisfiedBy: 'drone',
+			// The verdict of the claims that satisfy it (`drone.endurance >= 25 [min]`).
+			check: 'satisfied',
 			verifiedBy: 'enduranceFlightTest'
 		});
 		expect(record(t, 0)).toMatchObject({
@@ -679,6 +681,7 @@ describe('the demo’s tables', () => {
 			'feature:verificationMethod',
 			'metadata:StatusInfo.status',
 			'metadata:StatusInfo.owner',
+			null,
 			null,
 			null
 		]);
@@ -862,7 +865,7 @@ describe('the demo’s tables', () => {
 
 	it('report chapters render from the library’s subviews', () => {
 		expect(shape(table('ModelViews::SpecificationDocument::requirementsChapter'))).toEqual([
-			20, 10
+			20, 11
 		]);
 		expect(shape(table('ModelViews::InterfaceControlDocument::connectionsChapter'))).toEqual([
 			11, 2

@@ -58,7 +58,7 @@ describe('the demo’s checks', () => {
 				id: 'SYS-001'
 			},
 			limit: { feature: 'drone.endurance', operator: '>=', value: 25, unit: 'min' },
-			explanation: 'Met: drone.endurance = 27.54 min.'
+			explanation: 'Met: drone.endurance = 27.54 min (needs ≥ 25 min).'
 		});
 		// 216 W·h × 0.85 / 400 W = 0.459 h.
 		expect(endurance.values).toEqual([
@@ -95,7 +95,7 @@ describe('the demo’s checks', () => {
 		const endurance = byId(host.checks(edited).checks, 'SYS-001');
 		expect(endurance.status).toBe('violated');
 		expect(endurance.margin!.value).toBeCloseTo(-0.52);
-		expect(endurance.explanation).toMatch(/^Not met: drone\.endurance = 24\.48 min\.$/);
+		expect(endurance.explanation).toBe('Not met: drone.endurance = 24.48 min (needs ≥ 25 min).');
 		host.analyzeProject(files);
 		expect(byId(host.checks(files).checks, 'SYS-001').status).toBe('satisfied');
 	});
@@ -208,7 +208,7 @@ describe('checks on small models', () => {
 			margin: { value: -0.5, unit: 'kg', ratio: -1 }
 		});
 		expect(text.slice(check!.span.from, check!.span.to)).toBe('x <= 0.5 [kg]');
-		expect(check!.explanation).toBe('Not met: x = 1 kg.');
+		expect(check!.explanation).toBe('Not met: x = 1 kg (needs ≤ 0.5 kg).');
 	});
 
 	it('blanks metadata without moving anything', () => {
@@ -323,9 +323,8 @@ describe('the budget and checks tables', () => {
 			'SYS-001',
 			'Flight endurance',
 			'drone',
-			'drone.endurance = 27.54 min',
 			'2.54 min (10 %)',
-			'Met: drone.endurance = 27.54 min.'
+			'Met: drone.endurance = 27.54 min (needs ≥ 25 min).'
 		]);
 		expect(table.sources[1]).toMatchObject({ file: 'system/Satisfaction.sysml', line: 12 });
 		expect(typeof table.sources[1]!.byte).toBe('number');
