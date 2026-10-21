@@ -1,0 +1,219 @@
+{
+	"sessionBuildMs": 109.5,
+	"check": {
+		"ms": 122.9,
+		"count": 2,
+		"sample": {
+			"col": 50,
+			"endCol": 61,
+			"endLine": 29,
+			"line": 29,
+			"message": "unresolved reference `takeOffMass`",
+			"severity": "warning",
+			"stage": "referential",
+			"unit": "analysis/Performance.sysml"
+		}
+	},
+	"compactJson": {
+		"ms": 23.8,
+		"size": "1947 KiB",
+		"elements": 5022,
+		"hasSpans": false
+	},
+	"fullJson": {
+		"ms": 1937.9,
+		"size": "17233 KiB"
+	},
+	"outlinePlusRows": {
+		"ms": 5.9,
+		"size": "273 KiB",
+		"namedElements": 560,
+		"fields": [
+			"metaclass",
+			"qualifiedName",
+			"shortName",
+			"owner",
+			"declarationSite",
+			"memberExtent",
+			"valueSource",
+			"docs"
+		]
+	},
+	"rowsAllElements": {
+		"ms": 5.6,
+		"size": "364 KiB",
+		"elements": 1365,
+		"sample": {
+			"declarationSite": {
+				"end": 512,
+				"start": 495,
+				"unit": 106
+			},
+			"docs": [
+				"The operator needs to deliver parcels of up to 1 kg to recipients\nwithin 3 km of the depot, and get the drone back after each delivery."
+			],
+			"memberExtent": {
+				"end": 1011,
+				"start": 471,
+				"unit": 106
+			},
+			"metaclass": "RequirementUsage",
+			"owner": "54ba513d-56fd-5dfc-bde7-c56e56ee5519",
+			"qualifiedName": "StakeholderNeeds::'Parcel delivery'",
+			"shortName": "STK-001",
+			"valueSource": null
+		}
+	},
+	"treeGraph": {
+		"ms": 19.4,
+		"size": "317 KiB",
+		"nodes": 605
+	},
+	"referencesAllNamed": {
+		"ms": 12.3,
+		"elements": 560,
+		"references": 840,
+		"sample": {
+			"declaration": {
+				"col": 14,
+				"endCol": 21,
+				"endLine": 28,
+				"line": 28,
+				"site": "name",
+				"unit": "system/Components.sysml"
+			},
+			"references": [
+				{
+					"col": 24,
+					"endCol": 31,
+					"endLine": 36,
+					"kind": "type",
+					"line": 36,
+					"owner": {
+						"id": "268886b3-c3f5-50dc-8553-4ff4b5ba91bb",
+						"qualifiedName": "DroneArchitecture::drone::battery"
+					},
+					"unit": "system/DroneArchitecture.sysml"
+				}
+			]
+		}
+	},
+	"units": [
+		{
+			"unit": 96,
+			"name": "analysis/Performance.sysml"
+		},
+		{
+			"unit": 97,
+			"name": "behaviour/Allocation.sysml"
+		}
+	],
+	"offsets": {
+		"textUtf16IndexOfNope": 61,
+		"textByteIndexOfNope": 67,
+		"sessionCheckFinding": [
+			{
+				"col": 68,
+				"line": 1,
+				"message": "unresolved reference `Nope`"
+			}
+		],
+		"declarationSite": "{\"end\":64,\"start\":63,\"unit\":96}",
+		"references": [
+			{
+				"col": 42,
+				"endCol": 51
+			}
+		],
+		"utf16ColOfRef": 42
+	},
+	"brokenFile": {
+		"sessionThrows": "system/Components.sysml does not parse: missing `;` at end of declaration",
+		"checkSyntax": [
+			{
+				"col": 34,
+				"endCol": 34,
+				"endLine": 35,
+				"line": 35,
+				"message": "missing `;` at end of declaration",
+				"severity": "error",
+				"stage": "parse",
+				"unit": "system/Components.sysml"
+			}
+		],
+		"dropped": [
+			{
+				"unit": "system/Components.sysml",
+				"line": 35,
+				"col": 9,
+				"text": "port powerOut : PowerPort",
+				"message": "missing `;` at end of declaration"
+			}
+		],
+		"afterLenient": [
+			"warning analysis/Performance.sysml:29:50 unresolved reference `takeOffMass`",
+			"warning analysis/Performance.sysml:40:46 unresolved reference `endurance`",
+			"warning system/DroneArchitecture.sysml:46:62 unresolved reference `powerOut`"
+		]
+	},
+	"lsp": {
+		"initMs": 18.4,
+		"didOpenMs": 1.4,
+		"publishDiagnostics": [
+			{
+				"uri": "file:///demo/system/DroneArchitecture.sysml",
+				"count": 0
+			}
+		],
+		"textDocument/hover": {
+			"firstMs": 27.9,
+			"againMs": 0.8,
+			"result": "{\"contents\":{\"kind\":\"markdown\",\"value\":\"**DroneComponents::Battery**  \\n`PartDefinition`\\n\\n---\\nSix-cell lithium-ion pack with a built-in battery management system.\"},\"range\":{\"end\":{\"character\":30,\"line\":35},\"start\":{\""
+		},
+		"textDocument/definition": {
+			"firstMs": 0.3,
+			"againMs": 0.1,
+			"result": "{\"range\":{\"end\":{\"character\":20,\"line\":27},\"start\":{\"character\":13,\"line\":27}},\"uri\":\"file:///demo/system/Components.sysml\"}"
+		},
+		"textDocument/references": {
+			"firstMs": 0.2,
+			"againMs": 0.1,
+			"result": "[{\"range\":{\"end\":{\"character\":20,\"line\":27},\"start\":{\"character\":13,\"line\":27}},\"uri\":\"file:///demo/system/Components.sysml\"},{\"range\":{\"end\":{\"character\":30,\"line\":35},\"start\":{\"character\":23,\"line\":35}},\"uri\":\"file:///"
+		},
+		"completion": {
+			"ms": 39,
+			"items": 321,
+			"first": [
+				"DroneArchitecture",
+				"DeliveryDrone",
+				"DronePerformance",
+				"FunctionAllocation",
+				"DeliveryMission",
+				"FlightControl",
+				"LinkLost",
+				"FaultDetected"
+			]
+		},
+		"brokenDiagnostics": [
+			{
+				"severity": 1,
+				"range": {
+					"end": {
+						"character": 33,
+						"line": 34
+					},
+					"start": {
+						"character": 33,
+						"line": 34
+					}
+				},
+				"message": "missing `;` at end of declaration",
+				"source": "sysmlv2"
+			}
+		],
+		"semanticTokens": {
+			"ms": 1.9,
+			"tokens": 224
+		}
+	}
+}

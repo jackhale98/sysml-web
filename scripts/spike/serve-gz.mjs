@@ -91,4 +91,6 @@ http
 		sent[key].bytes += req.method === 'HEAD' ? 0 : body.length;
 		res.end(req.method === 'HEAD' ? undefined : body);
 	})
-	.listen(port, () => console.log(`serving ${root} on http://localhost:${port} (GitHub-Pages-like gzip)`));
+	.listen(port, () =>
+		console.log(`serving ${root} on http://localhost:${port} (GitHub-Pages-like gzip)`)
+	);

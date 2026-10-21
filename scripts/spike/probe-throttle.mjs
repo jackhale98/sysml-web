@@ -9,7 +9,10 @@ import { chromePath, PHONE, SLOW_4G } from './profiles.mjs';
 
 const base = process.argv[2] ?? 'http://localhost:4575';
 const port = 9420 + Math.floor(Math.random() * 50);
-const browser = await chromium.launch({ executablePath: chromePath(), args: [`--remote-debugging-port=${port}`, '--no-sandbox'] });
+const browser = await chromium.launch({
+	executablePath: chromePath(),
+	args: [`--remote-debugging-port=${port}`, '--no-sandbox']
+});
 const cdp = await Cdp.connect(port);
 for (const mode of ['none', 'page', 'page+worker']) {
 	const context = await browser.newContext({ ...PHONE, serviceWorkers: 'block' });
@@ -35,7 +38,8 @@ for (const mode of ['none', 'page', 'page+worker']) {
 	await page.waitForFunction(() => window.__toolkitStats?.done, null, { timeout: 600000 });
 	const stats = await page.evaluate(() => window.__toolkitStats);
 	const spins = [];
-	for (let i = 0; i < 3; i++) spins.push((await page.evaluate(() => window.__toolkit.call('spin'))).ms);
+	for (let i = 0; i < 3; i++)
+		spins.push((await page.evaluate(() => window.__toolkit.call('spin'))).ms);
 	const mainSpin = await page.evaluate(() => {
 		const s = performance.now();
 		let x = 0;

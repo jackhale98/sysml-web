@@ -38,14 +38,18 @@ const { values: opt } = parseArgs({
 const ROOT = path.resolve(import.meta.dirname, '../..');
 const phone = opt.profile === 'phone';
 const throttleBin = process.env.CPU_THROTTLE_BIN;
-if (phone && !throttleBin) throw new Error('set CPU_THROTTLE_BIN (gcc -O2 -o cpu-throttle scripts/spike/cpu-throttle.c)');
+if (phone && !throttleBin)
+	throw new Error('set CPU_THROTTLE_BIN (gcc -O2 -o cpu-throttle scripts/spike/cpu-throttle.c)');
 
 const query =
 	opt.target === 'app' ? '' : `?toolkit=${opt.target}${opt.wasm === 'plain' ? '&wasm=plain' : ''}`;
 const url = `${opt.base}/p/demo${query}`;
 const COMPONENTS = 'system/Components.sysml';
 const componentsText = fs.readFileSync(path.join(ROOT, 'src/demo/drone', COMPONENTS), 'utf8');
-const archText = fs.readFileSync(path.join(ROOT, 'src/demo/drone/system/DroneArchitecture.sysml'), 'utf8');
+const archText = fs.readFileSync(
+	path.join(ROOT, 'src/demo/drone/system/DroneArchitecture.sysml'),
+	'utf8'
+);
 
 /** Edits of one file, by size. */
 function edited(size, i) {
@@ -100,7 +104,8 @@ async function runOnce(run) {
 		window.__longTasks = [];
 		try {
 			new PerformanceObserver((l) => {
-				for (const e of l.getEntries()) window.__longTasks.push({ start: Math.round(e.startTime), ms: Math.round(e.duration) });
+				for (const e of l.getEntries())
+					window.__longTasks.push({ start: Math.round(e.startTime), ms: Math.round(e.duration) });
 			}).observe({ type: 'longtask', buffered: true });
 		} catch {}
 	});
@@ -110,33 +115,58 @@ async function runOnce(run) {
 	if (phone) await session.send('Network.emulateNetworkConditions', SLOW_4G);
 	await session.send('Performance.enable');
 	const { targetInfo } = await session.send('Target.getTargetInfo');
-	const { sessionId: pageSession } = await cdp.send('Target.attachToTarget', { targetId: targetInfo.targetId, flatten: true });
+	const { sessionId: pageSession } = await cdp.send('Target.attachToTarget', {
+		targetId: targetInfo.targetId,
+		flatten: true
+	});
 	const workers = new Map();
 	cdp.on((m) => {
 		if (m.method === 'Target.attachedToTarget' && m.params.targetInfo.type === 'worker')
 			workers.set(m.params.targetInfo.url, m.params.sessionId);
 	});
-	await cdp.send('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: false, flatten: true }, pageSession);
+	await cdp.send(
+		'Target.setAutoAttach',
+		{ autoAttach: true, waitForDebuggerOnStart: false, flatten: true },
+		pageSession
+	);
 	// Bytes over the wire per URL, from the network domain (includes worker fetches).
 	const wire = new Map();
 	const urls = new Map();
-	session.on('Network.responseReceived', (e) => urls.set(e.requestId, { url: e.response.url, fromSW: e.response.fromServiceWorker, fromCache: e.response.fromDiskCache }));
+	session.on('Network.responseReceived', (e) =>
+		urls.set(e.requestId, {
+			url: e.response.url,
+			fromSW: e.response.fromServiceWorker,
+			fromCache: e.response.fromDiskCache
+		})
+	);
 	session.on('Network.loadingFinished', (e) => {
 		const u = urls.get(e.requestId);
-		if (u) wire.set(u.url, { bytes: e.encodedDataLength, fromSW: u.fromSW, fromCache: u.fromCache });
+		if (u)
+			wire.set(u.url, { bytes: e.encodedDataLength, fromSW: u.fromSW, fromCache: u.fromCache });
 	});
 
-	const isDone = opt.target === 'app' ? () => performance.getEntriesByName('sysml:workspace-ready').length > 0 : () => window.__toolkitStats?.done;
+	const isDone =
+		opt.target === 'app'
+			? () => performance.getEntriesByName('sysml:workspace-ready').length > 0
+			: () => window.__toolkitStats?.done;
 	if (opt.cache === 'warm') {
 		// Visit until the service worker controls the page and holds the engine files.
 		for (let visit = 0; visit < 4; visit++) {
 			await page.goto(url, { waitUntil: 'load' });
 			await page.waitForFunction(isDone, null, { timeout: 900000, polling: 500 });
-			await page.waitForFunction(() => navigator.serviceWorker?.controller, null, { timeout: 120000 });
+			await page.waitForFunction(() => navigator.serviceWorker?.controller, null, {
+				timeout: 120000
+			});
 			const cached = await page.evaluate(async (target) => {
 				const keys = [];
-				for (const name of await caches.keys()) if (name.includes('engine')) for (const r of await (await caches.open(name)).keys()) keys.push(new URL(r.url).pathname);
-				const want = target === 'app' || target === 'ours' ? ['/engine/sysml_wasm_bg.wasm'] : ['/toolkit/sysmlv2_bg.opt.wasm', '/toolkit/stdlib/sysml-library.json.gz'];
+				for (const name of await caches.keys())
+					if (name.includes('engine'))
+						for (const r of await (await caches.open(name)).keys())
+							keys.push(new URL(r.url).pathname);
+				const want =
+					target === 'app' || target === 'ours'
+						? ['/engine/sysml_wasm_bg.wasm']
+						: ['/toolkit/sysmlv2_bg.opt.wasm', '/toolkit/stdlib/sysml-library.json.gz'];
 				return want.every((w) => keys.includes(w));
 			}, opt.target);
 			if (cached && visit > 0) break;
@@ -149,11 +179,22 @@ async function runOnce(run) {
 	const t0 = Date.now();
 	await page.goto(url, { waitUntil: 'load' });
 	await page.waitForFunction(isDone, null, { timeout: 900000, polling: 250 });
-	const result = { run, target: opt.target, profile: opt.profile, cache: opt.cache, wasm: opt.wasm, load: os.loadavg().map((x) => +x.toFixed(2)), wallMs: Date.now() - t0 };
+	const result = {
+		run,
+		target: opt.target,
+		profile: opt.profile,
+		cache: opt.cache,
+		wasm: opt.wasm,
+		load: os.loadavg().map((x) => +x.toFixed(2)),
+		wallMs: Date.now() - t0
+	};
 
 	result.page = await page.evaluate(async () => {
 		const lcp = await new Promise((resolve) => {
-			new PerformanceObserver((l) => resolve(l.getEntries().at(-1)?.startTime)).observe({ type: 'largest-contentful-paint', buffered: true });
+			new PerformanceObserver((l) => resolve(l.getEntries().at(-1)?.startTime)).observe({
+				type: 'largest-contentful-paint',
+				buffered: true
+			});
 			setTimeout(() => resolve(null), 1000);
 		});
 		const fcp = performance.getEntriesByName('first-contentful-paint')[0]?.startTime;
@@ -172,15 +213,23 @@ async function runOnce(run) {
 		if (!sid) return null;
 		try {
 			const h = await cdp.send('Runtime.getHeapUsage', {}, sid);
-			return { usedMB: +(h.usedSize / 1048576).toFixed(1), totalMB: +(h.totalSize / 1048576).toFixed(1), backingStoreMB: +((h.backingStorageSize ?? 0) / 1048576).toFixed(1) };
+			return {
+				usedMB: +(h.usedSize / 1048576).toFixed(1),
+				totalMB: +(h.totalSize / 1048576).toFixed(1),
+				backingStoreMB: +((h.backingStorageSize ?? 0) / 1048576).toFixed(1)
+			};
 		} catch (e) {
 			return { error: e.message };
 		}
 	};
 	const memory = async (label) => {
-		const renderers = (await procs()).filter((p) => p.type === 'renderer').map((p) => ({ pid: p.id, ...procMem(p.id) }));
+		const renderers = (await procs())
+			.filter((p) => p.type === 'renderer')
+			.map((p) => ({ pid: p.id, ...procMem(p.id) }));
 		const main = renderers.sort((a, b) => (b.rss ?? 0) - (a.rss ?? 0))[0];
-		const metrics = Object.fromEntries((await session.send('Performance.getMetrics')).metrics.map((m) => [m.name, m.value]));
+		const metrics = Object.fromEntries(
+			(await session.send('Performance.getMetrics')).metrics.map((m) => [m.name, m.value])
+		);
 		return {
 			label,
 			benchWorkerHeap: await heapOf('bench.worker'),
@@ -198,9 +247,25 @@ async function runOnce(run) {
 		const tbt = (list) => list.reduce((s, t) => s + Math.max(0, t.ms - 50), 0);
 		const pre = lt.filter((t) => t.start < after);
 		const post = lt.filter((t) => t.start >= after);
-		result.longTasks = { beforeWorkspaceReady: { count: pre.length, blockingMs: tbt(pre), max: Math.max(0, ...pre.map((t) => t.ms)) }, afterWorkspaceReady: { count: post.length, blockingMs: tbt(post), max: Math.max(0, ...post.map((t) => t.ms)), list: post } };
+		result.longTasks = {
+			beforeWorkspaceReady: {
+				count: pre.length,
+				blockingMs: tbt(pre),
+				max: Math.max(0, ...pre.map((t) => t.ms))
+			},
+			afterWorkspaceReady: {
+				count: post.length,
+				blockingMs: tbt(post),
+				max: Math.max(0, ...post.map((t) => t.ms)),
+				list: post
+			}
+		};
 	}
-	result.served = await (await fetch(`${opt.base}/__stats`).catch(() => null))?.json().catch(() => null);
+	result.served = await (
+		await fetch(`${opt.base}/__stats`).catch(() => null)
+	)
+		?.json()
+		.catch(() => null);
 	if (opt.target !== 'app') {
 		const stats = await page.evaluate(() => window.__toolkitStats);
 		const origin = result.page.timeOrigin;
@@ -212,15 +277,32 @@ async function runOnce(run) {
 			workerScriptStart: rel(stats.boot?.scriptStart),
 			ready: rel(stats.ready),
 			timeToReadyMs: stats.timeToReadyMs,
-			steps: Object.fromEntries(Object.entries(stats.boot?.steps ?? {}).map(([k, v]) => [k, { ms: v.ms, start: rel(v.start), end: rel(v.end) }])),
+			steps: Object.fromEntries(
+				Object.entries(stats.boot?.steps ?? {}).map(([k, v]) => [
+					k,
+					{ ms: v.ms, start: rel(v.start), end: rel(v.end) }
+				])
+			),
 			memAfterInstantiate: stats.boot?.memAfterInstantiate,
 			memAfterLibrary: stats.boot?.memAfterLibrary,
 			firstAnalysis: stats.firstAnalysis,
 			extract: stats.extract,
-			resources: stats.boot?.resources.map((r) => ({ name: r.name, transferSize: r.transferSize, encoded: r.encodedBodySize, decoded: r.decodedBodySize, ms: Math.round(r.end - r.start) })),
+			resources: stats.boot?.resources.map((r) => ({
+				name: r.name,
+				transferSize: r.transferSize,
+				encoded: r.encodedBodySize,
+				decoded: r.decodedBodySize,
+				ms: Math.round(r.end - r.start)
+			})),
 			// Main-thread long tasks from the moment the workbench was ready until the engine was.
-			longTasksDuringSpike: stats.longTasks.filter((t) => t.start >= stats.workbenchReady && t.start <= (stats.ready ?? Infinity) + 2000).map((t) => ({ at: rel(t.start), ms: t.duration })),
-			longTasksBefore: stats.longTasks.filter((t) => t.start < stats.workbenchReady).map((t) => ({ at: rel(t.start), ms: t.duration }))
+			longTasksDuringSpike: stats.longTasks
+				.filter(
+					(t) => t.start >= stats.workbenchReady && t.start <= (stats.ready ?? Infinity) + 2000
+				)
+				.map((t) => ({ at: rel(t.start), ms: t.duration })),
+			longTasksBefore: stats.longTasks
+				.filter((t) => t.start < stats.workbenchReady)
+				.map((t) => ({ at: rel(t.start), ms: t.duration }))
 		};
 		if (opt.edits && !stats.error) {
 			const call = (op, args) => page.evaluate(([o, a]) => window.__toolkit.call(o, a), [op, args]);
@@ -232,7 +314,8 @@ async function runOnce(run) {
 					await call('edit', { path: COMPONENTS, text: componentsText });
 				}
 			const series = [];
-			for (let i = 0; i < 20; i++) series.push(await call('edit', { path: COMPONENTS, text: edited('small', i + 10) }));
+			for (let i = 0; i < 20; i++)
+				series.push(await call('edit', { path: COMPONENTS, text: edited('small', i + 10) }));
 			result.edits = {
 				small: edits.small.map((e) => e.ms),
 				medium: edits.medium.map((e) => e.ms),
@@ -244,7 +327,8 @@ async function runOnce(run) {
 			result.memory.push(await memory('after 50 edits'));
 			const offset = archText.indexOf(': Battery') + 3;
 			const nav = [];
-			for (let i = 0; i < 5; i++) nav.push(await call('navigate', { path: 'system/DroneArchitecture.sysml', offset }));
+			for (let i = 0; i < 5; i++)
+				nav.push(await call('navigate', { path: 'system/DroneArchitecture.sysml', offset }));
 			result.navigate = {
 				lspInitMs: nav[0].lspInitMs,
 				memAfterLspInit: nav[0].memAfterLspInit,
@@ -260,7 +344,11 @@ async function runOnce(run) {
 	} else {
 		result.memory[0].note = 'app only: our engine in the app worker';
 	}
-	result.wire = Object.fromEntries([...wire.entries()].filter(([u]) => /engine\/|toolkit\//.test(u)).map(([u, v]) => [u.replace(opt.base, ''), v]));
+	result.wire = Object.fromEntries(
+		[...wire.entries()]
+			.filter(([u]) => /engine\/|toolkit\//.test(u))
+			.map(([u, v]) => [u.replace(opt.base, ''), v])
+	);
 	result.wireTotal = [...wire.values()].reduce((s, v) => s + v.bytes, 0);
 	throttle?.kill('SIGTERM');
 	await sleep(100);
@@ -270,14 +358,27 @@ async function runOnce(run) {
 }
 
 const runs = Number(opt.runs);
-console.error(`[measure] ${url} profile=${opt.profile} cache=${opt.cache} runs=${runs} load=${os.loadavg().map((x) => x.toFixed(2))}`);
+console.error(
+	`[measure] ${url} profile=${opt.profile} cache=${opt.cache} runs=${runs} load=${os.loadavg().map((x) => x.toFixed(2))}`
+);
 for (let i = 0; i < runs; i++) {
 	try {
 		const r = await runOnce(i);
 		fs.appendFileSync(opt.out, JSON.stringify(r) + '\n');
-		console.error(`[measure] run ${i}: ttr=${r.spike?.timeToReadyMs ?? '-'} ms first=${r.spike?.firstAnalysis?.ms ?? '-'} wsReady=${r.page.workspaceReady} mem=${r.spike?.firstAnalysis?.mem ?? '-'}MB load=${r.load.join(',')} err=${r.spike?.error ?? ''}`);
+		console.error(
+			`[measure] run ${i}: ttr=${r.spike?.timeToReadyMs ?? '-'} ms first=${r.spike?.firstAnalysis?.ms ?? '-'} wsReady=${r.page.workspaceReady} mem=${r.spike?.firstAnalysis?.mem ?? '-'}MB load=${r.load.join(',')} err=${r.spike?.error ?? ''}`
+		);
 	} catch (e) {
 		console.error(`[measure] run ${i} failed:`, e);
-		fs.appendFileSync(opt.out, JSON.stringify({ run: i, target: opt.target, profile: opt.profile, cache: opt.cache, failed: String(e) }) + '\n');
+		fs.appendFileSync(
+			opt.out,
+			JSON.stringify({
+				run: i,
+				target: opt.target,
+				profile: opt.profile,
+				cache: opt.cache,
+				failed: String(e)
+			}) + '\n'
+		);
 	}
 }

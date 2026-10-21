@@ -5,7 +5,11 @@ import path from 'node:path';
 export function chromePath() {
 	if (process.env.PW_CHROMIUM_PATH) return process.env.PW_CHROMIUM_PATH;
 	const root = process.env.PLAYWRIGHT_BROWSERS_PATH ?? '/opt/pw-browsers';
-	for (const dir of fs.readdirSync(root).filter((d) => /^chromium-\d+$/.test(d)).sort().reverse())
+	for (const dir of fs
+		.readdirSync(root)
+		.filter((d) => /^chromium-\d+$/.test(d))
+		.sort()
+		.reverse())
 		for (const sub of ['chrome-linux', 'chrome-linux64']) {
 			const bin = path.join(root, dir, sub, 'chrome');
 			if (fs.existsSync(bin)) return bin;

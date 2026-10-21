@@ -228,7 +228,9 @@ function analyse(kind: 'first' | 'again'): Record<string, unknown> {
 					: toolkit.Session.fromSourcesWithPreparedLibrary(src, lib);
 			} catch (error) {
 				const t = abs();
-				src = JSON.stringify((JSON.parse(toolkit.lenientSources(src)) as { sources: unknown }).sources);
+				src = JSON.stringify(
+					(JSON.parse(toolkit.lenientSources(src)) as { sources: unknown }).sources
+				);
 				lenientMs = Math.round(abs() - t);
 				void error;
 				return toolkit.Session.fromSourcesWithPreparedLibrary(src, lib);

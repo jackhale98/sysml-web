@@ -6,7 +6,7 @@
  * them). `window.__toolkit.call(op, …)` drives further steps (edits, hover)
  * from Playwright. Without the flag nothing here runs.
  *
- *   ?toolkit                  the toolkit, default library variant
+ *   ?toolkit                  the toolkit, default library variant (none: no snapshot)
  *   ?toolkit=<variant>        libcache | none | prepared | prepared-stream | subset
  *   ?toolkit=ours             our engine, in a second worker, measured the same way
  *   &wasm=plain               the toolkit's wasm before wasm-opt
@@ -15,7 +15,8 @@
 import { asset } from '$app/paths';
 
 export type Variant = 'libcache' | 'none' | 'prepared' | 'prepared-stream' | 'subset' | 'embedded';
-export const DEFAULT_VARIANT: Variant = 'libcache';
+// Measured best general option on a phone, cold: no snapshot (2 MB less to download).
+export const DEFAULT_VARIANT: Variant = 'none';
 
 export interface FileText {
 	path: string;

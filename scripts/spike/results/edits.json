@@ -1,0 +1,461 @@
+[
+	{
+		"label": "set usage type",
+		"how": "setFeatureType",
+		"ok": false,
+		"ops": [
+			{
+				"op": "setFeatureType",
+				"target": "DroneArchitecture::drone::gnss",
+				"type": "DroneComponents::Camera"
+			}
+		],
+		"error": "edit refused: 3 references would break: `navigation` at system/DroneArchitecture.sysml:56:39 (bytes 2466..2476) would no longer resolve (expected target: `DroneComponents::GnssReceiver::navigation`); `fix` at system/DroneArchitecture.sysml:56:50 (bytes 2477..2480) would no longer resolve (expected t"
+	},
+	{
+		"label": "set multiplicity [4] -> [6]",
+		"how": "memberSource + replaceMember",
+		"ok": true,
+		"ms": 35.8,
+		"ops": [
+			{
+				"op": "replaceMember",
+				"target": "DroneArchitecture::drone::rotors",
+				"text": "part rotors : Rotor[6];"
+			}
+		],
+		"splices": [
+			{
+				"unit": "system/DroneArchitecture.sysml",
+				"replaced": "part rotors : Rotor[4];",
+				"with": "part rotors : Rotor[6];"
+			}
+		],
+		"findingsAfter": 2,
+		"editFindings": []
+	},
+	{
+		"label": "set direction (port feature in -> inout)",
+		"how": "memberSource + replaceMember",
+		"ok": true,
+		"ms": 44.3,
+		"ops": [
+			{
+				"op": "replaceMember",
+				"target": "@f0852f9c-765d-5277-8781-e23e393cf1d1",
+				"text": "inout item power : ElectricPower;"
+			}
+		],
+		"splices": [
+			{
+				"unit": "interfaces/DroneInterfaces.sysml",
+				"replaced": "out item power : ElectricPower;",
+				"with": "inout item power : ElectricPower;"
+			}
+		],
+		"findingsAfter": 2,
+		"editFindings": []
+	},
+	{
+		"label": "set value",
+		"how": "setFeatureValue",
+		"ok": true,
+		"ms": 29.3,
+		"ops": [
+			{
+				"op": "setFeatureValue",
+				"target": "DroneComponents::Battery::mass",
+				"expr": "1150 [g]"
+			}
+		],
+		"splices": [
+			{
+				"unit": "system/Components.sysml",
+				"replaced": "1100 [g]",
+				"with": "1150 [g]"
+			}
+		],
+		"findingsAfter": 2,
+		"editFindings": []
+	},
+	{
+		"label": "remove value",
+		"how": "removeFeatureValue",
+		"ok": true,
+		"ms": 38.9,
+		"ops": [
+			{
+				"op": "removeFeatureValue",
+				"target": "DroneComponents::Battery::mass"
+			}
+		],
+		"splices": [
+			{
+				"unit": "system/Components.sysml",
+				"replaced": " = 1100 [g]",
+				"with": ""
+			}
+		],
+		"findingsAfter": 2,
+		"editFindings": []
+	},
+	{
+		"label": "set short name (ID) SYS-001 -> SYS-101",
+		"how": "memberSource + replaceMember",
+		"ok": true,
+		"ms": 32,
+		"ops": [
+			{
+				"op": "replaceMember",
+				"target": "SystemRequirements::'Flight endurance'",
+				"text": "requirement <'SYS-101'> 'Flight endurance' : DroneRequirement {\n        doc /* The drone shall fly for at least 25 minutes with a 1 kg payload in still air\n             * before it reaches its landing reserve. */\n        :>> kind = RequirementKind::performance;\n        :>> priority = Priority::high;\n        :>> verificationMethod = (VerificationMethod::'analysis', VerificationMethod::test);\n        @StatusInfo { status = StatusKind::done; owner = \"J. Hale\"; }\n        @Rationale { text = \"A 3 km delivery and return takes about 10 minutes; the rest covers hover at the drop point, headwind and battery ageing.\"; }\n        require constraint { drone.endurance >= 25 [min] }\n    }"
+			}
+		],
+		"splices": [
+			{
+				"unit": "requirements/SystemRequirements.sysml",
+				"replaced": "requirement <'SYS-001'> 'Flight endurance' : DroneRequirement {\n        doc /* The drone shall fly for at least 25 minutes with a 1 kg payload in still air\n             * before it reaches its landing reserve. */\n        :>> kind = RequirementKind::performance;\n        :>> priority = Priority::high;\n        :>> verificationMethod = (VerificationMethod::'analysis', VerificationMethod::test);\n        @StatusInfo { status = StatusKind::done; owner = \"J. Hale\"; }\n        @Rationale { text = \"A 3 km delivery and return takes about 10 minutes; the rest covers hover at the drop point, headwind and battery ageing.\"; }\n        require constraint { drone.endurance >= 25 [min] }\n    }",
+				"with": "requirement <'SYS-101'> 'Flight endurance' : DroneRequirement {\n            doc /* The drone shall fly for at least 25 minutes with a 1 kg payload in still air\n                 * before it reaches its landing reserve. */\n            :>> kind = RequirementKind::performance;\n            :>> priority = Priority::high;\n            :>> verificationMethod = (VerificationMethod::'analysis', VerificationMethod::test);\n            @StatusInfo { status = StatusKind::done; owner = \"J. Hale\"; }\n            @Rationale { text = \"A 3 km delivery and return takes about 10 minutes; the rest covers hover at the drop point, headwind and battery ageing.\"; }\n            require constraint { drone.endurance >= 25 [min] }\n        }"
+			}
+		],
+		"findingsAfter": 2,
+		"editFindings": []
+	},
+	{
+		"label": "set doc",
+		"how": "setCommentBody on the Documentation element",
+		"ok": true,
+		"ms": 30.4,
+		"ops": [
+			{
+				"op": "setCommentBody",
+				"target": "@137a2e3f-4f74-5314-a917-0181ae84f79f",
+				"body": "A new description."
+			}
+		],
+		"splices": [
+			{
+				"unit": "system/Components.sysml",
+				"replaced": "/* Six-cell lithium-ion pack with a built-in battery management system. */",
+				"with": "/* A new description. */"
+			}
+		],
+		"findingsAfter": 2,
+		"editFindings": []
+	},
+	{
+		"label": "add specialization + abstract on a definition",
+		"how": "memberSource + replaceMember (whole definition)",
+		"ok": true,
+		"ms": 39.6,
+		"ops": [
+			{
+				"op": "replaceMember",
+				"target": "DroneComponents::Camera",
+				"text": "abstract part def Camera :> Component, Payload {\n        doc /* Downward-looking camera used to check that the drop zone is clear. */\n        attribute :>> mass = 60 [g];\n        port imageOut : ImagePort;\n    }"
+			}
+		],
+		"splices": [
+			{
+				"unit": "system/Components.sysml",
+				"replaced": "part def Camera :> Component {\n        doc /* Downward-looking camera used to check that the drop zone is clear. */\n        attribute :>> mass = 60 [g];\n        port imageOut : ImagePort;\n    }",
+				"with": "abstract part def Camera :> Component, Payload {\n            doc /* Downward-looking camera used to check that the drop zone is clear. */\n            attribute :>> mass = 60 [g];\n            port imageOut : ImagePort;\n        }"
+			}
+		],
+		"findingsAfter": 3,
+		"editFindings": ["unresolved references: 8 -> 9"]
+	},
+	{
+		"label": "insert member into a definition",
+		"how": "insertMember",
+		"ok": true,
+		"ms": 38.2,
+		"ops": [
+			{
+				"op": "insertMember",
+				"owner": "DroneComponents::Battery",
+				"text": "attribute cellCount : ScalarValues::Integer = 6;"
+			}
+		],
+		"splices": [
+			{
+				"unit": "system/Components.sysml",
+				"replaced": "",
+				"with": "        attribute cellCount : ScalarValues::Integer = 6;\n"
+			}
+		],
+		"findingsAfter": 2,
+		"editFindings": []
+	},
+	{
+		"label": "insert member into a package",
+		"how": "insertMember",
+		"ok": true,
+		"ms": 37.3,
+		"ops": [
+			{
+				"op": "insertMember",
+				"owner": "DroneComponents",
+				"text": "part def Parachute :> Component;"
+			}
+		],
+		"splices": [
+			{
+				"unit": "system/Components.sysml",
+				"replaced": "",
+				"with": "    part def Parachute :> Component;\n"
+			}
+		],
+		"findingsAfter": 2,
+		"editFindings": []
+	},
+	{
+		"label": "remove element",
+		"how": "remove",
+		"ok": false,
+		"ops": [
+			{
+				"op": "remove",
+				"target": "DroneArchitecture::drone::camera"
+			}
+		],
+		"error": "removing `DroneArchitecture::drone::camera` breaks 3 reference(s)"
+	},
+	{
+		"label": "rename across files",
+		"how": "rename",
+		"ok": true,
+		"ms": 36.1,
+		"ops": [
+			{
+				"op": "rename",
+				"target": "DroneComponents::Battery",
+				"newName": "PowerPack"
+			}
+		],
+		"splices": [
+			{
+				"unit": "system/Components.sysml",
+				"replaced": "Battery",
+				"with": "PowerPack"
+			},
+			{
+				"unit": "system/DroneArchitecture.sysml",
+				"replaced": "Battery",
+				"with": "PowerPack"
+			}
+		],
+		"findingsAfter": 2,
+		"editFindings": []
+	},
+	{
+		"label": "enum-valued redefinition (:>> priority = Priority::high -> low)",
+		"how": "setFeatureValue",
+		"ok": true,
+		"ms": 34.9,
+		"ops": [
+			{
+				"op": "setFeatureValue",
+				"target": "SystemRequirements::'Flight endurance'::priority",
+				"expr": "Priority::low"
+			}
+		],
+		"splices": [
+			{
+				"unit": "requirements/SystemRequirements.sysml",
+				"replaced": "Priority::high",
+				"with": "Priority::low"
+			}
+		],
+		"findingsAfter": 2,
+		"editFindings": []
+	},
+	{
+		"label": "add enum-valued redefinition where absent",
+		"how": "insertMember",
+		"ok": true,
+		"ms": 36.6,
+		"ops": [
+			{
+				"op": "insertMember",
+				"owner": "SystemRequirements::'Ingress protection'",
+				"text": ":>> verificationMethod = VerificationMethod::inspection;"
+			}
+		],
+		"splices": [
+			{
+				"unit": "requirements/SystemRequirements.sysml",
+				"replaced": "",
+				"with": "        :>> verificationMethod = VerificationMethod::inspection;\n"
+			}
+		],
+		"findingsAfter": 2,
+		"editFindings": []
+	},
+	{
+		"label": "metadata field (@StatusInfo { status = … })",
+		"how": "setFeatureValue on the metadata feature (by @id)",
+		"ok": true,
+		"ms": 35.6,
+		"ops": [
+			{
+				"op": "setFeatureValue",
+				"target": "@7363f368-5760-5ec3-9e5a-98b5c43a5b35",
+				"expr": "StatusKind::open"
+			}
+		],
+		"splices": [
+			{
+				"unit": "requirements/SystemRequirements.sysml",
+				"replaced": "StatusKind::done",
+				"with": "StatusKind::open"
+			}
+		],
+		"findingsAfter": 2,
+		"editFindings": []
+	},
+	{
+		"label": "add metadata field (owner absent)",
+		"how": "insertMember into the metadata usage",
+		"ok": true,
+		"ms": 35.3,
+		"ops": [
+			{
+				"op": "insertMember",
+				"owner": "@f752190a-a76f-570d-804a-ddcd3f9b6f80",
+				"text": "originator = \"Ops\";"
+			}
+		],
+		"splices": [
+			{
+				"unit": "requirements/SystemRequirements.sysml",
+				"replaced": "",
+				"with": "\n            originator = \"Ops\";\n        "
+			}
+		],
+		"findingsAfter": 2,
+		"editFindings": []
+	},
+	{
+		"label": "set usage type (no dependent references)",
+		"how": "setFeatureType",
+		"ok": true,
+		"ms": 35.3,
+		"ops": [
+			{
+				"op": "setFeatureType",
+				"target": "DroneArchitecture::drone::rotors",
+				"type": "DroneComponents::Rotor"
+			}
+		],
+		"splices": [
+			{
+				"unit": "system/DroneArchitecture.sysml",
+				"replaced": "Rotor",
+				"with": "DroneComponents::Rotor"
+			}
+		],
+		"findingsAfter": 2,
+		"editFindings": []
+	},
+	{
+		"label": "set short name, dedented",
+		"how": "memberSource + dedent + replaceMember",
+		"ok": true,
+		"ms": 30.4,
+		"ops": [
+			{
+				"op": "replaceMember",
+				"target": "SystemRequirements::'Flight endurance'",
+				"text": "requirement <'SYS-101'> 'Flight endurance' : DroneRequirement {\n    doc /* The drone shall fly for at least 25 minutes with a 1 kg payload in still air\n         * before it reaches its landing reserve. */\n    :>> kind = RequirementKind::performance;\n    :>> priority = Priority::high;\n    :>> verificationMethod = (VerificationMethod::'analysis', VerificationMethod::test);\n    @StatusInfo { status = StatusKind::done; owner = \"J. Hale\"; }\n    @Rationale { text = \"A 3 km delivery and return takes about 10 minutes; the rest covers hover at the drop point, headwind and battery ageing.\"; }\n    require constraint { drone.endurance >= 25 [min] }\n}"
+			}
+		],
+		"splices": [
+			{
+				"unit": "requirements/SystemRequirements.sysml",
+				"replaced": "requirement <'SYS-001'> 'Flight endurance' : DroneRequirement {\n        doc /* The drone shall fly for at least 25 minutes with a 1 kg payload in still air\n             * before it reaches its landing reserve. */\n        :>> kind = RequirementKind::performance;\n        :>> priority = Priority::high;\n        :>> verificationMethod = (VerificationMethod::'analysis', VerificationMethod::test);\n        @StatusInfo { status = StatusKind::done; owner = \"J. Hale\"; }\n        @Rationale { text = \"A 3 km delivery and return takes about 10 minutes; the rest covers hover at the drop point, headwind and battery ageing.\"; }\n        require constraint { drone.endurance >= 25 [min] }\n    }",
+				"with": "requirement <'SYS-101'> 'Flight endurance' : DroneRequirement {\n        doc /* The drone shall fly for at least 25 minutes with a 1 kg payload in still air\n             * before it reaches its landing reserve. */\n        :>> kind = RequirementKind::performance;\n        :>> priority = Priority::high;\n        :>> verificationMethod = (VerificationMethod::'analysis', VerificationMethod::test);\n        @StatusInfo { status = StatusKind::done; owner = \"J. Hale\"; }\n        @Rationale { text = \"A 3 km delivery and return takes about 10 minutes; the rest covers hover at the drop point, headwind and battery ageing.\"; }\n        require constraint { drone.endurance >= 25 [min] }\n    }"
+			}
+		],
+		"findingsAfter": 2,
+		"editFindings": []
+	},
+	{
+		"label": "abstract + extra specialization, dedented",
+		"how": "memberSource + dedent + replaceMember",
+		"ok": true,
+		"ms": 42.8,
+		"ops": [
+			{
+				"op": "replaceMember",
+				"target": "DroneComponents::Camera",
+				"text": "abstract part def Camera :> Component, Airframe {\n    doc /* Downward-looking camera used to check that the drop zone is clear. */\n    attribute :>> mass = 60 [g];\n    port imageOut : ImagePort;\n}"
+			}
+		],
+		"splices": [
+			{
+				"unit": "system/Components.sysml",
+				"replaced": "part def Camera :> Component {\n        doc /* Downward-looking camera used to check that the drop zone is clear. */\n        attribute :>> mass = 60 [g];\n        port imageOut : ImagePort;\n    }",
+				"with": "abstract part def Camera :> Component, Airframe {\n        doc /* Downward-looking camera used to check that the drop zone is clear. */\n        attribute :>> mass = 60 [g];\n        port imageOut : ImagePort;\n    }"
+			}
+		],
+		"findingsAfter": 2,
+		"editFindings": []
+	},
+	{
+		"label": "refused edit (rename that rebinds a reference)",
+		"how": "rename",
+		"ok": true,
+		"ms": 0.6,
+		"ops": [
+			{
+				"op": "rename",
+				"target": "DroneComponents::Battery",
+				"newName": "Camera"
+			}
+		],
+		"splices": [],
+		"findingsAfter": 2,
+		"editFindings": [
+			"rename of `DroneComponents::Battery` to `Camera` skipped: its sibling `DroneComponents::Camera` is already named `Camera`"
+		]
+	},
+	{
+		"label": "dry run (checkEdit)",
+		"how": "checkEdit",
+		"ok": true,
+		"ms": 25.9,
+		"ops": [
+			{
+				"op": "setFeatureValue",
+				"target": "DroneComponents::Battery::mass",
+				"expr": "1200 [g]"
+			}
+		],
+		"splices": [
+			{
+				"unit": "system/Components.sysml",
+				"replaced": "1100 [g]",
+				"with": "1200 [g]"
+			}
+		],
+		"findingsAfter": 2,
+		"editFindings": []
+	},
+	{
+		"label": "set usage type Battery -> Camera (after inserting the usage)",
+		"how": "setFeatureType",
+		"ok": true,
+		"ms": 31.6,
+		"splices": [
+			{
+				"end": 3285,
+				"start": 3278,
+				"text": "Camera",
+				"unit": "system/DroneArchitecture.sysml"
+			}
+		],
+		"findingsAfter": 2,
+		"typedBy": ["DroneComponents::Camera"]
+	}
+]

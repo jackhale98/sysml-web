@@ -42,7 +42,10 @@ export class Cdp {
 		const { targetInfos } = await this.send('Target.getTargets');
 		const t = targetInfos.find(pred);
 		if (!t) return null;
-		const { sessionId } = await this.send('Target.attachToTarget', { targetId: t.targetId, flatten: true });
+		const { sessionId } = await this.send('Target.attachToTarget', {
+			targetId: t.targetId,
+			flatten: true
+		});
 		return { sessionId, target: t };
 	}
 }

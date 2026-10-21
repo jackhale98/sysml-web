@@ -22,12 +22,39 @@ for (const f of fs.readdirSync(dir).filter((f) => /^lhr-.*\.json$/.test(f))) {
 		throttling: lhr.configSettings.throttlingMethod
 	});
 }
-const med = (xs) => { const s = [...xs].sort((a, b) => a - b); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+const med = (xs) => {
+	const s = [...xs].sort((a, b) => a - b);
+	const m = s.length >> 1;
+	return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+};
 const cell = (xs, f) => `${f(med(xs))} [${f(Math.min(...xs))}–${f(Math.max(...xs))}]`;
 const ms = (x) => Math.round(x).toLocaleString('en-US');
-console.log('| URL | runs | form factor / throttling | performance score | FCP ms | LCP ms | TBT ms | Speed Index ms | CLS | total byte weight KB |');
+console.log(
+	'| URL | runs | form factor / throttling | performance score | FCP ms | LCP ms | TBT ms | Speed Index ms | CLS | total byte weight KB |'
+);
 console.log('|---|---|---|---|---|---|---|---|---|---|');
 for (const [url, runs] of byUrl)
 	console.log(
-		`| \`${url}\` | ${runs.length} | ${runs[0].formFactor} / ${runs[0].throttling} | ${cell(runs.map((r) => r.score), String)} | ${cell(runs.map((r) => r.fcp), ms)} | ${cell(runs.map((r) => r.lcp), ms)} | ${cell(runs.map((r) => r.tbt), ms)} | ${cell(runs.map((r) => r.si), ms)} | ${cell(runs.map((r) => r.cls), (x) => x.toFixed(3))} | ${cell(runs.map((r) => r.bytes / 1024), ms)} |`
+		`| \`${url}\` | ${runs.length} | ${runs[0].formFactor} / ${runs[0].throttling} | ${cell(
+			runs.map((r) => r.score),
+			String
+		)} | ${cell(
+			runs.map((r) => r.fcp),
+			ms
+		)} | ${cell(
+			runs.map((r) => r.lcp),
+			ms
+		)} | ${cell(
+			runs.map((r) => r.tbt),
+			ms
+		)} | ${cell(
+			runs.map((r) => r.si),
+			ms
+		)} | ${cell(
+			runs.map((r) => r.cls),
+			(x) => x.toFixed(3)
+		)} | ${cell(
+			runs.map((r) => r.bytes / 1024),
+			ms
+		)} |`
 	);

@@ -1,0 +1,13 @@
+{
+	"memInit": 17,
+	"checkSyntaxMs": 9,
+	"syntaxFindings": 0,
+	"memAfterCheckSyntax": 17,
+	"checkSyntaxAgainMs": 3,
+	"sessionNoLibraryMs": 58,
+	"sessionNoLibraryFindings": 0,
+	"unresolvedWithoutLibrary": 224,
+	"memAfterSessionNoLibrary": 24,
+	"lspNoLibraryInitMs": 32,
+	"memAfterLsp": 24
+}
