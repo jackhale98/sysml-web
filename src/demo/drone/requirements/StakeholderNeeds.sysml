@@ -27,7 +27,7 @@ package StakeholderNeeds {
         stakeholder authority : AviationAuthority;
         :>> kind = RequirementKind::safety;
         :>> priority = Priority::high;
-        :>> verificationMethod = (VerificationMethod::analysis, VerificationMethod::test);
+        :>> verificationMethod = (VerificationMethod::'analysis', VerificationMethod::test);
         @StatusInfo { status = StatusKind::open; owner = "S. Lindqvist"; originator = "Safety Office"; }
         @Rationale { text = "Flights over populated areas are only approved when the remaining risk is acceptable to the authority."; }
     }
@@ -50,7 +50,7 @@ package StakeholderNeeds {
         stakeholder authority : AviationAuthority;
         :>> kind = RequirementKind::regulatory;
         :>> priority = Priority::high;
-        :>> verificationMethod = (VerificationMethod::inspection, VerificationMethod::analysis);
+        :>> verificationMethod = (VerificationMethod::inspection, VerificationMethod::'analysis');
         @StatusInfo { status = StatusKind::done; owner = "A. Brandt"; originator = "Compliance"; }
     }
 

@@ -80,7 +80,7 @@ describe('requirementText', () => {
 						value: {
 							kind: 'enum',
 							enumName: 'VerificationMethod',
-							literals: ['test', 'inspection'],
+							literals: ['analysis', 'inspection'],
 							many: true
 						}
 					}
@@ -95,7 +95,7 @@ describe('requirementText', () => {
 				"requirement <'SYS-101'> 'Landing light' : DroneRequirement {",
 				'    doc /* The drone shall show a light. */',
 				'    :>> priority = Priority::high;',
-				'    :>> verificationMethod = (VerificationMethod::test, VerificationMethod::inspection);',
+				"    :>> verificationMethod = (VerificationMethod::'analysis', VerificationMethod::inspection);",
 				'    @StatusInfo { status = StatusKind::open; owner = "Zoë \\"Z\\" Åberg"; }',
 				'    @Rationale { text = "Night deliveries."; }',
 				'    @Issue { text = "Which colour?"; }',

@@ -26,7 +26,7 @@ package SystemRequirements {
              * before it reaches its landing reserve. */
         :>> kind = RequirementKind::performance;
         :>> priority = Priority::high;
-        :>> verificationMethod = (VerificationMethod::analysis, VerificationMethod::test);
+        :>> verificationMethod = (VerificationMethod::'analysis', VerificationMethod::test);
         @StatusInfo { status = StatusKind::done; owner = "J. Hale"; }
         @Rationale { text = "A 3 km delivery and return takes about 10 minutes; the rest covers hover at the drop point, headwind and battery ageing."; }
         require constraint { drone.endurance >= 25 [min] }
@@ -45,7 +45,7 @@ package SystemRequirements {
         doc /* The take-off mass, including battery and payload, shall not exceed 4 kg. */
         :>> kind = RequirementKind::regulatory;
         :>> priority = Priority::high;
-        :>> verificationMethod = (VerificationMethod::analysis, VerificationMethod::test);
+        :>> verificationMethod = (VerificationMethod::'analysis', VerificationMethod::test);
         @StatusInfo { status = StatusKind::done; owner = "J. Hale"; }
         @Rationale { text = "4 kg is the upper mass limit of the drone class the operator is approved for."; }
         require constraint { drone.takeOffMass <= 4 [kg] }
@@ -58,7 +58,7 @@ package SystemRequirements {
              * with gusts of up to 14 m/s. */
         :>> kind = RequirementKind::environmental;
         :>> priority = Priority::medium;
-        :>> verificationMethod = (VerificationMethod::analysis, VerificationMethod::test);
+        :>> verificationMethod = (VerificationMethod::'analysis', VerificationMethod::test);
         @StatusInfo { status = StatusKind::open; owner = "R. Tanaka"; }
     }
 
@@ -107,7 +107,7 @@ package SystemRequirements {
              * over-temperature or deep-discharge condition. */
         :>> kind = RequirementKind::safety;
         :>> priority = Priority::high;
-        :>> verificationMethod = (VerificationMethod::test, VerificationMethod::analysis);
+        :>> verificationMethod = (VerificationMethod::test, VerificationMethod::'analysis');
         @StatusInfo { status = StatusKind::open; owner = "L. Moreau"; }
         @Rationale { text = "Battery fire is the most severe hazard of the design; see the design FMEA."; }
     }
@@ -117,7 +117,7 @@ package SystemRequirements {
     requirement <'SYS-010'> 'Command and telemetry link' : DroneRequirement {
         doc /* The drone shall exchange commands and telemetry with the ground station up to
              * 5 km away in line of sight, with a round-trip delay below 200 ms. */
-        :>> kind = RequirementKind::interface;
+        :>> kind = RequirementKind::'interface';
         :>> priority = Priority::high;
         :>> verificationMethod = VerificationMethod::test;
         @StatusInfo { status = StatusKind::done; owner = "K. Novak"; }

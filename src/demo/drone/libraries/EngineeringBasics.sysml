@@ -5,7 +5,7 @@ library package EngineeringBasics {
         doc /* The nature of a requirement. */
         enum functional;
         enum performance;
-        enum interface;
+        enum 'interface';
         enum safety;
         enum regulatory;
         enum environmental;
@@ -21,7 +21,7 @@ library package EngineeringBasics {
     enum def VerificationMethod {
         doc /* The way a requirement is shown to be met. */
         enum test;
-        enum analysis;
+        enum 'analysis';
         enum inspection;
         enum demonstration;
     }

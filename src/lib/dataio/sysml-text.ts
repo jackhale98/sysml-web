@@ -5,37 +5,8 @@
  * redefinitions, then `@StatusInfo`, `@Rationale` and `@Issue` metadata.
  */
 
-/** SysML v2 / KerML reserved words: a name spelled like one must be quoted. */
-const KEYWORDS = new Set(
-	(
-		'about abstract accept action actor after alias all allocate allocation analysis and as ' +
-		'assert assign assoc assume at attribute behavior bind binding bool by calc case chains ' +
-		'class classifier comment composite concern conjugate conjugates conjugation connect ' +
-		'connection connector const constant constraint crosses datatype decide def default ' +
-		'defined dependency derived differences disjoining disjoint do doc else end entry enum ' +
-		'event exhibit exit expose expr false feature featured featuring filter first flow for ' +
-		'fork frame from function hastype if implies import in include individual inout interaction ' +
-		'interface intersects inv inverse inverting istype item join language library locale loop ' +
-		'member merge message meta metaclass metadata multiplicity namespace new nonunique not null ' +
-		'objective occurrence of or ordered out package parallel part perform port portion predicate ' +
-		'private protected public readonly redefines redefinition ref references render rendering ' +
-		'rep require requirement return satisfy send snapshot specialization specializes stakeholder ' +
-		'standard state step struct subclassifier subject subset subsets subtype succession ' +
-		'terminate then timeslice to transition true type typed typing unions until use var variant ' +
-		'variation verification verify via view viewpoint when while xor'
-	).split(' ')
-);
-
-/**
- * A name as SysML text: as-is when it is a basic name, otherwise single-quoted
- * with backslashes escaped. An apostrophe becomes a typographic one (’): KerML
- * allows `\'` in a quoted name, but the engine's parser does not read it yet.
- */
-export function sysmlName(raw: string, { quoteKeywords = true } = {}): string {
-	const name = raw.replace(/\s+/g, ' ').trim();
-	if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(name) && !(quoteKeywords && KEYWORDS.has(name))) return name;
-	return `'${name.replace(/\\/g, '\\\\').replace(/'/g, '’')}'`;
-}
+export { sysmlName } from '#lib/project/names.ts';
+import { sysmlName } from '#lib/project/names.ts';
 
 /** A string literal: `"…"` with `\"`, `\\` and line breaks escaped. */
 export function sysmlString(value: string): string {
@@ -118,10 +89,8 @@ export interface RequirementSpec {
 function attributeValue(value: AttributeValue): string {
 	switch (value.kind) {
 		case 'enum': {
-			// Literals as their enumeration spells them (`VerificationMethod::analysis`).
-			const refs = value.literals.map(
-				(l) => `${value.enumName}::${sysmlName(l, { quoteKeywords: false })}`
-			);
+			// A literal spelled like a keyword is quoted, as its declaration is (`V::'analysis'`).
+			const refs = value.literals.map((l) => `${value.enumName}::${sysmlName(l)}`);
 			return refs.length > 1 ? `(${refs.join(', ')})` : refs[0]!;
 		}
 		case 'string':

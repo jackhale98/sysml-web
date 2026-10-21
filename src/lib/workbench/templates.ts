@@ -4,6 +4,8 @@
  * what to write.
  */
 
+import { sysmlName } from '#lib/project/names.ts';
+
 export type AddKind =
 	| 'package'
 	| 'part def'
@@ -44,12 +46,8 @@ export function canOwnMembers(kind: string, isDefinition: boolean): boolean {
 	return kind === 'package' || (isDefinition && kind !== 'enum' && kind !== 'attribute');
 }
 
-/** A KerML name: as-is when basic, otherwise quoted with escapes. */
-export function formatName(raw: string): string {
-	const name = raw.trim();
-	if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) return name;
-	return `'${name.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
-}
+/** A KerML name: as-is when basic, otherwise quoted (reserved words too). */
+export const formatName = sysmlName;
 
 /** Text for a new element; `type` is used only for typed kinds. */
 export function elementText(kind: AddKind, name: string, type = ''): string {

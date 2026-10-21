@@ -97,7 +97,7 @@ package DroneFmea {
 
     // ---- 4. FMEA worksheet lines ----
 
-    @Fmea about drone.battery {
+    @Fmea about drone::battery {
         failureMode = "Thermal runaway";
         cause = "Internal cell short, overcharge or crash damage";
         effect = "Fire in the airframe; loss of the drone; burns to bystanders";
@@ -107,7 +107,7 @@ package DroneFmea {
         hazard = batteryFire;
     }
 
-    @Fmea about drone.rotors.motor {
+    @Fmea about drone::rotors::motor {
         failureMode = "Motor stops or loses torque";
         cause = "Bearing seizure, winding short or loose connector";
         effect = "One rotor loses thrust; the drone cannot hold altitude and falls";
@@ -116,7 +116,7 @@ package DroneFmea {
         hazard = uncontrolledDescent;
     }
 
-    @Fmea about drone.rotors.propeller {
+    @Fmea about drone::rotors::propeller {
         failureMode = "Blade breaks or comes off";
         cause = "Hitting an obstacle, fatigue, or a badly tightened hub";
         effect = "Thrust imbalance and vibration; the drone falls";
@@ -125,7 +125,7 @@ package DroneFmea {
         hazard = uncontrolledDescent;
     }
 
-    @Fmea about drone.flightController {
+    @Fmea about drone::flightController {
         failureMode = "Software lock-up";
         cause = "Unhandled fault or timing overrun in the control loop";
         effect = "Loss of attitude control; the drone falls";
@@ -134,7 +134,7 @@ package DroneFmea {
         hazard = uncontrolledDescent;
     }
 
-    @Fmea about drone.gnss {
+    @Fmea about drone::gnss {
         failureMode = "Satellite position lost or wrong";
         cause = "Signal blocked by buildings, jamming or spoofing";
         effect = "Position drifts; the drone may leave the approved area";
@@ -143,7 +143,7 @@ package DroneFmea {
         hazard = flyAway;
     }
 
-    @Fmea about drone.radio {
+    @Fmea about drone::radio {
         failureMode = "Command link lost";
         cause = "Out of range, interference or a damaged antenna";
         effect = "The operator cannot command the drone; it relies on return-to-home";

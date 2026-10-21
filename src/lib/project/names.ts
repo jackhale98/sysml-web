@@ -41,3 +41,36 @@ export function stringValue(expression: string): string {
 	}
 	return trimmed;
 }
+
+/** SysML v2 / KerML reserved words: a name spelled like one must be quoted. */
+const KEYWORDS = new Set(
+	(
+		'about abstract accept action actor after alias all allocate allocation analysis and as ' +
+		'assert assign assoc assume at attribute behavior bind binding bool by calc case chains ' +
+		'class classifier comment composite concern conjugate conjugates conjugation connect ' +
+		'connection connector const constant constraint crosses datatype decide def default ' +
+		'defined dependency derived differences disjoining disjoint do doc else end entry enum ' +
+		'event exhibit exit expose expr false feature featured featuring filter first flow for ' +
+		'fork frame from function hastype if implies import in include individual inout interaction ' +
+		'interface intersects inv inverse inverting istype item join language library locale loop ' +
+		'member merge message meta metaclass metadata multiplicity namespace new nonunique not null ' +
+		'objective occurrence of or ordered out package parallel part perform port portion predicate ' +
+		'private protected public readonly redefines redefinition ref references render rendering ' +
+		'rep require requirement return satisfy send snapshot specialization specializes stakeholder ' +
+		'standard state step struct subclassifier subject subset subsets subtype succession ' +
+		'terminate then timeslice to transition true type typed typing unions until use var variant ' +
+		'variation verification verify via view viewpoint when while xor'
+	).split(' ')
+);
+
+/**
+ * A name as SysML text: as-is when it is a basic name that is not a reserved
+ * word, otherwise single-quoted
+ * with backslashes escaped. An apostrophe becomes a typographic one (’): KerML
+ * allows `\'` in a quoted name, but the engine's parser does not read it yet.
+ */
+export function sysmlName(raw: string): string {
+	const name = raw.replace(/\s+/g, ' ').trim();
+	if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(name) && !KEYWORDS.has(name)) return name;
+	return `'${name.replace(/\\/g, '\\\\').replace(/'/g, '’')}'`;
+}

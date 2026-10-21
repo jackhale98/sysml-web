@@ -5,7 +5,8 @@ describe('templates', () => {
 	it('quotes names that are not basic identifiers', () => {
 		expect(formatName('Battery')).toBe('Battery');
 		expect(formatName(' flight controller ')).toBe("'flight controller'");
-		expect(formatName("it's")).toBe("'it\\'s'");
+		expect(formatName("it's")).toBe("'it’s'");
+		expect(formatName('interface')).toBe("'interface'");
 	});
 
 	it('writes idiomatic SysML for each kind', () => {
