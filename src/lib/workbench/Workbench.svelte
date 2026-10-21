@@ -25,6 +25,7 @@
 	import Explorer from './Explorer.svelte';
 	import HomeView from './HomeView.svelte';
 	import Inspector from './Inspector.svelte';
+	import DocumentView from '#lib/markdown/DocumentView.svelte';
 	import CommandPalette from './CommandPalette.svelte';
 	import ViewTable from './ViewTable.svelte';
 	import { presentationOf } from './views.ts';
@@ -68,8 +69,22 @@
 		{ id: 'split', label: 'Split', icon: Columns2 },
 		{ id: 'diagram', label: 'Diagram', icon: Network }
 	];
-	const showText = $derived(ui.layout !== 'diagram' || !filePackage);
-	const showDiagram = $derived(ui.layout !== 'text' && !!filePackage);
+	/**
+	 * Phones show one thing at a time: text or diagram, switched with the
+	 * segmented control, never side by side.
+	 */
+	let isPhone = $state(false);
+	$effect(() => {
+		const query = matchMedia('(max-width: 760px)');
+		isPhone = query.matches;
+		const update = () => (isPhone = query.matches);
+		query.addEventListener('change', update);
+		return () => query.removeEventListener('change', update);
+	});
+	const layout: FileLayout = $derived(isPhone && ui.layout === 'split' ? 'text' : ui.layout);
+	const layoutChoices = $derived(isPhone ? layouts.filter((l) => l.id !== 'split') : layouts);
+	const showText = $derived(layout !== 'diagram' || !filePackage);
+	const showDiagram = $derived(layout !== 'text' && !!filePackage);
 
 	const userElements = $derived(
 		workspace.elements.filter((e) => !e.file.startsWith('libraries/')).length
@@ -181,10 +196,10 @@
 				</ul>
 				{#if tab?.kind === 'file' && filePackage}
 					<div class="segmented" role="group" aria-label="Show the model as">
-						{#each layouts as l (l.id)}
+						{#each layoutChoices as l (l.id)}
 							<button
 								type="button"
-								aria-pressed={ui.layout === l.id}
+								aria-pressed={layout === l.id}
 								title="{l.label} view"
 								onclick={() => (ui.layout = l.id)}
 							>
@@ -243,6 +258,10 @@
 								{engine}
 							/>
 						{/await}
+					{/key}
+				{:else if tab.path.endsWith('.md') && !tab.raw}
+					{#key tab.path}
+						<DocumentView path={tab.path} {workspace} {ui} />
 					{/key}
 				{:else}
 					<div class="split" class:single={!showText || !showDiagram}>
@@ -810,9 +829,6 @@
 		}
 		.problems-toggle {
 			display: inline-flex;
-		}
-		.segmented span {
-			display: none;
 		}
 		.pane,
 		.problems-open .problems-pane {

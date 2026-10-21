@@ -35,7 +35,13 @@
 	);
 	/** The standard tables the engine bundles (ModelViews). */
 	const standardViews = $derived(
-		workspace.views.filter((v) => v.builtin && v.hasTable && v.name !== 'RequirementsTable')
+		workspace.views.filter(
+			(v) =>
+				(v.builtin || v.file.endsWith('ModelViews.sysml')) &&
+				!v.isUsage &&
+				v.hasTable &&
+				v.name !== 'RequirementsTable'
+		)
 	);
 	let packagesOpen = $state(false);
 

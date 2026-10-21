@@ -4,7 +4,8 @@ import type { DiagramView } from '#lib/engine/types.ts';
 export type Tab =
 	| { kind: 'home' }
 	| { kind: 'requirements' }
-	| { kind: 'file'; path: string }
+	/** `raw` shows a document (Markdown) as source rather than as a page. */
+	| { kind: 'file'; path: string; raw?: boolean }
 	| { kind: 'diagram'; view: DiagramView; scope: string | null; title: string }
 	| { kind: 'view'; name: string; title: string };
 
@@ -26,7 +27,7 @@ export type FileLayout = 'text' | 'split' | 'diagram';
 export function tabId(tab: Tab): string {
 	switch (tab.kind) {
 		case 'file':
-			return `file:${tab.path}`;
+			return `file:${tab.path}${tab.raw ? ':raw' : ''}`;
 		case 'diagram':
 			return `diagram:${tab.view}:${tab.scope ?? ''}`;
 		case 'view':
@@ -43,7 +44,7 @@ export function tabTitle(tab: Tab): string {
 		case 'requirements':
 			return 'Requirements';
 		case 'file':
-			return tab.path.split('/').pop() ?? tab.path;
+			return (tab.path.split('/').pop() ?? tab.path) + (tab.raw ? ' (source)' : '');
 		case 'diagram':
 		case 'view':
 			return tab.title;

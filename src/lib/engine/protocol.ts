@@ -24,6 +24,8 @@ export interface EngineApi {
 	edit(request: EditRequest): EditResult;
 	listViews(files: SourceFile[]): ViewInfo[];
 	renderView(files: SourceFile[], name: string): RenderedTable;
+	/** The view libraries the engine bundles (`Reporting`, `ModelViews`). */
+	viewLibraries(): SourceFile[];
 }
 
 export type Method = keyof EngineApi;

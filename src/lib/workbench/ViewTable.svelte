@@ -6,6 +6,7 @@
 		Check,
 		ChevronsUpDown,
 		FileCode,
+		FilePlus,
 		Minus,
 		Search,
 		TriangleAlert
@@ -15,6 +16,7 @@
 	import type { ModelElement } from '#lib/project/elements.ts';
 	import type { Workspace } from '#lib/project/workspace.svelte.ts';
 	import KindGlyph from '#lib/ui/KindGlyph.svelte';
+	import { toasts } from '#lib/ui/toasts.svelte.ts';
 	import type { WorkbenchUi } from './ui.svelte.ts';
 	import { viewTitle } from './views.ts';
 
@@ -113,6 +115,21 @@
 		if (element) ui.select(element.key, 'table');
 	}
 
+	/** Copy the bundled view libraries into the project so they can be edited. */
+	async function addToModel() {
+		const libraries = await engine.viewLibraries();
+		const added = libraries.filter((f) => workspace.text(f.path) === undefined);
+		for (const file of added) workspace.setText(file.path, file.text);
+		const path = added.find((f) => f.path.endsWith('ModelViews.sysml'))?.path;
+		toasts.show(
+			added.length
+				? `Added ${added.map((f) => f.path).join(' and ')} to the project; edit them like any SysML.`
+				: 'The standard views are already in the project.',
+			{ tone: 'success' }
+		);
+		if (path) ui.open({ kind: 'file', path });
+	}
+
 	function showSource() {
 		if (!info || info.builtin) return;
 		ui.open({ kind: 'file', path: info.file });
@@ -168,6 +185,15 @@
 			{#if info && !info.builtin}
 				<button type="button" class="source" onclick={showSource}>
 					<FileCode size={14} /> Show SysML
+				</button>
+			{:else if info?.builtin}
+				<button
+					type="button"
+					class="source"
+					title="Copy the standard views into this project as SysML you can change"
+					onclick={addToModel}
+				>
+					<FilePlus size={14} /> Add to my model
 				</button>
 			{/if}
 		</div>

@@ -96,9 +96,8 @@
 			disabled={!architecture}
 			onclick={openArchitecture}
 		>
-			<Network size={18} aria-hidden="true" /> Architecture<span class="wide-only"
-				>&nbsp;diagram</span
-			>
+			<Network size={18} aria-hidden="true" />
+			<span>Architecture<span class="wide-only">&nbsp;diagram</span></span>
 		</button>
 		<button
 			type="button"

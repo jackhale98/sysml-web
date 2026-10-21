@@ -43,6 +43,7 @@ export function startEngine(urls: Init): Engine {
 		edit: (...params) => call('edit', ...params),
 		listViews: (...params) => call('listViews', ...params),
 		renderView: (...params) => call('renderView', ...params),
+		viewLibraries: (...params) => call('viewLibraries', ...params),
 		terminate: () => worker.terminate()
 	};
 }

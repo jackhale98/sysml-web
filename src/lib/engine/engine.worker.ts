@@ -4,7 +4,7 @@
  * wasm-bindgen glue is loaded at runtime from `static/engine/`, built by
  * `scripts/build-engine.sh`, so it is not part of the app bundle.
  */
-import type { Init, Method, Request, Response } from './protocol';
+import type { Init, Method, Request, Response, SourceFile } from './protocol';
 import type {
 	Analysis,
 	DiagramGraph,
@@ -24,6 +24,7 @@ interface Wasm {
 	edit(request: string): string;
 	listViews(files: string): string;
 	renderView(files: string, name: string): string;
+	viewLibraries(): string;
 }
 
 const scope = self as unknown as DedicatedWorkerGlobalScope;
@@ -49,7 +50,8 @@ const handlers: { [M in Method]: (wasm: Wasm, ...params: never[]) => unknown } =
 	listViews: (wasm, files: unknown): ViewInfo[] =>
 		JSON.parse(wasm.listViews(JSON.stringify(files))) as ViewInfo[],
 	renderView: (wasm, files: unknown, name: string): RenderedTable =>
-		JSON.parse(wasm.renderView(JSON.stringify(files), name)) as RenderedTable
+		JSON.parse(wasm.renderView(JSON.stringify(files), name)) as RenderedTable,
+	viewLibraries: (wasm): SourceFile[] => JSON.parse(wasm.viewLibraries()) as SourceFile[]
 };
 
 scope.onmessage = async (event: MessageEvent<Init | Request>) => {

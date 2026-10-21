@@ -12,6 +12,33 @@ package DroneViews {
     private import Views::asTreeDiagram;
     private import Reporting::*;
     private import RiskAnalysis::FmeaWorksheet;
+    private import ModelViews::*;
+
+    // Tables. Each is a view typed by a standard table from ModelViews
+    // (libraries/ModelViews.sysml): change `expose` to pick what it lists,
+    // or edit the view def there to change its columns.
+
+    view systemRequirements : RequirementsTable {
+        doc /* The system requirements with their classification, status and trace links. */
+        expose SystemRequirements::*;
+    }
+
+    view designGaps : RequirementGaps {
+        doc /* System requirements the design does not satisfy yet, or that no test verifies. */
+        expose SystemRequirements::*;
+    }
+
+    view droneInterfaces : InterfaceTable {
+        doc /* Every port of the drone's components and what it is connected to. */
+        expose DroneComponents::**;
+    }
+
+    view droneBillOfMaterials : BillOfMaterials {
+        doc /* What the drone is made of, with quantities. */
+        expose DroneArchitecture::drone::**;
+    }
+
+    // Diagrams.
 
     view serviceContext : InterconnectionView {
         doc /* The drone in its world: operator, ground station and recipient. */

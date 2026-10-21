@@ -264,6 +264,11 @@
 		font-size: 11px;
 		color: var(--text-2);
 	}
+	.block-head strong,
+	.skeleton.title {
+		height: 1.25rem;
+		line-height: 1.25rem;
+	}
 	.block-head strong {
 		max-width: 100%;
 		overflow: hidden;
@@ -325,8 +330,6 @@
 	}
 	.skeleton.title {
 		width: 8rem;
-		height: 0.8rem;
-		margin-top: 3px;
 	}
 	@keyframes pulse {
 		50% {

@@ -133,3 +133,30 @@ test('the command palette jumps to any element', async ({ page }) => {
 	const inspector = page.getByRole('complementary', { name: 'Inspector' });
 	await expect(inspector.getByRole('heading', { level: 2 })).toContainText('Battery');
 });
+
+test('the guided tour reads as a page whose references open the model', async ({ page }) => {
+	await openDemo(page);
+	await page.getByRole('button', { name: /Start the tour/ }).click();
+	await expect(page.getByRole('heading', { name: /guided tour/ })).toBeVisible();
+	await expectAccessible(page);
+	await page.getByRole('button', { name: 'DroneViews::serviceContext' }).first().click();
+	await expect(page.getByRole('region', { name: /Service context diagram/ })).toBeVisible();
+});
+
+test('on a phone, a file switches between text and diagram instead of splitting', async ({
+	page
+}) => {
+	await page.setViewportSize({ width: 390, height: 844 });
+	await openDemo(page);
+	await page
+		.getByRole('navigation', { name: 'Panes' })
+		.getByRole('button', { name: 'Model' })
+		.click();
+	await openFile(page, /DroneArchitecture/);
+	const layouts = page.getByRole('group', { name: 'Show the model as' });
+	await expect(layouts.getByRole('button')).toHaveCount(2);
+	await expect(page.getByRole('region', { name: /DroneArchitecture diagram/ })).toHaveCount(0);
+	await layouts.getByRole('button', { name: /Diagram/ }).click();
+	await expect(page.getByRole('region', { name: /DroneArchitecture diagram/ })).toBeVisible();
+	await expect(page.locator('.cm-content')).toBeHidden();
+});
