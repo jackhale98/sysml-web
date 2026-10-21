@@ -46,6 +46,17 @@ test('state and action views draw transitions and decision branches', async ({ p
 	await expect(states.getByText('ArmCommand [preflightChecksPassed]')).toBeVisible();
 	await expect(states.getByText('when stateOfCharge < returnThreshold')).toBeVisible();
 	await expect(states.locator('.svelte-flow__edge')).toHaveCount(12);
+	// Transition labels never cover each other (antiparallel ones included).
+	const boxes = await states
+		.locator('.sysml-edge-label')
+		.evaluateAll((els) => els.map((el) => el.getBoundingClientRect().toJSON() as DOMRect));
+	const crossing = boxes.flatMap((a, i) =>
+		boxes
+			.slice(i + 1)
+			.filter((b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom)
+	);
+	expect(boxes.length).toBeGreaterThan(8);
+	expect(crossing).toEqual([]);
 
 	const flow = await openView(page, 'Delivery flight flow');
 	await expect(flow.getByText('[checkDropZone.isClear]')).toBeVisible();

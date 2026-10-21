@@ -3,7 +3,8 @@
  * ELK is loaded on first use so it stays out of the initial bundle.
  */
 import type { DiagramGraph, DiagramNode } from '#lib/engine/types.ts';
-import { MAX_ROWS, notationOf } from './notation.ts';
+import { LABEL_HEIGHT, labelWidth } from './labels.svelte.ts';
+import { edgeLabelText, MAX_ROWS, notationOf } from './notation.ts';
 
 export interface Placed {
 	node: DiagramNode;
@@ -14,6 +15,26 @@ export interface Placed {
 }
 
 export type Direction = 'DOWN' | 'RIGHT';
+
+export interface XY {
+	x: number;
+	y: number;
+}
+
+/**
+ * How ELK drew an edge: its bends, from the end laid out first (the general
+ * end of an `UPWARD` edge) to the other, and the centre of its label.
+ */
+export interface Route {
+	points: XY[];
+	label: XY | null;
+}
+
+export interface Layout {
+	nodes: Placed[];
+	/** By the edge's index in `graph.edges`. */
+	routes: Map<number, Route>;
+}
 
 /** Box metrics shared with SysmlNode.svelte (px). */
 export const METRICS = {
@@ -89,21 +110,47 @@ let elk: Promise<{ layout(graph: unknown): Promise<ElkResult> }> | undefined;
 
 interface ElkResult {
 	children?: { id: string; x?: number; y?: number; width?: number; height?: number }[];
+	edges?: {
+		id: string;
+		sections?: { startPoint: XY; endPoint: XY; bendPoints?: XY[] }[];
+		labels?: { x?: number; y?: number; width?: number; height?: number }[];
+	}[];
+}
+
+/** The text drawn on an edge, keyword first; shared with SysmlEdge.svelte. */
+export function edgeText(kind: string, label: string | null): string {
+	const keyword =
+		kind === 'satisfy' || kind === 'verify' || kind === 'allocate'
+			? `«${kind}»`
+			: kind === 'binding' || kind === 'constraint_binding'
+				? '='
+				: null;
+	return [keyword, edgeLabelText(kind, label)].filter(Boolean).join(' ');
 }
 
 async function getElk() {
-	elk ??= import('elkjs/lib/elk.bundled.js').then((m) => new m.default());
+	elk ??= import('elkjs/lib/elk.bundled.js').then(
+		(m) => new m.default() as unknown as { layout(graph: unknown): Promise<ElkResult> }
+	);
 	return elk;
 }
 
-/** Positions for every node of the graph. */
+/** Positions for every node of the graph, and the route of every edge between two of them. */
 export async function layout(
 	graph: DiagramGraph,
 	direction: Direction,
 	view = 'general'
-): Promise<Placed[]> {
+): Promise<Layout> {
 	const ids = new Set(graph.nodes.map((n) => n.id));
 	const engine = await getElk();
+	const edges = graph.edges.flatMap((e, i) => {
+		if (!ids.has(e.source) || !ids.has(e.target) || e.source === e.target) return [];
+		const [from, to] = UPWARD.has(e.kind) ? [e.target, e.source] : [e.source, e.target];
+		const text = edgeText(e.kind, e.label);
+		// Labels take part in the layout, so ELK keeps them clear of nodes and of each other.
+		const labels = text ? [{ text, width: labelWidth(text), height: LABEL_HEIGHT }] : [];
+		return [{ id: `e${i}`, sources: [from], targets: [to], labels }];
+	});
 	const result = await engine.layout({
 		id: 'root',
 		layoutOptions: {
@@ -111,24 +158,43 @@ export async function layout(
 			'elk.direction': direction,
 			'elk.edgeRouting': 'ORTHOGONAL',
 			'elk.layered.spacing.nodeNodeBetweenLayers': '64',
+			'elk.layered.spacing.edgeNodeBetweenLayers': '20',
+			'elk.layered.spacing.edgeEdgeBetweenLayers': '12',
 			'elk.spacing.nodeNode': '36',
+			'elk.spacing.edgeNode': '20',
+			'elk.spacing.edgeEdge': '14',
+			'elk.spacing.edgeLabel': '4',
 			'elk.spacing.componentComponent': '56',
+			'elk.edgeLabels.placement': 'CENTER',
+			'elk.layered.mergeEdges': 'false',
 			'elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF',
 			'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES'
 		},
 		children: graph.nodes.map((node) => ({ id: node.id, ...nodeSize(node, view) })),
-		edges: graph.edges
-			.filter((e) => ids.has(e.source) && ids.has(e.target) && e.source !== e.target)
-			.map((e, i) =>
-				UPWARD.has(e.kind)
-					? { id: `e${i}`, sources: [e.target], targets: [e.source] }
-					: { id: `e${i}`, sources: [e.source], targets: [e.target] }
-			)
+		edges
 	});
 	const byId = new Map(graph.nodes.map((n) => [n.id, n]));
-	return (result.children ?? []).flatMap((c) => {
+	const nodes = (result.children ?? []).flatMap((c) => {
 		const node = byId.get(c.id);
 		if (!node) return [];
 		return [{ node, x: c.x ?? 0, y: c.y ?? 0, width: c.width ?? 120, height: c.height ?? 40 }];
 	});
+	const routes = new Map<number, Route>();
+	for (const e of result.edges ?? []) {
+		const section = e.sections?.[0];
+		if (!section) continue;
+		const l = e.labels?.[0];
+		routes.set(Number(e.id.slice(1)), {
+			points: [section.startPoint, ...(section.bendPoints ?? []), section.endPoint],
+			label:
+				l &&
+				l.x !== undefined &&
+				l.y !== undefined &&
+				l.width !== undefined &&
+				l.height !== undefined
+					? { x: l.x + l.width / 2, y: l.y + l.height / 2 }
+					: null
+		});
+	}
+	return { nodes, routes };
 }

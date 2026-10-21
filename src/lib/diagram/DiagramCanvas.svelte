@@ -6,6 +6,7 @@
 		Panel,
 		SvelteFlow,
 		ViewportPortal,
+		getViewportForBounds,
 		type Edge,
 		type Node,
 		type NodeTypes,
@@ -27,7 +28,8 @@
 	import ConnectPicker, { type ConnectTarget } from './ConnectPicker.svelte';
 	import { DiagramEditing, provideEditing } from './editing.svelte.ts';
 	import FlowBridge, { type FlowApi } from './FlowBridge.svelte';
-	import { layout, nodeSize, UPWARD, type Direction } from './layout.ts';
+	import { LABEL_HEIGHT, labelWidth, provideLabels } from './labels.svelte.ts';
+	import { edgeText, layout, nodeSize, UPWARD, type Direction, type Layout } from './layout.ts';
 	import { ownersOf, resolveNode } from './model.ts';
 	import NodeMenu, { type MenuItem } from './NodeMenu.svelte';
 	import {
@@ -121,6 +123,34 @@
 		focus?: string;
 	} | null>(null);
 	let confirmError = $state<string | null>(null);
+
+	const labels = provideLabels();
+	// Labels keep clear of nodes, wherever they are dragged.
+	$effect(() => {
+		labels.setObstacles(
+			nodes.map((n) => ({
+				x: n.position.x,
+				y: n.position.y,
+				width: n.width ?? 0,
+				height: n.height ?? 0
+			}))
+		);
+	});
+
+	/** The last automatic layout, reused while the graph and its node sizes stay the same. */
+	let lastLayout: { key: string; result: Layout } | null = null;
+	async function autoLayout(graph: DiagramGraph, direction: Direction): Promise<Layout> {
+		const key = JSON.stringify([
+			direction,
+			view,
+			graph.nodes.map((n) => [n.id, nodeSize(n, view)]),
+			graph.edges
+		]);
+		if (lastLayout?.key === key) return lastLayout.result;
+		const result = await layout(graph, direction, view);
+		lastLayout = { key, result };
+		return result;
+	}
 
 	const editing = provideEditing(
 		new DiagramEditing({
@@ -229,9 +259,50 @@
 		savePositions(Object.fromEntries(nodes.map((n) => [n.id, n.position])));
 	}
 
+	/** What the drawing covers: its nodes, and the routes and labels ELK placed beside them. */
+	function drawingBounds() {
+		const xs: number[] = [];
+		const ys: number[] = [];
+		for (const n of nodes) {
+			xs.push(n.position.x, n.position.x + (n.width ?? 0));
+			ys.push(n.position.y, n.position.y + (n.height ?? 0));
+		}
+		for (const e of edges) {
+			const route = e.data?.route;
+			if (!route) continue;
+			for (const p of route.points) {
+				xs.push(p.x);
+				ys.push(p.y);
+			}
+			if (route.label) {
+				const half = labelWidth(edgeText(e.data!.kind, e.data!.label)) / 2;
+				xs.push(route.label.x - half, route.label.x + half);
+				ys.push(route.label.y - LABEL_HEIGHT / 2, route.label.y + LABEL_HEIGHT / 2);
+			}
+		}
+		if (!xs.length) return null;
+		const x = Math.min(...xs);
+		const y = Math.min(...ys);
+		return { x, y, width: Math.max(...xs) - x, height: Math.max(...ys) - y };
+	}
+
 	function fit() {
 		requestAnimationFrame(() =>
-			requestAnimationFrame(() => void flow?.fitView({ ...FIT, duration: reducedMotion ? 0 : 280 }))
+			requestAnimationFrame(() => {
+				const bounds = drawingBounds();
+				const duration = reducedMotion ? 0 : 280;
+				if (!flow || !bounds || !host) return void flow?.fitView({ ...FIT, duration });
+				const { clientWidth: width, clientHeight: height } = host;
+				const viewport = getViewportForBounds(
+					bounds,
+					width,
+					height,
+					0.15,
+					FIT.maxZoom,
+					FIT.padding
+				);
+				void flow.setViewport(viewport, { duration });
+			})
 		);
 	}
 
@@ -283,12 +354,15 @@
 					dropped = n.id;
 				}
 			}
+			// Laid out every time, also when every node has its place: edges between
+			// nodes that are still where ELK put them follow its routes.
+			const auto = await autoLayout(graph, direction);
+			if (current !== generation) return;
+			const autoAt = new Map(auto.nodes.map((p) => [p.node.id, { x: p.x, y: p.y }]));
 			let positions: Map<string, XY> = fixed;
 			if (!graph.nodes.every((n) => fixed.has(n.id))) {
-				const auto = await layout(graph, direction, view);
-				if (current !== generation) return;
 				positions = placeAround(
-					auto.map((p) => ({
+					auto.nodes.map((p) => ({
 						id: p.node.id,
 						x: p.x,
 						y: p.y,
@@ -333,17 +407,26 @@
 			const ids = new Set(graph.nodes.map((n) => n.id));
 			const labelOf = (id: string) => graph.nodes.find((n) => n.id === id)?.label ?? id;
 			edges = graph.edges
-				.filter((e) => ids.has(e.source) && ids.has(e.target))
-				.map((e, i) => {
+				.map((e, index) => ({ e, index }))
+				.filter(({ e }) => ids.has(e.source) && ids.has(e.target))
+				.map(({ e, index }, i) => {
 					// Drawn from the general end (laid out above), so the line leaves its bottom.
 					const reversed = UPWARD.has(e.kind);
+					const route = auto.routes.get(index);
+					const from = autoAt.get(reversed ? e.target : e.source);
+					const to = autoAt.get(reversed ? e.source : e.target);
 					return {
 						id: `${e.kind}:${e.source}:${e.target}:${i}`,
 						source: reversed ? e.target : e.source,
 						target: reversed ? e.source : e.target,
 						type: 'sysml',
 						ariaLabel: `${e.kind.replace(/_/g, ' ')} from ${labelOf(e.source)} to ${labelOf(e.target)}`,
-						data: { kind: e.kind, label: e.label, reversed }
+						data: {
+							kind: e.kind,
+							label: e.label,
+							reversed,
+							route: route && from && to ? { ...route, from, to } : undefined
+						}
 					};
 				});
 			frameTitle = graph.title;

@@ -1,4 +1,5 @@
 import type { DiagramNode, DiagramView, EdgeKind } from '#lib/engine/types.ts';
+import type { Route, XY } from './layout.ts';
 
 export interface SysmlNodeData extends Record<string, unknown> {
 	node: DiagramNode;
@@ -18,4 +19,6 @@ export interface SysmlEdgeData extends Record<string, unknown> {
 	label: string | null;
 	/** Drawn from the model's target to its source (the general end first, see `UPWARD`). */
 	reversed?: boolean;
+	/** ELK's route, valid while the two nodes stay at `from` and `to` (their positions when it was made). */
+	route?: Route & { from: XY; to: XY };
 }
