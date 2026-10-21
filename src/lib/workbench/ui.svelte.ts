@@ -11,12 +11,8 @@ export type Tab =
 	| { kind: 'view'; name: string; title: string }
 	/** Run a state machine interactively. `machine` is its (qualified) name. */
 	| { kind: 'emulator'; machine: string; title: string }
-	/**
-	 * A read-only file of the OMG standard library, at a line. `name` is the
-	 * element looked for there: when the line is from another release of the
-	 * library, the nearest declaration of that name is shown instead.
-	 */
-	| { kind: 'library'; path: string; line?: number; name?: string };
+	/** A read-only file of the OMG standard library, at a line. */
+	| { kind: 'library'; path: string; line?: number };
 
 export type SelectionSource = 'text' | 'diagram' | 'explorer' | 'inspector' | 'table';
 

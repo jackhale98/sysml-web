@@ -6,7 +6,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { gunzipSync } from 'node:zlib';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { buildCatalog, relocate, searchCatalog, type BundleFile, type Catalog } from './catalog';
+import { buildCatalog, searchCatalog, type BundleFile, type Catalog } from './catalog';
 import { LIBRARY_REVISION, licenseFor, libraryLicense } from './license';
 
 const fixture: BundleFile[] = [
@@ -78,14 +78,6 @@ describe('the library catalog', () => {
 				doc: 'The most general port.'
 			}
 		]);
-	});
-
-	it('finds a name near a line from another release of the library', () => {
-		const text = fixture[0]!.text;
-		expect(relocate(text, 2, 'Port')).toBe(2);
-		expect(relocate(text, 9, 'ports')).toBe(5);
-		expect(relocate(text, 3, undefined)).toBe(3);
-		expect(relocate(text, 3, 'Nowhere')).toBe(3);
 	});
 
 	it('is EPL-2.0, and the toolkit’s own packages Apache-2.0', () => {

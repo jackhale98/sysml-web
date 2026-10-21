@@ -4,18 +4,16 @@
 	import { EditorView, highlightActiveLine, lineNumbers } from '@codemirror/view';
 	import { BookLock } from '@lucide/svelte';
 	import type { Engine } from '#lib/engine/client.ts';
-	import { isStandardFile, relocate } from '#lib/library/catalog.ts';
+	import { isStandardFile } from '#lib/library/catalog.ts';
 	import { libraryFile, licenseFor } from '#lib/library/library.ts';
 	import { editorTheme, highlightEffect, sysmlHighlighting } from '#lib/editor/sysml.ts';
 
 	/**
 	 * A file of the OMG SysML v2 standard library, read-only: the definitions
 	 * every model builds on (ISQ quantities, SI units, Parts, Ports, …). It
-	 * opens at `line`, or at the nearest declaration of `name` when the line
-	 * comes from another release of the library.
+	 * opens at `line`.
 	 */
-	let { path, line, name, engine }: { path: string; line?: number; name?: string; engine: Engine } =
-		$props();
+	let { path, line, engine }: { path: string; line?: number; engine: Engine } = $props();
 
 	let host: HTMLDivElement;
 	/** Marks the line navigated to (none until a line is asked for). */
@@ -68,9 +66,8 @@
 	$effect(() => {
 		if (!view || !line) return;
 		const doc = view.state.doc;
-		const target = relocate(doc.toString(), line, name);
-		if (target > doc.lines) return;
-		const at = doc.line(target).from;
+		if (line > doc.lines) return;
+		const at = doc.line(line).from;
 		view.dispatch({
 			effects: [
 				mark.reconfigure(highlightActiveLine()),

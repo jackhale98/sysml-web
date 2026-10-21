@@ -31,11 +31,8 @@ export interface LanguageContext {
 	path: string;
 	/** The whole project, as the engine expects it. */
 	files(): { path: string; text: string }[];
-	/**
-	 * Open a definition: a project file range, or a library line. `name` is
-	 * the name that was looked up, when known.
-	 */
-	goto(target: DefinitionTarget, name?: string): void;
+	/** Open a definition: a project file range, or a library line. */
+	goto(target: DefinitionTarget): void;
 	/** Apply changes across files as one undoable step. */
 	applyChanges(label: string, changes: FileChange[]): Promise<void>;
 }
@@ -307,7 +304,7 @@ function fixesField(ctx: LanguageContext) {
 function commands(ctx: LanguageContext, open: (state: EditorView['state']) => boolean) {
 	const definition = (view: EditorView, pos = view.state.selection.main.head) => {
 		void ctx.engine.definition(ctx.files(), ctx.path, pos).then((target) => {
-			if (target) ctx.goto(target, wordAt(view, pos) || undefined);
+			if (target) ctx.goto(target);
 		});
 		return true;
 	};

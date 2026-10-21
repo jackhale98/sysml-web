@@ -137,19 +137,3 @@ function hit(item: Item): LibraryHit {
 		? { name, qualifiedName, kind, isDefinition, path, line, doc }
 		: { name, qualifiedName, kind, isDefinition, path, line };
 }
-
-/**
- * The line to show for `name` in a library file: `line` when the name is
- * declared there, otherwise the nearest declaration of that name (a line
- * from another release of the library), otherwise `line` as it is.
- */
-export function relocate(text: string, line: number, name: string | undefined): number {
-	if (!name) return line;
-	let best: number | undefined;
-	for (const d of scanDeclarations(text)) {
-		if (d.name !== name && d.shortName !== name) continue;
-		if (d.line === line) return line;
-		if (best === undefined || Math.abs(d.line - line) < Math.abs(best - line)) best = d.line;
-	}
-	return best ?? line;
-}

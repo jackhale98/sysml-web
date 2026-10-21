@@ -505,7 +505,7 @@
 						{#await loadLibraryFile()}
 							<p class="empty">Opening the library file…</p>
 						{:then LibraryFile}
-							<LibraryFile path={tab.path} line={tab.line} name={tab.name} {engine} />
+							<LibraryFile path={tab.path} line={tab.line} {engine} />
 						{/await}
 					{/key}
 				{:else if tab.path.endsWith('.md') && !tab.raw}
