@@ -6,11 +6,11 @@
  * - The app shell (prerendered pages, the `404.html` SPA fallback, hashed
  *   JS/CSS/fonts, icons and the manifest) is precached when the worker
  *   installs, and served cache-first.
- * - The engines (`engine/*` and the sysml-toolkit's `toolkit/*`, WebAssembly
- *   and the standard library) are not precached, so a phone visiting the
- *   landing page doesn't download them: they are cached on first use
- *   (cache-first afterwards), and the page asks the worker to fill in any
- *   missing engine files once the engine has started.
+ * - The engine (the sysml-toolkit's `toolkit/*`: WebAssembly and the
+ *   standard library) is not precached, so a phone visiting the landing page
+ *   doesn't download it: its files are cached on first use (cache-first
+ *   afterwards), and the page asks the worker to fill in any missing engine
+ *   files once the engine has started.
  * - The toolkit's library snapshots (`*.prepared.gz`, 10 MB, and
  *   `*.libcache.gz`) are never cached here: the toolkit worker downloads the
  *   prepared one into its own cache (`SNAPSHOT_CACHE`) once the app is idle.
@@ -59,16 +59,13 @@ export interface CachePlan {
 	shell: string[];
 	/** Engine files: cached on first use, never at install. */
 	engine: string[];
-	/** The engine's build stamp; when it is unchanged, cached engine files carry over. */
+	/** The engine's stamp (it names the toolkit release); while it is unchanged, cached engine files carry over. */
 	engineStamp: string;
-	/** The toolkit's (it names the release); both must be unchanged for a carry-over. */
-	toolkitStamp: string;
 }
 
-const ENGINE_DIR = 'engine/';
-/** The sysml-toolkit engine, cached on first use like the classic one. */
-const TOOLKIT_DIR = 'toolkit/';
-const engineFile = (path: string) => path.startsWith(ENGINE_DIR) || path.startsWith(TOOLKIT_DIR);
+/** The sysml-toolkit engine, cached on first use. */
+const ENGINE_DIR = 'toolkit/';
+const engineFile = (path: string) => path.startsWith(ENGINE_DIR);
 
 /**
  * Static files not worth keeping offline (type declarations, host markers),
@@ -103,8 +100,7 @@ export function planCaches(input: {
 		fallback: at('404.html'),
 		shell: [...input.immutable.map(at), ...statics.filter((path) => !engineFile(path)).map(at)],
 		engine: statics.filter(engineFile).map(at),
-		engineStamp: at(`${ENGINE_DIR}build.json`),
-		toolkitStamp: at(`${TOOLKIT_DIR}stdlib/manifest.json`)
+		engineStamp: at(`${ENGINE_DIR}stdlib/manifest.json`)
 	};
 }
 

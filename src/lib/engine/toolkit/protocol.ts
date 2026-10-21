@@ -1,40 +1,9 @@
 /**
- * Messages between the page and the toolkit worker. Calls reuse the app's
- * engine protocol (`{id, method, params}` for an `EngineApi` method the
- * toolkit implements); the rest are the worker's own.
+ * Messages between the page and the toolkit worker. Calls are
+ * `{id, method, params}` for an `EngineApi` method; the rest are the
+ * worker's own.
  */
-import type { EngineApi } from '../protocol';
-
-/** The `EngineApi` methods the toolkit implements (the composite routes them here). */
-export const TOOLKIT_METHODS = [
-	// Phase 1: analysis and the model.
-	'version',
-	'analyze',
-	'analyzeProject',
-	'elementDetails',
-	// Phase 2: the editor's language services.
-	'highlight',
-	'format',
-	'complete',
-	'hover',
-	'definition',
-	'references',
-	'renameSymbol',
-	'outline',
-	'codeActions',
-	// Phase 3: views and tables.
-	'listViews',
-	'renderView',
-	'viewLibraries',
-	// Phase 5: diagrams.
-	'diagram',
-	// Phase 6: state machines for the emulator.
-	'stateMachines',
-	// Phase 4: model edits.
-	'edit'
-] as const satisfies readonly (keyof EngineApi)[];
-
-export type ToolkitMethod = (typeof TOOLKIT_METHODS)[number];
+import type { EngineApi, Method } from '../protocol';
 
 /** First message: where the toolkit's files are. */
 export interface ToolkitInit {
@@ -56,7 +25,7 @@ export interface ToolkitPrefetch {
 	type: 'prefetch';
 }
 
-export interface ToolkitCall<M extends ToolkitMethod = ToolkitMethod> {
+export interface ToolkitCall<M extends Method = Method> {
 	type: 'call';
 	id: number;
 	method: M;
@@ -77,8 +46,6 @@ export interface ToolkitStats {
 }
 
 export type ToolkitOutbound =
-	/** The module is downloaded and compiled; the library loads next (CPU, not network). */
-	| { type: 'loaded' }
 	| { type: 'ready'; stats: ToolkitStats }
 	/** Booting failed, or the instance trapped: the worker can't be used again. */
 	| { type: 'fatal'; error: string }

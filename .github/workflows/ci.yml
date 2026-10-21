@@ -24,7 +24,6 @@ jobs:
           cache: npm
 
       - run: npm ci
-      - uses: ./.github/actions/build-engine
 
       # The sysml-toolkit engine (pinned in toolkit.json): the app's engine, and the unit tests'.
       - name: Cache toolkit download

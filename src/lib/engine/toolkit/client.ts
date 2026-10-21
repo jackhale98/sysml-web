@@ -4,17 +4,11 @@
  * started once more and the calls in flight are sent again; if that fails
  * too, every call fails from then on and `onFailure` runs once.
  */
-import type { EngineApi } from '../protocol';
-import type {
-	ToolkitCall,
-	ToolkitInit,
-	ToolkitMethod,
-	ToolkitOutbound,
-	ToolkitStats
-} from './protocol';
+import type { EngineApi, Method } from '../protocol';
+import type { ToolkitCall, ToolkitInit, ToolkitOutbound, ToolkitStats } from './protocol';
 
 export interface ToolkitClient {
-	call<M extends ToolkitMethod>(
+	call<M extends Method>(
 		method: M,
 		...params: Parameters<EngineApi[M]>
 	): Promise<ReturnType<EngineApi[M]>>;
@@ -27,8 +21,6 @@ export interface ToolkitClient {
 }
 
 export interface ToolkitOptions {
-	/** The module has downloaded (the library loads next): the network is free again. */
-	onLoaded?: () => void;
 	onReady?: (stats: ToolkitStats) => void;
 	/** The toolkit could not be started (after one restart): the reason. */
 	onFailure?: (reason: string) => void;
@@ -76,9 +68,6 @@ export function startToolkit(
 	function receive(from: Worker, message: ToolkitOutbound) {
 		if (from !== worker) return;
 		switch (message.type) {
-			case 'loaded':
-				options.onLoaded?.();
-				return;
 			case 'ready':
 				stats = message.stats;
 				options.onReady?.(message.stats);

@@ -32,7 +32,7 @@ async function waitForShell(page: Page) {
 function engineCached(page: Page) {
 	return page.evaluate(async () => {
 		const engine = (await caches.keys()).find((key) => key.startsWith('sysml-web-engine-'));
-		return !!engine && !!(await (await caches.open(engine)).match('/engine/sysml_wasm_bg.wasm'));
+		return !!engine && !!(await (await caches.open(engine)).match('/toolkit/sysmlv2_bg.wasm'));
 	});
 }
 

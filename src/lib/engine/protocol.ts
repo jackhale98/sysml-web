@@ -58,27 +58,3 @@ export interface EngineApi {
 }
 
 export type Method = keyof EngineApi;
-
-/** Methods deleted from the classic engine once the toolkit served them (composite.ts checks). */
-export type RetiredMethod =
-	'stateMachines' | 'diagram' | 'listViews' | 'renderView' | 'viewLibraries' | 'edit';
-
-/** Methods the classic engine's worker still serves. */
-export type ClassicMethod = Exclude<Method, RetiredMethod>;
-
-export interface Request<M extends Method = Method> {
-	id: number;
-	method: M;
-	params: Parameters<EngineApi[M]>;
-}
-
-export type Response =
-	{ id: number; ok: true; result: unknown } | { id: number; ok: false; error: string };
-
-/** First message to the worker: where the engine files are served from. */
-export interface Init {
-	/** The wasm-bindgen ES module (`sysml_wasm.js`). */
-	glueUrl: string;
-	/** The WebAssembly binary (`sysml_wasm_bg.wasm`). */
-	wasmUrl: string;
-}

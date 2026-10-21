@@ -1,8 +1,6 @@
 /**
- * JSON shapes returned by the SysML engine (`sysml-wasm`).
- *
- * These mirror `sysml-core`'s serialized `Model` and `Diagnostic`. Only the
- * fields the app reads are typed; the engine may send more.
+ * The shapes the engine's calls return (`EngineApi`), built from the
+ * sysml-toolkit's model by the adapter in `toolkit/` (docs/engine.md).
  */
 
 export interface Span {
@@ -14,7 +12,7 @@ export interface Span {
 	end_col: number;
 	start_byte: number;
 	end_byte: number;
-	/** UTF-16 offsets into the file (from the toolkit engine; absent from the classic one). */
+	/** UTF-16 offsets into the file, which the editor prefers (absent where only bytes are known). */
 	from?: number;
 	to?: number;
 }
@@ -28,7 +26,7 @@ export interface Definition {
 	short_name?: string;
 	doc?: string;
 	is_abstract?: boolean;
-	/** The toolkit's element id and qualified name (absent from the classic engine). */
+	/** The toolkit's element id and qualified name. */
 	id?: string;
 	qualified_name?: string;
 }
@@ -44,7 +42,7 @@ export interface Usage {
 	value_expr?: string;
 	redefinition?: string;
 	multiplicity?: string;
-	/** The toolkit's element id and qualified name (absent from the classic engine). */
+	/** The toolkit's element id and qualified name. */
 	id?: string;
 	qualified_name?: string;
 }

@@ -40,7 +40,6 @@
 	import Logo from '#lib/ui/Logo.svelte';
 	import { theme, type ThemeChoice } from '#lib/ui/theme.svelte.ts';
 	import { version } from '#lib/version.ts';
-	import engineInfo from '../../../engine.json';
 	import toolkitRelease from '../../../toolkit.json';
 	import {
 		editorFontSizeHere,
@@ -546,17 +545,6 @@
 									rel="noopener noreferrer">sysml-toolkit {toolkitRelease.version}</a
 								>
 								<span class="muted">({engineVersion ?? '…'})</span>
-							</dd>
-							<dt>Classic engine</dt>
-							<dd>
-								sysml-cli
-								<a
-									class="rev"
-									href="{engineInfo.repository}/tree/{engineInfo.rev}"
-									target="_blank"
-									rel="noopener noreferrer">({engineInfo.rev.slice(0, 7)})</a
-								>
-								<span class="muted">· tables, diagrams and edits, until they move</span>
 								<!-- eslint-enable svelte/no-navigation-without-resolve -->
 							</dd>
 						</dl>
@@ -578,7 +566,7 @@
 								href="https://spdx.org/licenses/Apache-2.0.html"
 								target="_blank"
 								rel="noopener noreferrer">Apache License 2.0</a
-							>; the classic engine, sysml-cli, under Apache 2.0 or MIT.
+							>.
 						</p>
 						<p>
 							The OMG SysML v2 and KerML standard library is included unmodified, as bundled by the
@@ -587,12 +575,6 @@
 								href="https://spdx.org/licenses/EPL-2.0.html"
 								target="_blank"
 								rel="noopener noreferrer">Eclipse Public License 2.0</a
-							>. Until the move to the toolkit is finished, the classic engine also carries an
-							earlier release of the library (February 2026) under the
-							<a
-								href="https://spdx.org/licenses/LGPL-3.0-only.html"
-								target="_blank"
-								rel="noopener noreferrer">GNU LGPL 3.0</a
 							>.
 						</p>
 						<button
@@ -1115,10 +1097,6 @@
 	dd {
 		margin: 0;
 		font-family: var(--font-mono);
-	}
-	.rev {
-		margin-left: 4px;
-		color: var(--text-2);
 	}
 	.notice pre {
 		max-height: 14rem;

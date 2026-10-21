@@ -15,11 +15,8 @@ const manifest = {
 		'.nojekyll',
 		'favicon.svg',
 		'manifest.webmanifest',
-		'engine/LICENSE-MIT',
-		'engine/build.json',
-		'engine/sysml_wasm.d.ts',
-		'engine/sysml_wasm.js',
-		'engine/sysml_wasm_bg.wasm',
+		'toolkit/LICENSE',
+		'toolkit/sysmlv2.d.ts',
 		'toolkit/sysmlv2.js',
 		'toolkit/sysmlv2_bg.wasm',
 		'toolkit/stdlib/sysml-library.json.gz',
@@ -42,17 +39,13 @@ describe('planCaches', () => {
 			'/sysml-web/manifest.webmanifest'
 		]);
 		expect(plan.engine).toEqual([
-			'/sysml-web/engine/LICENSE-MIT',
-			'/sysml-web/engine/build.json',
-			'/sysml-web/engine/sysml_wasm.js',
-			'/sysml-web/engine/sysml_wasm_bg.wasm',
+			'/sysml-web/toolkit/LICENSE',
 			// The toolkit's snapshots are left to its worker (10 MB is not for every visitor).
 			'/sysml-web/toolkit/sysmlv2.js',
 			'/sysml-web/toolkit/sysmlv2_bg.wasm',
 			'/sysml-web/toolkit/stdlib/sysml-library.json.gz'
 		]);
-		expect(plan.engineStamp).toBe('/sysml-web/engine/build.json');
-		expect(plan.toolkitStamp).toBe('/sysml-web/toolkit/stdlib/manifest.json');
+		expect(plan.engineStamp).toBe('/sysml-web/toolkit/stdlib/manifest.json');
 	});
 
 	it('works at the site root', () => {
@@ -60,7 +53,7 @@ describe('planCaches', () => {
 		expect(plan.base).toBe('');
 		expect(plan.pages).toEqual(['/', '/projects', '/p/demo']);
 		expect(plan.fallback).toBe('/404.html');
-		expect(plan.engine).toContain('/engine/sysml_wasm_bg.wasm');
+		expect(plan.engine).toContain('/toolkit/sysmlv2_bg.wasm');
 	});
 });
 
@@ -135,16 +128,16 @@ describe('routeRequest', () => {
 			});
 
 			it('caches the engine on use', () => {
-				expect(get(`${base}/engine/sysml_wasm_bg.wasm`)).toEqual({
+				expect(get(`${base}/toolkit/sysmlv2_bg.wasm`)).toEqual({
 					strategy: 'engine',
-					key: `${base}/engine/sysml_wasm_bg.wasm`
+					key: `${base}/toolkit/sysmlv2_bg.wasm`
 				});
-				expect(navigate(`${base}/engine/LICENSE-MIT`).strategy).toBe('engine');
+				expect(navigate(`${base}/toolkit/LICENSE`).strategy).toBe('engine');
 			});
 
 			it('leaves everything else to the network', () => {
 				expect(get(`${base}/_app/version.json`)).toEqual({ strategy: 'network' });
-				expect(get(`${base}/engine/sysml_wasm.d.ts`)).toEqual({ strategy: 'network' });
+				expect(get(`${base}/toolkit/sysmlv2.d.ts`)).toEqual({ strategy: 'network' });
 				expect(get(`${base}/toolkit/stdlib/sysml-library.prepared.gz`)).toEqual({
 					strategy: 'network'
 				});
@@ -157,7 +150,7 @@ describe('routeRequest', () => {
 						plan
 					)
 				).toEqual({ strategy: 'network' });
-				expect(get(`${base}/engine/sysml_wasm_bg.wasm`, 'cors', { range: true })).toEqual({
+				expect(get(`${base}/toolkit/sysmlv2_bg.wasm`, 'cors', { range: true })).toEqual({
 					strategy: 'network'
 				});
 			});
@@ -169,7 +162,7 @@ describe('routeRequest', () => {
 		for (const url of [
 			'https://api.github.com/user/repos',
 			'https://avatars.githubusercontent.com/u/1',
-			'https://other.example/sysml-web/engine/sysml_wasm_bg.wasm'
+			'https://other.example/sysml-web/toolkit/sysmlv2_bg.wasm'
 		]) {
 			expect(routeRequest({ url, method: 'GET', mode: 'cors' }, origin, plan)).toEqual({
 				strategy: 'network'

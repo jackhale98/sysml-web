@@ -3,28 +3,19 @@ import { pwa } from '#lib/offline/pwa.svelte.ts';
 import { SNAPSHOT_CACHE } from '#lib/offline/caching.ts';
 import { toasts } from '#lib/ui/toasts.svelte.ts';
 import toolkitRelease from '../../../toolkit.json';
-import { startEngine, type Engine } from './client';
-import { composeEngine } from './composite';
+import { toolkitEngine, type Engine } from './client';
 import { startToolkit, type ToolkitClient } from './toolkit/client';
 
 let engine: Engine | undefined;
 let toolkit: ToolkitClient | undefined;
 
-// Absolute URLs: the workers resolve relative ones against their own script.
+// Absolute URLs: the worker resolves relative ones against its own script.
 const absolute = (path: string) =>
 	new URL(asset(path as Parameters<typeof asset>[0]), location.href).href;
 
-/** The app-wide engine (the toolkit, with the classic engine for what isn't ported yet), started on first use. */
+/** The app-wide engine (the sysml-toolkit, in a worker), started on first use. */
 export function getEngine(): Engine {
 	if (engine) return engine;
-	const classic = startEngine(
-		() => ({
-			glueUrl: absolute('engine/sysml_wasm.js'),
-			wasmUrl: absolute('engine/sysml_wasm_bg.wasm')
-		}),
-		// Keep the engine for offline use, once it has been used.
-		{ onReady: () => pwa.warmEngineCache() }
-	);
 	toolkit = startToolkit(
 		() => ({
 			glueUrl: absolute('toolkit/sysmlv2.js'),
@@ -35,11 +26,9 @@ export function getEngine(): Engine {
 			snapshotCache: SNAPSHOT_CACHE
 		}),
 		{
-			// On a slow network the toolkit's download comes first (analysis waits for it);
-			// the classic engine (diagrams, edits) downloads while the library loads.
-			onLoaded: () => void classic.version().catch(() => undefined),
 			onReady: (stats) => {
 				performance.mark('sysml:toolkit-ready', { detail: stats });
+				// Keep the engine for offline use, once it has been used.
 				pwa.warmEngineCache();
 				if (stats.library === 'source')
 					whenIdle(() => wantsSnapshot() && toolkit?.prefetchSnapshot());
@@ -52,7 +41,7 @@ export function getEngine(): Engine {
 				})
 		}
 	);
-	engine = composeEngine(classic, toolkit);
+	engine = toolkitEngine(toolkit);
 	return engine;
 }
 

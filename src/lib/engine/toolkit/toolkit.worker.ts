@@ -9,18 +9,12 @@
  * Storage; later starts load the library from it (measured on a throttled
  * phone: 2.6 s to ready instead of 8.2 s, and 105 MB of memory instead of 160).
  */
-import type { SourceFile } from '../protocol';
+import type { Method, SourceFile } from '../protocol';
 import type { DiagramView, EditRequest } from '../types';
 import type { Toolkit } from './api';
 import { ToolkitHost } from './host';
 import { SyntaxServices } from './language';
-import type {
-	ToolkitCall,
-	ToolkitInbound,
-	ToolkitInit,
-	ToolkitMethod,
-	ToolkitOutbound
-} from './protocol';
+import type { ToolkitCall, ToolkitInbound, ToolkitInit, ToolkitOutbound } from './protocol';
 
 const scope = self as unknown as DedicatedWorkerGlobalScope;
 const started = performance.now();
@@ -76,7 +70,6 @@ async function boot(i: ToolkitInit): Promise<ToolkitHost> {
 	tk.install_panic_hook?.();
 	const early = new SyntaxServices(tk);
 	syntaxReady(early);
-	post({ type: 'loaded' });
 	const bundle = new TextDecoder().decode(await gunzipMaybe(await bundleBytes));
 	const libraryStart = performance.now();
 	let library: ToolkitHost['library'] | undefined;
@@ -134,7 +127,7 @@ async function prefetch(i: ToolkitInit) {
 }
 
 type Handler = (host: ToolkitHost, ...params: never[]) => unknown;
-const handlers: { [M in ToolkitMethod]: Handler } = {
+const handlers: { [M in Method]: Handler } = {
 	version: (host) => host.version(),
 	analyze: (host, path: string, source: string) => host.analyze(path, source),
 	analyzeProject: (host, files: SourceFile[]) => host.analyzeProject(files),

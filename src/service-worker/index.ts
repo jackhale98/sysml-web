@@ -59,25 +59,17 @@ async function storeFallback(shell: Cache) {
 	await shell.put(plan.fallback, page);
 }
 
-/** Reuse the engines cached by an earlier build when the engines themselves haven't changed. */
+/** Reuse the engine cached by an earlier build when the engine itself hasn't changed. */
 async function carryOverEngine() {
 	const earlier = earlierEngineCaches(await caches.keys(), names);
 	if (!earlier.length) return;
-	const stamps = [plan.engineStamp, plan.toolkitStamp];
-	const current = await Promise.all(
-		stamps.map((path) =>
-			fetch(fresh(path))
-				.then((response) => (response.ok ? response.text() : null))
-				.catch(() => null)
-		)
-	);
-	if (current.some((stamp) => stamp === null)) return;
+	const current = await fetch(fresh(plan.engineStamp))
+		.then((response) => (response.ok ? response.text() : null))
+		.catch(() => null);
+	if (current === null) return;
 	for (const name of earlier) {
 		const old = await caches.open(name);
-		const same = await Promise.all(
-			stamps.map(async (path, i) => (await (await old.match(path))?.text()) === current[i])
-		);
-		if (!same.every(Boolean)) continue;
+		if ((await (await old.match(plan.engineStamp))?.text()) !== current) continue;
 		const engine = await caches.open(names.engine);
 		for (const request of await old.keys()) {
 			const response = await old.match(request);

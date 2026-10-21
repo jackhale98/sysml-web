@@ -12,7 +12,6 @@ export default ts.config(
 			'node_modules/',
 			'playwright-report/',
 			'test-results/',
-			'static/engine/',
 			'static/toolkit/',
 			'.cache/',
 			'.lighthouseci/',

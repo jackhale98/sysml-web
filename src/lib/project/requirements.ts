@@ -116,7 +116,7 @@ function linksTo(usage: Usage, links: TraceLink[]): string[] {
 	const names = referencesTo(usage);
 	const targets = links
 		.filter((link) => {
-			// The toolkit resolves the link's requirement; the classic engine gives its name.
+			// A resolved link names its requirement by id; an unresolved one only by name.
 			if (link.requirement_id && usage.id) return link.requirement_id === usage.id;
 			const segments = link.requirement.split('::');
 			return names.has(link.requirement) || names.has(segments[segments.length - 1] ?? '');
