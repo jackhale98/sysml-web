@@ -35,21 +35,22 @@ phone first visit, 2.6 s on return with the prepared snapshot) and memory
 (105–160 MB vs 24 MB). Reports: `scratchpad/engine-evaluation.md`,
 `scratchpad/toolkit-browser-measurements.md` (in the session record).
 
-How: one engine interface (`EngineApi`, 26 methods) stays the app's only
-contract. A composite engine routes each method to the toolkit once it is
-ported and to the current engine until then; the screens don't change.
-Ported pieces that the toolkit doesn't provide are written in TypeScript
-over the toolkit's model (tables, diagrams, emulator, `.kpar`, library
-browser). Fallback while both exist: if the toolkit fails to load or its
-worker crashes, restart once, then route everything to the current engine.
+How: one engine interface (`EngineApi`) stays the app's only contract. The
+toolkit is the default engine from phase 1; methods not yet ported are
+routed to the current engine as a temporary convenience, and each phase
+deletes its routes until phase 7 deletes the current engine. Nobody uses
+the app yet, so there is no setting, no dual-engine testing and no
+fallback: a crashed toolkit worker restarts once, then shows an error.
+Pieces the toolkit doesn't provide are written in TypeScript over its model
+(tables, diagrams, emulator, `.kpar`, library browser); those that don't
+need a model run in parallel with the foundation.
 
-1. **Foundation** — toolkit worker and client; release pinned in
-   `toolkit.json` and fetched in every workflow; byte ↔ UTF-16 offsets;
-   start-up without a snapshot, prepared snapshot fetched in the
-   background for later visits; the composite engine with a setting
-   (Settings → Engine, `?engine=toolkit`); analysis and the model adapter
+1. **Foundation** — toolkit worker and client as the default engine;
+   release pinned in `toolkit.json` and fetched in every workflow; byte ↔
+   UTF-16 offsets; start-up without a snapshot, prepared snapshot fetched
+   in the background for later visits; analysis and the model adapter
    (explorer, tree, inspector details, requirements, overview, problems);
-   crash handling; the e2e suite running on both engines in CI.
+   worker restart on crash.
 2. **Editor** — completion, hover, definition, references, rename,
    format, code actions and highlighting from the toolkit's language
    server.
@@ -60,13 +61,17 @@ worker crashes, restart once, then route everything to the current engine.
    retarget), composed where it has no single operation.
 5. **Diagrams** — the seven diagram graphs in TypeScript over the model.
 6. **The rest** — state machine emulator, `.kpar` read/write, library
-   browser.
-7. **Switch** — after parity (the whole e2e suite green on the toolkit)
-   and a real-iPhone test of memory: make the toolkit the default, keep
-   the fallback one release, then remove the current engine and its
-   build. Upstream requests (lighter build, on-demand library packages,
-   declaration-header edit, semantic diagnostics in its language server,
-   consistent offsets) are drafted for the owner to file.
+   browser. The emulator is done: `src/lib/sim/emulator.ts` runs any
+   `StateMachine` in TypeScript (extraction still comes from the current
+   engine); `parity.test.ts` checks it against the old `stateStep` and
+   lists where it follows the SysML/UML semantics instead.
+7. **Remove the current engine** — once nothing routes to it: delete it,
+   its build and the `?toolkit` test build. On a real iPhone the toolkit
+   held 154–160 MB with no growth over 20 edits and no tab kill (library
+   build 3.2 s, analysis 0.3 s). Upstream requests (lighter build,
+   on-demand library packages, declaration-header edit, semantic
+   diagnostics in its language server, consistent offsets) are drafted for
+   the owner to file.
 
 ---
 
@@ -780,7 +785,7 @@ Engine gaps found while authoring the demo (inputs to Phase 1):
 | 12 | Every table is a SysML view rendered by the engine (`renderView`); standard tables ship as `ModelViews.sysml`, so tables are reproducible in any conformant tool | 2026-10-21 |
 | 13 | Diagrams follow SysML v2 graphical notation strictly (definitions square, usages rounded, standard edge adornments, diagram frames); element families add colour, never replace shape | 2026-10-21 |
 | 14 | A document-centric reading of the model is offered as a *perspective* over SysML views, not as a separate data model | 2026-10-21 |
-| 16 | Move the app onto the Open-MBEE sysml-toolkit engine (one core, maintained by an organisation) in place of our own `sysml-cli` engine; features the toolkit lacks are written in TypeScript over its model; the switch is gradual behind one engine interface, with our engine as fallback until parity and a real-phone memory test | 2026-10-21 |
+| 16 | Move the app onto the Open-MBEE sysml-toolkit engine (one core, maintained by an organisation) in place of our own `sysml-cli` engine; features the toolkit lacks are written in TypeScript over its model; the app switches to it directly (no users yet), porting piece by piece behind one engine interface | 2026-10-21 |
 | 15 | Spreadsheets in and out without a spreadsheet library: hand-written OOXML and a small ZIP over the browser's `CompressionStream`; imported requirements become SysML written the way the engine's own edits write it (one `insertMember` per import, checked against the engine in tests), in one undoable change | 2026-10-21 |
 | 8 | Element ids use the normative KerML 9.1 scheme for library and user models alike (project URI as base) | 2026-10-21 |
 | 6 | Engine built in the `sysml-cli` workspace (new `sysml-semantic`, `sysml-interchange`, `sysml-wasm` crates); this app consumes its WASM release | 2026-10-21 |

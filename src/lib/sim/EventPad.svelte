@@ -188,7 +188,7 @@
 			onclick={() => onfire(null)}
 			aria-disabled={busy || !running}
 			aria-keyshortcuts="S"
-			title="Take completion, guard-only and change (when …) transitions (S)"
+			title="Take completion, guard-only, change (when …) and time (after …) transitions (S)"
 		>
 			<StepForward size={17} aria-hidden="true" />
 			<span class="step-text">

@@ -16,7 +16,6 @@ import type {
 	LibraryLicense,
 	RenderedTable,
 	StateMachine,
-	StateSession,
 	ViewInfo
 } from './types';
 
@@ -47,13 +46,6 @@ interface Wasm {
 	librarySearch(query: string, limit: number): string;
 	libraryLicense(): string;
 	stateMachines(files: string): string;
-	stateStep(
-		files: string,
-		machine: string,
-		session: string | null,
-		event: string | null,
-		variables: string | null
-	): string;
 }
 
 const scope = self as unknown as DedicatedWorkerGlobalScope;
@@ -117,24 +109,7 @@ const handlers: { [M in Method]: (wasm: Wasm, ...params: never[]) => unknown } =
 		JSON.parse(wasm.librarySearch(query, limit)) as LibraryHit[],
 	libraryLicense: (wasm): LibraryLicense => JSON.parse(wasm.libraryLicense()) as LibraryLicense,
 	stateMachines: (wasm, files: unknown): StateMachine[] =>
-		JSON.parse(wasm.stateMachines(JSON.stringify(files))) as StateMachine[],
-	stateStep: (
-		wasm,
-		files: unknown,
-		machine: string,
-		session: unknown,
-		event: string | null,
-		variables: unknown
-	): StateSession =>
-		JSON.parse(
-			wasm.stateStep(
-				JSON.stringify(files),
-				machine,
-				session ? JSON.stringify(session) : null,
-				event,
-				variables ? JSON.stringify(variables) : null
-			)
-		) as StateSession
+		JSON.parse(wasm.stateMachines(JSON.stringify(files))) as StateMachine[]
 };
 
 scope.onmessage = async (event: MessageEvent<Init | Request>) => {

@@ -19,7 +19,6 @@ import type {
 	LibraryLicense,
 	RenderedTable,
 	StateMachine,
-	StateSession,
 	ViewInfo
 } from './types';
 
@@ -68,14 +67,6 @@ export interface EngineApi {
 	librarySearch(query: string, limit: number): LibraryHit[];
 	libraryLicense(): LibraryLicense;
 	stateMachines(files: SourceFile[]): StateMachine[];
-	/** Start (null session) or advance a machine; variables override values first. */
-	stateStep(
-		files: SourceFile[],
-		machine: string,
-		session: StateSession | null,
-		event: string | null,
-		variables: Record<string, unknown> | null
-	): StateSession;
 }
 
 export type Method = keyof EngineApi;
