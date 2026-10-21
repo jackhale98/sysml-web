@@ -216,7 +216,9 @@
 	</div>
 
 	{#if mode === 'model'}
-		{#if !ready}
+		{#if workspace.state.phase === 'error' && !workspace.elements.length}
+			<p class="empty">The model could not be read. See Problems.</p>
+		{:else if !ready}
 			<p class="empty">Reading the model…</p>
 		{:else if needle}
 			<section aria-labelledby="results-heading" class="results">

@@ -83,7 +83,7 @@
 				<Timer size={14} aria-hidden="true" />
 				{#if workspace.state.phase === 'ready'}Analysed in {duration(
 						workspace.state.millis
-					)}{:else}Analysing…{/if}
+					)}{:else if workspace.state.phase === 'error'}Not analysed{:else}Analysing…{/if}
 			</li>
 		</ul>
 	</div>
