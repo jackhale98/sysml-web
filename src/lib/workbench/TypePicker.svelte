@@ -242,7 +242,8 @@
 										>{:else}{seg.text}{/if}{/each}</span
 							>
 							<span class="description"
-								>{#if s.description}{s.description}{' · '}{/if}<span class="detail">{s.detail}</span
+								>{#if s.description}<span>{s.description}</span>{/if}<span class="detail"
+									>{s.detail}</span
 								></span
 							>
 						</span>
@@ -345,6 +346,10 @@
 	}
 	.detail {
 		color: var(--text-3);
+	}
+	.description > span + .detail::before {
+		margin: 0 0.35em;
+		content: '·';
 	}
 	.new {
 		display: inline-grid;
