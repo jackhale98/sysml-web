@@ -28,7 +28,7 @@
 	import type { DefinitionTarget } from '#lib/engine/types.ts';
 	import { sysmlLanguage } from '#lib/editor/language.ts';
 	import { editorTheme, highlightEffect, sysmlHighlighting } from '#lib/editor/sysml.ts';
-	import { settings } from '#lib/settings/settings.svelte.ts';
+	import { editorFontSizeHere, settings } from '#lib/settings/settings.svelte.ts';
 	import { byteToUtf16, elementAt, utf16ToByte } from '#lib/project/elements.ts';
 	import type { Workspace } from '#lib/project/workspace.svelte.ts';
 	import type { WorkbenchUi } from './ui.svelte.ts';
@@ -48,8 +48,8 @@
 	let revealing = false;
 
 	/**
-	 * On phones the text is for reading first: read-only, soft-wrapped and at
-	 * 16 px (so focusing it never zooms the page). "Edit text" turns typing on.
+	 * On phones the text is for reading first: read-only and soft-wrapped.
+	 * "Edit text" turns typing on.
 	 */
 	const phone = $derived(ui.phone);
 	const editable = $derived(!phone || ui.editingText);
@@ -62,7 +62,6 @@
 	let canRedo = $state(false);
 
 	const phoneTheme = EditorView.theme({
-		'&': { fontSize: '16px' },
 		'.cm-content': { padding: '10px 0 96px' },
 		'.cm-line': { padding: '0 12px 0 8px' },
 		'.cm-gutters': { fontSize: '11px', minWidth: '0' },
@@ -78,7 +77,7 @@
 		return [
 			...(numbers ? [lineNumbers()] : []),
 			...(!small && wrap ? [EditorView.lineWrapping] : []),
-			...(small ? [] : [EditorView.theme({ '&': { fontSize: `${size}px` } })])
+			EditorView.theme({ '&': { fontSize: `${editorFontSizeHere(size)}px` } })
 		];
 	}
 	$effect(() => {

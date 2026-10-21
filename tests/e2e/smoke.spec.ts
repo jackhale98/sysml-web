@@ -315,6 +315,40 @@ test.describe('on a phone', () => {
 		await expectNoSidewaysScroll(page);
 	});
 
+	async function editorFontSize(page: Page, setting: number) {
+		await page.addInitScript((size) => {
+			localStorage.setItem('sysml-web:settings', JSON.stringify({ editorFontSize: size }));
+		}, setting);
+		await openDemo(page);
+		await page
+			.getByRole('navigation', { name: 'Sections' })
+			.getByRole('button', { name: 'Model' })
+			.click();
+		await page.getByRole('tab', { name: 'Files' }).click();
+		await page.getByRole('button', { name: /^DroneArchitecture\.sysml/ }).click();
+		await page
+			.getByRole('group', { name: 'Show the model as' })
+			.getByRole('button', { name: /Text/ })
+			.click();
+		return page.locator('.cm-editor').evaluate((e) => getComputedStyle(e).fontSize);
+	}
+
+	test('on a phone, the editor uses the text size setting', async ({ page }) => {
+		expect(await editorFontSize(page, 19)).toBe('19px');
+	});
+
+	test.describe('on an iPhone', () => {
+		test.use({
+			userAgent:
+				'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1'
+		});
+		test('on an iPhone, the editor text is never small enough to zoom the page', async ({
+			page
+		}) => {
+			expect(await editorFontSize(page, 12)).toBe('16px');
+		});
+	});
+
 	test('on a phone, a file opens as its diagram and its text is read-only until Edit text', async ({
 		page
 	}) => {

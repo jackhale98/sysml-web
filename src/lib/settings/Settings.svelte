@@ -41,7 +41,13 @@
 	import { theme, type ThemeChoice } from '#lib/ui/theme.svelte.ts';
 	import { version } from '#lib/version.ts';
 	import engineInfo from '../../../engine.json';
-	import { FONT_SIZES, settings } from './settings.svelte.ts';
+	import {
+		editorFontSizeHere,
+		FONT_SIZES,
+		IOS_MIN_FONT_SIZE,
+		settings,
+		zoomsSmallText
+	} from './settings.svelte.ts';
 
 	let {
 		open = $bindable(false),
@@ -50,6 +56,8 @@
 	}: { open?: boolean; section?: SettingsSection; engine?: Engine } = $props();
 
 	const uid = $props.id();
+	/** The editor's text size as it shows on this device. */
+	const fontSize = $derived(editorFontSizeHere(settings.editorFontSize));
 	let dialog = $state<HTMLDialogElement>();
 	let tabs = $state<HTMLDivElement>();
 
@@ -306,22 +314,27 @@
 				{:else if section === 'editor'}
 					<div class="field">
 						<label for="{uid}-font">Text size</label>
+						{#if zoomsSmallText()}
+							<p class="help">
+								At least {IOS_MIN_FONT_SIZE}px here, so typing doesn't zoom the page.
+							</p>
+						{/if}
 						<div class="range">
 							<input
 								id="{uid}-font"
 								type="range"
-								min={FONT_SIZES.min}
+								min={zoomsSmallText() ? IOS_MIN_FONT_SIZE : FONT_SIZES.min}
 								max={FONT_SIZES.max}
 								step="1"
-								bind:value={settings.editorFontSize}
-								aria-valuetext="{settings.editorFontSize} pixels"
+								value={fontSize}
+								oninput={(e) => (settings.editorFontSize = Number(e.currentTarget.value))}
+								aria-valuetext="{fontSize} pixels"
 							/>
-							<output for="{uid}-font">{settings.editorFontSize}px</output>
+							<output for="{uid}-font">{fontSize}px</output>
 						</div>
-						<pre
-							class="sample"
-							style:font-size="{settings.editorFontSize}px"
-							aria-hidden="true"><span class="k">part def</span> <span class="d">Drone</span> &#123;
+						<pre class="sample" style:font-size="{fontSize}px" aria-hidden="true"><span class="k"
+								>part def</span
+							> <span class="d">Drone</span> &#123;
     <span class="k">attribute</span> mass : <span class="t">MassValue</span>;
 &#125;</pre>
 					</div>

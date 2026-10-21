@@ -35,6 +35,23 @@ export const DEFAULTS: SettingsValues = {
 
 export const FONT_SIZES = { min: 11, max: 20 };
 
+/** iOS zooms the page into any text field set smaller than this while typing in it. */
+export const IOS_MIN_FONT_SIZE = 16;
+
+/** Whether this is an iPhone or iPad (iPads may say they are Macs). */
+export function zoomsSmallText(): boolean {
+	if (typeof navigator === 'undefined') return false;
+	return (
+		/iPhone|iPad|iPod/.test(navigator.userAgent) ||
+		(/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
+	);
+}
+
+/** The editor's text size here: the setting, but never small enough for iOS to zoom. */
+export function editorFontSizeHere(size: number): number {
+	return zoomsSmallText() ? Math.max(size, IOS_MIN_FONT_SIZE) : size;
+}
+
 const KEY = 'sysml-web:settings';
 
 /** Stored values, checked one by one so a bad or older entry falls back to the default. */
@@ -142,7 +159,7 @@ function apply(values: SettingsValues) {
 		if (values.density === 'compact') root.style.setProperty(name, value);
 		else root.style.removeProperty(name);
 	}
-	root.style.setProperty('--editor-font-size', `${values.editorFontSize}px`);
+	root.style.setProperty('--editor-font-size', `${editorFontSizeHere(values.editorFontSize)}px`);
 	if (values.motion === 'system') delete root.dataset.motion;
 	else root.dataset.motion = values.motion;
 	// The reduced-motion override needs a rule; the system preference has one in global.css.
