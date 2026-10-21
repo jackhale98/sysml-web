@@ -95,6 +95,15 @@ async function runOnce(run) {
 		...(phone ? PHONE : DESKTOP),
 		serviceWorkers: opt.cache === 'cold' ? 'block' : 'allow'
 	});
+	// Main-thread long tasks from document start, for every target alike.
+	await context.addInitScript(() => {
+		window.__longTasks = [];
+		try {
+			new PerformanceObserver((l) => {
+				for (const e of l.getEntries()) window.__longTasks.push({ start: Math.round(e.startTime), ms: Math.round(e.duration) });
+			}).observe({ type: 'longtask', buffered: true });
+		} catch {}
+	});
 	const page = await context.newPage();
 	const session = await context.newCDPSession(page);
 	await session.send('Network.enable');
@@ -136,6 +145,7 @@ async function runOnce(run) {
 		wire.clear();
 		workers.clear();
 	}
+	await fetch(`${opt.base}/__stats?reset`).catch(() => null);
 	const t0 = Date.now();
 	await page.goto(url, { waitUntil: 'load' });
 	await page.waitForFunction(isDone, null, { timeout: 900000, polling: 250 });
@@ -182,6 +192,15 @@ async function runOnce(run) {
 		};
 	};
 	result.memory = [await memory('ready')];
+	{
+		const lt = await page.evaluate(() => window.__longTasks ?? []);
+		const after = result.page.workspaceReady;
+		const tbt = (list) => list.reduce((s, t) => s + Math.max(0, t.ms - 50), 0);
+		const pre = lt.filter((t) => t.start < after);
+		const post = lt.filter((t) => t.start >= after);
+		result.longTasks = { beforeWorkspaceReady: { count: pre.length, blockingMs: tbt(pre), max: Math.max(0, ...pre.map((t) => t.ms)) }, afterWorkspaceReady: { count: post.length, blockingMs: tbt(post), max: Math.max(0, ...post.map((t) => t.ms)), list: post } };
+	}
+	result.served = await (await fetch(`${opt.base}/__stats`).catch(() => null))?.json().catch(() => null);
 	if (opt.target !== 'app') {
 		const stats = await page.evaluate(() => window.__toolkitStats);
 		const origin = result.page.timeOrigin;

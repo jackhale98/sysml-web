@@ -28,15 +28,18 @@ const types = {
 };
 const compressible = /^(text\/|application\/(javascript|json|wasm|manifest\+json)|image\/svg)/;
 const cache = new Map();
+/** Bytes sent per path since the last `GET /__stats?reset` (for the measurement harness). */
+let sent = {};
 
 function load(file) {
+	const mtime = fs.statSync(file).mtimeMs;
 	let entry = cache.get(file);
-	if (!entry) {
+	if (!entry || entry.mtime !== mtime) {
 		const body = fs.readFileSync(file);
 		const type = types[path.extname(file)] ?? 'application/octet-stream';
 		const gz = compressible.test(type) ? zlib.gzipSync(body, { level: 6 }) : null;
 		const etag = '"' + crypto.createHash('sha1').update(body).digest('hex').slice(0, 16) + '"';
-		entry = { body, gz, type, etag };
+		entry = { body, gz, type, etag, mtime };
 		cache.set(file, entry);
 	}
 	return entry;
@@ -55,6 +58,12 @@ function resolveFile(pathname) {
 http
 	.createServer((req, res) => {
 		const url = new URL(req.url, 'http://x');
+		if (url.pathname === '/__stats') {
+			const body = JSON.stringify(sent);
+			if (url.searchParams.has('reset')) sent = {};
+			res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+			return res.end(body);
+		}
 		let file = resolveFile(url.pathname);
 		let status = 200;
 		if (!file) {
@@ -76,6 +85,10 @@ http
 			Vary: 'Accept-Encoding',
 			...(gzip ? { 'Content-Encoding': 'gzip' } : {})
 		});
+		const key = url.pathname + url.search;
+		sent[key] = sent[key] ?? { requests: 0, bytes: 0, gzip: !!gzip };
+		sent[key].requests++;
+		sent[key].bytes += req.method === 'HEAD' ? 0 : body.length;
 		res.end(req.method === 'HEAD' ? undefined : body);
 	})
 	.listen(port, () => console.log(`serving ${root} on http://localhost:${port} (GitHub-Pages-like gzip)`));
