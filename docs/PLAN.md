@@ -8,20 +8,35 @@ SysML text in a git repository is the single source of truth; every change is a
 minimal, reviewable diff that any other conformant tool can read. It runs well
 on desktop and mobile.
 
-Status: **Phase 0 complete; Phase 2 workbench started on the current engine.**
-- Engine → WebAssembly, element identity (all 404,686 OMG library ids), `.kpar`
-  interchange: merged in `sysml-cli`.
-- Editor services (highlighting, diagram graphs, source edits, project-wide
-  analysis): `sysml-cli` PR #2.
-- Workbench (§7.2): explorer, CodeMirror editor coloured by the engine, live
-  General View beside the text, Add / Rename / Delete on diagrams and in the
-  inspector writing minimal SysML edits, inspector with concept explanations,
-  requirements view, problems, phone layout. Lighthouse: landing 0.98–1 and
-  workbench 0.94 (mobile) / 1.0 (desktop) performance; 1.0 accessibility,
-  best practices and SEO everywhere.
-- Demo model authored for teaching (`src/demo/drone`, guided tour in
-  `TOUR.md`).
-
+Status (2026-10-21): **Phases 2–4 largely built on the current engine; now
+finishing Phase 1 (the semantic engine core).**
+- Built: workbench with text and diagram editing (General, Interconnection,
+  states, actions, packages), language features (completion, hover,
+  definition, references, rename, format, quick fixes), property form,
+  unified undo; tables as SysML views, editable in place; requirements,
+  trace and verification matrices; projects in the browser, folders,
+  `.kpar`/zip import and export; GitHub source control (commit, branches,
+  pull requests, three-way merge); state machine emulator; OMG standard
+  library browser; settings; touch-first phone layout. Lighthouse ≥ 0.9
+  performance and 1.0 accessibility on mobile and desktop, enforced in CI.
+- Gap: name resolution is approximate (per-file summaries plus a lexer
+  index with a global by-name fallback), so checks give false warnings
+  (W001, W005, W013, W016 on the demo) and diagrams miss inherited ports,
+  flows and bindings.
+- Engine core plan, in three stages:
+  1. Semantic model in `sysml-semantic`: CST lowering to the KerML/SysML
+     element graph, name resolution by the KerML rules, implied
+     relationships, standard library. Verified against the release's
+     resolved library (`sysml.library.xmi`, `.xmi.implied`) and with zero
+     unresolved names across the OMG examples, training and validation
+     models and the demo.
+  2. Checks, diagrams and editor services moved onto it; JSON export.
+  3. Web app integration and performance (prebuilt library, < 30 ms
+     re-analysis).
+- Not yet started: reports (specification, ICD), semantic diff and review
+  mode, Sequence view, FMEA and hazard views, spreadsheet import,
+  CSV/XLSX/PDF export, Systems Modeling API client, conformance dashboard,
+  offline/PWA.
 ---
 
 ## 1. Why this, and why now
