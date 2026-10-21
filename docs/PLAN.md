@@ -8,35 +8,66 @@ SysML text in a git repository is the single source of truth; every change is a
 minimal, reviewable diff that any other conformant tool can read. It runs well
 on desktop and mobile.
 
-Status (2026-10-21): **Phases 2–4 largely built on the current engine; now
-finishing Phase 1 (the semantic engine core).**
-- Built: workbench with text and diagram editing (General, Interconnection,
-  states, actions, packages), language features (completion, hover,
-  definition, references, rename, format, quick fixes), property form,
-  unified undo; tables as SysML views, editable in place; requirements,
-  trace and verification matrices; projects in the browser, folders,
-  `.kpar`/zip import and export; GitHub source control (commit, branches,
-  pull requests, three-way merge); state machine emulator; OMG standard
-  library browser; settings; touch-first phone layout. Lighthouse ≥ 0.9
-  performance and 1.0 accessibility on mobile and desktop, enforced in CI.
-- Gap: name resolution is approximate (per-file summaries plus a lexer
-  index with a global by-name fallback), so checks give false warnings
-  (W001, W005, W013, W016 on the demo) and diagrams miss inherited ports,
-  flows and bindings.
-- Engine core plan, in three stages:
-  1. Semantic model in `sysml-semantic`: CST lowering to the KerML/SysML
-     element graph, name resolution by the KerML rules, implied
-     relationships, standard library. Verified against the release's
-     resolved library (`sysml.library.xmi`, `.xmi.implied`) and with zero
-     unresolved names across the OMG examples, training and validation
-     models and the demo.
-  2. Checks, diagrams and editor services moved onto it; JSON export.
-  3. Web app integration and performance (prebuilt library, < 30 ms
-     re-analysis).
-- Not yet started: reports (specification, ICD), semantic diff and review
-  mode, Sequence view, FMEA and hazard views, spreadsheet import,
-  CSV/XLSX/PDF export, Systems Modeling API client, conformance dashboard,
-  offline/PWA.
+Status (2026-10-21): **Phases 2–4 largely built; the app is moving onto the
+Open-MBEE sysml-toolkit engine (decision #16).**
+- Built: workbench with text and diagram editing, language features,
+  property form with type suggestions, unified undo; tables as SysML views,
+  editable in place; requirements, trace and verification matrices;
+  generated specification and ICD reports; spreadsheet import and table
+  export; projects in the browser, folders, `.kpar`/zip; GitHub source
+  control; state machine emulator; library browser; settings; offline and
+  installable; touch-first phone layout. Lighthouse ≥ 0.9 performance and
+  1.0 accessibility on mobile and desktop, enforced in CI.
+- Not yet started: semantic diff and review mode, Sequence view, FMEA and
+  hazard views, Systems Modeling API client, conformance dashboard.
+
+### Engine migration (decision #16)
+
+Why: the current engine (`sysml-cli`, tree-sitter) resolves names
+approximately — 48 of its 78 findings on the demo are false, it accepts
+invalid SysML, and it has no standard JSON interchange. The toolkit
+resolves 99.96 % of the official corpus's references, agrees with the
+release XMI on 99.90 % of library relationships, rejects 440 of 462
+invalid fixtures (ours: 63) and exports schema-valid JSON. Measured in the
+browser on a throttled phone it re-analyses as fast as ours and never
+blocks the main thread; its costs are start-up (library model: 5–7 s on a
+phone first visit, 2.6 s on return with the prepared snapshot) and memory
+(105–160 MB vs 24 MB). Reports: `scratchpad/engine-evaluation.md`,
+`scratchpad/toolkit-browser-measurements.md` (in the session record).
+
+How: one engine interface (`EngineApi`, 26 methods) stays the app's only
+contract. A composite engine routes each method to the toolkit once it is
+ported and to the current engine until then; the screens don't change.
+Ported pieces that the toolkit doesn't provide are written in TypeScript
+over the toolkit's model (tables, diagrams, emulator, `.kpar`, library
+browser). Fallback while both exist: if the toolkit fails to load or its
+worker crashes, restart once, then route everything to the current engine.
+
+1. **Foundation** — toolkit worker and client; release pinned in
+   `toolkit.json` and fetched in every workflow; byte ↔ UTF-16 offsets;
+   start-up without a snapshot, prepared snapshot fetched in the
+   background for later visits; the composite engine with a setting
+   (Settings → Engine, `?engine=toolkit`); analysis and the model adapter
+   (explorer, tree, inspector details, requirements, overview, problems);
+   crash handling; the e2e suite running on both engines in CI.
+2. **Editor** — completion, hover, definition, references, rename,
+   format, code actions and highlighting from the toolkit's language
+   server.
+3. **Views and tables** — view listing and table rendering in TypeScript
+   (`expose`, `@TableRendering`, editable columns); reports follow.
+4. **Edits** — every inspector, table and diagram edit through the
+   toolkit's transform operations (rename, set value, insert, remove,
+   retarget), composed where it has no single operation.
+5. **Diagrams** — the seven diagram graphs in TypeScript over the model.
+6. **The rest** — state machine emulator, `.kpar` read/write, library
+   browser.
+7. **Switch** — after parity (the whole e2e suite green on the toolkit)
+   and a real-iPhone test of memory: make the toolkit the default, keep
+   the fallback one release, then remove the current engine and its
+   build. Upstream requests (lighter build, on-demand library packages,
+   declaration-header edit, semantic diagnostics in its language server,
+   consistent offsets) are drafted for the owner to file.
+
 ---
 
 ## 1. Why this, and why now
@@ -749,6 +780,7 @@ Engine gaps found while authoring the demo (inputs to Phase 1):
 | 12 | Every table is a SysML view rendered by the engine (`renderView`); standard tables ship as `ModelViews.sysml`, so tables are reproducible in any conformant tool | 2026-10-21 |
 | 13 | Diagrams follow SysML v2 graphical notation strictly (definitions square, usages rounded, standard edge adornments, diagram frames); element families add colour, never replace shape | 2026-10-21 |
 | 14 | A document-centric reading of the model is offered as a *perspective* over SysML views, not as a separate data model | 2026-10-21 |
+| 16 | Move the app onto the Open-MBEE sysml-toolkit engine (one core, maintained by an organisation) in place of our own `sysml-cli` engine; features the toolkit lacks are written in TypeScript over its model; the switch is gradual behind one engine interface, with our engine as fallback until parity and a real-phone memory test | 2026-10-21 |
 | 15 | Spreadsheets in and out without a spreadsheet library: hand-written OOXML and a small ZIP over the browser's `CompressionStream`; imported requirements become SysML written the way the engine's own edits write it (one `insertMember` per import, checked against the engine in tests), in one undoable change | 2026-10-21 |
 | 8 | Element ids use the normative KerML 9.1 scheme for library and user models alike (project URI as base) | 2026-10-21 |
 | 6 | Engine built in the `sysml-cli` workspace (new `sysml-semantic`, `sysml-interchange`, `sysml-wasm` crates); this app consumes its WASM release | 2026-10-21 |
