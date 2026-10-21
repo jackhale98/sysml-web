@@ -77,6 +77,14 @@ export function nodeSize(node: DiagramNode, view = 'general'): { width: number; 
 	return { width, height: Math.round(height) };
 }
 
+/**
+ * Relationships drawn from the specific to the general (a specialization,
+ * a typing, a derived requirement to its original, a design element to the
+ * requirement it satisfies): laid out with the general end first, so
+ * supertypes, definitions and requirements sit above what refers to them.
+ */
+export const UPWARD = new Set(['specialization', 'typing', 'dependency', 'satisfy', 'verify']);
+
 let elk: Promise<{ layout(graph: unknown): Promise<ElkResult> }> | undefined;
 
 interface ElkResult {
@@ -111,7 +119,11 @@ export async function layout(
 		children: graph.nodes.map((node) => ({ id: node.id, ...nodeSize(node, view) })),
 		edges: graph.edges
 			.filter((e) => ids.has(e.source) && ids.has(e.target) && e.source !== e.target)
-			.map((e, i) => ({ id: `e${i}`, sources: [e.source], targets: [e.target] }))
+			.map((e, i) =>
+				UPWARD.has(e.kind)
+					? { id: `e${i}`, sources: [e.target], targets: [e.source] }
+					: { id: `e${i}`, sources: [e.source], targets: [e.target] }
+			)
 	});
 	const byId = new Map(graph.nodes.map((n) => [n.id, n]));
 	return (result.children ?? []).flatMap((c) => {

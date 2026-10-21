@@ -1,7 +1,8 @@
 /**
  * How a SysML view is presented: views with a `@TableRendering` are tables
  * the engine renders; the standard diagram views (SysML v2 clause 9.2.20)
- * are drawn from what they expose.
+ * are drawn from what they expose (a general view from the view usage
+ * itself, so its filters apply; the others from the element it exposes).
  */
 import type { DiagramView, ViewInfo } from '#lib/engine/types.ts';
 
@@ -24,10 +25,10 @@ export function presentationOf(view: ViewInfo): Presentation {
 	const scope = exposes.length === 1 ? exposedName(exposes[0]!) : null;
 	switch (view.definition) {
 		case 'GeneralView':
-			// Several exposed packages: requirement trees are the common case.
-			return exposes.length > 1
-				? { kind: 'diagram', view: 'requirements', scope: null }
-				: { kind: 'diagram', view: 'general', scope };
+			// The view itself is the scope: the engine draws what it exposes, filtered.
+			if (exposes.length && !view.builtin)
+				return { kind: 'diagram', view: 'general', scope: view.qualifiedName ?? view.name };
+			return { kind: 'diagram', view: 'general', scope };
 		case 'InterconnectionView':
 			return scope ? { kind: 'diagram', view: 'interconnection', scope } : { kind: 'none' };
 		case 'StateTransitionView':

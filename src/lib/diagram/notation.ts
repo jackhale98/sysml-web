@@ -61,10 +61,15 @@ const PLURAL: Record<string, string> = {
 	verify: 'verifies',
 	subject: 'subject',
 	objective: 'objective',
-	'use case': 'use cases'
+	'use case': 'use cases',
+	entry: 'actions',
+	do: 'actions',
+	exit: 'actions',
+	render: 'rendering'
 };
 
 const DIRECTIONS = new Set(['in', 'out', 'inout']);
+const STATE_ACTIONS = new Set(['entry', 'do', 'exit']);
 const HIDDEN = /succession|_node$|^(first|then|accept|send|assign|if|while|for|loop)$/;
 
 /** "in port" → { base: "port", direction: "in" }. */
@@ -132,7 +137,9 @@ export function notationOf(node: DiagramNode, view: 'general' | 'interconnection
 		// Control nodes and successions belong to the flow, not to a compartment.
 		if (!text.trim() || HIDDEN.test(rawKeyword)) continue;
 		const { base: rowBase, direction } = splitKeyword(rawKeyword);
-		const row = direction ? `${direction} ${text}` : text;
+		let row = direction ? `${direction} ${text}` : text;
+		// A state's entry, do and exit actions read as `entry / alertOperator`.
+		if (STATE_ACTIONS.has(rowBase)) row = `${rowBase} / ${text}`;
 		if (rowBase === 'port' && view === 'interconnection') {
 			ports.push({ label: row, side: direction === 'out' ? 'right' : 'left' });
 			continue;

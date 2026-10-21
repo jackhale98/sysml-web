@@ -5,7 +5,7 @@
  * `scripts/build-engine.sh`, so it is not part of the app bundle.
  */
 import type { ClassicMethod, Init, Request, Response, SourceFile } from './protocol';
-import type { Analysis, DiagramGraph, Highlights, RenderedTable, ViewInfo } from './types';
+import type { Analysis, Highlights, RenderedTable, ViewInfo } from './types';
 
 interface Wasm {
 	default(options: { module_or_path: string }): Promise<unknown>;
@@ -13,7 +13,6 @@ interface Wasm {
 	analyze(path: string, source: string): string;
 	analyzeProject(files: string): string;
 	highlight(source: string): string;
-	diagram(view: string, files: string, scope: string | null): string;
 	listViews(files: string): string;
 	renderView(files: string, name: string): string;
 	viewLibraries(): string;
@@ -53,8 +52,6 @@ const handlers: { [M in ClassicMethod]: (wasm: Wasm, ...params: never[]) => unkn
 	analyzeProject: (wasm, files: unknown): Analysis[] =>
 		JSON.parse(wasm.analyzeProject(JSON.stringify(files))) as Analysis[],
 	highlight: (wasm, source: string): Highlights => JSON.parse(wasm.highlight(source)) as Highlights,
-	diagram: (wasm, view: string, files: unknown, scope: string | null): DiagramGraph =>
-		JSON.parse(wasm.diagram(view, JSON.stringify(files), scope)) as DiagramGraph,
 	listViews: (wasm, files: unknown): ViewInfo[] =>
 		JSON.parse(wasm.listViews(JSON.stringify(files))) as ViewInfo[],
 	renderView: (wasm, files: unknown, name: string): RenderedTable =>

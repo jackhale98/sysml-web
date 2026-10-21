@@ -69,7 +69,6 @@ export function startEngine(
 		analyze: (...params) => call('analyze', ...params),
 		analyzeProject: (...params) => call('analyzeProject', ...params),
 		highlight: (...params) => call('highlight', ...params),
-		diagram: (...params) => call('diagram', ...params),
 		listViews: (...params) => call('listViews', ...params),
 		renderView: (...params) => call('renderView', ...params),
 		viewLibraries: (...params) => call('viewLibraries', ...params),

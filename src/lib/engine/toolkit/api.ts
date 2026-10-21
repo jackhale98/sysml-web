@@ -63,6 +63,8 @@ export interface TkSession {
 	evaluate(e: TkElement): string;
 	/** Whether `e` reaches `general` through its specializations. */
 	conforms(e: TkElement, general: TkElement): boolean;
+	/** JSON `{qualifiedName, id, rendering, exposed: [{id, qualifiedName, metaclass}], …}` of a view usage. */
+	viewInfo(qualifiedName: string): string;
 }
 
 export interface TkLspServer {

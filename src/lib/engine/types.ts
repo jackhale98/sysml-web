@@ -387,6 +387,8 @@ export type EdgeKind =
 	| 'composition'
 	| 'specialization'
 	| 'connection'
+	| 'binding'
+	| 'typing'
 	| 'flow'
 	| 'transition'
 	| 'satisfy'
@@ -405,6 +407,8 @@ export interface DiagramNode {
 	/** Compartment rows: `[keyword, text]`. */
 	attributes: [string, string][];
 	is_definition: boolean;
+	/** Where the element the node draws is declared (absent for pseudo states and control nodes). */
+	element?: { file: string; start_byte: number };
 }
 
 export interface DiagramEdge {
