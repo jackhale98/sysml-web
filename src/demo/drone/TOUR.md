@@ -83,10 +83,22 @@ Diagram: **`DroneViews::flightModeStates`**.
 
 `satisfy 'Battery protection' by drone.battery` assigns each requirement to the part
 responsible. `DronePerformance::HoverEndurance` is a calculation with units, and the
-analyses `massBudget` and `enduranceBudget` show the margins: 0.23 kg below the mass
-limit and 2.5 minutes above the endurance target.
+analyses `massBudget` and `enduranceBudget` state the margins: 0.23 kg below the
+mass limit and 2.5 minutes above the endurance target.
 
-## 11. Proving it: `DroneVerification::enduranceFlightTest`
+## 11. Budgets and checks: `DroneViews::designChecks`
+
+Because the requirements state their limits as constraints with units, the app can check
+them against the design. `satisfy 'Flight endurance' by drone` binds the requirement's
+subject to `drone`, so `drone.endurance >= 25 [min]` is evaluated with the drone's values:
+216 W·h × 0.85 / 400 W = 27.5 minutes, so it is **satisfied**, with 2.5 minutes to spare.
+Change `hoverPower` in `DroneArchitecture::drone` to `450 [W]` and the check turns
+**violated** and shows up under Problems; Undo puts it back. The take-off mass check is
+**undecided**: the engine cannot yet add up `rotors.mass` over four rotors, and the view
+says so. Tables: **`DroneViews::droneMassBudget`** adds up what each part weighs (2.77 kg
+empty) and **`DroneViews::dronePowerBudget`** what each part draws in hover (397 W).
+
+## 12. Proving it: `DroneVerification::enduranceFlightTest`
 
 A verification case names what it tests (its subject), what it verifies (its
 objective), the method (`@VerificationMethod`) and how the verdict is decided.
@@ -95,7 +107,7 @@ purpose: nothing satisfies or verifies `'Ingress protection'` (SYS-005) or
 `'Acoustic noise'` (SYS-006), and `'Controlled parcel release'` (SYS-011) is not
 verified yet.
 
-## 12. What could go wrong: `DroneFmea`
+## 13. What could go wrong: `DroneFmea`
 
 A design FMEA. Hazards lead to harms (`Causation`). Risk controls are requirements
 on the design. Mitigations are the work that implements them (`satisfy`). Each
@@ -103,7 +115,7 @@ on the design. Mitigations are the work that implements them (`satisfy`). Each
 calculated from the ratings, never typed in. Two risk controls are not verified yet.
 Diagram: **`DroneViews::fmeaWorksheet`**.
 
-## 13. Documents for review: `DroneViews::droneSpecification`
+## 14. Documents for review: `DroneViews::droneSpecification`
 
 Not everyone who reviews the design reads SysML. A report is a view too: it puts
 what it exposes into a document. `droneSpecification` lists the needs and

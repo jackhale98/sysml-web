@@ -62,3 +62,23 @@ test('on a phone, every main screen fits the width without panning sideways', as
 	await expect(page.locator('.cards .card').first()).toBeVisible();
 	await expectFitsWidth(page, 'the requirements table');
 });
+
+test('on a phone, the budgets and the checks are cards that fit the width', async ({ page }) => {
+	await openDemo(page);
+	for (const [view, card] of [
+		['Drone mass budget', '720 g'],
+		['Drone power budget', '397 W'],
+		['Design checks', 'Satisfied']
+	] as const) {
+		await nav(page, 'Views');
+		const open = page.getByRole('button', { name: new RegExp(`^${view}`) }).first();
+		await open.scrollIntoViewIfNeeded();
+		await open.click();
+		await expect(page.locator('.cards .card').filter({ hasText: card }).first()).toBeVisible({
+			timeout: 15_000
+		});
+		await expectFitsWidth(page, view);
+		await page.locator('.cards-scroll').evaluate((el) => el.scrollTo(0, el.scrollHeight));
+		await expectFitsWidth(page, `the end of ${view}`);
+	}
+});

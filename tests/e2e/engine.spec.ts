@@ -26,14 +26,12 @@ const libraryLoad = (page: Page) =>
 			)?.detail?.library
 	);
 
-test('the model is analysed by the sysml-toolkit, with only the real problems', async ({
-	page
-}) => {
+test('the model is analysed by the sysml-toolkit, without false problems', async ({ page }) => {
 	await openDemo(page);
 	const footer = page.locator('footer');
 	await expect(footer).toContainText('engine toolkit 0.10.10');
-	// The two genuine warnings (`estimate` has no type); the earlier engine reported 78 findings.
-	await expect(page.getByRole('button', { name: 'Problems: 0 errors, 2 warnings' })).toBeVisible();
+	// No problems (the earlier engine reported 78 findings, most of them false).
+	await expect(page.getByRole('button', { name: 'Problems: 0 errors, 0 warnings' })).toBeVisible();
 	await expect(page.getByRole('tree', { name: 'Model' })).toContainText('DroneArchitecture');
 	await expectAccessible(page);
 });
@@ -57,7 +55,7 @@ test('later visits load the library from the snapshot fetched in the background'
 		.toBe(1);
 	await openDemo(page);
 	expect(await libraryLoad(page)).toBe('snapshot');
-	await expect(page.getByRole('button', { name: 'Problems: 0 errors, 2 warnings' })).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Problems: 0 errors, 0 warnings' })).toBeVisible();
 });
 
 test('when the toolkit cannot start, it is retried once and then says so', async ({ page }) => {

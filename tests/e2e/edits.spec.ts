@@ -90,7 +90,7 @@ test('renaming updates references in every file; deleting says what no longer re
 	await motor.getByRole('button', { name: 'Delete' }).click();
 	await motor.getByRole('alert').getByRole('button', { name: 'Delete' }).click();
 	await expect(toasts(page)).toContainText(
-		'2 references to Motor no longer resolve (DroneComponents::Rotor::motor)'
+		'3 references to Motor no longer resolve (DroneComponents::Rotor::motor)'
 	);
 	await toasts(page).getByRole('button', { name: 'Undo' }).last().click();
 	await expect(page.getByRole('button', { name: /^Problems/ })).not.toContainText(/[1-9] error/);
