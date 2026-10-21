@@ -38,7 +38,7 @@ function skipTrivia(text: string, i: number): number {
 /** Index of the `}` matching the `{` at `open`, or -1. */
 export function matchBrace(text: string, open: number): number {
 	let depth = 0;
-	for (let i = open; i < text.length; ) {
+	for (let i = open; i < text.length;) {
 		const next = skipTrivia(text, i);
 		if (next !== i) {
 			i = next;
@@ -60,7 +60,7 @@ export function headerEnd(
 	from: number,
 	to = text.length
 ): { index: number; char: '{' | ';' } | null {
-	for (let i = from; i < to; ) {
+	for (let i = from; i < to;) {
 		const next = skipTrivia(text, i);
 		if (next !== i) {
 			i = next;
@@ -261,7 +261,7 @@ export function findStatement(
 }
 
 function insideComment(text: string, at: number): boolean {
-	for (let i = 0; i < at; ) {
+	for (let i = 0; i < at;) {
 		const next = skipTrivia(text, i);
 		if (next > at && (text[i] === '/' || text[i] === "'" || text[i] === '"')) {
 			return text[i] === '/';

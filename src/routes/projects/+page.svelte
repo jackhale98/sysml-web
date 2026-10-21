@@ -45,7 +45,8 @@
 	onMount(() => {
 		folderAccess = canOpenFolders();
 		void refresh();
-		if (new URLSearchParams(location.search).has('new') || location.hash === '#new') void tick().then(() => nameField?.focus());
+		if (new URLSearchParams(location.search).has('new') || location.hash === '#new')
+			void tick().then(() => nameField?.focus());
 	});
 
 	async function refresh() {
