@@ -61,12 +61,7 @@ export type Method = keyof EngineApi;
 
 /** Methods deleted from the classic engine once the toolkit served them (composite.ts checks). */
 export type RetiredMethod =
-	| 'stateMachines'
-	| 'diagram'
-	| 'listViews'
-	| 'renderView'
-	| 'viewLibraries'
-	| 'edit';
+	'stateMachines' | 'diagram' | 'listViews' | 'renderView' | 'viewLibraries' | 'edit';
 
 /** Methods the classic engine's worker still serves. */
 export type ClassicMethod = Exclude<Method, RetiredMethod>;
