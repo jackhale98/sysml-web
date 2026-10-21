@@ -8,3 +8,5 @@ LICENSE-*
 /static/engine
 docs
 README.md
+/.cache
+/src/demo/**/*.sysml

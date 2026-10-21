@@ -623,10 +623,24 @@ Each phase ends in something usable and demoable; vertical slices over breadth.
   pinned in Phase 1 against the library XMI and the pilot.
 - ~~Engine crates~~ (`sysml-semantic`, `sysml-interchange`, `sysml-wasm`),
   relicensing, wasm CI — `sysml-cli` PR #1; grammar PR #1.
-- ~~SvelteKit app scaffold~~, CI, Pages deploy. Design system, app shell and
-  engine worker integration with the demo project.
-- _Exit_: the demo project opens in the browser, analysed by the WASM engine,
-  inside the real app shell.
+- ~~SvelteKit app scaffold~~, CI, Pages deploy. ~~Design system, app shell and
+  engine worker integration with the demo project~~ — landing page, project
+  shell with the §7.2 areas, Overview, read-only Requirements grid with detail
+  panel ("Show SysML"), Model browser; engine built from the pinned
+  `sysml-cli` revision (`engine.json`, `scripts/build-engine.sh`) and run in a
+  Web Worker; e2e + axe tests pass with zero violations.
+- ~~_Exit_: the demo project opens in the browser, analysed by the WASM engine,
+  inside the real app shell.~~ **Met.**
+
+Found in Phase 0, to address in Phases 1–2:
+- The engine analyses files one at a time, so cross-file references produce
+  false warnings (W004 unresolved types, W016 unbound ports). Phase 1's
+  project-level semantic model removes them.
+- Coverage ignores `#derivation` links, so stakeholder needs appear as gaps
+  even when their derived requirements are covered; requirement checks also
+  fire on library `requirement def`s.
+- W013 (camelCase) flags quoted titles; it should respect the project's name
+  style (§7.3).
 
 **Phase 1 — Semantic engine core**
 - Lowering, element graph, resolution, imports, implied specializations,

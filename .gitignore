@@ -12,7 +12,6 @@ blob-report
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
-# Compiled Rust/WASM engine artifacts (built separately)
-/static/engine/*.wasm
-/static/engine/*.wasm.map
-/engine/target
+# The SysML engine is built from sysml-cli by scripts/build-engine.sh
+/static/engine/
+/.cache/

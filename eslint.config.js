@@ -11,7 +11,9 @@ export default ts.config(
 			'dist/',
 			'node_modules/',
 			'playwright-report/',
-			'test-results/'
+			'test-results/',
+			'static/engine/',
+			'.cache/'
 		]
 	},
 	js.configs.recommended,

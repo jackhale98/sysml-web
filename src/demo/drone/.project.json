@@ -1,0 +1,24 @@
+{
+	"name": "Drone UAV",
+	"description": "Demo project: a small quadcopter delivery drone with requirements, structure, verification and a design FMEA.",
+	"version": "0.1.0",
+	"license": "Apache-2.0 OR MIT",
+	"usage": [
+		{
+			"resource": "https://www.omg.org/spec/SysML/20250201/Systems-Library.kpar",
+			"versionConstraint": "2.0.0"
+		},
+		{
+			"resource": "https://www.omg.org/spec/SysML/20250201/Quantities-and-Units-Domain-Library.kpar",
+			"versionConstraint": "2.0.0"
+		},
+		{
+			"resource": "https://www.omg.org/spec/SysML/20250201/Metadata-Domain-Library.kpar",
+			"versionConstraint": "2.0.0"
+		},
+		{
+			"resource": "https://www.omg.org/spec/SysML/20250201/Requirement-Derivation-Domain-Library.kpar",
+			"versionConstraint": "2.0.0"
+		}
+	]
+}
