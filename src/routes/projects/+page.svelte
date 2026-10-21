@@ -419,6 +419,10 @@
 	.dark:hover {
 		opacity: 0.9;
 	}
+	.dark:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
 	.gh {
 		display: inline-flex;
 		align-items: center;
