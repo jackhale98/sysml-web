@@ -25,6 +25,8 @@ jobs:
 
       - run: npm ci
       - uses: ./.github/actions/build-engine
+      # The sysml-toolkit (pinned in toolkit.json): its standard library feeds the library browser.
+      - run: scripts/fetch-toolkit.sh
       - run: npm run format:check
       - run: npm run lint
       - run: npm run check

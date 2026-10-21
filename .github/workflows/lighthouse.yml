@@ -30,6 +30,7 @@ jobs:
 
       - run: npm ci
       - uses: ./.github/actions/build-engine
+      - run: scripts/fetch-toolkit.sh
       - run: npm run build
 
       - name: Install Chrome
