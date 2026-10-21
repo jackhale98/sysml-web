@@ -74,10 +74,12 @@ export interface ElementRecord {
 	derived: boolean;
 	end: boolean;
 	membership: string | null;
-	/** Ids of the explicit types (`: T`), resolved. */
+	/** Ids of the explicit types (`: T`), resolved; for `~T`, the port def T (with `conjugated`). */
 	typeIds: string[];
-	/** Ids of the specializations (`:>`) the tree graph resolves. */
+	/** Ids of the specializations (`:>`) the tree graph resolves (definitions and part-like usages). */
 	generalIds: string[];
+	/** The feature this one redefines, through its redefinitions (`redefinitionRoot`). */
+	rootId: string | null;
 }
 
 /** A satisfy or verify link with its resolved ends, by element id. */
@@ -310,8 +312,10 @@ export function extractModel(
 			derived: row['property:isDerived'] === true,
 			end: row['property:isEnd'] === true,
 			membership,
-			typeIds: typingsOf.get(id) ?? [],
-			generalIds: generals ?? []
+			// For `~T`, the port def T (the toolkit types it by the conjugate it makes in T).
+			typeIds: (typingsOf.get(id) ?? []).map((t, i) => (i === 0 && typeTarget ? typeTarget : t)),
+			generalIds: generals ?? [],
+			rootId: rootOf.get(id) ?? null
 		};
 		records.push(record);
 		byId.set(id, record);

@@ -1,6 +1,8 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
+import type { ToolkitHost } from '#lib/engine/toolkit/host.ts';
+import { loadHost } from '#lib/engine/toolkit/testing.ts';
 import type { Analysis, ViewInfo } from '#lib/engine/types.ts';
 import { buildTree, collectElements } from '#lib/project/elements.ts';
 import { collectRequirements } from '#lib/project/requirements.ts';
@@ -15,13 +17,6 @@ import { toMarkdown } from './markdown.ts';
 import { defaultExposes, reportLibrary } from './save.ts';
 
 const ROOT = join(import.meta.dirname, '../../demo/drone');
-const ENGINE = join(import.meta.dirname, '../../../static/engine');
-
-interface Wasm {
-	initSync(options: { module: Buffer }): void;
-	analyzeProject(files: string): string;
-	listViews(files: string): string;
-}
 
 function walk(dir: string): string[] {
 	return readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
@@ -29,14 +24,14 @@ function walk(dir: string): string[] {
 	);
 }
 
-let wasm: Wasm;
+let host: ToolkitHost;
 let demo: Record<string, string>;
 const DATE = new Date('2026-10-21T12:00:00Z');
 
 function sourceFor(texts: Record<string, string>): ReportSource {
 	const list = Object.entries(texts).map(([path, text]) => ({ path, text }));
-	const analyses = JSON.parse(wasm.analyzeProject(JSON.stringify(list))) as Analysis[];
-	const views = JSON.parse(wasm.listViews(JSON.stringify(list))) as ViewInfo[];
+	const analyses: Analysis[] = host.analyzeProject(list);
+	const views: ViewInfo[] = host.listViews(list);
 	return {
 		views,
 		analyses,
@@ -67,8 +62,7 @@ const facts = (s: Section) =>
 	);
 
 beforeAll(async () => {
-	wasm = (await import(/* @vite-ignore */ join(ENGINE, 'sysml_wasm.js'))) as Wasm;
-	wasm.initSync({ module: readFileSync(join(ENGINE, 'sysml_wasm_bg.wasm')) });
+	host = await loadHost();
 	demo = Object.fromEntries(
 		walk(ROOT)
 			.filter((f) => f.endsWith('.sysml'))

@@ -25,7 +25,9 @@ import type {
 	Highlights,
 	Hover,
 	OutlineItem,
-	StateMachine
+	RenderedTable,
+	StateMachine,
+	ViewInfo
 } from '../types';
 import type {
 	TkFinding,
@@ -44,10 +46,13 @@ import { extractMachines } from './machines';
 import { detailsOf, extractModel, findElement, type ExtractedModel, type UnitInfo } from './model';
 import { TextIndexCache } from './offsets';
 import { RepairMap } from './repair';
+import * as views from './views';
 
 /** A session over `files`, with how its units map to them; not analysed yet. */
 interface Prepared {
 	files: SourceFile[];
+	/** The files and the view libraries the project lacks: what the session holds. */
+	all: SourceFile[];
 	session: TkSession;
 	units: Map<string, UnitInfo>;
 	/** Parse errors (the session holds the repaired texts of the files that have them). */
@@ -61,6 +66,8 @@ interface Built {
 	units: Map<string, UnitInfo>;
 	analyses: Analysis[];
 	extracted: ExtractedModel | null;
+	/** The tables' index of the model, made on the first view call. */
+	views?: views.ViewContext;
 	/** The state machines, read on first ask. */
 	machines?: StateMachine[];
 }
@@ -166,7 +173,7 @@ export class ToolkitHost {
 		this.settled = undefined;
 		this.pending = null;
 		try {
-			const single = this.build([{ path, text: source }]);
+			const single = this.build([{ path, text: source }], false);
 			single.session?.free();
 			return single.analyses[0]!;
 		} finally {
@@ -204,7 +211,14 @@ export class ToolkitHost {
 		const built = this.built && sameFiles(this.built.files, files) ? this.built : null;
 		// An edit needs the session, not the analysis: an analysed build, or a session alone.
 		const start: Prepared = built?.session
-			? { files, session: built.session, units: built.units, parse: [], lenient: false }
+			? {
+					files,
+					all: [...built.units.values()].map((u) => ({ path: u.path, text: u.original.text })),
+					session: built.session,
+					units: built.units,
+					parse: [],
+					lenient: false
+				}
 			: this.prepare(files);
 		const editing = new ModelEditing({
 			tk: this.tk,
@@ -226,11 +240,13 @@ export class ToolkitHost {
 				if (editing.inSync && !repaired) {
 					// The session holds the edited texts: their analysis starts from it.
 					const changed = editing.changedTexts();
-					const edited = files.map((f) => ({ path: f.path, text: changed.get(f.path) ?? f.text }));
+					const edit = (f: SourceFile) => ({ path: f.path, text: changed.get(f.path) ?? f.text });
+					const all = start.all.map(edit);
 					this.keepPending({
-						files: edited,
+						files: files.map(edit),
+						all,
 						session,
-						units: this.unitsOf(edited, edited),
+						units: this.unitsOf(all, all),
 						parse: [],
 						lenient: false
 					});
@@ -242,6 +258,32 @@ export class ToolkitHost {
 	private keepPending(next: Prepared | null) {
 		if (this.pending && this.pending.session !== next?.session) this.pending.session.free();
 		this.pending = next;
+	}
+
+	/** The project's views and the bundled libraries' (phase 3). */
+	listViews(files: SourceFile[]): ViewInfo[] {
+		return views.listViews(this.viewContext(files));
+	}
+
+	/** A view rendered as a table by its `@TableRendering`. */
+	renderView(files: SourceFile[], name: string): RenderedTable {
+		return views.renderView(this.viewContext(files), name);
+	}
+
+	/** The view libraries every project has (`Reporting`, `ModelViews`). */
+	viewLibraries(): SourceFile[] {
+		return views.viewLibraries();
+	}
+
+	private viewContext(files: SourceFile[]): views.ViewContext {
+		const built = this.build(files);
+		built.views ??= new views.ViewContext({
+			session: built.session,
+			extracted: built.extracted,
+			content: new Set(files.map((f) => f.path)),
+			texts: new Map([...built.units.values()].map((u) => [u.path, u.original.text]))
+		});
+		return built.views;
 	}
 
 	/** A standard view of the project as a diagram graph (`diagrams/`). */
@@ -273,13 +315,13 @@ export class ToolkitHost {
 		return { session: built.session, units: built.units };
 	}
 
-	private build(files: SourceFile[]): Built {
+	private build(files: SourceFile[], withViewLibraries = true): Built {
 		if (this.built && sameFiles(this.built.files, files)) return this.built;
 		const started = performance.now();
 		const previous = this.built;
 		this.built = null;
 		previous?.session?.free();
-		const { session, units, parse, lenient } = this.prepare(files);
+		const { session, units, parse, lenient } = this.prepare(files, withViewLibraries);
 		const findings = session ? (JSON.parse(session.check()) as TkFinding[]) : [];
 
 		// The session numbers its units; map them to the app's files.
@@ -322,15 +364,17 @@ export class ToolkitHost {
 	 * A session for `files`: the pending one when it holds them, else a new
 	 * one, over repaired texts where a file doesn't parse.
 	 */
-	private prepare(files: SourceFile[]): Prepared {
-		if (this.pending && sameFiles(this.pending.files, files)) {
+	private prepare(files: SourceFile[], withViewLibraries = true): Prepared {
+		// The view libraries a project lacks are resolution context, like the standard library.
+		const all = withViewLibraries ? [...files, ...views.missingViewLibraries(files)] : files;
+		if (this.pending && sameFiles(this.pending.all, all)) {
 			const pending = this.pending;
 			this.pending = null;
 			this.settle(pending.session);
-			return pending;
+			return { ...pending, files };
 		}
 		this.keepPending(null);
-		const sources: TkSource[] = files.map((f) => ({ name: f.path, text: f.text }));
+		const sources: TkSource[] = all.map((f) => ({ name: f.path, text: f.text }));
 		const json = JSON.stringify(sources);
 
 		// Units that don't parse are repaired first: a session can't be built over them.
@@ -345,12 +389,12 @@ export class ToolkitHost {
 			repaired = lenient.sources.filter((s) => !stillBroken.has(s.name));
 		}
 		const units = this.unitsOf(
-			files,
+			all,
 			repaired.map((r) => ({ path: r.name, text: r.text })),
 			lenient
 		);
 		const session = this.openSession(JSON.stringify(repaired));
-		return { files, session, units, parse, lenient: !!lenient };
+		return { files, all, session, units, parse, lenient: !!lenient };
 	}
 
 	/** How each file maps to the text its session parsed (`repaired`, the same when it parses). */

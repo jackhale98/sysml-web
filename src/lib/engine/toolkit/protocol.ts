@@ -22,6 +22,10 @@ export const TOOLKIT_METHODS = [
 	'renameSymbol',
 	'outline',
 	'codeActions',
+	// Phase 3: views and tables.
+	'listViews',
+	'renderView',
+	'viewLibraries',
 	// Phase 5: diagrams.
 	'diagram',
 	// Phase 6: state machines for the emulator.

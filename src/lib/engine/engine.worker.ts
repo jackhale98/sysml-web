@@ -4,8 +4,8 @@
  * wasm-bindgen glue is loaded at runtime from `static/engine/`, built by
  * `scripts/build-engine.sh`, so it is not part of the app bundle.
  */
-import type { ClassicMethod, Init, Request, Response, SourceFile } from './protocol';
-import type { Analysis, Highlights, RenderedTable, ViewInfo } from './types';
+import type { ClassicMethod, Init, Request, Response } from './protocol';
+import type { Analysis, Highlights } from './types';
 
 interface Wasm {
 	default(options: { module_or_path: string }): Promise<unknown>;
@@ -13,9 +13,6 @@ interface Wasm {
 	analyze(path: string, source: string): string;
 	analyzeProject(files: string): string;
 	highlight(source: string): string;
-	listViews(files: string): string;
-	renderView(files: string, name: string): string;
-	viewLibraries(): string;
 	elementDetails(files: string, path: string, line: number, element: string | null): string;
 	complete(files: string, path: string, offset: number): string;
 	hover(files: string, path: string, offset: number): string;
@@ -52,11 +49,6 @@ const handlers: { [M in ClassicMethod]: (wasm: Wasm, ...params: never[]) => unkn
 	analyzeProject: (wasm, files: unknown): Analysis[] =>
 		JSON.parse(wasm.analyzeProject(JSON.stringify(files))) as Analysis[],
 	highlight: (wasm, source: string): Highlights => JSON.parse(wasm.highlight(source)) as Highlights,
-	listViews: (wasm, files: unknown): ViewInfo[] =>
-		JSON.parse(wasm.listViews(JSON.stringify(files))) as ViewInfo[],
-	renderView: (wasm, files: unknown, name: string): RenderedTable =>
-		JSON.parse(wasm.renderView(JSON.stringify(files), name)) as RenderedTable,
-	viewLibraries: (wasm): SourceFile[] => JSON.parse(wasm.viewLibraries()) as SourceFile[],
 	complete: (wasm, files: unknown, path: string, offset: number) =>
 		JSON.parse(wasm.complete(cachedFiles(files), path, offset)) as unknown,
 	hover: (wasm, files: unknown, path: string, offset: number) =>

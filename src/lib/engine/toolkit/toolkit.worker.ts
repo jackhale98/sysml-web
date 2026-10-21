@@ -158,7 +158,10 @@ const handlers: { [M in ToolkitMethod]: Handler } = {
 		host.codeActions(files, path, from, to),
 	edit: (host, request: EditRequest) => host.edit(request),
 	diagram: (host, view: DiagramView, files: SourceFile[], scope: string | null) =>
-		host.diagram(view, files, scope)
+		host.diagram(view, files, scope),
+	listViews: (host, files: SourceFile[]) => host.listViews(files),
+	renderView: (host, files: SourceFile[], name: string) => host.renderView(files, name),
+	viewLibraries: (host) => host.viewLibraries()
 };
 
 /** A trap or a failed memory grow leaves the instance unusable: the page restarts the worker. */

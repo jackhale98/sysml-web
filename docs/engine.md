@@ -83,8 +83,8 @@ Fields filled from the declaration text rather than the model:
 - `valueKind: 'initial'` (`:=`) — the toolkit only says whether a value is a
   default;
 - `connections[].source/target` — the ends of `connect a to b` as written;
-- `views[].filters` — the `filter` conditions as written (until views move
-  to the toolkit in phase 3).
+- `views[].filters` — the `filter` conditions as written (the reports read
+  them to sort chapters).
 
 ## Problems in the text
 
@@ -100,6 +100,55 @@ positions in the repaired text back to the person's text. Then
   a name before it in its chain, is written in a broken file is hidden (an
   unclosed `{` otherwise gave 40 such warnings on the demo), and the first
   syntax error says how many were hidden.
+
+## Views and tables
+
+`listViews`, `renderView` and `viewLibraries` are TypeScript over the model
+adapter's records, in the toolkit worker (`toolkit/views/`). A view renders
+as a table when a `@TableRendering` applies to it — its own, over what it
+inherits from the view def it is typed by or specializes, field by field.
+That says which rows to collect (`rows`: `requirements`, `trace`,
+`relation:…`, `kind:port`, `type:T`, `@Metadata`, `composition`,
+`kindcounts`), which columns to show (`name = expression` computes one with
+the emulator's evaluator, `src/lib/sim/expr.ts`), `where`, `sortBy` and
+`pivot`. Rows come from the project's files only; everything else in the
+session is resolution context.
+
+- **The view libraries.** `Reporting` and `ModelViews` (the demo's copies in
+  `src/demo/drone/libraries/`) are added to the session of a project that
+  doesn't declare those packages, like a second standard library: their views
+  are listed as `builtin`, they make no rows and no problems, and
+  `viewLibraries()` returns them to copy into a project.
+- **What the toolkit resolves.** Trace links match requirements by the
+  toolkit's resolved ends (`requirement_id`), not by name; a satisfied usage
+  counts for its definition and the definition's supertypes. Types,
+  specializations and redefinitions are the records' resolved ids
+  (`typeIds`, `generalIds`, `rootId`). A port's connections come from the
+  interconnection graph (`toGraph({view:'interconnection'})`), whose ends are
+  resolved through the parts' types; the far end is shown as written.
+- **`expose`.** `X` is X, `X::*` X's members, `X::**` X and everything
+  nested in it, `X::*::**` everything nested but X. Members are what a
+  namespace owns and what it inherits from its types and specializations
+  (less what it redefines) — not what it imports: the toolkit's own exposure
+  (`viewInfo`) follows the letter of the spec, where an expose takes in a
+  package's private imports too (`SystemRequirements::*` would bring in all
+  of SI). Targets resolve like names: from the namespaces around the view
+  (innermost first), then from the root, then by qualified-name suffix. A bill of materials row is exposed by
+  its path through the tree, so `drone::**` doesn't take in the same motor in
+  another assembly. A view without `expose` shows the whole model.
+- **`filter`.** On a view usage that exposes something, the toolkit's
+  `viewInfo` applies the filters with the language's semantics; otherwise
+  `@SysML::<Metaclass>` (by metaclass conformance: a part is an item),
+  `@<Metadata>` and `kind = x` terms are read, and anything else is reported
+  and ignored.
+- **Editing.** Each column says what it edits (`name`, `shortName`, `doc`,
+  `feature:<f>`, `metadata:<Meta>.<f>`) and its kind and enum options, found
+  through the rows' resolved types and the library's metadata defs
+  (`StatusInfo`); the `edit` method takes the same field names.
+- **Cost.** The index is built once per session on the first view call
+  (~15 ms on the demo in Node); a table then renders in a few milliseconds.
+  No derived relationship property is read (those cost a ~300 ms
+  derivation pass).
 
 ## State machines
 

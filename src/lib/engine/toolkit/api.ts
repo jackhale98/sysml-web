@@ -61,9 +61,9 @@ export interface TkSession {
 	property(e: TkElement, name: string): string;
 	/** `e`'s bound value, evaluated, as JSON. */
 	evaluate(e: TkElement): string;
-	/** Whether `e` reaches `general` through its specializations. */
-	conforms(e: TkElement, general: TkElement): boolean;
-	/** JSON `{qualifiedName, id, rendering, exposed: [{id, qualifiedName, metaclass}], …}` of a view usage. */
+	/** Whether `e` reaches `ancestor` through the explicit specialization closure. */
+	conforms(e: TkElement, ancestor: TkElement): boolean;
+	/** JSON `{qualifiedName, id, rendering, exposed: [{id, qualifiedName, metaclass}], …}` of a view usage (its filters applied to `exposed`). */
 	viewInfo(qualifiedName: string): string;
 }
 
