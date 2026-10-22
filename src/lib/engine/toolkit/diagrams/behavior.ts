@@ -108,6 +108,11 @@ class Behavior {
 		}
 		if (this.view === 'action') this.decisionBranches(placed);
 		else this.targetTransitions(placed);
+		// Where it starts first, so a layout in model order reads from the start down.
+		const first = (kind: string) => (kind === 'initial_state' ? 0 : 1);
+		this.g.nodes.sort((a, b) => first(a.kind) - first(b.kind));
+		const starts = new Set(this.g.nodes.filter((n) => n.kind === 'initial_state').map((n) => n.id));
+		this.g.edges.sort((a, b) => +!starts.has(a.source) - +!starts.has(b.source));
 	}
 
 	private node(n: TkGraphNode, root: TkGraphNode | undefined) {
