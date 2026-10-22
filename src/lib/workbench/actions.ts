@@ -118,7 +118,7 @@ export async function deleteElement(
 /** Change one table cell: the model value behind it, as a minimal SysML edit. */
 export async function setField(
 	workspace: Workspace,
-	source: { element: string; file: string; line: number },
+	source: { element: string; file: string; line: number; id?: string },
 	field: string,
 	value: string,
 	label: string
@@ -132,6 +132,7 @@ export async function setField(
 			source: text,
 			element: source.element,
 			line: source.line,
+			...(source.id ? { id: source.id } : {}),
 			field,
 			value
 		})

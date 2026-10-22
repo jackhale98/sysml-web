@@ -1,12 +1,14 @@
 <script lang="ts">
 	import type { Engine } from '#lib/engine/client.ts';
 	import type { DeclarationSet, ElementDetails, Evaluated } from '#lib/engine/types.ts';
+	import { CornerDownRight } from '@lucide/svelte';
 	import { computedText } from '#lib/project/checks.ts';
-	import type { ModelElement } from '#lib/project/elements.ts';
+	import { elementAt, utf16ToByte, type ModelElement } from '#lib/project/elements.ts';
 	import type { Workspace } from '#lib/project/workspace.svelte.ts';
 	import { toasts } from '#lib/ui/toasts.svelte.ts';
 	import { parentOf } from './actions.ts';
 	import TypePicker from './TypePicker.svelte';
+	import type { WorkbenchUi } from './ui.svelte.ts';
 
 	/**
 	 * The editable parts of an element's declaration — ID, type,
@@ -17,11 +19,14 @@
 		element,
 		workspace,
 		engine,
-		computed
+		computed,
+		ui
 	}: {
 		element: ModelElement;
 		workspace: Workspace;
 		engine: Engine;
+		/** For going to a type's or a supertype's definition. */
+		ui?: WorkbenchUi;
 		/** The value as the engine evaluated it, when it is an expression. */
 		computed?: Evaluated;
 	} = $props();
@@ -156,6 +161,38 @@
 		);
 	}
 
+	/**
+	 * Go to the definition a reference in the declaration names (`Operator` in
+	 * `stakeholder operator : Operator`), resolved as go-to-definition in the
+	 * text resolves it: a project definition is selected, a library one opens.
+	 */
+	async function goTo(reference: string) {
+		const text = workspace.text(element.file);
+		const { from, to } = element.span;
+		if (!ui || text === undefined || from === undefined || to === undefined) return;
+		const name = reference.replace(/^~/, '');
+		const header = text.slice(from, to);
+		const at = header.search(new RegExp(`[:>~,\\s]${escapeRegExp(name)}(?![\\w'])`));
+		if (at < 0) return;
+		// On the last segment of a qualified name: `DroneComponents::Battery` goes to Battery.
+		const last = name.lastIndexOf('::');
+		const offset = from + at + 1 + (last >= 0 ? last + 2 : 0);
+		const target = await engine.definition(workspace.sourceFiles(), element.file, offset);
+		if (!target) {
+			toasts.show(`${name} is not defined anywhere the project can see.`);
+			return;
+		}
+		if ('library' in target) {
+			ui.open({ kind: 'library', path: target.library.path, line: target.library.line });
+			return;
+		}
+		const file = workspace.text(target.path) ?? '';
+		const found = elementAt(workspace.elements, target.path, utf16ToByte(file, target.from));
+		if (found) ui.select(found.key, 'inspector');
+	}
+
+	const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 	function onkeydown(event: KeyboardEvent) {
 		if (event.key === 'Enter' && !(event.currentTarget instanceof HTMLTextAreaElement)) {
 			(event.currentTarget as HTMLInputElement).blur();
@@ -182,7 +219,11 @@
 		{#if typed}
 			<div class="field">
 				<label class="label" for="{uid}-type"
-					>Type <small>({kind === 'attribute' ? 'a value type' : `a ${kind} def`})</small></label
+					>Type <small
+						>({kind === 'attribute'
+							? 'a value type'
+							: `${/^[aeio]/.test(kind) ? 'an' : 'a'} ${kind} def`})</small
+					></label
 				>
 				<TypePicker
 					id="{uid}-type"
@@ -199,6 +240,11 @@
 						: undefined}
 					oncommit={(next) => commit('type', next, details?.type, 'the type')}
 				/>
+				{#if ui && details.type}
+					<button type="button" class="goto" onclick={() => void goTo(details!.type!)}>
+						<CornerDownRight size={14} aria-hidden="true" /> Go to {details.type.replace(/^~/, '')}
+					</button>
+				{/if}
 			</div>
 			<div class="row">
 				<label>
@@ -269,7 +315,16 @@
 				<div class="chips">
 					{#each details.specializes as general (general)}
 						<span class="chip">
-							{general}
+							{#if ui}
+								<button
+									type="button"
+									class="chip-name"
+									title="Go to {general}"
+									onclick={() => void goTo(general)}>{general}</button
+								>
+							{:else}
+								{general}
+							{/if}
 							<button
 								type="button"
 								aria-label="Remove {general}"
@@ -318,12 +373,12 @@
 		{/if}
 
 		<label>
-			<span>Description</span>
+			<span>Documentation <small>(its doc comment)</small></span>
 			<textarea
 				rows="3"
 				value={details.doc ?? ''}
 				placeholder="What is this, in plain words?"
-				onblur={(e) => commit('doc', e.currentTarget.value, details?.doc, 'the description')}
+				onblur={(e) => commit('doc', e.currentTarget.value, details?.doc, 'the documentation')}
 			></textarea>
 		</label>
 	</div>
@@ -454,6 +509,34 @@
 		background: transparent;
 		color: var(--text-2);
 		cursor: pointer;
+	}
+	.chip button.chip-name {
+		width: auto;
+		height: auto;
+		padding: 0;
+		border-radius: 0;
+		color: var(--accent);
+		font: inherit;
+	}
+	.chip button.chip-name:hover {
+		text-decoration: underline;
+	}
+	.goto {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		justify-self: start;
+		min-height: 2rem;
+		padding: 0;
+		border: 0;
+		background: transparent;
+		color: var(--accent);
+		font: inherit;
+		font-size: var(--text-sm);
+		cursor: pointer;
+	}
+	.goto:hover {
+		text-decoration: underline;
 	}
 	.add-super {
 		flex: 1 1 100%;

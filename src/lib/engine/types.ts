@@ -477,6 +477,24 @@ export interface StateSession {
 }
 
 /** How a table column maps back to the model. */
+/** One of a usage's attribute values, as the inspector edits it. */
+export interface FeatureValue {
+	name: string;
+	/** As written: the usage's own `:>> name = …`, else what its type gives (or null). */
+	value: string | null;
+	/** Whether the usage sets it itself. */
+	own: boolean;
+	/** The definition that declares it, when it is not the usage's own attribute. */
+	declaredBy: string | null;
+	/**
+	 * How to edit it (`feature:<name>` with `setField`), or null when it
+	 * can't be here: an expression is edited on the attribute itself.
+	 */
+	edit: ColumnEdit | null;
+	/** The usage's own attribute element, when it sets it itself. */
+	elementId?: string;
+}
+
 export interface ColumnEdit {
 	/** `name`, `shortName`, `doc`, `feature:priority`, `metadata:StatusInfo.status`, … */
 	field: string;
