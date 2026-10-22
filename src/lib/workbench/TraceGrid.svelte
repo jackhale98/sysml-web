@@ -1088,10 +1088,12 @@
 	.card-head .req-card {
 		display: flex;
 		flex-wrap: wrap;
+		align-content: center;
 		align-items: baseline;
 		gap: 2px var(--space-2);
 		width: 100%;
 		min-height: 2.75rem;
+		margin-bottom: var(--space-1);
 		padding: 0;
 		border: 0;
 		background: transparent;
@@ -1150,6 +1152,7 @@
 		display: inline;
 	}
 	.card > .flag {
+		margin: 0;
 		font-size: var(--text-xs);
 		line-height: 1.8;
 	}

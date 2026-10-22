@@ -163,7 +163,10 @@ test.describe('on a desktop', () => {
 			page.getByRole('menuitem', { name: /CSV/ }).click()
 		]);
 		const csv = (await readFile((await download.path())!)).toString('utf8');
-		const [header, ...lines] = csv.replace(/^\uFEFF/, '').trim().split(/\r?\n/);
+		const [header, ...lines] = csv
+			.replace(/^\uFEFF/, '')
+			.trim()
+			.split(/\r?\n/);
 		expect(header).toBe(
 			'ID,Requirement,Battery abuse test,Endurance flight test,Failsafe flight test,Link range test,Mass and payload check,Wind hold test,Total'
 		);
