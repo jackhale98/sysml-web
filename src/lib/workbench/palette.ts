@@ -62,6 +62,8 @@ export type PaletteAction =
 	| { type: 'create'; request: CreateRequest }
 	/** Make a file, or rename, move or delete one (`files/FileHost.svelte`). */
 	| { type: 'file'; request: FileRequest }
+	/** Copy an element under a new name, right after it. */
+	| { type: 'duplicate'; key: string }
 	/** Open the help, at a topic or at the start. */
 	| { type: 'help'; topic: string | null };
 
@@ -544,6 +546,24 @@ export function openFileItems(path: string | null): PaletteItem[] {
 		item('rename', 'Rename file', 'file name path'),
 		item('move', 'Move file', 'file folder directory path'),
 		item('delete', 'Delete file', 'file remove trash')
+	];
+}
+
+/** What can be done with the selected element (none when nothing is, or it is a library's). */
+export function selectionItems(
+	element: ModelElement | undefined,
+	isLibrary: (file: string) => boolean
+): PaletteItem[] {
+	if (!element || isLibrary(element.file)) return [];
+	return [
+		{
+			id: 'command:duplicate',
+			group: 'commands',
+			label: `Duplicate ${element.label}`,
+			detail: 'Ctrl+D or ⌘D',
+			aliases: 'copy clone',
+			action: { type: 'duplicate', key: element.key }
+		}
 	];
 }
 

@@ -23,6 +23,7 @@
 		openFileItems,
 		search,
 		segments,
+		selectionItems,
 		tableRowItems,
 		viewItems,
 		type PaletteGroup,
@@ -30,6 +31,7 @@
 		type Range
 	} from './palette.ts';
 	import type { WorkbenchUi } from './ui.svelte.ts';
+	import { duplicateAndSelect } from './actions.ts';
 	import { VIEW_KINDS } from '#lib/create/view.ts';
 	import { ALL_TOPICS } from '#lib/help/content.ts';
 
@@ -59,6 +61,10 @@
 		],
 		files: fileItems(workspace.modelPaths),
 		commands: [
+			...selectionItems(
+				workspace.elements.find((e) => e.key === ui.selection?.key),
+				isLibraryFile
+			),
 			...machineItems(workspace.machines),
 			...commandItems(theme.choice),
 			...openFileItems(ui.activeTab?.kind === 'file' ? ui.activeTab.path : null),
@@ -168,6 +174,12 @@
 			case 'file':
 				ui.fileRequest = action.request;
 				break;
+			case 'duplicate': {
+				const element = workspace.elements.find((e) => e.key === action.key);
+				if (element)
+					void duplicateAndSelect(workspace, ui, element, ui.selection?.source ?? 'explorer');
+				break;
+			}
 			case 'help':
 				ui.showHelp(action.topic);
 				break;

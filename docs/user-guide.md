@@ -62,7 +62,7 @@ In a saved view, removing an element its `expose` line names removes that line (
 
 Hidden elements are listed at the foot of the diagram (“2 hidden · Show all”): open the list to show one again, or show them all. Other diagrams are not affected.
 
-**Duplicate** (Ctrl D, ⌘ D on a Mac, or in a box’s actions and the details panel) copies the element right after it in the text, with everything inside it, under a free name (`battery2`), and selects the copy.
+**Duplicate** (Ctrl D, ⌘ D on a Mac, or in a box’s actions, an element’s menu in the explorer, the details panel and search) copies the element right after it in the text, with everything inside it, under a free name (`battery2`), and selects the copy.
 
 **Add connected elements** (in a box’s actions, on structure diagrams) puts on the diagram what the element refers to (**Outgoing**: its type, what it specializes, satisfies or is connected to), what refers to it (**Incoming**), or both, in one step. A saved view gets an `expose` line for each; its filter may still leave some out, and it says so.
 
@@ -73,6 +73,8 @@ Hidden elements are listed at the foot of the diagram (“2 hidden · Show all�
 The **Overview** shows the project at a glance: what the model has, how many requirements are met and tested, and any problems.
 
 Select anything (in a diagram, a table, the text or the explorer) and the **details panel** shows what it is, in plain words, with its values and links. On a phone, the details slide up from the bottom.
+
+In the explorer’s model tree, each element has a menu: its **⋯** button, a right-click, or a long press on a phone. It can **Duplicate** the element, **Rename** it (references to it follow), **Show in text**, or **Delete from model** (after saying what else uses it).
 
 Its **Related elements** say what it refers to (its type, what it specializes, satisfies or is connected to), what refers to it, and where it is. Choose one to go to it: a quick answer to “what uses this?”.
 
@@ -395,6 +397,14 @@ On a Mac, use ⌘ where it says Ctrl.
 | <kbd>Arrow keys</kbd> | Move the selected boxes |
 | <kbd>Shift F10</kbd> | The element’s menu |
 | <kbd>+ / − / 0</kbd> | Zoom in, out, fit (sequence diagrams) |
+
+### In the model tree
+
+| Keys | What they do |
+| --- | --- |
+| <kbd>Shift F10</kbd> | The element’s menu |
+| <kbd>F2</kbd> | Rename |
+| <kbd>Ctrl D</kbd> | Duplicate the selected element |
 
 ### In the simulator
 

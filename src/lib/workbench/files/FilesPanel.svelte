@@ -19,6 +19,7 @@
 	import { isLibraryFile, type Workspace } from '#lib/project/workspace.svelte.ts';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
 	import SheetDialog from '#lib/ui/SheetDialog.svelte';
+	import { longPress } from '#lib/mobile/press.ts';
 	import type { WorkbenchUi } from '../ui.svelte.ts';
 
 	let { workspace, ui }: { workspace: Workspace; ui: WorkbenchUi } = $props();
@@ -85,37 +86,11 @@
 		}
 	}
 
-	// ── Long press (touch): the file's menu, as a right click gives it ─────────
-	const LONG_PRESS_MS = 500;
-	let press: { timer: ReturnType<typeof setTimeout>; x: number; y: number } | null = null;
-	/** The click that ends a long press doesn't also open the file. */
-	let pressed = false;
+	// A long press (touch) gives the file's menu, as a right click does.
+	const press = longPress();
 
-	function pressStart(event: PointerEvent, path: string) {
-		if (event.pointerType === 'mouse') return;
-		pressEnd();
-		pressed = false;
-		press = {
-			x: event.clientX,
-			y: event.clientY,
-			timer: setTimeout(() => {
-				press = null;
-				pressed = true;
-				navigator.vibrate?.(10);
-				void openMenu(path);
-			}, LONG_PRESS_MS)
-		};
-	}
-	function pressMove(event: PointerEvent) {
-		if (press && Math.hypot(event.clientX - press.x, event.clientY - press.y) > 10) pressEnd();
-	}
-	function pressEnd() {
-		if (press) clearTimeout(press.timer);
-		press = null;
-	}
 	function openFile(event: MouseEvent, path: string) {
-		if (pressed) {
-			pressed = false;
+		if (press.fired()) {
 			event.preventDefault();
 			return;
 		}
@@ -145,14 +120,14 @@
 			onclick={(e) => openFile(e, path)}
 			oncontextmenu={(e) => {
 				e.preventDefault();
-				pressEnd();
+				press.cancel();
 				void openMenu(path);
 			}}
-			onpointerdown={(e) => pressStart(e, path)}
-			onpointermove={pressMove}
-			onpointerup={pressEnd}
-			onpointercancel={pressEnd}
-			onpointerleave={pressEnd}
+			onpointerdown={(e) => press.start(e, () => void openMenu(path))}
+			onpointermove={press.move}
+			onpointerup={press.cancel}
+			onpointercancel={press.cancel}
+			onpointerleave={press.cancel}
 		>
 			<FileCode size={14} />
 			<span class="label" id={labelId(path)}>{path.slice(folder ? folder.length + 1 : 0)}</span>

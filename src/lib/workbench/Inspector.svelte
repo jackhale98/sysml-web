@@ -168,16 +168,7 @@
 		message = await renameElement(workspace, element, name);
 	}
 
-	function showInText(e: ModelElement) {
-		if (ui.phone) {
-			// Select first: opening the text then lowers the sheet to show it.
-			ui.select(e.key, 'inspector');
-			ui.showText(e.file);
-			return;
-		}
-		ui.open({ kind: 'file', path: e.file });
-		ui.select(e.key, 'inspector');
-	}
+	const showInText = (e: ModelElement) => ui.showInText(e, 'inspector');
 
 	/** `a` or `an` before a concept's name (`an attribute usage`, `a part`). */
 	const article = (word: string) => (/^[aeio]/i.test(word) ? 'an' : 'a');

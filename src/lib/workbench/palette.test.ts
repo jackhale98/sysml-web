@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import type { ModelElement } from '#lib/project/elements.ts';
 import {
 	commandItems,
 	openFileItems,
 	fileItems,
+	selectionItems,
 	fuzzyMatch,
 	matchItem,
 	search,
@@ -291,5 +293,29 @@ describe('making views', () => {
 		};
 		expect(search(s, '').some((r) => r.item.quiet)).toBe(false);
 		expect(search(s, 'bill of').map((r) => r.item.label)).toContain('New view: Bill of materials');
+	});
+});
+
+describe('selectionItems', () => {
+	const part = {
+		key: 'model.sysml@10',
+		label: 'battery',
+		file: 'model.sysml'
+	} as unknown as ModelElement;
+	const isLibrary = (file: string) => file.startsWith('libraries/');
+
+	it('offers to duplicate the selected element, found by "copy" too', () => {
+		const items = selectionItems(part, isLibrary);
+		expect(items.map((i) => [i.label, i.action])).toEqual([
+			['Duplicate battery', { type: 'duplicate', key: 'model.sysml@10' }]
+		]);
+		const sources_ = { ...sources([]), commands: [...items, ...commandItems('system')] };
+		expect(labels(sources_, 'copy')[0]).toBe('Duplicate battery');
+		expect(labels(sources_, 'dup')[0]).toBe('Duplicate battery');
+	});
+
+	it('offers nothing without a selection, or for a library element', () => {
+		expect(selectionItems(undefined, isLibrary)).toEqual([]);
+		expect(selectionItems({ ...part, file: 'libraries/Units.sysml' }, isLibrary)).toEqual([]);
 	});
 });
