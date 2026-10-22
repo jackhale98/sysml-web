@@ -45,7 +45,7 @@ function edited(): SourceFile[] {
 		R,
 		'    // ---- Environment ----',
 		[
-			"    requirement <'SYS-011'> 'Noise at night' : DroneRequirement {",
+			"    requirement <'SYS-012'> 'Noise at night' : DroneRequirement {",
 			'        doc /* The drone shall be no louder than 55 dB(A) at 30 m between 22:00 and 06:00. */',
 			'        :>> priority = Priority::low;',
 			'    }',
@@ -109,7 +109,7 @@ describe('comparing two versions of the demo', () => {
 		const all = texts(summary);
 		expect(all).toContain('Design: `Motor.mass` changed 120 g → `190 g`');
 		expect(all).toContain(
-			'Requirements: Added requirement `SYS-011` ‘Noise at night’ to `SystemRequirements`'
+			'Requirements: Added requirement `SYS-012` ‘Noise at night’ to `SystemRequirements`'
 		);
 		expect(all).toContain('Design: Renamed part `Rotor.motor` to `engine`');
 		// What was removed reads as it was written.
@@ -125,7 +125,7 @@ describe('comparing two versions of the demo', () => {
 	it('suggests a commit message', () => {
 		const message = commitMessage(summary);
 		expect(message.split('\n')[0]).toBe(
-			'Add requirement SYS-011; rename Rotor.motor to engine and 3 more'
+			'Add requirement SYS-012; rename Rotor.motor to engine and 3 more'
 		);
 		expect(message).toContain(
 			'- drone.takeOffMass now violates SYS-003 ‘Maximum take-off mass’ (4.05 kg > 4 kg)'

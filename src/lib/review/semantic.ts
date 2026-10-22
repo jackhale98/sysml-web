@@ -176,6 +176,7 @@ export function compareSnapshots(base: ModelSnapshot, current: ModelSnapshot): M
 		title: e.title,
 		qualifiedName: e.qualifiedName,
 		owner: e.ownerId ? (all.get(e.ownerId)?.label ?? null) : null,
+		ownerId: e.ownerId,
 		path: e.path,
 		line: e.line,
 		from: e.from,

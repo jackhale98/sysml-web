@@ -25,6 +25,8 @@ export class ProjectSession {
 
 	private timer: ReturnType<typeof setTimeout> | undefined;
 	private folderTexts: Record<string, string> = {};
+	/** The files as they were when the project was opened on this page. */
+	private opened: ProjectFile[] = [];
 
 	constructor(private workspace: Workspace) {
 		this.git = new GitConnection(this, workspace);
@@ -47,6 +49,7 @@ export class ProjectSession {
 			if (stored.origin === 'folder') {
 				this.folderTexts = Object.fromEntries(stored.files.map((f) => [f.path, f.text]));
 			}
+			this.opened = stored.files;
 			return { id, info: stored.info, files: stored.files };
 		}
 		if (id === 'demo') {
@@ -60,6 +63,7 @@ export class ProjectSession {
 				created: now,
 				updated: now
 			};
+			this.opened = demo.files;
 			return demo;
 		}
 		return null;
@@ -121,6 +125,42 @@ export class ProjectSession {
 		for (const f of changed) this.folderTexts[f.path] = f.text;
 		this.unsavedToFolder = [];
 		return null;
+	}
+
+	/**
+	 * The version "Review changes" compares this browser's files with when the
+	 * project isn't in a repository: the one marked as reviewed, else the
+	 * folder's files (folder projects), the demo as it comes, or the files as
+	 * they were when the project was opened.
+	 */
+	reviewBase(): { files: ProjectFile[]; label: string; checkpoint: boolean } {
+		const record = this.record;
+		if (record?.checkpoint)
+			return {
+				files: record.checkpoint.files,
+				label: 'the version you marked as reviewed',
+				checkpoint: true
+			};
+		if (record?.origin === 'folder' && Object.keys(this.folderTexts).length)
+			return {
+				files: Object.entries(this.folderTexts).map(([path, text]) => ({ path, text })),
+				label: 'the files in the folder',
+				checkpoint: false
+			};
+		if (record?.origin === 'demo')
+			return { files: demoProject().files, label: 'the demo as it comes', checkpoint: false };
+		return {
+			files: this.opened,
+			label: 'the version you opened',
+			checkpoint: false
+		};
+	}
+
+	/** Make the files as they are now the version later changes are reviewed against. */
+	async markReviewed() {
+		if (!this.record) return;
+		this.record = { ...this.record, checkpoint: { files: this.files(), at: timestamp() } };
+		await this.save();
 	}
 
 	/** Download the project as a `.kpar` (KerML 10.3 project interchange). */

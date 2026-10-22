@@ -53,6 +53,7 @@
 	import SysmlEdge from './SysmlEdge.svelte';
 	import SysmlNode from './SysmlNode.svelte';
 	import type { SysmlEdgeData, SysmlNodeData } from './types.ts';
+	import { MARK_WORDS, reviewMarks, type ReviewMark } from '#lib/review/marks.svelte.ts';
 
 	let {
 		view,
@@ -422,9 +423,14 @@
 						view,
 						editable: !!element && !isLibrary(element),
 						elementKey: element?.key ?? null,
-						name: element?.label ?? null
+						name: element?.label ?? null,
+						elementId: element?.id ?? null,
+						review: untrack(() => reviewMarks.markOf(element?.id))
 					},
-					ariaLabel: `${node.stereotype?.replace(/^<<|>>$/g, '') ?? node.kind} ${node.label}`
+					ariaLabel: ariaOf(
+						node,
+						untrack(() => reviewMarks.markOf(element?.id))
+					)
 				};
 			});
 			const ids = new Set(graph.nodes.map((n) => n.id));
@@ -518,6 +524,37 @@
 			n.data.selected === isSelected(n) ? n : { ...n, data: { ...n.data, selected: isSelected(n) } }
 		);
 	});
+
+	/** A node as screen readers hear it, with its review mark (never colour alone). */
+	function ariaOf(node: SysmlNodeData['node'], mark: ReviewMark | null): string {
+		const base = `${node.stereotype?.replace(/^<<|>>$/g, '') ?? node.kind} ${node.label}`;
+		return mark ? `${base}, ${MARK_WORDS[mark].said}` : base;
+	}
+
+	// Review mode: mark what is new or changed, without relaying out.
+	$effect(() => {
+		const markOf = (n: Node<SysmlNodeData>) => reviewMarks.markOf(n.data.elementId);
+		void reviewMarks.shown;
+		void reviewMarks.byId;
+		const current = untrack(() => nodes);
+		if (current.every((n) => (n.data.review ?? null) === markOf(n))) return;
+		nodes = current.map((n) => {
+			const mark = markOf(n);
+			return (n.data.review ?? null) === mark
+				? n
+				: { ...n, data: { ...n.data, review: mark }, ariaLabel: ariaOf(n.data.node, mark) };
+		});
+	});
+	/** Removed elements this diagram would have shown: listed, since they can't be drawn. */
+	const removedHere = $derived.by(() => {
+		if (!reviewMarks.shown) return [];
+		const drawn = new Set(nodes.map((n) => n.data.name).filter(Boolean));
+		return reviewMarks.removed.filter(
+			(r) =>
+				(r.owner && drawn.has(r.owner)) || (!!scope && r.qualifiedName.startsWith(`${scope}::`))
+		);
+	});
+	const markedHere = $derived(nodes.some((n) => n.data.review));
 
 	// Select an element "Add" just created, once the model has read it.
 	$effect(() => {
@@ -1014,6 +1051,26 @@
 		<FlowBridge onready={(api) => (flow = api)} />
 		<Background gap={20} />
 		<Controls showLock={false} />
+		{#if reviewMarks.shown && (markedHere || removedHere.length)}
+			<Panel position="bottom-right">
+				<div class="review-legend" role="note" aria-label="Review changes">
+					<strong>Review</strong>
+					<span class="key added">{MARK_WORDS.added.badge}</span>
+					<span class="key changed">{MARK_WORDS.changed.badge}</span>
+					{#if removedHere.length}
+						<span class="removed"
+							>Removed: {removedHere
+								.slice(0, 3)
+								.map((r) => r.label)
+								.join(', ')}{removedHere.length > 3
+								? ` and ${removedHere.length - 3} more`
+								: ''}</span
+						>
+					{/if}
+					<button type="button" onclick={() => (reviewMarks.visible = false)}>Hide marks</button>
+				</div>
+			</Panel>
+		{/if}
 		{#if lastClick && popover === 'add'}
 			<ViewportPortal target="front">
 				<div
@@ -1539,5 +1596,58 @@
 	.toolbar button[aria-pressed='true'] {
 		background: var(--accent-weak);
 		color: var(--accent);
+	}
+	/* Review mode's legend: what the marks mean, and what was removed (not drawn). */
+	.review-legend {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 6px;
+		max-width: min(28rem, calc(100vw - 7rem));
+		padding: 6px 8px 6px 10px;
+		border: 1px solid var(--border);
+		border-radius: var(--radius-md);
+		background: color-mix(in oklab, var(--surface) 94%, transparent);
+		box-shadow: var(--shadow-md);
+		color: var(--text-2);
+		font-size: var(--text-xs);
+	}
+	.review-legend strong {
+		color: var(--text);
+		font-weight: 650;
+	}
+	.review-legend .key {
+		padding: 0 6px;
+		border: 1.5px solid;
+		border-radius: var(--radius-pill);
+		font-size: 10px;
+		font-weight: 700;
+		letter-spacing: 0.02em;
+		text-transform: uppercase;
+	}
+	.review-legend .key.added {
+		border-color: var(--ok);
+		color: var(--ok);
+	}
+	.review-legend .key.changed {
+		border-color: var(--warn);
+		color: var(--warn);
+	}
+	.review-legend .removed {
+		color: var(--danger);
+		overflow-wrap: anywhere;
+	}
+	.review-legend button {
+		min-height: 1.75rem;
+		padding: 0 6px;
+		border: 0;
+		border-radius: var(--radius-sm);
+		background: transparent;
+		color: var(--text-2);
+		font-size: var(--text-xs);
+		font-weight: 600;
+		text-decoration: underline;
+		text-underline-offset: 2px;
+		cursor: pointer;
 	}
 </style>

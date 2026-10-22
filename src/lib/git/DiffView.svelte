@@ -6,12 +6,17 @@
 		before,
 		after,
 		oldLabel = 'Before',
-		newLabel = 'After'
+		newLabel = 'After',
+		oldStart = 1,
+		newStart = 1
 	}: {
 		before: string | null;
 		after: string | null;
 		oldLabel?: string;
 		newLabel?: string;
+		/** Line numbers of the first lines, when the texts are excerpts of files. */
+		oldStart?: number;
+		newStart?: number;
 	} = $props();
 
 	const lines = $derived(lineDiff(before ?? '', after ?? ''));
@@ -43,8 +48,8 @@
 					{/if}
 					{#each hunk.lines as line, i (i)}
 						<tr class={line.op}>
-							<td class="num">{line.old ?? ''}</td>
-							<td class="num">{line.new ?? ''}</td>
+							<td class="num">{line.old === undefined ? '' : line.old + oldStart - 1}</td>
+							<td class="num">{line.new === undefined ? '' : line.new + newStart - 1}</td>
 							<td class="sign"
 								><span aria-hidden="true">{SIGN[line.op]}</span><span class="visually-hidden"
 									>{SAY[line.op]}</span

@@ -133,6 +133,7 @@ export interface ElementSide extends Location {
 	qualifiedName: string;
 	/** The label of the element it is in. */
 	owner: string | null;
+	ownerId: string | null;
 }
 
 export interface ElementChange {

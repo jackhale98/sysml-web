@@ -12,6 +12,7 @@
 		FolderOpen,
 		FolderUp,
 		GitBranch,
+		GitCompareArrows,
 		GitPullRequest,
 		LoaderCircle,
 		MonitorDown,
@@ -47,7 +48,8 @@
 		engine,
 		onopensettings,
 		onopensourcecontrol,
-		onimportrequirements
+		onimportrequirements,
+		onreview
 	}: {
 		workspace: Workspace;
 		session: ProjectSession;
@@ -56,6 +58,8 @@
 		onopensourcecontrol?: () => void;
 		/** Shows "Import requirements…" when the host can open the import dialog. */
 		onimportrequirements?: () => void;
+		/** Shows "Review changes" when the host can open the review. */
+		onreview?: () => void;
 	} = $props();
 
 	let open = $state(false);
@@ -278,6 +282,18 @@
 				{:else}
 					<button type="button" role="menuitem" onclick={showSourceControl}>
 						<GitHubMark size={15} /> Save to GitHub…
+					</button>
+				{/if}
+				{#if onreview}
+					<button
+						type="button"
+						role="menuitem"
+						onclick={() => {
+							open = false;
+							onreview();
+						}}
+					>
+						<GitCompareArrows size={15} /> Review changes <small>what changed</small>
 					</button>
 				{/if}
 				{#if session.canSaveToFolder}
