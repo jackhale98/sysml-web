@@ -294,6 +294,29 @@ test('a value with a unit its package doesn’t import brings the import with it
 	await expect(text).not.toContainText('private import SI::*;');
 });
 
+test('view as shows a saved view as another kind of diagram, in place, undone in one step', async ({
+	page
+}) => {
+	await openDemo(page);
+	const diagram = await openView(page, 'Drone interconnection');
+	const frame = diagram.locator('.frame');
+	await expect(frame).not.toContainText('gv [');
+	await diagram.getByRole('button', { name: 'View as' }).click();
+	const menu = page.getByRole('menu', { name: 'Show droneInterconnection as' });
+	await expect(menu.getByRole('menuitem')).toHaveCount(1);
+	await expectAccessible(page);
+	await menu.getByRole('menuitem', { name: /General view/ }).click();
+	await expect(toasts(page)).toContainText('droneInterconnection is now shown as a general view');
+	await expect(frame).toContainText('gv [droneInterconnection]', { timeout: 15_000 });
+	await expect(diagram.locator('.svelte-flow__node').first()).toBeVisible();
+	// And back: as an interconnection view, from the general one.
+	await diagram.getByRole('button', { name: 'View as' }).click();
+	await page.getByRole('menuitem', { name: /Interconnection view/ }).click();
+	await expect(frame).not.toContainText('gv [', { timeout: 15_000 });
+	await toasts(page).getByRole('button', { name: 'Undo' }).last().click();
+	await expect(frame).toContainText('gv [droneInterconnection]', { timeout: 15_000 });
+});
+
 test.describe('on a phone', () => {
 	test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 
@@ -340,6 +363,19 @@ test.describe('on a phone', () => {
 		await expectAccessible(page);
 		await component.tap();
 		await expect(inspector.getByRole('heading', { level: 2 })).toHaveText('Component');
+	});
+
+	test('view as is a sheet of choices', async ({ page }) => {
+		await openDemo(page);
+		const diagram = await openPhoneView(page, 'Drone interconnection');
+		await diagram.getByRole('button', { name: 'View as' }).tap();
+		const sheet = page.getByRole('dialog', { name: 'Show droneInterconnection as' });
+		const general = sheet.getByRole('menuitem', { name: /General view/ });
+		expect((await general.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+		await general.tap();
+		await expect(diagram.locator('.frame')).toContainText('gv [droneInterconnection]', {
+			timeout: 15_000
+		});
 	});
 
 	test('the node’s actions are a sheet: remove, show again, duplicate and add connected by touch', async ({

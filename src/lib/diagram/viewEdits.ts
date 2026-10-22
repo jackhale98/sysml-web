@@ -9,6 +9,7 @@
  * `EditStep`s for `applySteps`.
  */
 import type { DiagramGraph, RelatedElement } from '#lib/engine/types.ts';
+import { readHeader } from '#lib/engine/toolkit/header.ts';
 import { byteToUtf16, type ModelElement } from '#lib/project/elements.ts';
 import type { EditStep } from '#lib/workbench/actions.ts';
 import { qualifiedName } from './model.ts';
@@ -202,4 +203,71 @@ export function chooseNeighbours(
 ): NeighbourElement[] {
 	const chosen = list.filter((n) => direction === 'both' || n.direction === direction);
 	return chosen.filter((n, i) => chosen.findIndex((m) => m.element.key === n.element.key) === i);
+}
+
+/** The standard diagram views a saved view can be shown as, in plain words. */
+export const STANDARD_VIEWS = [
+	{ name: 'GeneralView', label: 'General view', detail: 'Boxes and how they relate' },
+	{
+		name: 'InterconnectionView',
+		label: 'Interconnection view',
+		detail: 'The parts inside one element, wired by their ports'
+	},
+	{ name: 'ActionFlowView', label: 'Action flow view', detail: 'The steps of an action, in order' },
+	{
+		name: 'StateTransitionView',
+		label: 'State transition view',
+		detail: 'The states of a machine and what moves it between them'
+	},
+	{ name: 'SequenceView', label: 'Sequence view', detail: 'Who sends what to whom, in time order' }
+] as const;
+
+export type StandardView = (typeof STANDARD_VIEWS)[number]['name'];
+
+/**
+ * What else a saved view showing one element can be shown as, by that
+ * element's kind (an interconnection of a part, the flow of an action…); a
+ * general view can show anything.
+ */
+export function viewAsChoices(
+	current: string | undefined,
+	exposes: readonly string[],
+	exposed: ModelElement | undefined
+): (typeof STANDARD_VIEWS)[number][] {
+	const kind = exposes.length === 1 ? exposed?.kind : undefined;
+	const fits: Record<StandardView, boolean> = {
+		GeneralView: true,
+		InterconnectionView: kind === 'part' || kind === 'item',
+		ActionFlowView: kind === 'action',
+		StateTransitionView: kind === 'state' || kind === 'exhibit',
+		SequenceView: kind === 'occurrence' || kind === 'interaction'
+	};
+	return STANDARD_VIEWS.filter((v) => v.name !== current && fits[v.name]);
+}
+
+/**
+ * Show a saved view as another standard view: its type changes in place
+ * (`view v : GeneralView` → `view v : InterconnectionView`), written as the
+ * old one was (qualified when it was).
+ */
+export function planViewAs(
+	view: ModelElement,
+	to: StandardView,
+	ctx: ModelContext
+): { label: string; statement: string; steps: EditStep[] } | string {
+	const text = ctx.textOf(view.file);
+	if (text === undefined) return `${view.file} is not in the project.`;
+	const header = readHeader(text, byteToUtf16(text, view.span.start_byte));
+	const typing = header?.parts.find((p) => p.slot === 'typing')?.targets?.[0];
+	if (!header || !typing) return `${view.label} has no view type to change.`;
+	const written = text.slice(typing.start, typing.end);
+	const standard = STANDARD_VIEWS.some((v) => written.endsWith(v.name));
+	const next = standard ? written.replace(/[\w']+$/, to) : `StandardViewDefinitions::${to}`;
+	const after = text.slice(0, typing.start) + next + text.slice(typing.end);
+	const label = STANDARD_VIEWS.find((v) => v.name === to)!.label.toLowerCase();
+	return {
+		label: `${view.label} is now shown as a ${label}`,
+		statement: text.slice(header.start, typing.start) + next,
+		steps: [{ kind: 'patch', path: view.file, before: text, after }]
+	};
 }

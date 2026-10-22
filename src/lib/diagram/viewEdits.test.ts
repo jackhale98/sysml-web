@@ -13,6 +13,8 @@ import {
 	neighbours,
 	planExpose,
 	planUnexpose,
+	planViewAs,
+	viewAsChoices,
 	withoutHidden
 } from './viewEdits.ts';
 
@@ -242,5 +244,62 @@ describe('connected elements', () => {
 		// Each comes with the name the engine adds it to a diagram by.
 		const requirement = list.find((n) => n.element.label === 'Battery protection')!;
 		expect(requirement.qualified).toBe("SystemRequirements::'Battery protection'");
+	});
+});
+
+describe('view as', () => {
+	const choices = (view: string, current: string, exposes: string[], exposed?: string) =>
+		viewAsChoices(current, exposes, exposed ? find(exposed) : undefined).map((c) => c.name);
+
+	it('offers the kinds of view that fit what the view shows', () => {
+		expect(
+			choices(
+				'droneBreakdown',
+				'GeneralView',
+				['DroneArchitecture::drone::**'],
+				'DroneArchitecture::drone'
+			)
+		).toEqual(['InterconnectionView']);
+		expect(
+			choices(
+				'droneInterconnection',
+				'InterconnectionView',
+				['DroneArchitecture::drone::*'],
+				'DroneArchitecture::drone'
+			)
+		).toEqual(['GeneralView']);
+		expect(
+			choices(
+				'flight',
+				'StateTransitionView',
+				['FlightControl::FlightModes'],
+				'FlightControl::FlightModes'
+			)
+		).toEqual(['GeneralView']);
+		expect(
+			choices(
+				'flow',
+				'GeneralView',
+				['DeliveryMission::DeliveryFlight'],
+				'DeliveryMission::DeliveryFlight'
+			)
+		).toEqual(['ActionFlowView']);
+		// Two exposes: only a general view shows them both.
+		expect(choices('tree', 'SequenceView', ['A', 'B'], 'DroneArchitecture::drone')).toEqual([
+			'GeneralView'
+		]);
+	});
+
+	it('changes the view’s type in place, and the view is drawn as the new kind', () => {
+		const plan = planViewAs(find('DroneViews::droneInterconnection'), 'GeneralView', ctx);
+		if (typeof plan === 'string') throw new Error(plan);
+		expect(plan.statement).toBe('view droneInterconnection : GeneralView');
+		const texts = patched(plan.steps);
+		expect(texts[VIEWS]).toContain('view droneInterconnection : GeneralView {');
+		const list = Object.entries(texts).map(([path, text]) => ({ path, text }));
+		host.analyzeProject(list);
+		const info = host.listViews(list).find((v) => v.name === 'droneInterconnection')!;
+		expect(info.definition?.split('::').pop()).toBe('GeneralView');
+		expect(drawn(texts, 'DroneViews::droneInterconnection')).toContain('battery');
 	});
 });

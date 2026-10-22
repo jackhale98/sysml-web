@@ -611,13 +611,15 @@
 							<ViewTable name={tab.name} {workspace} {ui} {engine} />
 						{/key}
 					{:else if presentation.kind === 'diagram'}
-						{#key tabId(tab)}
+						<!-- Shown as another kind of view ("View as"), it is drawn afresh. -->
+						{#key `${tabId(tab)}|${presentation.view}|${presentation.scope}`}
 							{#await loadDiagram(presentation.view)}
 								<p class="empty">Loading the diagram…</p>
 							{:then DiagramCanvas}
 								<DiagramCanvas
 									view={presentation.view}
 									scope={presentation.scope}
+									{...presentation.view === 'sequence' ? {} : { viewName: tab.name }}
 									label="{tab.title} diagram"
 									{workspace}
 									{ui}

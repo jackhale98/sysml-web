@@ -28,6 +28,7 @@
 		Pencil,
 		Play,
 		Plus,
+		Shapes,
 		Spline,
 		Trash2,
 		Unlink,
@@ -133,9 +134,13 @@
 		neighbours,
 		planExpose,
 		planUnexpose,
+		planViewAs,
+		viewAsChoices,
 		withoutHidden,
-		type NeighbourElement
+		type NeighbourElement,
+		type StandardView
 	} from './viewEdits.ts';
+	import { exposedName, presentationOf } from '#lib/workbench/views.ts';
 	import SysmlNode from './SysmlNode.svelte';
 	import type { SysmlEdgeData, SysmlNodeData } from './types.ts';
 	import { MARK_WORDS, reviewMarks, type ReviewMark } from '#lib/review/marks.svelte.ts';
@@ -143,6 +148,7 @@
 	let {
 		view,
 		scope,
+		viewName,
 		workspace,
 		ui,
 		engine,
@@ -150,6 +156,8 @@
 	}: {
 		view: DiagramView;
 		scope: string | null;
+		/** The saved view drawn, when it is one: it can be shown as another kind of view. */
+		viewName?: string;
 		workspace: Workspace;
 		ui: WorkbenchUi;
 		engine: Engine;
@@ -1649,6 +1657,92 @@
 		} else if (copy) ui.select(copy.key, 'diagram');
 	}
 
+	// ---- View as: a saved view shown as another kind of view ----
+
+	const viewInfo = $derived(
+		viewName
+			? workspace.views.find((v) => v.name === viewName && v.isUsage && !v.builtin)
+			: undefined
+	);
+	/** The saved view's own element, whose type "View as" changes. */
+	const viewUsage = $derived(
+		viewInfo
+			? workspace.elements.find(
+					(e) =>
+						e.kind === 'view' &&
+						!e.isDefinition &&
+						e.file === viewInfo.file &&
+						e.name === viewInfo.name
+				)
+			: undefined
+	);
+	const viewAs = $derived.by(() => {
+		if (!viewInfo || !viewUsage) return [];
+		const exposes = viewInfo.exposes ?? [];
+		// The element it exposes: by the name it is written with, qualified as far as it is.
+		const target = `::${(exposes[0] ?? '').replace(/::\*\*?$/, '').replace(/'/g, '')}`;
+		const name = exposes[0] ? exposedName(exposes[0]) : null;
+		const exposed = name
+			? workspace.elements.find(
+					(e) =>
+						e.label === name &&
+						!isLibrary(e) &&
+						`::${qualifiedName(e, owners).replace(/'/g, '')}`.endsWith(target)
+				)
+			: undefined;
+		const current = (viewInfo.standard ?? viewInfo.definition)?.split('::').pop();
+		return viewAsChoices(current, exposes, exposed);
+	});
+
+	function openViewAs(point: XY) {
+		const items: MenuItem[] = viewAs.map((choice) => ({
+			label: choice.label,
+			detail: choice.detail,
+			icon: Shapes,
+			run: () => void showViewAs(choice.name)
+		}));
+		const at = inCanvas({ x: point.x - 236, y: point.y }, 236, 48 + items.length * 52);
+		menu = { title: `Show ${viewInfo?.name ?? 'this view'} as`, items, ...at };
+	}
+
+	/**
+	 * Change the saved view's type in place, as one undoable step; its
+	 * positions and hidden elements go with it to the new kind of diagram.
+	 */
+	async function showViewAs(to: StandardView) {
+		if (!viewInfo || !viewUsage) return;
+		const plan = planViewAs(viewUsage, to, ctx);
+		if (typeof plan === 'string') {
+			toasts.show(plan, { tone: 'error' });
+			return;
+		}
+		const next = presentationOf({ ...viewInfo, definition: to, standard: undefined });
+		const nextKey = next.kind === 'diagram' ? diagramKey(next.view, next.scope) : null;
+		const error = await undoable(workspace, plan.label, async () => {
+			const refused = await applySteps(workspace, plan.label, plan.steps, checkSyntax);
+			if (refused) return refused;
+			if (nextKey && nextKey !== layoutKey) {
+				const current = workspace.text(LAYOUT_FILE);
+				const positions = parseLayout(current);
+				const kept = parseShown(current);
+				const moved = withPositions(
+					positions,
+					nextKey,
+					Object.fromEntries(
+						Object.entries(positions[layoutKey] ?? {}).map(([id, [x, y]]) => [id, { x, y }])
+					)
+				);
+				const text = serializeLayout(
+					moved,
+					kept[layoutKey] ? withShown(kept, nextKey, kept[layoutKey]) : kept
+				);
+				if (text !== (current ?? '{}\n')) workspace.setText(LAYOUT_FILE, text);
+			}
+			return null;
+		});
+		if (error) toasts.show(error, { tone: 'error' });
+	}
+
 	/** Put hidden nodes back on this diagram (one undoable step). */
 	async function showAgain(ids: string[] | 'all') {
 		const names = hiddenHere.filter((h) => ids === 'all' || ids.includes(h.id)).map((h) => h.label);
@@ -2149,6 +2243,19 @@
 				>
 					<LayoutGrid size={14} /> <span>Tidy up</span>
 				</button>
+				{#if viewAs.length}
+					<button
+						type="button"
+						aria-haspopup="menu"
+						title="Show this view as another kind of diagram"
+						onclick={(e) => {
+							const r = e.currentTarget.getBoundingClientRect();
+							openViewAs({ x: r.right, y: r.bottom + 6 });
+						}}
+					>
+						<Shapes size={14} /> <span>View as</span>
+					</button>
+				{/if}
 				<DiagramExport
 					title={label.replace(/ diagram$/, '')}
 					diagram={exportDiagram}

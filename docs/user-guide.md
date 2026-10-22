@@ -66,6 +66,8 @@ Hidden elements are listed at the foot of the diagram (“2 hidden · Show all�
 
 **Add connected elements** (in a box’s actions, on structure diagrams) puts on the diagram what the element refers to (**Outgoing**: its type, what it specializes, satisfies or is connected to), what refers to it (**Incoming**), or both, in one step. A saved view gets an `expose` line for each; its filter may still leave some out, and it says so.
 
+**View as** (in a saved view’s toolbar) shows the same view as another kind of diagram that fits what it shows: a part’s general view as its interconnection view, an action’s as its action flow, and back. Only the view’s type changes (`view v : GeneralView` becomes `view v : InterconnectionView`); its positions and hidden elements come along.
+
 ### The overview and the details panel
 
 The **Overview** shows the project at a glance: what the model has, how many requirements are met and tested, and any problems.
