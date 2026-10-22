@@ -6,6 +6,7 @@ import { buildTree, collectElements, type ModelElement } from '#lib/project/elem
 import type { EditStep } from '#lib/workbench/actions.ts';
 import { ownersOf, portsOf, resolveNode } from './model.ts';
 import {
+	connectOption,
 	defaultChoice,
 	partName,
 	planEdgeRemoval,
@@ -237,6 +238,25 @@ describe('statements', () => {
 		)!;
 		const p = planRelation(option, defaultChoice(option, ctx), ctx) as Plan;
 		expect(p.statement).toBe('interface : PowerSupply connect battery.powerOut to rotors.powerIn;');
+	});
+
+	it('connects a part without ports itself (a dependency matrix’s empty cell)', () => {
+		const airframe = el('drone.airframe', false);
+		const camera = el('drone.camera', false);
+		expect(relationsFor(airframe, camera, ctx).some((o) => o.kind === 'connect')).toBe(false);
+		const option = connectOption(airframe, camera, ctx)!;
+		const choice = defaultChoice(option, ctx);
+		expect(choice).toEqual({ fromPort: undefined, toPort: 'imageOut', interfaceDef: '' });
+		const p = planRelation(option, choice, ctx) as Plan;
+		expect(p.statement).toBe('connect airframe to camera.imageOut;');
+		expect(apply(p)['system/DroneArchitecture.sysml']).toContain(
+			'        connect airframe to camera.imageOut;\n    }'
+		);
+		expect(planRelation(option, { ...choice, toPort: undefined }, ctx)).toBe(
+			'Choose a port on each end.'
+		);
+		// Not parts of one thing: nothing to offer.
+		expect(connectOption(airframe, el('Battery', true), ctx)).toBeNull();
 	});
 
 	it('specializes adds :> to the declaration', () => {

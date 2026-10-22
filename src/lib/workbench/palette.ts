@@ -513,6 +513,15 @@ export function commandItems(themeChoice: string): PaletteItem[] {
 			{ aliases: 'create risk harm severity hazard log risk control iso 14971 safety' }
 		),
 		command(
+			'new-dsm',
+			'New DSM…',
+			{ type: 'create', request: { kind: 'dsm' } },
+			{
+				aliases:
+					'create dependency matrix design structure n2 n-squared interface chart modules coupling change impact'
+			}
+		),
+		command(
 			'new-file',
 			'New file…',
 			{ type: 'file', request: { kind: 'new' } },

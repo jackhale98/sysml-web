@@ -97,6 +97,7 @@
 	const loadEmulator = () => import('#lib/sim/StateEmulator.svelte').then((m) => m.default);
 	const loadLibraryFile = () => import('./LibraryFile.svelte').then((m) => m.default);
 	const loadReport = () => import('#lib/reports/ReportView.svelte').then((m) => m.default);
+	const loadMatrix = () => import('./DsmView.svelte').then((m) => m.default);
 	const loadReview = () => import('#lib/review/ReviewView.svelte').then((m) => m.default);
 
 	// Tabs follow a file that is renamed or moved, and close when it goes.
@@ -607,6 +608,14 @@
 					{:else if presentation.kind === 'table'}
 						{#key tab.name}
 							<ViewTable name={tab.name} {workspace} {ui} {engine} />
+						{/key}
+					{:else if presentation.kind === 'matrix'}
+						{#key tab.name}
+							{#await loadMatrix()}
+								<p class="empty">Loading the matrix…</p>
+							{:then DsmView}
+								<DsmView name={tab.name} {workspace} {ui} {engine} />
+							{/await}
 						{/key}
 					{:else if presentation.kind === 'diagram'}
 						<!-- Shown as another kind of view ("View as"), it is drawn afresh. -->

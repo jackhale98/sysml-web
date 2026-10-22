@@ -241,7 +241,7 @@ class MatrixReader {
 		const accepted = this.members(owner).filter((m) => this.accepts(m));
 		const usages = accepted.filter((m) => !m.isDefinition);
 		for (const m of usages.length ? usages : accepted) {
-			const index = this.addItem(m, [...path, m.id], depth, parent);
+			const index = this.addItem(m, [...path, m.id], depth, parent, m.ownerId !== owner.id);
 			if (index !== null) this.addMembers([...path, m.id], depth + 1, index, levels - 1);
 		}
 	}
@@ -250,7 +250,8 @@ class MatrixReader {
 		r: ElementRecord,
 		path: string[],
 		depth: number,
-		parent: number | null
+		parent: number | null,
+		inherited = false
 	): number | null {
 		const key = keyOf(path);
 		if (this.byPath.has(key) || !r.name) return null;
@@ -267,6 +268,7 @@ class MatrixReader {
 			type: (typeId ? this.ctx.nameOf(typeId) : null) ?? (r.type ? simpleName(r.type) : null),
 			depth,
 			parent,
+			...(inherited ? { inherited } : {}),
 			file: r.path,
 			start: r.span.start_byte,
 			end: r.span.end_byte

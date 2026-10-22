@@ -220,6 +220,8 @@ export interface MatrixItem {
 	depth: number;
 	/** The item it is nested in, by index. */
 	parent: number | null;
+	/** Given by a definition (a rotor's `esc`, written in `Rotor`), not written in what it is listed under. */
+	inherited?: boolean;
 	file: string;
 	start: number;
 	end: number;

@@ -151,30 +151,37 @@
 				<span>Name of the new part in {option.from.label}</span>
 				<input bind:value={choice.name} autocomplete="off" spellcheck="false" required />
 			</label>
-		{:else if option.kind === 'connect' && ports}
+		{:else if option.kind === 'connect' && ports && (ports.from.length || ports.to.length)}
+			<!-- A part without ports is connected itself. -->
 			<div class="row">
-				<label class="field">
-					<span>Port of {option.from.label}</span>
-					<select bind:value={choice.fromPort} onchange={portsChanged}>
-						{#each ports.from as p (p.name)}<option value={p.name}>{portLabel(p)}</option>{/each}
-					</select>
-				</label>
-				<label class="field">
-					<span>Port of {option.to.label}</span>
-					<select bind:value={choice.toPort} onchange={portsChanged}>
-						{#each ports.to as p (p.name)}<option value={p.name}>{portLabel(p)}</option>{/each}
-					</select>
-				</label>
+				{#if ports.from.length}
+					<label class="field">
+						<span>Port of {option.from.label}</span>
+						<select bind:value={choice.fromPort} onchange={portsChanged}>
+							{#each ports.from as p (p.name)}<option value={p.name}>{portLabel(p)}</option>{/each}
+						</select>
+					</label>
+				{/if}
+				{#if ports.to.length}
+					<label class="field">
+						<span>Port of {option.to.label}</span>
+						<select bind:value={choice.toPort} onchange={portsChanged}>
+							{#each ports.to as p (p.name)}<option value={p.name}>{portLabel(p)}</option>{/each}
+						</select>
+					</label>
+				{/if}
 			</div>
-			<label class="field">
-				<span>Typed by</span>
-				<select bind:value={choice.interfaceDef}>
-					<option value="">No interface (plain connect)</option>
-					{#each interfaces as f (f.def.key)}
-						<option value={f.def.name}>interface {f.def.label}</option>
-					{/each}
-				</select>
-			</label>
+			{#if ports.from.length && ports.to.length}
+				<label class="field">
+					<span>Typed by</span>
+					<select bind:value={choice.interfaceDef}>
+						<option value="">No interface (plain connect)</option>
+						{#each interfaces as f (f.def.key)}
+							<option value={f.def.name}>interface {f.def.label}</option>
+						{/each}
+					</select>
+				</label>
+			{/if}
 		{/if}
 
 		<div class="preview">

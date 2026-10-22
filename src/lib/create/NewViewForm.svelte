@@ -266,6 +266,13 @@
 							<small>{k.description}</small>
 						</label>
 					{/each}
+					{#if g.id === 'tables'}
+						<button type="button" class="card trade" onclick={() => (ui.create = { kind: 'dsm' })}>
+							<span class="glyph"><Grid3x3 size={18} aria-hidden="true" /></span>
+							<strong>Dependency matrix (DSM)</strong>
+							<small>Parts, steps or requirements against each other: what links to what.</small>
+						</button>
+					{/if}
 					{#if g.id === 'analysis'}
 						<button
 							type="button"

@@ -1,5 +1,5 @@
 /** Workbench UI state: open tabs, the selected element and the phone layout. */
-import type { DiagramView } from '#lib/engine/types.ts';
+import type { DiagramView, MatrixElements } from '#lib/engine/types.ts';
 import { isPhone } from '#lib/mobile/media.svelte.ts';
 import type { AddKind } from './templates.ts';
 
@@ -32,6 +32,8 @@ export type CreateRequest =
 	| { kind: 'fmea'; fmeaKind?: string }
 	| { kind: 'fmeaLine'; view: string }
 	| { kind: 'hazard' }
+	/** A new dependency matrix (DSM), of parts, steps or requirements, of an element (key). */
+	| { kind: 'dsm'; elements?: MatrixElements; target?: string }
 	| { kind: 'riskPolicy' }
 	| {
 			kind: 'savedReview';
