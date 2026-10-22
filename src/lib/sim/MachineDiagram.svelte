@@ -21,7 +21,8 @@
 		/** The state just entered, for a brief flourish. */
 		arrived: string | null;
 		/** Transitions leaving the active states: can they fire now? */
-		edgeState: Map<number, 'ready' | 'blocked'>;
+		/** `waiting`: a timer still to come. */
+		edgeState: Map<number, 'ready' | 'waiting' | 'blocked'>;
 		/** Keyboard shortcut shown on a transition's label. */
 		shortcuts: Map<number, number>;
 		lastEdge: number | null;
@@ -301,7 +302,14 @@
 
 	function edgeSuffix(e: EdgeGeometry) {
 		const state = edgeState.get(e.index);
-		const status = state === 'ready' ? ', can fire now' : state === 'blocked' ? ', blocked' : '';
+		const status =
+			state === 'ready'
+				? ', can fire now'
+				: state === 'waiting'
+					? ', waiting for its time'
+					: state === 'blocked'
+						? ', blocked'
+						: '';
 		return `, ${e.from} to ${e.to}${status}`;
 	}
 </script>
@@ -770,6 +778,10 @@
 		stroke: var(--text-3);
 		stroke-dasharray: 4 4;
 	}
+	.edge.waiting {
+		stroke: color-mix(in oklab, var(--fam) 70%, var(--edge));
+		stroke-dasharray: 7 3;
+	}
 	.edge.last {
 		stroke: color-mix(in oklab, var(--fam) 60%, var(--edge));
 		stroke-width: 2.25;
@@ -847,6 +859,10 @@
 	.label.blocked {
 		border-style: dashed;
 		border-color: var(--text-3);
+	}
+	.label.waiting {
+		border-style: dashed;
+		border-color: var(--fam);
 	}
 	.label.highlight,
 	.label.selected {

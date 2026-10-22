@@ -6,27 +6,27 @@ export const flightModes: StateMachine = {
 	qualifiedName: 'FlightControl::FlightModes',
 	file: 'behaviour/FlightControl.sysml',
 	line: 19,
-	doc: 'Flight modes of the delivery drone.',
+	doc: 'Flight modes of the delivery drone. Time matters here: in the air the battery\nruns down, and back on the landing pad it charges until the drone can fly again.',
 	states: [
 		{
 			name: 'entry',
 			label: 'entry',
 			kind: 'initial',
-			line: 25
+			line: 30
 		},
 		{
 			name: 'idle',
 			label: 'idle',
 			kind: 'state',
 			doc: 'On the ground with the motors off. Safe to handle.',
-			line: 27
+			line: 32
 		},
 		{
 			name: 'armed',
 			label: 'armed',
 			kind: 'state',
 			doc: 'On the ground with the motors idling, ready to take off.',
-			line: 28
+			line: 33
 		},
 		{
 			name: 'flying',
@@ -34,21 +34,43 @@ export const flightModes: StateMachine = {
 			kind: 'state',
 			do: 'followFlightPlan',
 			doc: 'Flying the mission under automatic control.',
-			line: 29
+			line: 34
+		},
+		{
+			name: 'flying.entry',
+			label: 'entry',
+			kind: 'initial',
+			parent: 'flying',
+			line: 38
+		},
+		{
+			name: 'flying.cruising',
+			label: 'cruising',
+			kind: 'state',
+			parent: 'flying',
+			doc: 'In the air. Every 5 minutes uses 15 % of the battery.',
+			line: 39
 		},
 		{
 			name: 'returningHome',
 			label: 'returningHome',
 			kind: 'state',
 			doc: 'Flying back to the depot on its own.',
-			line: 33
+			line: 43
 		},
 		{
 			name: 'landing',
 			label: 'landing',
 			kind: 'state',
 			doc: 'Descending onto the landing pad.',
-			line: 34
+			line: 44
+		},
+		{
+			name: 'charging',
+			label: 'charging',
+			kind: 'state',
+			doc: 'On the landing pad with the charger connected. Every 10 minutes adds 25 %.',
+			line: 45
 		},
 		{
 			name: 'failsafe',
@@ -56,14 +78,27 @@ export const flightModes: StateMachine = {
 			kind: 'state',
 			entry: 'alertOperator',
 			doc: 'Something is wrong: land at once, where the drone is.',
-			line: 35
+			line: 46
 		}
 	],
 	transitions: [
 		{
 			from: 'entry',
 			to: 'idle',
-			line: 25
+			line: 30
+		},
+		{
+			from: 'flying.entry',
+			to: 'flying.cruising',
+			line: 38
+		},
+		{
+			name: 'useCharge',
+			from: 'flying.cruising',
+			to: 'flying.cruising',
+			trigger: 'after 5 [SI::min]',
+			effect: 'assign stateOfCharge := stateOfCharge - 0.15',
+			line: 40
 		},
 		{
 			name: 'arm',
@@ -71,77 +106,92 @@ export const flightModes: StateMachine = {
 			to: 'armed',
 			trigger: 'ArmCommand',
 			guard: 'preflightChecksPassed',
-			line: 40
+			line: 51
 		},
 		{
 			name: 'disarm',
 			from: 'armed',
 			to: 'idle',
 			trigger: 'DisarmCommand',
-			line: 41
+			line: 52
 		},
 		{
 			name: 'takeOff',
 			from: 'armed',
 			to: 'flying',
 			trigger: 'TakeOffCommand',
-			line: 42
+			line: 53
 		},
 		{
 			name: 'commandedReturn',
 			from: 'flying',
 			to: 'returningHome',
 			trigger: 'ReturnHomeCommand',
-			line: 44
+			line: 55
 		},
 		{
 			name: 'linkLost',
 			from: 'flying',
 			to: 'returningHome',
 			trigger: 'LinkLost',
-			line: 45
+			line: 56
 		},
 		{
 			name: 'lowBattery',
 			from: 'flying',
 			to: 'returningHome',
 			trigger: 'when stateOfCharge < returnThreshold',
-			line: 46
+			line: 57
 		},
 		{
 			name: 'overDepot',
 			from: 'returningHome',
 			to: 'landing',
 			trigger: 'ArrivedHome',
-			line: 47
+			line: 58
 		},
 		{
 			name: 'landed',
 			from: 'landing',
-			to: 'idle',
+			to: 'charging',
 			trigger: 'TouchDown',
-			line: 48
+			line: 59
+		},
+		{
+			name: 'addCharge',
+			from: 'charging',
+			to: 'charging',
+			trigger: 'after 10 [SI::min]',
+			effect: 'assign stateOfCharge := stateOfCharge + 0.25',
+			line: 60
+		},
+		{
+			name: 'charged',
+			from: 'charging',
+			to: 'idle',
+			trigger: 'when stateOfCharge >= readyCharge',
+			line: 62
 		},
 		{
 			name: 'faultInFlight',
 			from: 'flying',
 			to: 'failsafe',
 			trigger: 'FaultDetected',
-			line: 50
+			line: 64
 		},
 		{
 			name: 'faultOnReturn',
 			from: 'returningHome',
 			to: 'failsafe',
 			trigger: 'FaultDetected',
-			line: 51
+			line: 65
 		},
 		{
 			name: 'emergencyLanded',
 			from: 'failsafe',
 			to: 'idle',
 			trigger: 'TouchDown',
-			line: 52
+			line: 66
 		}
 	],
 	variables: [
@@ -153,7 +203,7 @@ export const flightModes: StateMachine = {
 		{
 			name: 'stateOfCharge',
 			type: 'Real',
-			direction: 'in',
+			value: '1.0',
 			doc: 'Battery charge left: 0 is empty, 1 is full.'
 		},
 		{
@@ -161,6 +211,12 @@ export const flightModes: StateMachine = {
 			type: 'Real',
 			value: '0.3',
 			doc: 'Charge needed to fly home plus a 20 % reserve.'
+		},
+		{
+			name: 'readyCharge',
+			type: 'Real',
+			value: '0.95',
+			doc: 'Charge at which charging stops and the drone is ready.'
 		}
 	]
 };

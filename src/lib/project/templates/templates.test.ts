@@ -182,5 +182,11 @@ describe('starting points', { timeout: 60_000 }, () => {
 		expect(session.current).toEqual(['lowBattery']);
 		session = step(machine, session, { event: 'ButtonPress' });
 		expect(session.current).toEqual(['off']);
+		// Left on, it dims by itself after 3 hours, as long as its run time.
+		session = step(machine, start(machine), { event: 'ButtonPress' });
+		session = step(machine, session, { wait: 4 * 3600 });
+		expect(session.current).toEqual(['lowBattery']);
+		expect(session.time).toBe(4 * 3600);
+		expect(session.trace.at(-1)).toMatchObject({ transition_name: 'batteryLow', time: 3 * 3600 });
 	});
 });

@@ -52,7 +52,16 @@ describe('start', () => {
 			current: ['idle'],
 			step: 0,
 			status: 'running',
-			variables: { preflightChecksPassed: null, stateOfCharge: null, returnThreshold: 0.3 }
+			variables: {
+				preflightChecksPassed: null,
+				stateOfCharge: 1,
+				returnThreshold: 0.3,
+				readyCharge: 0.95
+			},
+			time: 0,
+			entered: { idle: 0 },
+			timers: {},
+			doing: []
 		});
 		expect(s.trace).toEqual([
 			{
@@ -64,13 +73,16 @@ describe('start', () => {
 				effect: null,
 				to_state: 'idle',
 				exit_action: null,
-				entry_action: null
+				entry_action: null,
+				time: 0,
+				do_action: null,
+				do_stopped: null
 			}
 		]);
 		expect(s.enabled).toEqual([
 			{
 				transition: 'arm',
-				index: 1,
+				index: 3,
 				from: 'idle',
 				to: 'armed',
 				trigger: 'ArmCommand',
@@ -154,13 +166,15 @@ describe('step', () => {
 			effect: null,
 			to_state: 'armed',
 			exit_action: null,
-			entry_action: null
+			entry_action: null,
+			time: 0,
+			do_action: null,
+			do_stopped: null
 		});
 		s = step(flightModes, s, { event: 'TakeOffCommand' });
-		s = step(flightModes, s, { event: null });
-		expect(s.messages).toEqual([
-			'no completion, guard-only or change transition is ready in flying'
-		]);
+		expect(s.current).toEqual(['flying.cruising']);
+		s = step(flightModes, s, { event: 'Whatever' });
+		expect(s.messages).toEqual(['`Whatever` fires no transition from flying.cruising']);
 		s = step(flightModes, s, { event: null, variables: { stateOfCharge: 0.2 } });
 		expect(s.current).toEqual(['returningHome']);
 		expect(s.trace.at(-1)).toMatchObject({ trigger: 'when stateOfCharge < returnThreshold' });
@@ -177,13 +191,13 @@ describe('step', () => {
 
 	it('fires one chosen transition', () => {
 		const s = start(flightModes, { preflightChecksPassed: true });
-		expect(step(flightModes, s, { transition: 1 }).current).toEqual(['armed']);
-		const blocked = step(flightModes, start(flightModes), { transition: 1 });
+		expect(step(flightModes, s, { transition: 3 }).current).toEqual(['armed']);
+		const blocked = step(flightModes, start(flightModes), { transition: 3 });
 		expect(blocked.current).toEqual(['idle']);
 		expect(blocked.messages).toEqual([
 			'`arm` cannot fire: guard `preflightChecksPassed`: undefined variable `preflightChecksPassed`'
 		]);
-		expect(step(flightModes, s, { transition: 2 }).messages).toEqual([
+		expect(step(flightModes, s, { transition: 4 }).messages).toEqual([
 			'`disarm` does not leave idle'
 		]);
 		expect(() => step(flightModes, s, { transition: 99 })).toThrow('no transition 99');
@@ -410,5 +424,57 @@ describe('units and enums in variables', () => {
 		const s = step(m, start(m), { event: 'Go' });
 		expect(s.current).toEqual(['b']);
 		expect(s.variables.mode).toBe('cruise');
+	});
+});
+
+describe('the clock', () => {
+	const timed = () =>
+		machine(
+			['entry', 'a', 'b'],
+			[
+				t('entry', 'a'),
+				t('a', 'b', { trigger: 'after 2 [min]' }),
+				t('b', 'a', { trigger: 'after 0 [s]' })
+			]
+		);
+
+	it('refuses to wait for no time, or for time going backwards', () => {
+		const m = timed();
+		expect(() => step(m, start(m), { wait: 0 })).toThrow('cannot wait for 0 seconds');
+		expect(() => step(m, start(m), { wait: -5 })).toThrow('cannot wait for -5 seconds');
+	});
+
+	it('resumes a session kept without the clock, starting its timers from time 0', () => {
+		const m = timed();
+		const old = json(start(m));
+		delete old.time;
+		delete old.entered;
+		delete old.timers;
+		delete old.doing;
+		const s = step(m, old, { event: null });
+		expect(s).toMatchObject({ current: ['b'], time: 120 });
+	});
+
+	it('stops a wait at the step limit, and when the machine never lets time pass', () => {
+		const m = timed();
+		const limited = step(m, start(m, null, { maxSteps: 3 }), { wait: 3600 }, { maxSteps: 3 });
+		expect(limited).toMatchObject({ step: 3, status: 'max steps reached', time: 240 });
+		// `b` goes back to `a` at once and `a` waits 2 minutes: an hour is 30 round trips.
+		const hour = step(m, start(m), { wait: 3600 });
+		expect(hour).toMatchObject({ step: 60, time: 3600, current: ['a'] });
+		const spin = machine(
+			['entry', 'a'],
+			[t('entry', 'a'), t('a', 'a', { trigger: 'after 0 [s]' })]
+		);
+		const stuck = step(spin, start(spin), { wait: 10 });
+		expect(stuck.time).toBe(0);
+		expect(stuck.messages).toEqual([
+			'stopped after 200 steps at 0 s: the machine keeps moving without time passing'
+		]);
+	});
+
+	it('lets time pass for a machine that is stuck', () => {
+		const m = machine(['entry', 'a'], [t('entry', 'a')]);
+		expect(step(m, start(m), { wait: 60 })).toMatchObject({ status: 'deadlocked', time: 60 });
 	});
 });

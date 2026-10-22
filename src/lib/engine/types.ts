@@ -574,6 +574,14 @@ export interface SimStep {
 	to_state: string;
 	exit_action: string | null;
 	entry_action: string | null;
+	/** Simulated time of the step, in seconds since the start. */
+	time?: number;
+	/** The `do` actions of the states entered, started after their entry actions. */
+	do_action?: string | null;
+	/** The `do` actions still running in the states exited, stopped before their exit actions. */
+	do_stopped?: string | null;
+	/** What the step could not do, such as a time trigger whose duration cannot be worked out. */
+	notes?: string[];
 }
 
 /** One emulation session: where the machine is and what can happen next. */
@@ -584,6 +592,17 @@ export interface StateSession {
 	variables: Record<string, unknown>;
 	trace: SimStep[];
 	status: 'running' | 'completed' | 'deadlocked' | 'max steps reached' | string;
+	/** Simulated time, in seconds since the start. */
+	time?: number;
+	/** When each active state was entered, in seconds since the start. */
+	entered?: Record<string, number>;
+	/**
+	 * The time triggers of the active states, by transition index: when it is
+	 * due (seconds since the start), or why it will not fire this time.
+	 */
+	timers?: Record<string, number | string>;
+	/** Active states whose `do` action is still running. */
+	doing?: string[];
 	enabled: {
 		transition: string;
 		index: number;
@@ -593,6 +612,8 @@ export interface StateSession {
 		guard?: string;
 		guardResult?: boolean;
 		conditionResult?: boolean;
+		/** For a time trigger: when it is due, in seconds since the start. */
+		due?: number;
 		ready: boolean;
 		reason?: string;
 	}[];

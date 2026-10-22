@@ -16,7 +16,7 @@
 		/** Values changed since the last step. */
 		pending: Record<string, unknown>;
 		/** Ready (true) or blocked (false) state of the transitions leaving the current state. */
-		readiness: Map<number, 'ready' | 'blocked'>;
+		readiness: Map<number, 'ready' | 'waiting' | 'blocked'>;
 		onchange: (name: string, value: unknown) => void;
 		onreset: (name: string) => void;
 		onhover: (indices: number[]) => void;
@@ -166,9 +166,11 @@
 								<span class="visually-hidden"
 									>: {use.expression}{state === 'ready'
 										? ', ready now'
-										: state === 'blocked'
-											? ', blocked now'
-											: ''}</span
+										: state === 'waiting'
+											? ', waiting for its time'
+											: state === 'blocked'
+												? ', blocked now'
+												: ''}</span
 								>
 							</button>
 						{/each}

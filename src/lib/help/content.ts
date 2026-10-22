@@ -244,7 +244,9 @@ export const HELP: HelpSection[] = [
 					'A state machine lists the modes something can be in (off, on, low battery) and what makes it switch between them. A **transition** leaves one state (`first`), on an event (`accept`), maybe only if a condition holds (`if`), for another (`then`).',
 					concept('state def'),
 					concept('transition'),
-					'Run any state machine from **Simulations** in the explorer: send it events and watch it move.'
+					'Run any state machine from **Simulations** in the explorer: send it events and watch it move. **Step** takes what happens without an event: a transition with no trigger, an `accept when …` whose condition is true, or a timer that is due; if nothing is ready, time passes to the next timer. **Wait** lets time pass by an amount, and everything due on the way happens in order.',
+					'Time is simulated: the clock starts at 0 and moves only when you Step or Wait. `accept after 5 [SI::min]` fires 5 minutes after its state was entered, counting again each time the state is entered; `accept at 2 [SI::h]` fires 2 hours after the start. The **Timeline** shows when each step happened.',
+					'Something that changes over time, like a battery running down, is a timed transition that changes a value: `accept after 5 [SI::min] do assign charge := charge - 0.1`. A state’s `do` action starts once the state is entered and stops when it is left.'
 				],
 				action: { action: 'state-machine', label: 'Draw a state machine' }
 			},
@@ -539,6 +541,7 @@ export const HELP: HelpSection[] = [
 						keys: [
 							['1 to 9', 'Send that event'],
 							['S', 'Step'],
+							['W', 'Wait (let time pass)'],
 							['B', 'Back a step'],
 							['P', 'Play or pause']
 						]
