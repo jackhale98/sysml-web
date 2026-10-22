@@ -68,7 +68,7 @@ test('the battery trade study ranks the packs and says which one to fly', async 
 	// A criterion opens its attribute in the evaluation function.
 	await row('Endurance').getByRole('button', { name: 'Endurance' }).click();
 	await expect(inspector(page).getByRole('heading', { name: 'endurance' })).toBeVisible();
-	await expect(inspector(page).getByLabel(/^Value/)).toHaveValue(
+	await expect(inspector(page).getByRole('textbox', { name: /^Value \(/ })).toHaveValue(
 		'HoverEndurance(pack.usableEnergy, hoverPower)'
 	);
 });
@@ -76,16 +76,14 @@ test('the battery trade study ranks the packs and says which one to fly', async 
 test('a pricier pack changes the choice, until undone', async ({ page }) => {
 	await openDemo(page);
 	const view = await openTrade(page);
-	// The alternative opens in the inspector, with its values.
+	// The alternative opens in the inspector, with its values, each edited in place.
 	await column(view, 'semiSolidState').getByRole('button', { name: 'semiSolidState' }).click();
 	await expect(inspector(page).getByRole('heading', { name: 'semiSolidState' })).toBeVisible();
-	await inspector(page)
-		.getByRole('button', { name: /attribute price/ })
-		.click();
-	const value = inspector(page).getByLabel(/^Value/);
-	await expect(value).toHaveValue('1150.0');
-	await value.fill('2500.0');
-	await value.press('Enter');
+	const values = inspector(page).getByRole('region', { name: 'Values' });
+	await values.getByRole('button', { name: /^price: 1150\.0/ }).click();
+	const price = values.getByRole('textbox', { name: 'price of semiSolidState' });
+	await price.fill('2500.0');
+	await price.press('Enter');
 
 	await expect(view.locator('.verdict')).toContainText(
 		'drone.battery is selected: it has the highest score, 0.39.',
