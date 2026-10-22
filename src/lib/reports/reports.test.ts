@@ -80,9 +80,13 @@ describe('report views', () => {
 		const entries = reportEntries(views, isLibraryFile);
 		expect(entries.map((e) => [e.name, e.saved])).toEqual([
 			['droneSpecification', true],
-			['droneInterfaceControl', true],
-			['SpecificationDocument', false],
-			['InterfaceControlDocument', false]
+			['droneInterfaceControl', true]
+		]);
+		// A project without saved copies is offered the standard ones.
+		const unsaved = views.filter((v) => v.name !== 'droneSpecification');
+		expect(reportEntries(unsaved, isLibraryFile).map((e) => e.name)).toEqual([
+			'droneInterfaceControl',
+			'SpecificationDocument'
 		]);
 	});
 

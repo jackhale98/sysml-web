@@ -47,8 +47,16 @@ export function viewTitle(name: string): string {
 	const words = name
 		.replace(/^'|'$/g, '')
 		.replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+		.replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
 		.split(/\s+/);
 	return words
-		.map((w, i) => (i === 0 ? w[0]!.toUpperCase() + w.slice(1) : w.toLowerCase()))
+		.map((w, i) => {
+			const lower = w.toLowerCase();
+			if (ACRONYMS.has(lower) || (w.length > 1 && w === w.toUpperCase())) return w.toUpperCase();
+			return i === 0 ? w[0]!.toUpperCase() + w.slice(1) : lower;
+		})
 		.join(' ');
 }
+
+/** Abbreviations engineers write in capitals, even when a name is camel case (`fmeaWorksheet`). */
+const ACRONYMS = new Set(['fmea', 'icd', 'bom', 'rpn', 'uav', 'gps', 'id', 'si', 'ui', 'api']);
