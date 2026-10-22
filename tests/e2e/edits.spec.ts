@@ -215,3 +215,13 @@ test('the inspector goes to the definition of a type', async ({ page }) => {
 	await camera.getByRole('button', { name: 'Component', exact: true }).click();
 	await expect(camera.getByRole('heading', { level: 2 })).toHaveText(/\bComponent$/);
 });
+
+test('a requirement links to what satisfies and verifies it', async ({ page }) => {
+	await openDemo(page);
+	const requirement = await select(page, 'Flight endurance');
+	await requirement.getByRole('button', { name: 'enduranceFlightTest' }).click();
+	await expect(requirement.getByRole('heading', { level: 2 })).toHaveText(/\benduranceFlightTest$/);
+	const again = await select(page, 'Flight endurance');
+	await again.getByRole('button', { name: 'drone', exact: true }).click();
+	await expect(again.getByRole('heading', { level: 2 })).toHaveText(/\bdrone$/);
+});

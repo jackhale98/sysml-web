@@ -23,6 +23,8 @@ export interface RequirementRow {
 	issues: string[];
 	satisfiedBy: string[];
 	verifiedBy: string[];
+	/** The element ids of what satisfies or verifies it, by the name shown (when resolved). */
+	linkIds: Record<string, string>;
 	file: string;
 	span: Span;
 }
@@ -62,6 +64,7 @@ export function collectRequirements(analyses: Iterable<Analysis>): RequirementRo
 					.map((a) => field(a, 'text', stringValue) ?? ''),
 				satisfiedBy: linksTo(usage, satisfactions),
 				verifiedBy: linksTo(usage, verifications),
+				linkIds: linkIds(usage, [...satisfactions, ...verifications]),
 				file: model.file,
 				span: usage.span
 			});
@@ -113,14 +116,22 @@ function referencesTo(usage: Usage): Set<string> {
 }
 
 function linksTo(usage: Usage, links: TraceLink[]): string[] {
+	return [...new Set(linksOf(usage, links).map((link) => displayReference(link.by)))];
+}
+
+/** The links to a requirement: by its resolved id, else (unresolved) by name. */
+function linksOf(usage: Usage, links: TraceLink[]): TraceLink[] {
 	const names = referencesTo(usage);
-	const targets = links
-		.filter((link) => {
-			// A resolved link names its requirement by id; an unresolved one only by name.
-			if (link.requirement_id && usage.id) return link.requirement_id === usage.id;
-			const segments = link.requirement.split('::');
-			return names.has(link.requirement) || names.has(segments[segments.length - 1] ?? '');
-		})
-		.map((link) => displayReference(link.by));
-	return [...new Set(targets)];
+	return links.filter((link) => {
+		if (link.requirement_id && usage.id) return link.requirement_id === usage.id;
+		const segments = link.requirement.split('::');
+		return names.has(link.requirement) || names.has(segments[segments.length - 1] ?? '');
+	});
+}
+
+function linkIds(usage: Usage, links: TraceLink[]): Record<string, string> {
+	const ids: Record<string, string> = {};
+	for (const link of linksOf(usage, links))
+		if (link.by_id) ids[displayReference(link.by)] ??= link.by_id;
+	return ids;
 }
