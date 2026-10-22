@@ -81,12 +81,21 @@ releases the parcel, the flight controller does the rest.
 
 ## 9. Flight modes: `FlightControl::FlightModes`
 
-A state machine: idle, armed, flying, returning home, landing and failsafe. Each
-transition says what triggers it (`accept LinkLost`), an optional guard
-(`if preflightChecksPassed`) and where it goes. `accept when stateOfCharge < ...`
-fires on its own when the battery runs low. The flight controller runs it
-(`exhibit state` in `DroneComponents::FlightController`).
+A state machine: idle, armed, flying, returning home, landing, charging and
+failsafe. Each transition says what triggers it (`accept LinkLost`), an optional
+guard (`if preflightChecksPassed`) and where it goes. Time matters too:
+`accept after 5 [SI::min]` fires 5 minutes after the state was entered, and its
+`do assign stateOfCharge := ...` uses up some of the battery each time.
+`accept when stateOfCharge < ...` fires on its own when the battery runs low, and
+on the ground `charging` adds charge every 10 minutes until the drone is ready.
+The flight controller runs it (`exhibit state` in `DroneComponents::FlightController`).
 Diagram: **`DroneViews::flightModeStates`**.
+
+Run it from **Simulations**: switch `preflightChecksPassed` on, press
+`ArmCommand` and `TakeOffCommand`, then **Step**. Each Step lets time pass to the
+next timer, so the clock goes 5, 10, 15 minutes and the charge goes down until the
+drone turns home. Press `ArrivedHome` and `TouchDown`, then Step (or **Wait**)
+until it has charged and is idle again.
 
 ## 10. Meeting the requirements: `RequirementSatisfaction` and `DronePerformance`
 

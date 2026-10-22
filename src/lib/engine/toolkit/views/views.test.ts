@@ -1071,7 +1071,7 @@ describe('the demo’s tables', () => {
 		const row = (kind: string) => stats.rows.find((r) => r[0] === kind);
 		expect(row('part def')).toEqual(['part def', '19', '0']);
 		expect(row('requirement')).toEqual(['requirement', '0', '20']);
-		expect(row('attribute')).toEqual(['attribute', '0', '197']);
+		expect(row('attribute')).toEqual(['attribute', '0', '198']);
 		// Enum literals count as usages, metadata annotations are anonymous.
 		expect(row('enum')).toEqual(['enum', '0', '36']);
 		expect(row('metadata')).toBeUndefined();

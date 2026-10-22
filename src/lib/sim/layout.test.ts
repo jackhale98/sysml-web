@@ -20,7 +20,7 @@ const inside = (
 
 describe('labels', () => {
 	it('writes trigger [guard] / effect', () => {
-		expect(labelText(flightModes.transitions[1]!)).toBe('ArmCommand [preflightChecksPassed]');
+		expect(labelText(flightModes.transitions[3]!)).toBe('ArmCommand [preflightChecksPassed]');
 		expect(labelText(nestedMachine.transitions[2]!)).toBe('Go [count > 2] / inc');
 		expect(labelLines(flightModes.transitions[0]!)).toEqual([]);
 	});
@@ -43,7 +43,7 @@ describe('labels', () => {
 	});
 
 	it('wraps a long change trigger between words', () => {
-		const lines = labelLines(flightModes.transitions[6]!);
+		const lines = labelLines(flightModes.transitions[8]!);
 		expect(lines.map((l) => l.map((p) => p.text).join(' '))).toEqual([
 			'when stateOfCharge <',
 			'returnThreshold'
@@ -79,7 +79,8 @@ describe('layout', () => {
 			expect(e.path.startsWith('M')).toBe(true);
 		}
 		const labelled = layout.edges.filter((e) => e.label);
-		expect(labelled).toHaveLength(flightModes.transitions.length - 1);
+		// All but the two initial transitions (of the machine and of `flying`).
+		expect(labelled).toHaveLength(flightModes.transitions.length - 2);
 		for (const s of layout.states) {
 			expect(inside(s, { x: 0, y: 0, width: layout.width, height: layout.height })).toBe(true);
 		}

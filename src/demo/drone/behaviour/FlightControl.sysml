@@ -17,10 +17,15 @@ package FlightControl {
     item def TouchDown { doc /* The landing gear has touched the ground. */ }
 
     state def FlightModes {
-        doc /* Flight modes of the delivery drone. */
+        doc
+        /*
+         * Flight modes of the delivery drone. Time matters here: in the air the battery
+         * runs down, and back on the landing pad it charges until the drone can fly again.
+         */
         in attribute preflightChecksPassed : Boolean;
-        in attribute stateOfCharge : Real { doc /* Battery charge left: 0 is empty, 1 is full. */ }
+        attribute stateOfCharge : Real = 1.0 { doc /* Battery charge left: 0 is empty, 1 is full. */ }
         attribute returnThreshold : Real = 0.3 { doc /* Charge needed to fly home plus a 20 % reserve. */ }
+        attribute readyCharge : Real = 0.95 { doc /* Charge at which charging stops and the drone is ready. */ }
 
         entry; then idle;
 
@@ -29,9 +34,15 @@ package FlightControl {
         state flying {
             doc /* Flying the mission under automatic control. */
             do action followFlightPlan;
+
+            entry; then cruising;
+            state cruising { doc /* In the air. Every 5 minutes uses 15 % of the battery. */ }
+            transition useCharge first cruising accept after 5 [SI::min]
+                do assign stateOfCharge := stateOfCharge - 0.15 then cruising;
         }
         state returningHome { doc /* Flying back to the depot on its own. */ }
         state landing { doc /* Descending onto the landing pad. */ }
+        state charging { doc /* On the landing pad with the charger connected. Every 10 minutes adds 25 %. */ }
         state failsafe {
             doc /* Something is wrong: land at once, where the drone is. */
             entry action alertOperator;
@@ -45,7 +56,10 @@ package FlightControl {
         transition linkLost first flying accept LinkLost then returningHome;
         transition lowBattery first flying accept when stateOfCharge < returnThreshold then returningHome;
         transition overDepot first returningHome accept ArrivedHome then landing;
-        transition landed first landing accept TouchDown then idle;
+        transition landed first landing accept TouchDown then charging;
+        transition addCharge first charging accept after 10 [SI::min]
+            do assign stateOfCharge := stateOfCharge + 0.25 then charging;
+        transition charged first charging accept when stateOfCharge >= readyCharge then idle;
 
         transition faultInFlight first flying accept FaultDetected then failsafe;
         transition faultOnReturn first returningHome accept FaultDetected then failsafe;
