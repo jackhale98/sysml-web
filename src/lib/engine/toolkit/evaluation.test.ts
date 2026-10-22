@@ -28,7 +28,7 @@ beforeAll(async () => {
 describe('the demo’s checks', () => {
 	it('decides the requirements stated as constraints', () => {
 		const report = host.checks(files);
-		const checkable = report.checks.filter((c) => c.checkable);
+		const checkable = report.checks.filter((c) => c.checkable && c.kind !== 'assert');
 		expect(checkable.map((c) => [c.requirement?.id, c.status])).toEqual([
 			['SYS-001', 'satisfied'],
 			['SYS-002', 'satisfied'],
@@ -36,11 +36,15 @@ describe('the demo’s checks', () => {
 		]);
 		// Requirements in words only are listed, with nothing to check.
 		const words = report.checks.filter((c) => !c.checkable);
-		expect(words).toHaveLength(9);
+		expect(words).toHaveLength(13);
 		expect(words.every((c) => c.status === 'undecided' && c.kind === 'satisfy')).toBe(true);
-		// The libraries' type invariants (`that >= 1 and that <= 10`) hold and are left out.
-		expect(report.checks.some((c) => c.kind === 'assert')).toBe(false);
-		expect(report.summary).toEqual({ satisfied: 3, violated: 0, undecided: 9 });
+		// The libraries' type invariants (`that >= 1 and that <= 10`) hold and are left out; the
+		// risk review flags the camera's FMEA line (unacceptable, no verified control).
+		expect(report.checks.filter((c) => c.kind === 'assert').map((c) => c.by)).toEqual([
+			'drone::camera',
+			'drone::camera'
+		]);
+		expect(report.summary).toEqual({ satisfied: 3, violated: 2, undecided: 13 });
 	});
 
 	it('gives the values, the limit and the margin of a met requirement', () => {
@@ -356,11 +360,13 @@ describe('the budget and checks tables', () => {
 		const table = host.renderView(files, 'designChecks');
 		expect(table.opensText).toBe(true);
 		expect(table.rows.map((r) => [r[0], r[1]])).toEqual([
+			['violated', ''],
+			['violated', ''],
 			['satisfied', 'SYS-001'],
 			['satisfied', 'SYS-002'],
 			['satisfied', 'SYS-003']
 		]);
-		expect(table.rows[0]).toEqual([
+		expect(table.rows[2]).toEqual([
 			'satisfied',
 			'SYS-001',
 			'Flight endurance',
@@ -368,8 +374,8 @@ describe('the budget and checks tables', () => {
 			'2.54 min (10 %)',
 			'Met: drone.endurance = 27.54 min (needs ≥ 25 min).'
 		]);
-		expect(table.sources[0]).toMatchObject({ file: 'system/Satisfaction.sysml', line: 12 });
-		expect(typeof table.sources[0]!.byte).toBe('number');
+		expect(table.sources[2]).toMatchObject({ file: 'system/Satisfaction.sysml', line: 12 });
+		expect(typeof table.sources[2]!.byte).toBe('number');
 	});
 });
 

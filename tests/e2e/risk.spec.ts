@@ -213,8 +213,9 @@ test('the demo’s worksheet keeps its figures in view beside the details, and f
 		'Severity is 14, outside the scale of 1 to 10.'
 	);
 	const problems = page.getByRole('button', { name: /^Problems:/ });
-	// Out of scale, and not the battery fire's worst harm (critical, 8).
-	await expect(problems).toHaveAccessibleName('Problems: 0 errors, 2 warnings');
+	// Out of scale, and not the battery fire's worst harm (critical, 8), beside the demo's
+	// review item (the camera's line: unacceptable, no verified control).
+	await expect(problems).toHaveAccessibleName('Problems: 0 errors, 4 warnings');
 	await problems.click();
 	await expect(page.locator('section.problems-pane')).toContainText(
 		'Severity is 14, outside the scale of 1 to 10 (@Fmea about drone::battery).'

@@ -156,8 +156,18 @@ describe('the risk policy form’s SysML', { timeout: 60_000 }, () => {
 		]);
 		const priority = sheet.rows.map((r) => r[5]);
 		// High before medium before low, then by RPN.
-		expect(priority).toEqual(['medium', 'medium', 'medium', 'low', 'low', 'low']);
-		expect(sheet.rows.map((r) => Number(r[6]))).toEqual([144, 96, 80, 96, 72, 60]);
+		expect(priority).toEqual([
+			'high',
+			'medium',
+			'medium',
+			'medium',
+			'low',
+			'low',
+			'low',
+			'low',
+			'low'
+		]);
+		expect(sheet.rows.map((r) => Number(r[6]))).toEqual([288, 144, 96, 80, 96, 72, 72, 60, 48]);
 		// And back.
 		expect(withPolicy(text, { lead: 'rpn' })).toBe(library);
 	});

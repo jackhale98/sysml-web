@@ -175,7 +175,7 @@ package HazardAnalysis {
          */
         @TableRendering {
             rows = "hazards";
-            columns = "hazard = element; description; harms; severity; controls; satisfiedBy; verifiedBy";
+            columns = "hazard = element; description; situations; harms; severity; controls; satisfiedBy; verifiedBy";
             sortBy = "-severityValue";
         }
     }

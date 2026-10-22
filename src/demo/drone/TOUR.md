@@ -126,17 +126,38 @@ verified yet.
 
 ## 13. What could go wrong: `DroneFmea`
 
-A design FMEA. Hazards lead to harms (`Causation`). Risk controls are requirements
-on the design. Mitigations are the work that implements them (`satisfy`). Each
-`@Fmea` line rates one failure mode of one component. The risk priority number is
-calculated from the ratings, never typed in, and so are its band, the action priority
-(high, medium or low) and the acceptability under the risk policy in
-`libraries/RiskAnalysis.sysml`. Each line names the risk controls that address it;
-two of them are not verified yet. Tables: **`DroneViews::fmeaWorksheet`**,
-**`DroneViews::fmeaReview`** (the lines the policy says to reduce, saved as a view),
-**`DroneViews::riskReduction`** (the risk before and after the controls),
-**`DroneViews::riskMatrix`** (the lines by severity and likelihood, coloured by the policy)
-and **`DroneViews::hazardLog`** (each hazard with its harms and controls).
+Risk management in the terms of ISO 14971, with the risk libraries in `libraries/`.
+Follow one thread through it:
+
+1. **Hazard**: `payloadDrop`, the parcel falling from height.
+2. **Hazardous situation**: `parcelOverPeople`, the parcel coming loose above someone
+   at the drop zone (a `Causation` connection leads from the hazard to it).
+3. **Harm**: `impactInjury`, critical (8 on the severity scale), at the end of the chain.
+4. **Risk controls**: requirements on the hazard. `RC-005 Release height interlock` is
+   safe by design (the hook cannot open above 2 m); `RC-007 Drop-zone clearance check`
+   is a protective measure. Other hazards have a guard (`RC-004 Propeller guards`) and
+   information for safety (`RC-006 Hand-over warnings`).
+5. **What implements each control**: a `satisfy` from a part (`drone.payloadRelease`)
+   or a `Mitigation` action (`dropZoneScan`, in progress).
+6. **What verifies it**: a verification case in `DroneVerification` (`releaseInterlockTest`).
+
+Each `@Fmea` line rates one failure mode of one component, names its hazard and the
+controls that address it, and keeps its ratings before the controls. The RPN and its
+band, the action priority and the acceptability under the risk policy (the
+`Acceptability` calc in `libraries/RiskAnalysis.sysml`) are calculated, never typed in.
+
+Two controls are deliberately not verified yet: `RC-003 Navigation integrity monitoring`
+(the hazard log shows the gap for `flyAway`) and `RC-007 Drop-zone clearance check`. So the
+camera's line, "A person under the drop point is not seen", is still unacceptable and of
+high priority with no verified control: it is listed under **Problems** as a review item.
+
+A reviewer opens **`DroneViews::fmeaWorksheet`** and uses the quick reviews above it
+(**High priority**, **Unacceptable**, ...) or **Filter** to see only what still needs work,
+then **Save as a view**: **`DroneViews::fmeaReview`** is such a saved review (the lines the
+policy says to reduce). **`DroneViews::riskReduction`** shows the risk before and after the
+controls, **`DroneViews::riskMatrix`** the lines by severity and likelihood coloured by the
+policy (its **Risk policy** button changes the zones), and **`DroneViews::hazardLog`** each
+hazard with its situations, harms, controls and what implements and verifies them.
 
 ## 14. Documents for review: `DroneViews::droneSpecification`
 

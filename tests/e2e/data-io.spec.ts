@@ -96,7 +96,7 @@ test('a table prints on its own page with its title, project and date', async ({
 	await expect(sheet).toBeVisible();
 	await expect(sheet.getByRole('heading', { name: 'Requirements table' })).toBeVisible();
 	await expect(sheet).toContainText('Drone UAV ·');
-	await expect(sheet.getByRole('row')).toHaveCount(21);
+	await expect(sheet.getByRole('row')).toHaveCount(25);
 	await expect(page.locator('.workbench')).toBeHidden();
 });
 

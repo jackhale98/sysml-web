@@ -290,6 +290,7 @@ describe('on a new Small system project', { timeout: 60_000 }, () => {
 			[
 				'Hot battery',
 				'The battery heats up when shorted.',
+				'Held in the hand',
 				'Burned hand, Dropped light',
 				'serious',
 				'RC-001 Thermal fuse',
@@ -371,7 +372,10 @@ describe('on the demo', { timeout: 60_000 }, () => {
 		});
 		await analysed(workspace, () => write(workspace, line.label, line.write));
 		expect(problemsOf(workspace)).toEqual([]);
-		expect(workspace.problems.filter((p) => p.code === 'check')).toEqual([]);
+		// The only checks that fail are the demo's own review item (the camera's line).
+		expect(
+			workspace.problems.filter((p) => p.code === 'check' && !p.message.includes('drone::camera'))
+		).toEqual([]);
 		const sheet = await render(workspace, pfmea.open!.name);
 		expect(sheet.columns[0]).toBe('processStep');
 		expect(sheet.rows[0]!.slice(0, 2)).toEqual([
@@ -379,7 +383,7 @@ describe('on the demo', { timeout: 60_000 }, () => {
 			'Latch opens too early'
 		]);
 		// The design worksheet doesn't show process lines.
-		expect((await render(workspace, 'fmeaWorksheet')).rows).toHaveLength(6);
+		expect((await render(workspace, 'fmeaWorksheet')).rows).toHaveLength(9);
 
 		const ufmea = planFmea(workspace, {
 			kind: use,
@@ -415,11 +419,15 @@ describe('on the demo', { timeout: 60_000 }, () => {
 		const workspace = await openWorkspace(host, demoFiles());
 		const { setField } = await import('#lib/workbench/actions.ts');
 		const all = await render(workspace, 'FmeaWorksheet');
-		const battery = all.sources[0]!;
+		const battery = all.sources[col(all, 'element').indexOf('drone::battery')]!;
 		await analysed(workspace, () =>
 			setField(workspace, battery, 'metadata:Fmea.severity', '14', 'Set severity')
 		);
-		expect(workspace.problems.filter((p) => p.code === 'check').map((p) => p.message)).toEqual([
+		expect(
+			workspace.problems
+				.filter((p) => p.code === 'check' && !p.message.includes('drone::camera'))
+				.map((p) => p.message)
+		).toEqual([
 			'Severity is 14, outside the scale of 1 to 10 (@Fmea about drone::battery).',
 			'Severity is 14, but its hazard batteryFire can lead to burnInjury, which is critical (8) (@Fmea about drone::battery).'
 		]);
@@ -429,7 +437,7 @@ describe('on the demo', { timeout: 60_000 }, () => {
 			'Severity is 14, outside the scale of 1 to 10.'
 		);
 		// The RPN and the action priority wait for a rating in scale (the line sorts last).
-		expect(at).toBe(5);
+		expect(at).toBe(flagged.rows.length - 1);
 		expect(flagged.rows[at]!.slice(5, 7)).toEqual(['', '']);
 		const category = all.columns.indexOf('category');
 		expect(all.editable?.[category]?.options).toContain('use');
@@ -469,14 +477,15 @@ describe('on the demo', { timeout: 60_000 }, () => {
 		expect(problemsOf(workspace)).toEqual([]);
 		const text = workspace.text('risk/DesignFmea.sysml')!;
 		expect(text).toContain("connection : Causation connect 'Parcel drop' to impactInjury;");
-		expect(text).toContain("requirement <'RC-004'> 'Latch interlock' : RiskControl {");
+		expect(text).toContain("requirement <'RC-008'> 'Latch interlock' : RiskControl {");
 		const log = await render(workspace, 'hazardLog');
 		expect(log.rows.find((r) => r[0] === 'Parcel drop')).toEqual([
 			'Parcel drop',
 			'The parcel falls from the drone.',
+			'',
 			'impactInjury',
 			'critical',
-			'RC-004 Latch interlock',
+			'RC-008 Latch interlock',
 			'',
 			''
 		]);

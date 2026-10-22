@@ -18,20 +18,20 @@ exports[`on the demo > a new line names its controls and mitigations, and can br
     cause = "Humidity";
     category = RiskCategory::design;
     severity = 4; likelihood = 5; detection = 3;
-    riskControls = ('RC-003', 'RC-004');
+    riskControls = ('RC-003', 'RC-008');
     mitigations = navigationIntegrityMonitor;
 }
 
 // in DroneFmea
 
-requirement <'RC-004'> 'Lens heater' : RiskControl {
+requirement <'RC-008'> 'Lens heater' : RiskControl {
     doc /* The camera shall keep its lens above the dew point. */
     :>> hierarchy = ControlHierarchy::inherentSafety;
 }"
 `;
 
 exports[`on the demo > links a line to more controls and a mitigation, and makes new ones, in one step each 1`] = `
-"requirement <'RC-004'> 'Motor current limit' : RiskControl {
+"requirement <'RC-008'> 'Motor current limit' : RiskControl {
     doc /* The motor driver shall limit the current to 30 A. */
     :>> hierarchy = ControlHierarchy::protectiveMeasure;
     ref :>> hazard = uncontrolledDescent;
@@ -44,7 +44,7 @@ action currentLimiter : Mitigation {
     :>> owner = "R. Tanaka";
 }
 
-riskControls = ('RC-002', 'RC-004');
+riskControls = ('RC-002', 'RC-008');
 
 mitigations = (rotorHealthMonitor, currentLimiter);"
 `;

@@ -86,7 +86,7 @@ test.describe('on a desktop', () => {
 		await expect(form).toBeHidden();
 
 		await expect(cell).toHaveAttribute('data-zone', 'unacceptable', { timeout: 15_000 });
-		await expect(zones).toContainText(/Unacceptable\s*2 lines/);
+		await expect(zones).toContainText(/Unacceptable\s*3 lines/);
 		// The two lines are now unacceptable risks: problems to review.
 		await expect(page.getByRole('button', { name: /^Problems:/ })).toHaveAccessibleName(
 			/Problems: 0 errors, [1-9]\d* warnings/
@@ -102,15 +102,20 @@ test.describe('on a desktop', () => {
 		await openDemo(page);
 		await views(page).getByRole('button', { name: 'FMEA worksheet', exact: true }).click();
 		const sheet = page.getByRole('region', { name: 'FMEA worksheet view' });
-		await expect(sheet.getByText('6 rows')).toBeVisible({ timeout: 15_000 });
-		// A quick review: no line has an RPN in the high band.
+		await expect(sheet.getByText('9 rows')).toBeVisible({ timeout: 15_000 });
+		// A quick review: the one line whose RPN is in the high band.
 		const preset = sheet.getByRole('button', { name: 'RPN ≥ 151', exact: true });
 		await preset.click();
 		await expect(preset).toHaveAttribute('aria-pressed', 'true');
-		await expect(sheet.getByText('0 of 6 rows')).toBeVisible();
+		await expect(sheet.getByText('1 of 9 rows')).toBeVisible();
+		await expect(sheet.locator('tbody tr')).toContainText('A person under the drop point');
+		await preset.click();
+		await expect(sheet.getByText('9 rows')).toBeVisible();
+		// No line is of severity 9 or more.
+		await sheet.getByRole('button', { name: 'Severity ≥ 9', exact: true }).click();
 		await expect(sheet.getByText('No rows match the filters.')).toBeVisible();
 		await sheet.getByRole('button', { name: 'Show all rows' }).click();
-		await expect(sheet.getByText('6 rows')).toBeVisible();
+		await expect(sheet.getByText('9 rows')).toBeVisible();
 
 		// A filter of a column: the lines the policy says to reduce.
 		await sheet.getByRole('button', { name: /^Filter/ }).click();
@@ -119,7 +124,7 @@ test.describe('on a desktop', () => {
 		await panel.getByRole('checkbox', { name: 'reduce' }).check();
 		await expectAccessible(page);
 		await panel.getByRole('button', { name: 'Done' }).click();
-		await expect(sheet.getByText('4 of 6 rows')).toBeVisible();
+		await expect(sheet.getByText('4 of 9 rows')).toBeVisible();
 		await expect(sheet.locator('tbody tr')).toHaveCount(4);
 		await expect(
 			sheet.getByRole('button', { name: 'Remove the filter Acceptability: reduce' })
@@ -164,19 +169,19 @@ test.describe('on a desktop', () => {
 		await openDemo(page);
 		await views(page).getByRole('button', { name: 'FMEA worksheet', exact: true }).click();
 		const sheet = page.getByRole('region', { name: 'FMEA worksheet view' });
-		const row = sheet.locator('tbody tr').filter({ hasText: 'Blade breaks or comes off' });
-		await expect(row).toContainText('RC-002 Rotor health monitoring', { timeout: 15_000 });
+		const row = sheet.locator('tbody tr').filter({ hasText: 'Command link lost' });
+		await expect(row).toContainText('RC-003 Navigation integrity monitoring', { timeout: 15_000 });
 		await expect(row).toContainText('Not verified');
 		await expect(sheet.locator('tbody tr').filter({ hasText: 'Thermal runaway' })).toContainText(
 			'Verified'
 		);
 
-		await row.getByRole('button', { name: 'drone::rotors::propeller', exact: true }).click();
+		await row.getByRole('button', { name: 'drone::radio', exact: true }).click();
 		const inspector = page.getByRole('complementary', { name: 'Inspector' });
-		const line = inspector.getByRole('article', { name: 'FMEA line Blade breaks or comes off' });
+		const line = inspector.getByRole('article', { name: 'FMEA line Command link lost' });
 		await expect(line).toContainText('Not verified yet', { timeout: 15_000 });
-		await expect(line).toContainText('Implemented by rotorHealthMonitor');
-		await expect(line).toContainText('rotorHealthMonitor');
+		await expect(line).toContainText('Implemented by navigationIntegrityMonitor');
+		await expect(line).toContainText('proposed');
 		await expectAccessible(page);
 
 		await line.getByRole('button', { name: 'Link a risk control or mitigation' }).click();
@@ -208,7 +213,7 @@ test.describe('on a phone', () => {
 		await list.getByRole('button', { name: /^FMEA worksheet/ }).click();
 		const sheet = page.getByRole('region', { name: 'FMEA worksheet view' });
 		const cards = sheet.locator('.cards .card');
-		await expect(cards).toHaveCount(6, { timeout: 15_000 });
+		await expect(cards).toHaveCount(9, { timeout: 15_000 });
 		await tall(sheet.getByRole('button', { name: 'High priority' }), 'a quick review');
 		// Each line's controls, with whether they are verified.
 		await expect(cards.filter({ hasText: 'Thermal runaway' })).toContainText('Verified');
@@ -222,8 +227,8 @@ test.describe('on a phone', () => {
 		await fits(page, 'the filter sheet');
 		await expectAccessible(page);
 		await panel.getByRole('button', { name: 'Done' }).click();
-		await expect(cards).toHaveCount(4);
-		await expect(sheet.getByText('4 of 6 rows')).toBeVisible();
+		await expect(cards).toHaveCount(6);
+		await expect(sheet.getByText('6 of 9 rows')).toBeVisible();
 		await tall(sheet.getByRole('button', { name: 'Save as a view' }), 'Save as a view');
 		await fits(page, 'the filtered worksheet');
 		await expectAccessible(page);

@@ -130,14 +130,15 @@ test('a value that breaks a requirement is a violation and a problem, until undo
 	page
 }) => {
 	await openDemo(page);
-	await expect(problems(page)).toHaveAccessibleName('Problems: 0 errors, 0 warnings');
+	// The demo's two warnings are its risk review item (an unacceptable FMEA line).
+	await expect(problems(page)).toHaveAccessibleName('Problems: 0 errors, 2 warnings');
 	// The drone's own hover power (the second `hoverPower` attribute: DeliveryDrone declares it).
 	const inspector = await select(page, 'hoverPower', 'attribute', 1, 'DroneArchitecture.sysml');
 	const value = inspector.getByRole('textbox', { name: /^Value \(/ });
 	await expect(value).toHaveValue('400 [W]');
 	await value.fill('450 [W]');
 	await value.press('Enter');
-	await expect(problems(page)).toHaveAccessibleName('Problems: 0 errors, 1 warnings', {
+	await expect(problems(page)).toHaveAccessibleName('Problems: 0 errors, 3 warnings', {
 		timeout: 15_000
 	});
 
@@ -157,7 +158,7 @@ test('a value that breaks a requirement is a violation and a problem, until undo
 
 	await undo.click();
 	await expect(endurance).toContainText('Satisfied', { timeout: 15_000 });
-	await expect(problems(page)).toHaveAccessibleName('Problems: 0 errors, 0 warnings');
+	await expect(problems(page)).toHaveAccessibleName('Problems: 0 errors, 2 warnings');
 });
 
 test('the inspector shows what an expression comes to, and why when it cannot', async ({

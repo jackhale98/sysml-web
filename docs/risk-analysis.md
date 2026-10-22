@@ -209,7 +209,7 @@ fire") stay a way of looking: SysML's expression language has no
 | `connection def Causation` | From a cause to its effect (`end cause`, `end effect`): hazard → situation → harm, or failure mode → hazard. |
 | `requirement def RiskControl` | A requirement that lowers the risk of a `hazard`, with its kind (`hierarchy`) and a `rationale`. What implements it `satisfy`s it, a verification case `verify`s it. |
 | `enum def ControlHierarchy` | The ISO 14971 kinds of control, most effective first: `inherentSafety`, `protectiveMeasure`, `informationForSafety`. |
-| `view def HazardLog` | One row per hazard: its description, harms, worst severity, controls, and what satisfies and verifies them. |
+| `view def HazardLog` | One row per hazard: its description, the hazardous situations and harms it leads to, the worst severity, its controls, and what satisfies and verifies them. |
 
 ```sysml
 occurrence 'Battery fire' : Hazard { :>> description = "Fire or explosion of the pack."; }

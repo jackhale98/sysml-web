@@ -120,7 +120,7 @@ package DroneViews {
     }
 
     view fmeaReview : DesignFmeaWorksheet {
-        doc /* The lines whose risk the policy says to reduce: a review of the worksheet, saved as a view. */
+        doc /* The lines the risk policy does not accept as they are: a review of the worksheet, saved as a view. */
         expose DroneFmea::*;
         @TableRendering { where = "Acceptability(severity, likelihood) != RiskAcceptability::acceptable"; }
     }

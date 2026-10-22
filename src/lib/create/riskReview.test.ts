@@ -98,15 +98,20 @@ describe('on the demo', { timeout: 60_000 }, () => {
 	it('the worksheet shows each line’s controls, whether they are verified, and the mitigations', async () => {
 		const workspace = await openWorkspace(host, demoFiles());
 		const sheet = await render(workspace, 'fmeaWorksheet');
+		const at = (part: string, mode?: string) =>
+			sheet.rows.findIndex((r) => r[0] === part && (!mode || r[1] === mode));
 		expect(col(sheet, 'riskControls')).toEqual([
+			'RC-007 Drop-zone clearance check',
 			'RC-001 Battery thermal protection',
 			'RC-002 Rotor health monitoring',
 			'RC-002 Rotor health monitoring',
-			'RC-002 Rotor health monitoring',
+			'',
+			'RC-004 Propeller guards, RC-006 Hand-over warnings',
 			'RC-003 Navigation integrity monitoring',
-			'RC-003 Navigation integrity monitoring'
+			'RC-003 Navigation integrity monitoring',
+			'RC-005 Release height interlock'
 		]);
-		expect(sheet.rowInfo?.[0]?.controls).toEqual([
+		expect(sheet.rowInfo?.[at('drone::battery')]?.controls).toEqual([
 			{
 				label: 'RC-001 Battery thermal protection',
 				element: "DroneFmea::'Battery thermal protection'",
@@ -114,18 +119,23 @@ describe('on the demo', { timeout: 60_000 }, () => {
 				verifiedBy: ['batteryAbuseTest']
 			}
 		]);
-		expect(sheet.rowInfo?.[1]?.controls?.[0]?.verifiedBy).toEqual([]);
-		expect(sheet.rowInfo?.[1]?.mitigations).toEqual([
+		// The camera's control is implemented (in progress) but not verified yet.
+		expect(sheet.rowInfo?.[at('drone::camera')]?.controls?.[0]).toMatchObject({
+			satisfiedBy: ['dropZoneScan'],
+			verifiedBy: []
+		});
+		expect(sheet.rowInfo?.[at('drone::camera')]?.mitigations).toEqual([
 			{
-				name: 'rotorHealthMonitor',
-				element: 'DroneFmea::rotorHealthMonitor',
+				name: 'dropZoneScan',
+				element: 'DroneFmea::dropZoneScan',
 				status: 'inProgress',
 				named: true
 			}
 		]);
 		// The mitigation that implements a line's control counts, though the line doesn't name it.
-		expect(sheet.rowInfo?.[2]?.mitigations?.[0]).toMatchObject({
+		expect(sheet.rowInfo?.[at('drone::rotors::motor')]?.mitigations?.[0]).toMatchObject({
 			name: 'rotorHealthMonitor',
+			status: 'verified',
 			named: false
 		});
 		const reduction = await render(workspace, 'riskReduction');
@@ -143,7 +153,7 @@ describe('on the demo', { timeout: 60_000 }, () => {
 			'mitigations',
 			'mitigationStatus'
 		]);
-		expect(reduction.rows[0]!.slice(2)).toEqual([
+		expect(reduction.rows.find((r) => r[0] === 'drone::battery')!.slice(2)).toEqual([
 			'384',
 			'144',
 			'high',
@@ -153,8 +163,10 @@ describe('on the demo', { timeout: 60_000 }, () => {
 			'RC-001 Battery thermal protection',
 			'verified',
 			'batteryManagementSystem',
-			'completed'
+			'verified'
 		]);
+		// Every line assessed before its controls is lower now, or as low.
+		for (const r of reduction.rows) expect(Number(r[3]), r[1]).toBeLessThanOrEqual(Number(r[2]));
 		const lines = host.fmeaLines(workspace.sourceFiles(), motorId(workspace));
 		expect(lines).toHaveLength(1);
 		expect(lines[0]).toMatchObject({
@@ -196,7 +208,7 @@ describe('on the demo', { timeout: 60_000 }, () => {
 			controls: [rc2],
 			mitigations: [monitor],
 			newControl: {
-				id: 'RC-004',
+				id: 'RC-008',
 				title: 'Motor current limit',
 				statement: 'The motor driver shall limit the current to 30 A.',
 				hierarchy: 'protectiveMeasure',
@@ -208,7 +220,7 @@ describe('on the demo', { timeout: 60_000 }, () => {
 				kind: 'prevention',
 				owner: 'R. Tanaka'
 			},
-			label: 'Added RC-004'
+			label: 'Added RC-008'
 		});
 		if (typeof plan === 'string') throw new Error(plan);
 		expect(plan.preview).toMatchSnapshot();
@@ -216,13 +228,13 @@ describe('on the demo', { timeout: 60_000 }, () => {
 		expect(problemsOf(workspace)).toEqual([]);
 		sheet = await render(workspace, 'fmeaWorksheet');
 		expect(sheet.rows[motor]![sheet.columns.indexOf('riskControls')]).toBe(
-			'RC-002 Rotor health monitoring, RC-004 Motor current limit'
+			'RC-002 Rotor health monitoring, RC-008 Motor current limit'
 		);
 		const log = await render(workspace, 'hazardLog');
-		expect(log.rows.find((r) => r[0] === 'uncontrolledDescent')?.join()).toContain('RC-004');
+		expect(log.rows.find((r) => r[0] === 'uncontrolledDescent')?.join()).toContain('RC-008');
 		const lines = host.fmeaLines(workspace.sourceFiles(), motorId(workspace));
 		expect(lines[0]!.mitigations.map((m) => `${m.name} ${m.status}`)).toEqual([
-			'rotorHealthMonitor inProgress',
+			'rotorHealthMonitor verified',
 			'currentLimiter proposed'
 		]);
 	});
@@ -246,7 +258,7 @@ describe('on the demo', { timeout: 60_000 }, () => {
 			controls: [linked(workspace, "DroneFmea::'Navigation integrity monitoring'")],
 			mitigations: [linked(workspace, 'DroneFmea::navigationIntegrityMonitor')],
 			newControl: {
-				id: 'RC-004',
+				id: 'RC-008',
 				title: 'Lens heater',
 				statement: 'The camera shall keep its lens above the dew point.',
 				hierarchy: 'inherentSafety'
@@ -258,7 +270,7 @@ describe('on the demo', { timeout: 60_000 }, () => {
 		const sheet = await render(workspace, 'fmeaWorksheet');
 		const row = sheet.rows.find((r) => r[1] === 'Lens fogs up')!;
 		expect(row[sheet.columns.indexOf('riskControls')]).toBe(
-			'RC-003 Navigation integrity monitoring, RC-004 Lens heater'
+			'RC-003 Navigation integrity monitoring, RC-008 Lens heater'
 		);
 	});
 
@@ -333,9 +345,14 @@ describe('on the demo', { timeout: 60_000 }, () => {
 		expect(problemsOf(workspace)).toEqual([]);
 		const saved = await render(workspace, plan.name);
 		// The design worksheet's own condition (its category) still applies.
-		expect(col(saved, 'failureMode')).toEqual(['Thermal runaway', 'Motor stops or loses torque']);
+		expect(col(saved, 'failureMode')).toEqual([
+			'A person under the drop point is not seen',
+			'Thermal runaway',
+			'Motor stops or loses torque'
+		]);
 		// The demo's saved review: the lines the policy says to reduce.
 		expect(col(await render(workspace, 'fmeaReview'), 'acceptability')).toEqual([
+			'unacceptable',
 			'reduce',
 			'reduce',
 			'reduce',

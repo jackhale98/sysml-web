@@ -418,15 +418,19 @@ describe('requirement views', () => {
 			"'Battery thermal protection'",
 			"'Command and telemetry link'",
 			"'Controlled parcel release'",
+			"'Drop-zone clearance check'",
 			"'Flight endurance'",
 			"'Flying in typical weather'",
 			"'Geofencing'",
+			"'Hand-over warnings'",
 			"'Ingress protection'",
 			"'Maximum take-off mass'",
 			"'Navigation integrity monitoring'",
 			"'Parcel delivery'",
 			"'Payload capacity'",
+			"'Propeller guards'",
 			"'Quiet neighbour'",
+			"'Release height interlock'",
 			"'Return to home'",
 			"'Rotor health monitoring'",
 			"'Safe hand-over'",
@@ -447,13 +451,17 @@ describe('requirement views', () => {
 			"drone -satisfy-> 'Flight endurance' (<<satisfy>>)",
 			"drone -satisfy-> 'Maximum take-off mass' (<<satisfy>>)",
 			"drone -satisfy-> 'Payload capacity' (<<satisfy>>)",
+			"dropZoneScan -satisfy-> 'Drop-zone clearance check' (<<satisfy>>)",
+			"fitPropellerGuards -satisfy-> 'Propeller guards' (<<satisfy>>)",
 			"flightController -satisfy-> 'Geofencing' (<<satisfy>>)",
 			"flightController -satisfy-> 'Return to home' (<<satisfy>>)",
 			"flightController -satisfy-> 'Wind tolerance' (<<satisfy>>)",
 			"navigationIntegrityMonitor -satisfy-> 'Navigation integrity monitoring' (<<satisfy>>)",
 			"payloadRelease -satisfy-> 'Controlled parcel release' (<<satisfy>>)",
+			"payloadRelease -satisfy-> 'Release height interlock' (<<satisfy>>)",
 			"radio -satisfy-> 'Command and telemetry link' (<<satisfy>>)",
-			"rotorHealthMonitor -satisfy-> 'Rotor health monitoring' (<<satisfy>>)"
+			"rotorHealthMonitor -satisfy-> 'Rotor health monitoring' (<<satisfy>>)",
+			"warningLabelsAndTone -satisfy-> 'Hand-over warnings' (<<satisfy>>)"
 		]);
 		expect(edges(tk, 'verify')).toEqual([
 			"batteryAbuseTest -verify-> 'Battery protection' (<<verify>>)",
@@ -461,9 +469,13 @@ describe('requirement views', () => {
 			"enduranceFlightTest -verify-> 'Flight endurance' (<<verify>>)",
 			"failsafeFlightTest -verify-> 'Geofencing' (<<verify>>)",
 			"failsafeFlightTest -verify-> 'Return to home' (<<verify>>)",
+			"handOverWarningReview -verify-> 'Hand-over warnings' (<<verify>>)",
 			"linkRangeTest -verify-> 'Command and telemetry link' (<<verify>>)",
 			"massAndPayloadCheck -verify-> 'Maximum take-off mass' (<<verify>>)",
 			"massAndPayloadCheck -verify-> 'Payload capacity' (<<verify>>)",
+			"propellerGuardInspection -verify-> 'Propeller guards' (<<verify>>)",
+			"releaseInterlockTest -verify-> 'Release height interlock' (<<verify>>)",
+			"rotorFailureTest -verify-> 'Rotor health monitoring' (<<verify>>)",
 			"windHoldTest -verify-> 'Wind tolerance' (<<verify>>)"
 		]);
 		expect(edges(tk, 'dependency')).toHaveLength(11);
@@ -477,8 +489,8 @@ describe('requirement views', () => {
 				.map(([, v]) => v);
 		expect(status("'Acoustic noise'")).toEqual(['UNSATISFIED', 'UNVERIFIED']);
 		expect(status("'Flight endurance'")).toEqual([]);
-		expect(edges(tk, 'satisfy')).toHaveLength(12);
-		expect(edges(tk, 'verify')).toHaveLength(9);
+		expect(edges(tk, 'satisfy')).toHaveLength(16);
+		expect(edges(tk, 'verify')).toHaveLength(13);
 	});
 });
 
