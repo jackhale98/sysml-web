@@ -379,6 +379,30 @@ test.describe('on a phone', () => {
 		await expectNoSidewaysScroll(page);
 	});
 
+	test('on a phone, a tap in a diagram peeks at the element; a second tap opens it', async ({
+		page
+	}) => {
+		await openDemo(page);
+		await page
+			.getByRole('navigation', { name: 'Sections' })
+			.getByRole('button', { name: 'Views' })
+			.click();
+		await page.getByRole('button', { name: 'Drone interconnection Diagram' }).first().click();
+		const diagram = page.getByRole('region', { name: /Drone interconnection diagram/ });
+		const node = diagram.locator('.svelte-flow__node').filter({ hasText: 'battery : Battery' });
+		await expect(node).toBeVisible({ timeout: 15_000 });
+		const sheet = page.locator('[data-snap]');
+
+		// The first tap keeps the diagram in view, with the element's connections highlighted.
+		await node.click();
+		await expect(sheet).toHaveAttribute('data-snap', 'peek');
+		await expect(sheet.getByRole('heading', { level: 2 })).toContainText('battery');
+		await expect(diagram.locator('.sysml-edge.lit')).not.toHaveCount(0);
+		// Tapping it again opens the details.
+		await node.click();
+		await expect(sheet).toHaveAttribute('data-snap', 'half');
+	});
+
 	test('on a phone, filtering the model shows matching elements at once', async ({ page }) => {
 		await openDemo(page);
 		await page
