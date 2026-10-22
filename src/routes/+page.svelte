@@ -24,6 +24,10 @@
 	import Practices from '#lib/landing/Practices.svelte';
 	import Logo from '#lib/ui/Logo.svelte';
 	import ThemeToggle from '#lib/ui/ThemeToggle.svelte';
+	import { LANDING_REDIRECT } from '#lib/offline/launch.ts';
+
+	/** The installed app opens on the projects page, never here (run before the page paints). */
+	const launchScript = `<script>${LANDING_REDIRECT}</` + 'script>';
 
 	const demo = resolve('/p/[project]', { project: 'demo' });
 
@@ -128,6 +132,8 @@
 		name="description"
 		content="A web workbench for SysML v2: build models in text or diagrams, live-synced, with every element explained in plain language. Standard SysML in your own git repository; no server holds your data."
 	/>
+	<!-- eslint-disable-next-line svelte/no-at-html-tags -- a fixed script of ours, not content -->
+	{@html launchScript}
 </svelte:head>
 
 <header class="bar">

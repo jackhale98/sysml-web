@@ -19,15 +19,20 @@
 		Palette,
 		ShieldCheck,
 		Sun,
+		Smartphone,
 		Trash2,
 		Type,
+		UserPlus,
 		X
 	} from '@lucide/svelte';
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import type { Engine } from '#lib/engine/client.ts';
 	import type { LibraryLicense } from '#lib/engine/types.ts';
-	import { accounts } from '#lib/git/account.svelte.ts';
+	import { accounts, sameLogin } from '#lib/git/account.svelte.ts';
+	import { pwa } from '#lib/offline/pwa.svelte.ts';
+	import { leaving } from '#lib/project/leaving.svelte.ts';
+	import { pendingLabel, strandedBySignOut } from '#lib/project/pending.ts';
 	import ConnectGitHub from '#lib/git/ConnectGitHub.svelte';
 	import GitHubMark from '#lib/git/GitHubMark.svelte';
 	import { takeResume } from '#lib/git/oauth.ts';
@@ -174,6 +179,28 @@
 		if (n < 1024 ** 2) return `${(n / 1024).toFixed(0)} KB`;
 		if (n < 1024 ** 3) return `${(n / 1024 ** 2).toFixed(1)} MB`;
 		return `${(n / 1024 ** 3).toFixed(1)} GB`;
+	}
+
+	// --- Accounts -------------------------------------------------------------
+	let addingAccount = $state(false);
+	/** Signing out of an account whose projects have changes not on GitHub: which ones. */
+	let signingOut = $state.raw<{ login: string; projects: ProjectSummary[] } | null>(null);
+	/** Back from adding an account: say who was added (or that it was already here). */
+	const justAdded = $derived(accounts.lastAdded);
+
+	/** Sign out, unless projects would be left with changes this account should save: then ask. */
+	async function askSignOut(login: string) {
+		// The open project's latest edit counts too.
+		await leaving.session?.flush();
+		const list = await listProjects().catch(() => []);
+		const stranded = strandedBySignOut(list, login, sameLogin(accounts.active, login));
+		if (stranded.length) signingOut = { login, projects: stranded };
+		else signOut(login);
+	}
+
+	function signOut(login: string) {
+		signingOut = null;
+		accounts.signOut(login);
 	}
 
 	// --- About --------------------------------------------------------------
@@ -502,73 +529,158 @@
 				{:else if section === 'accounts'}
 					<section class="block">
 						<h3><GitHubMark size={18} /> GitHub</h3>
-						{#if accounts.github}
-							{@const user = accounts.github.user}
-							{@const signedIn = accounts.github.via === 'app'}
-							<div class="account">
-								{#if user.avatarUrl}<img src={user.avatarUrl} alt="" width="40" height="40" />{/if}
-								<div>
-									<strong>{user.name || user.login}</strong>
-									<span class="muted"
-										>@{user.login} · {signedIn ? 'signed in' : 'connected'}
-										{new Date(accounts.github.connectedAt).toLocaleDateString()}</span
-									>
-								</div>
-								<span class="pill"
-									><Check size={13} aria-hidden="true" />
-									{signedIn ? 'Signed in' : 'Connected'}</span
-								>
-							</div>
-							{#if signedIn}
+						{#if accounts.list.length}
+							{#if accounts.list.length > 1}
 								<p class="muted">
-									You signed in with GitHub. Your sign-in is kept only in this browser and renews
-									itself while you use Fairtide. Fairtide can use only the repositories you chose on
-									GitHub.
+									Each project saves with the account that opened it. The default account is the one
+									new projects use.
 								</p>
-								<div class="row">
-									<button type="button" class="button" onclick={() => accounts.signOut()}>
-										<LogOut size={15} aria-hidden="true" /> Sign out
-									</button>
-									{#if chooseRepositoriesUrl()}
-										<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- GitHub's page; returns here -->
-										<a class="button" href={chooseRepositoriesUrl()} onclick={chooseOnGitHub}>
-											Choose repositories on GitHub <ExternalLink size={13} aria-hidden="true" />
-										</a>
+							{/if}
+							{#if justAdded}
+								<p class="notice" role="status">
+									{#if justAdded.existed}
+										<strong>@{justAdded.login}</strong> was already here: GitHub signed in the account
+										that's signed in on github.com. To add a different one, sign out of GitHub in the
+										browser first, or use an access token for the other account.
+									{:else}
+										Added <strong>@{justAdded.login}</strong>.
 									{/if}
-								</div>
-								<p class="muted small">
-									Signing out forgets your sign-in here. To remove Fairtide's access everywhere,
-									revoke it on GitHub under
-									<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external link -->
-									<a
-										href="https://github.com/settings/apps/authorizations"
-										target="_blank"
-										rel="noopener noreferrer"
-										>Settings → Applications<span class="visually-hidden">
-											(opens in a new tab)</span
-										></a
-									>.
 								</p>
-							{:else}
-								<p class="muted">
-									Your access token is kept only in this browser. Signing out forgets it here; to
-									disable it everywhere, delete it on GitHub too.
-								</p>
-								<div class="row">
-									<button type="button" class="button" onclick={() => accounts.signOut()}>
-										<LogOut size={15} aria-hidden="true" /> Sign out and forget token
-									</button>
-									<a
-										class="button"
-										href="https://github.com/settings/personal-access-tokens"
-										target="_blank"
-										rel="noopener noreferrer"
+							{/if}
+							<ul class="accounts" aria-label="GitHub accounts">
+								{#each accounts.list as account (account.user.login)}
+									{@const user = account.user}
+									{@const signedIn = account.via === 'app'}
+									{@const isDefault = sameLogin(accounts.active, user.login)}
+									<li class="account-item">
+										<div class="account">
+											{#if user.avatarUrl}<img
+													src={user.avatarUrl}
+													alt=""
+													width="40"
+													height="40"
+												/>{:else}<span class="avatar" aria-hidden="true"
+													>{user.login.slice(0, 1).toUpperCase()}</span
+												>{/if}
+											<div>
+												<strong>{user.name || user.login}</strong>
+												<span class="muted"
+													>@{user.login} · {signedIn ? 'signed in' : 'access token'}
+													{new Date(account.connectedAt).toLocaleDateString()}</span
+												>
+											</div>
+											{#if accounts.list.length > 1 && isDefault}
+												<span class="pill"><Check size={13} aria-hidden="true" /> Default</span>
+											{:else if accounts.list.length === 1}
+												<span class="pill"
+													><Check size={13} aria-hidden="true" />
+													{signedIn ? 'Signed in' : 'Connected'}</span
+												>
+											{/if}
+										</div>
+										{#if signingOut?.login === user.login}
+											<div class="stranded" role="alert">
+												<p>
+													<strong
+														>{signingOut.projects.length === 1
+															? 'A project has'
+															: `${signingOut.projects.length} projects have`} changes not on GitHub</strong
+													>
+													that @{user.login} would save:
+												</p>
+												<ul>
+													{#each signingOut.projects as p (p.id)}
+														<li>
+															<a href={resolve('/p/[project]', { project: p.id })}>{p.info.name}</a>
+															<span class="muted">· {pendingLabel(p)}</span>
+														</li>
+													{/each}
+												</ul>
+												<p class="muted">
+													They stay on this device. To save them to GitHub later, sign in as @{user.login}
+													again, or choose another account in each project.
+												</p>
+												<div class="row">
+													<button type="button" class="button" onclick={() => (signingOut = null)}
+														>Cancel</button
+													>
+													<button
+														type="button"
+														class="button danger-outline"
+														onclick={() => signOut(user.login)}
+													>
+														<LogOut size={15} aria-hidden="true" /> Sign out anyway
+													</button>
+												</div>
+											</div>
+										{:else}
+											<div class="row">
+												<button
+													type="button"
+													class="button"
+													onclick={() => void askSignOut(user.login)}
+													aria-label="Sign out @{user.login}"
+												>
+													<LogOut size={15} aria-hidden="true" />
+													{signedIn ? 'Sign out' : 'Sign out and forget token'}
+												</button>
+												{#if accounts.list.length > 1 && !isDefault}
+													<button
+														type="button"
+														class="button"
+														onclick={() => accounts.use(user.login)}
+														aria-label="Make @{user.login} the default"
+													>
+														Make default
+													</button>
+												{/if}
+												{#if signedIn && chooseRepositoriesUrl()}
+													<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- GitHub's page; returns here -->
+													<a class="button" href={chooseRepositoriesUrl()} onclick={chooseOnGitHub}>
+														Choose repositories <ExternalLink size={13} aria-hidden="true" />
+													</a>
+												{/if}
+											</div>
+										{/if}
+									</li>
+								{/each}
+							</ul>
+							<p class="muted small">
+								Sign-ins and tokens are kept only in this browser. Signing out forgets them here; to
+								remove Fairtide's access everywhere, revoke it on GitHub under
+								<!-- eslint-disable svelte/no-navigation-without-resolve -- external links -->
+								<a
+									href="https://github.com/settings/apps/authorizations"
+									target="_blank"
+									rel="noopener noreferrer"
+									>Settings → Applications<span class="visually-hidden">
+										(opens in a new tab)</span
+									></a
+								>, or delete the token under
+								<a
+									href="https://github.com/settings/personal-access-tokens"
+									target="_blank"
+									rel="noopener noreferrer"
+									>Developer settings<span class="visually-hidden"> (opens in a new tab)</span></a
+								>.
+								<!-- eslint-enable svelte/no-navigation-without-resolve -->
+							</p>
+							{#if addingAccount}
+								<section class="add-account" aria-labelledby="{uid}-add">
+									<h4 id="{uid}-add">Add another account</h4>
+									<ConnectGitHub
+										resume="settings"
+										another
+										onconnected={() => (addingAccount = false)}
+									/>
+									<button type="button" class="button" onclick={() => (addingAccount = false)}
+										>Cancel</button
 									>
-										Manage tokens on GitHub <ExternalLink size={13} aria-hidden="true" /><span
-											class="visually-hidden">(opens in a new tab)</span
-										>
-									</a>
-								</div>
+								</section>
+							{:else}
+								<button type="button" class="button" onclick={() => (addingAccount = true)}>
+									<UserPlus size={15} aria-hidden="true" /> Add another account
+								</button>
 							{/if}
 						{:else}
 							<ConnectGitHub resume="settings" />
@@ -578,6 +690,23 @@
 						{SIGN_IN ? 'GitLab is planned.' : 'GitLab and sign-in without a token are planned.'}
 					</p>
 				{:else if section === 'about'}
+					<section class="block">
+						<h3><Smartphone size={18} aria-hidden="true" /> Install the app</h3>
+						{#if pwa.installed}
+							<p class="muted">
+								You're using Fairtide as an installed app. It opens straight into your projects and
+								works offline.
+							</p>
+						{:else}
+							<p class="muted">
+								Keep Fairtide on your Home Screen, Dock or app list: it opens straight into your
+								projects, like any app, and works offline.
+							</p>
+							<button type="button" class="button" onclick={() => pwa.offerInstall()}>
+								{pwa.canInstall ? 'Install app' : 'Install app…'}
+							</button>
+						{/if}
+					</section>
 					<section class="block about">
 						<div class="brand">
 							<Logo size={48} variant="tile" />
@@ -1107,8 +1236,65 @@
 		border: 1px solid var(--border);
 		border-radius: var(--radius-md);
 	}
-	.account img {
+	.account img,
+	.avatar {
+		flex: none;
 		border-radius: 50%;
+	}
+	.avatar {
+		display: grid;
+		place-items: center;
+		width: 40px;
+		height: 40px;
+		background: var(--accent-weak);
+		color: var(--accent);
+		font-weight: 700;
+	}
+	.accounts {
+		display: grid;
+		gap: var(--space-3);
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	.account-item {
+		display: grid;
+		gap: var(--space-2);
+	}
+	.stranded {
+		display: grid;
+		gap: var(--space-2);
+		padding: var(--space-3);
+		border: 1px solid color-mix(in oklab, var(--warn) 40%, var(--border));
+		border-radius: var(--radius-md);
+		background: var(--warn-weak);
+		font-size: var(--text-sm);
+	}
+	.stranded ul {
+		display: grid;
+		gap: 2px;
+		margin: 0;
+		padding-left: var(--space-4);
+	}
+	.stranded a {
+		color: var(--text);
+		font-weight: 600;
+		text-decoration: underline;
+	}
+	.notice {
+		padding: var(--space-2) var(--space-3);
+		border-radius: var(--radius-sm);
+		background: var(--info-weak);
+	}
+	.add-account {
+		display: grid;
+		gap: var(--space-3);
+		padding: var(--space-4);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-md);
+	}
+	.add-account h4 {
+		font-size: var(--text-md);
 	}
 	.account div {
 		display: grid;
@@ -1203,6 +1389,16 @@
 		}
 		.tiles {
 			gap: var(--space-2);
+		}
+		/* Comfortable to tap. */
+		.button,
+		.danger,
+		.tabs button {
+			min-height: 2.75rem;
+		}
+		.icon {
+			width: 2.75rem;
+			height: 2.75rem;
 		}
 	}
 	@media (prefers-reduced-motion: reduce) {

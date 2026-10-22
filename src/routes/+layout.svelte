@@ -24,6 +24,13 @@
 
 {@render children()}
 
+<!-- "Add to Home Screen", from the project menu, Settings or the projects page. -->
+{#if pwa.guideOpen}
+	{#await import('#lib/offline/InstallGuide.svelte') then { default: InstallGuide }}
+		<InstallGuide bind:open={pwa.guideOpen} />
+	{/await}
+{/if}
+
 {#if pwa.updateReady && !ownToaster}
 	{#await import('#lib/ui/Toaster.svelte') then { default: Toaster }}
 		<Toaster />

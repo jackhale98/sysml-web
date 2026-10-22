@@ -19,11 +19,14 @@
 
 	let {
 		onconnected,
-		resume
+		resume,
+		another = false
 	}: {
 		onconnected?: (user: GitUser) => void;
 		/** What to reopen after coming back from signing in on GitHub. */
 		resume?: Resume;
+		/** Adding a second (or later) account: say how GitHub picks the account. */
+		another?: boolean;
 	} = $props();
 
 	const uid = $props.id();
@@ -53,7 +56,7 @@
 		leaving = true;
 		signInError = null;
 		try {
-			if (await signInWithGitHub(resume))
+			if (await signInWithGitHub(resume, { another }))
 				// On the way to GitHub; if the browser stays (it was stopped), allow another try.
 				setTimeout(() => (leaving = false), 5000);
 			else leaving = false;
@@ -145,12 +148,24 @@
 	</form>
 {/snippet}
 
+{#snippet anotherNote()}
+	<p class="another" id="{uid}-another">
+		GitHub signs in whichever account is signed in on github.com in this browser. To add a different
+		account, <strong>sign out of GitHub in the browser first</strong> (or switch accounts there), or
+		use an <strong>access token</strong> made for the other account.
+	</p>
+{/snippet}
+
 {#if SIGN_IN}
 	<div class="connect">
-		<p class="intro">
-			Sign in with GitHub to open your models and save them back. You choose which repositories
-			Fairtide can use.
-		</p>
+		{#if another}
+			{@render anotherNote()}
+		{:else}
+			<p class="intro">
+				Sign in with GitHub to open your models and save them back. You choose which repositories
+				Fairtide can use.
+			</p>
+		{/if}
 		<button
 			type="button"
 			class="signin"
@@ -181,6 +196,9 @@
 		</details>
 	</div>
 {:else}
+	{#if another}<p class="another">
+			Signed in to GitHub as someone else? Make the token while signed in to the other account.
+		</p>{/if}
 	{@render tokenForm(false)}
 {/if}
 
@@ -247,6 +265,13 @@
 	}
 	.intro {
 		color: var(--text-2);
+	}
+	.another {
+		padding: var(--space-3);
+		border-radius: var(--radius-sm);
+		background: var(--info-weak);
+		color: var(--text);
+		font-size: var(--text-sm);
 	}
 	.steps {
 		display: grid;

@@ -69,9 +69,12 @@
 	const git = $derived(session.git);
 	const record = $derived(session.record?.git ?? null);
 	const changes = $derived(git.changes);
-	const connected = $derived(accounts.connected);
+	/** The project's own account (or, before it has a repository, any account) is connected. */
+	const connected = $derived(record ? !!git.account : accounts.connected);
+	/** The project remembers an account that isn't signed in here (signed out, or another device). */
+	const missingLogin = $derived(record?.account && !git.account ? record.account : null);
 	/** Signed in with GitHub (rather than with an access token). */
-	const signedIn = $derived(accounts.github?.via === 'app');
+	const signedIn = $derived((record ? git.account : accounts.github)?.via === 'app');
 	/** Signed in: where to choose the repositories Fairtide can use. */
 	const installLink = $derived(signedIn ? chooseRepositoriesUrl() : null);
 
@@ -140,7 +143,7 @@
 		if (!record || !ref) return;
 		summarising = true;
 		try {
-			const provider = accounts.provider();
+			const provider = git.provider();
 			const start = await provider.mergeBase(ref, prInto || record.defaultBranch, record.base);
 			knowBlobs(record.files);
 			const before = await modelFilesAt(provider, ref, start);
@@ -242,7 +245,7 @@
 	async function loadBranches() {
 		if (branches || !ref) return;
 		try {
-			branches = await accounts.provider().listBranches(ref);
+			branches = await git.provider().listBranches(ref);
 		} catch {
 			branches = [];
 		}
@@ -274,17 +277,27 @@
 			if (expanded === path) expanded = null;
 		});
 
-	const link = async ({ ref, branch, defaultBranch }: RepoChoice, onProgress: Progress) => {
-		await git.link(ref, branch, defaultBranch, onProgress);
+	const link = async (
+		{ ref, branch, defaultBranch, account }: RepoChoice,
+		onProgress: Progress
+	) => {
+		await git.link(ref, branch, defaultBranch, onProgress, account);
 		notice = {
 			text: `Connected to ${ref.owner}/${ref.repo}. Your files are compared with “${branch}” below.`
 		};
 	};
 
 	function reconnect() {
-		accounts.signOut();
+		accounts.signOut(git.login);
 		error = null;
 	}
+
+	const useAccount = (login: string) =>
+		act(async () => {
+			await git.useAccount(login);
+			notice = { text: `This project now saves to GitHub as @${login}.` };
+			void git.check();
+		});
 
 	function onbackdrop(event: MouseEvent) {
 		if (event.target === dialog) open = false;
@@ -432,7 +445,35 @@
 				</div>
 			{/if}
 
-			{#if !connected}
+			{#if missingLogin}
+				<section class="card" aria-labelledby="{uid}-connect">
+					<h3 id="{uid}-connect">Sign in as @{missingLogin}</h3>
+					<p class="muted">
+						This project saves to GitHub as <strong>@{missingLogin}</strong>, who isn't signed in
+						here. Your changes are safe on this device.
+					</p>
+					{#if accounts.list.length}
+						<div class="use-accounts">
+							{#each accounts.list as other (other.user.login)}
+								<button
+									type="button"
+									class="small-button"
+									onclick={() => useAccount(other.user.login)}
+								>
+									{#if other.user.avatarUrl}<img
+											src={other.user.avatarUrl}
+											alt=""
+											width="18"
+											height="18"
+										/>{/if}
+									Use @{other.user.login} instead
+								</button>
+							{/each}
+						</div>
+					{/if}
+					<ConnectGitHub resume="source-control" another={accounts.connected} />
+				</section>
+			{:else if !connected}
 				<section class="card" aria-labelledby="{uid}-connect">
 					<h3 id="{uid}-connect">Connect your GitHub account</h3>
 					<ConnectGitHub resume="source-control" />
@@ -1260,6 +1301,14 @@
 	a.small-button {
 		color: var(--text);
 		text-decoration: none;
+	}
+	.use-accounts {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--space-2);
+	}
+	.use-accounts img {
+		border-radius: 50%;
 	}
 	.danger {
 		border-color: transparent !important;

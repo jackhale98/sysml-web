@@ -7,7 +7,7 @@ import type { Engine } from '#lib/engine/client.ts';
 import type { ProjectSession } from '#lib/project/session.svelte.ts';
 import { timestamp } from '#lib/project/store.ts';
 import type { Workspace } from '#lib/project/workspace.svelte.ts';
-import { accounts } from './account.svelte.ts';
+import { accounts, type AccountInfo } from './account.svelte.ts';
 import { GitError } from './errors.ts';
 import { readRepository } from './open.ts';
 import {
@@ -22,7 +22,7 @@ import {
 	type PullPlan,
 	type Resolution
 } from './sync.ts';
-import type { GitRecord, Head, Progress, PullRequest, RepoRef } from './types.ts';
+import type { GitProvider, GitRecord, Head, Progress, PullRequest, RepoRef } from './types.ts';
 
 export type GitBusy = 'checking' | 'saving' | 'pulling' | 'branching' | 'proposing' | 'linking';
 
@@ -54,6 +54,40 @@ export class GitConnection {
 	get ref(): RepoRef | null {
 		const git = this.record;
 		return git ? { owner: git.owner, repo: git.repo } : null;
+	}
+
+	/**
+	 * The login of the GitHub account this project uses: the one that opened
+	 * it, else (projects opened before several accounts could be kept, or not
+	 * connected yet) the default account.
+	 */
+	get login(): string | null {
+		return this.record?.account ?? accounts.github?.user.login ?? null;
+	}
+
+	/** The account this project uses, when it is signed in here. */
+	get account(): AccountInfo | null {
+		return accounts.accountFor(this.record?.account);
+	}
+
+	/** The GitHub API as this project's account. */
+	provider(): GitProvider {
+		return accounts.provider(this.record?.account);
+	}
+
+	/** Remember `login` as this project's account if it doesn't say yet (another account is being added). */
+	async claim(login: string) {
+		const git = this.record;
+		if (git && !git.account) await this.setGit({ ...git, account: login });
+	}
+
+	/** Use another of the connected accounts for this project from now on. */
+	async useAccount(login: string) {
+		const git = this.record;
+		const account = accounts.find(login);
+		if (!git || !account) return;
+		await this.setGit({ ...git, account: account.user.login });
+		this.remote = null;
 	}
 
 	/** Changes since the base, in this browser. */
@@ -94,11 +128,11 @@ export class GitConnection {
 
 	/** Ask the host whether the branch has moved. Quiet: failures leave the status unknown. */
 	async check(): Promise<RemoteStatus | null> {
-		if (!this.record || !accounts.connected || this.busy) return this.remote;
+		if (!this.record || !this.account || this.busy) return this.remote;
 		this.busy = 'checking';
 		try {
 			const { git, ref } = this.require();
-			const provider = accounts.provider();
+			const provider = this.provider();
 			const head = await provider.head(ref, git.branch);
 			const behind =
 				head.commit === git.base
@@ -119,7 +153,7 @@ export class GitConnection {
 			const { git, ref } = this.require();
 			const changes = fileChanges(this.changes);
 			if (!changes.length) throw new GitError('invalid', 'There are no changes to save.');
-			const result = await accounts.provider().commit(ref, {
+			const result = await this.provider().commit(ref, {
 				branch: git.branch,
 				parent: git.base,
 				baseTree: git.baseTree,
@@ -147,7 +181,7 @@ export class GitConnection {
 	pull(engine: Engine, progress?: Progress): Promise<PullOutcome> {
 		return this.run('pulling', async () => {
 			const { git, ref } = this.require();
-			const provider = accounts.provider();
+			const provider = this.provider();
 			const head = await provider.head(ref, git.branch);
 			if (head.commit === git.base) {
 				this.remote = { head: head.commit, behind: 0, checkedAt: Date.now() };
@@ -219,7 +253,7 @@ export class GitConnection {
 	createBranch(name: string): Promise<void> {
 		return this.run('branching', async () => {
 			const { git, ref } = this.require();
-			await accounts.provider().createBranch(ref, name, git.base);
+			await this.provider().createBranch(ref, name, git.base);
 			await this.setGit({ ...git, branch: name });
 			this.remote = { head: git.base, behind: 0, checkedAt: Date.now() };
 		});
@@ -234,9 +268,12 @@ export class GitConnection {
 					'invalid',
 					'Changes are proposed from one branch into another. Start a new branch first.'
 				);
-			const pr = await accounts
-				.provider()
-				.openPullRequest(ref, { title, body, head: git.branch, base: into });
+			const pr = await this.provider().openPullRequest(ref, {
+				title,
+				body,
+				head: git.branch,
+				base: into
+			});
 			await this.setGit({ ...git, pullRequest: { ...pr, branch: git.branch } });
 			return pr;
 		});
@@ -247,16 +284,23 @@ export class GitConnection {
 	 * branch's files become the base, so the project's files show as changes
 	 * against it, ready to review and save.
 	 */
-	link(ref: RepoRef, branch: string, defaultBranch: string, progress?: Progress): Promise<void> {
+	link(
+		ref: RepoRef,
+		branch: string,
+		defaultBranch: string,
+		progress?: Progress,
+		account?: string
+	): Promise<void> {
 		return this.run('linking', async () => {
 			const opened = await readRepository(
-				accounts.provider(),
+				accounts.provider(account),
 				ref,
 				branch,
 				defaultBranch,
 				progress
 			);
-			await this.setGit(opened.git);
+			const login = account ?? accounts.github?.user.login;
+			await this.setGit({ ...opened.git, ...(login ? { account: login } : {}) });
 			this.remote = { head: opened.git.base, behind: 0, checkedAt: Date.now() };
 		});
 	}
