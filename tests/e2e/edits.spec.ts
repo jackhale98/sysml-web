@@ -164,7 +164,7 @@ test('diagram edits: add, specialize, rename and delete', async ({ page }) => {
 	await expect(text).toContainText('part drone : Quadcopter {');
 
 	// Delete: the new definition (once the rename's re-analysis has settled the diagram).
-	const confirm = page.getByRole('alertdialog', { name: 'Delete Payload?' });
+	const confirm = page.getByRole('alertdialog', { name: 'Delete Payload from the model?' });
 	await expect(async () => {
 		await diagram.getByText('Payload', { exact: true }).click();
 		await diagram.getByRole('button', { name: 'Delete' }).click({ timeout: 2_000 });
@@ -212,7 +212,8 @@ test('the inspector goes to the definition of a type', async ({ page }) => {
 	await expect(operator.getByRole('heading', { level: 2 })).toHaveText(/\bOperator$/);
 	// A supertype, from a definition's chips.
 	const camera = await select(page, 'Camera');
-	await camera.getByRole('button', { name: 'Component', exact: true }).click();
+	// The chip comes first; the related elements below list Component too.
+	await camera.getByRole('button', { name: 'Component', exact: true }).first().click();
 	await expect(camera.getByRole('heading', { level: 2 })).toHaveText(/\bComponent$/);
 });
 

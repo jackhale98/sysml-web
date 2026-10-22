@@ -14,6 +14,10 @@
  *   toolkit), with connections between exposed elements as edges (a
  *   `#derivation` connection as «derive»);
  * - nothing: every definition of the project.
+ *
+ * Elements added to the diagram by qualified name (`added`, the layout
+ * file's for a diagram that is not a saved view) are drawn too, with their
+ * features as rows, and joined to the rest like any other.
  */
 import type { DiagramGraph } from '../../types';
 import { isReference, type ElementRecord } from '../model';
@@ -34,8 +38,12 @@ import { connectorEdges, viewExposed } from './connectors';
 /** Levels of a part tree drawn as boxes; deeper parts are compartment rows. */
 const TREE_DEPTH = 3;
 
-export function generalView(ctx: DiagramContext, scope: string | null): DiagramGraph {
-	if (scope === null) return wholeModel(ctx);
+export function generalView(
+	ctx: DiagramContext,
+	scope: string | null,
+	added: string[] = []
+): DiagramGraph {
+	if (scope === null) return wholeModel(ctx, added);
 	const subject = ctx.resolve(scope, (r) =>
 		r.kind === 'package' || r.metaclass === 'ViewUsage' ? 3 : r.isDefinition ? 2 : 1
 	);
@@ -46,11 +54,12 @@ export function generalView(ctx: DiagramContext, scope: string | null): DiagramG
 	else if (subject.kind === 'package') general.package(subject);
 	else if (subject.isDefinition) general.definition(subject);
 	else general.usageTree(subject, null, 0);
+	general.added(added);
 	general.relationships();
 	return g.graph();
 }
 
-function wholeModel(ctx: DiagramContext): DiagramGraph {
+function wholeModel(ctx: DiagramContext, added: string[]): DiagramGraph {
 	const g = new GraphBuilder('gv [model]');
 	const general = new General(ctx, g);
 	for (const r of ctx.records) {
@@ -59,6 +68,7 @@ function wholeModel(ctx: DiagramContext): DiagramGraph {
 		if (owner && owner.kind !== 'package') continue;
 		general.def(r);
 	}
+	general.added(added);
 	general.relationships();
 	return g.graph();
 }
@@ -129,6 +139,19 @@ class General {
 				const id = this.usage(r, prefix, boxed);
 				if (ownerId && owner!.kind !== 'package') this.g.edge(ownerId, id, 'composition');
 			}
+		}
+	}
+
+	/** Elements added to the diagram by qualified name, unless drawn already. */
+	added(names: string[]) {
+		for (const name of names) {
+			const r = this.ctx.records.find(
+				(x) => x.qualifiedName === name && !!x.name && !CONNECTORS.test(x.metaclass)
+			);
+			if (!r || this.g.drawn.has(r.id)) continue;
+			if (r.kind === 'package') this.pkg(r);
+			else if (r.isDefinition) this.def(r);
+			else this.usageTree(r, null, TREE_DEPTH - 1);
 		}
 	}
 

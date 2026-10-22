@@ -6,11 +6,13 @@
 	import PropertyForm from './PropertyForm.svelte';
 	import TradeSummary from './TradeSummary.svelte';
 	import TraceAdd from './TraceAdd.svelte';
+	import RelatedElements from './RelatedElements.svelte';
 	import TransitionDetails from '#lib/diagram/TransitionDetails.svelte';
 	import {
 		BookOpen,
 		CircleAlert,
 		Code,
+		CopyPlus,
 		FileCode,
 		Gauge,
 		Link2,
@@ -24,9 +26,16 @@
 	import type { ModelElement, TreeNode } from '#lib/project/elements.ts';
 	import { displayReference } from '#lib/project/names.ts';
 	import { humanize, statusLabel } from '#lib/project/status.ts';
-	import type { Workspace } from '#lib/project/workspace.svelte.ts';
+	import { isLibraryFile, type Workspace } from '#lib/project/workspace.svelte.ts';
 	import Pill from '#lib/ui/Pill.svelte';
-	import { addElement, applySteps, deleteElement, renameElement } from './actions.ts';
+	import {
+		addElement,
+		applySteps,
+		deleteElement,
+		deleteImpact,
+		duplicateElement,
+		renameElement
+	} from './actions.ts';
 	import { ownersOf } from '#lib/diagram/model.ts';
 	import { planLinkRemoval } from '#lib/diagram/relationships.ts';
 	import { toasts } from '#lib/ui/toasts.svelte.ts';
@@ -122,6 +131,8 @@
 	let name = $state('');
 	let adding = $state(false);
 	let confirmDelete = $state(false);
+	/** What else deleting it affects, once known. */
+	let impact = $state<string | null>(null);
 	let message = $state<string | null>(null);
 	let learnMore = $state(false);
 
@@ -129,8 +140,19 @@
 		name = element?.label ?? '';
 		adding = false;
 		confirmDelete = false;
+		impact = null;
 		message = null;
 	});
+
+	function askDelete() {
+		if (!element) return;
+		const asked = element;
+		confirmDelete = true;
+		impact = 'Checking what uses it…';
+		void deleteImpact(workspace, asked).then((line) => {
+			if (confirmDelete && element?.key === asked.key) impact = line;
+		});
+	}
 
 	async function rename() {
 		if (!element || name.trim() === element.label) return;
@@ -340,7 +362,9 @@
 			</section>
 		{/if}
 
-		{#if satisfies.length}
+		{#if engine}
+			<RelatedElements {element} {workspace} {ui} {engine} requirement={!!requirement} />
+		{:else if satisfies.length}
 			<section>
 				<h3>Satisfies</h3>
 				<ul class="links">
@@ -430,9 +454,27 @@
 					</button>
 				{/if}
 			{/if}
+			{#if !isLibraryFile(element.file)}
+				<button
+					type="button"
+					class="button"
+					title="Copy it under a new name, right after it (Ctrl+D or ⌘D)"
+					onclick={async () => {
+						const { error, copy } = await duplicateElement(workspace, element);
+						if (error) message = error;
+						else if (copy) ui.select(copy.key, 'inspector');
+					}}
+				>
+					<CopyPlus size={15} /> Duplicate
+				</button>
+			{/if}
 			{#if confirmDelete}
 				<div class="confirm" role="alert">
-					<p>Delete <strong>{element.label}</strong>? References to it will show as problems.</p>
+					<p>
+						Delete <strong>{element.label}</strong> from the model? Its text is removed, so it leaves
+						every diagram and table.
+					</p>
+					{#if impact}<p class="impact" role="status">{impact}</p>{/if}
 					<button
 						type="button"
 						class="button danger"
@@ -443,8 +485,8 @@
 					<button type="button" class="button" onclick={() => (confirmDelete = false)}>Keep</button>
 				</div>
 			{:else}
-				<button type="button" class="button quiet" onclick={() => (confirmDelete = true)}>
-					<Trash2 size={15} /> Delete
+				<button type="button" class="button quiet" onclick={askDelete}>
+					<Trash2 size={15} /> Delete from model
 				</button>
 			{/if}
 			{#if message}<p class="error" role="alert">{message}</p>{/if}
@@ -714,6 +756,9 @@
 	.confirm {
 		display: grid;
 		gap: var(--space-2);
+	}
+	.impact {
+		color: var(--text-2);
 	}
 	.error {
 		color: var(--danger);

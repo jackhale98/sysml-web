@@ -7,6 +7,8 @@ import type { DeclarationSet } from '#lib/engine/types.ts';
 import type { ModelElement } from '#lib/project/elements.ts';
 import type { Workspace } from '#lib/project/workspace.svelte.ts';
 import { toasts } from '#lib/ui/toasts.svelte.ts';
+import { planDuplicate } from '#lib/diagram/duplicate.ts';
+import { modelContext } from '#lib/diagram/modelContext.ts';
 import { elementText, formatName, type AddKind } from './templates';
 
 /**
@@ -15,12 +17,13 @@ import { elementText, formatName, type AddKind } from './templates';
  */
 export async function undoable(
 	workspace: Workspace,
-	label: string,
+	given: string | (() => string),
 	run: () => Promise<string | null>
 ): Promise<string | null> {
 	const before = workspace.undoStack.length;
-	const error = await workspace.transact(label, run);
+	const error = await workspace.transact(given, run);
 	if (!error && workspace.undoStack.length > before) {
+		const label = typeof given === 'function' ? given() : given;
 		// A deletion that leaves references unresolved says so (they show in Problems).
 		const warning = workspace.warnings.join(' ');
 		toasts.show(warning ? `${label}. ${warning}` : label, {
@@ -115,6 +118,43 @@ export async function deleteElement(
 	);
 }
 
+/**
+ * Copy an element under a free name, right after it (one undoable step), and
+ * give back the copy once the model has read it, to select it.
+ */
+export async function duplicateElement(
+	workspace: Workspace,
+	element: ModelElement,
+	check?: (path: string, before: string, after: string) => Promise<string | null>
+): Promise<{ error: string | null; copy?: ModelElement }> {
+	if (element.file.startsWith('libraries/'))
+		return { error: 'Library elements can’t be changed here.' };
+	const ctx = modelContext(workspace);
+	const owner = ctx.owners.get(element.key);
+	const plan = planDuplicate(element, ctx);
+	if (typeof plan === 'string') return { error: plan };
+	const error = await applySteps(workspace, plan.label, plan.steps, check);
+	if (error) return { error };
+	for (let i = 0; i < 200 && !workspace.settled; i++) {
+		await new Promise((done) => setTimeout(done, 40));
+	}
+	const now = modelContext(workspace);
+	const copy = workspace.elements.find(
+		(e) =>
+			e.label === plan.name && e.file === element.file && now.owners.get(e.key)?.key === owner?.key
+	);
+	return { error: null, ...(copy ? { copy } : {}) };
+}
+
+/** What else a delete affects, in a line for its confirmation. */
+export async function deleteImpact(workspace: Workspace, element: ModelElement): Promise<string> {
+	const broken = await workspace.whatBreaksWithoutElement(element);
+	if (broken === '') return 'Nothing else in the model refers to it.';
+	if (broken === null) return 'Anything that refers to it will show as a problem.';
+	const would = broken.replace(/\bno longer resolves?\b/, 'would no longer resolve');
+	return `Other elements use it: ${would.charAt(0).toLowerCase()}${would.slice(1)} They will show as problems until you change them.`;
+}
+
 /** Change one table cell: the model value behind it, as a minimal SysML edit. */
 export async function setField(
 	workspace: Workspace,
@@ -125,18 +165,36 @@ export async function setField(
 ): Promise<string | null> {
 	const text = workspace.text(source.file);
 	if (text === undefined) return `${source.file} is not in the project.`;
-	return undoable(workspace, label, () =>
-		workspace.edit(source.file, {
-			op: 'setField',
-			path: source.file,
-			source: text,
-			element: source.element,
-			line: source.line,
-			...(source.id ? { id: source.id } : {}),
-			field,
-			value
-		})
+	let imported: string[] = [];
+	return undoable(
+		workspace,
+		() => withImported(label, imported),
+		async () => {
+			const error = await workspace.edit(source.file, {
+				op: 'setField',
+				path: source.file,
+				source: text,
+				element: source.element,
+				line: source.line,
+				...(source.id ? { id: source.id } : {}),
+				field,
+				value
+			});
+			if (error) return error;
+			if (value.includes('[')) imported = await workspace.importUnits(source.file, text);
+			return null;
+		}
 	);
+}
+
+/** How libraries of units read in a toast. */
+const UNIT_LIBRARIES: Record<string, string> = { SI: 'SI', USCustomaryUnits: 'US customary' };
+
+/** "Set mass to 3 [kg], and imported the SI units it uses". */
+export function withImported(label: string, libraries: string[]): string {
+	if (!libraries.length) return label;
+	const names = libraries.map((l) => UNIT_LIBRARIES[l] ?? l).join(' and ');
+	return `${label}, and imported the ${names} units it uses`;
 }
 
 /** Choose and order a table view's columns (its @TableRendering). */

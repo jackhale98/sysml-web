@@ -3,10 +3,12 @@ import {
 	diagramKey,
 	freeSpot,
 	parseLayout,
+	parseShown,
 	placeAround,
 	renamedNode,
 	serializeLayout,
 	withPositions,
+	withShown,
 	type Box
 } from './positions.ts';
 
@@ -29,6 +31,32 @@ describe('layout file', () => {
 		expect(parseLayout('not json')).toEqual({});
 		expect(parseLayout('{"a:b": {"x": [1], "y": [1, 2]}, "c": 3}')).toEqual({
 			'a:b': { y: [1, 2] }
+		});
+	});
+
+	it('keeps what a diagram hides and adds beside its positions', () => {
+		const key = diagramKey('general', 'DroneArchitecture');
+		const file = withPositions({}, key, { drone: { x: 1, y: 2 } });
+		const shown = withShown({}, key, { hidden: ['drone.radio', 'drone.camera', 'drone.radio'] });
+		const text = serializeLayout(file, shown);
+		expect(text).toBe(
+			'{\n\t"general:DroneArchitecture": {\n\t\t"#hidden": ["drone.camera", "drone.radio"],\n\t\t"drone": [1, 2]\n\t}\n}\n'
+		);
+		// Positions read past it; older versions of the app ignore it.
+		expect(parseLayout(text)).toEqual({ [key]: { drone: [1, 2] } });
+		expect(parseShown(text)).toEqual({
+			[key]: { hidden: ['drone.camera', 'drone.radio'], added: [] }
+		});
+		// A diagram with only hidden or added elements is kept; with neither, dropped.
+		const added = withShown(shown, 'general:', { added: ['P::Q'] });
+		expect(parseShown(serializeLayout({}, added))).toEqual(added);
+		expect(withShown(shown, key, { hidden: [] })).toEqual({});
+		// Tidying the layout up forgets the positions, not what is hidden.
+		const tidied = serializeLayout(withPositions(file, key, null), shown);
+		expect(parseLayout(tidied)).toEqual({});
+		expect(parseShown(tidied)).toEqual(shown);
+		expect(parseShown('{"k": {"#hidden": [1, "a", ""]}}')).toEqual({
+			k: { hidden: ['a'], added: [] }
 		});
 	});
 

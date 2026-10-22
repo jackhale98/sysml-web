@@ -32,12 +32,14 @@
 	import Logo from '#lib/ui/Logo.svelte';
 	import ThemeToggle from '#lib/ui/ThemeToggle.svelte';
 	import Toaster from '#lib/ui/Toaster.svelte';
+	import { toasts } from '#lib/ui/toasts.svelte.ts';
 	import type { ProjectSession } from '#lib/project/session.svelte.ts';
 	import Explorer from './Explorer.svelte';
 	import ProjectMenu from './ProjectMenu.svelte';
 	import { settings } from '#lib/settings/settings.svelte.ts';
 	import HomeView from './HomeView.svelte';
 	import Inspector from './Inspector.svelte';
+	import { duplicateElement } from './actions.ts';
 	import DocumentView from '#lib/markdown/DocumentView.svelte';
 	import ViewTable from './ViewTable.svelte';
 	import { presentationOf } from './views.ts';
@@ -356,6 +358,23 @@
 			event.preventDefault();
 			ui.paletteOpen = !ui.paletteOpen;
 		} else if (
+			(isMac ? event.metaKey : event.ctrlKey) &&
+			event.key.toLowerCase() === 'd' &&
+			!event.altKey &&
+			!event.shiftKey &&
+			!event.defaultPrevented &&
+			!typing(event) &&
+			!document.querySelector('dialog[open]')
+		) {
+			// Duplicate the selection (a diagram does it itself, placing the copy).
+			const selected = workspace.elements.find((e) => e.key === ui.selection?.key);
+			if (!selected) return;
+			event.preventDefault();
+			void duplicateElement(workspace, selected).then(({ error, copy }) => {
+				if (error) toasts.show(error, { tone: 'error' });
+				else if (copy) ui.select(copy.key, ui.selection?.source ?? 'inspector');
+			});
+		} else if (
 			event.key === '?' &&
 			!event.metaKey &&
 			!event.ctrlKey &&
@@ -592,13 +611,15 @@
 							<ViewTable name={tab.name} {workspace} {ui} {engine} />
 						{/key}
 					{:else if presentation.kind === 'diagram'}
-						{#key tabId(tab)}
+						<!-- Shown as another kind of view ("View as"), it is drawn afresh. -->
+						{#key `${tabId(tab)}|${presentation.view}|${presentation.scope}`}
 							{#await loadDiagram(presentation.view)}
 								<p class="empty">Loading the diagram…</p>
 							{:then DiagramCanvas}
 								<DiagramCanvas
 									view={presentation.view}
 									scope={presentation.scope}
+									{...presentation.view === 'sequence' ? {} : { viewName: tab.name }}
 									label="{tab.title} diagram"
 									{workspace}
 									{ui}

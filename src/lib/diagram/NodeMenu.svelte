@@ -4,6 +4,8 @@
 	export interface MenuItem {
 		label: string;
 		icon: Component<{ size?: number }>;
+		/** A line under the label saying what it does, when the label alone could mislead. */
+		detail?: string;
 		/** Keyboard shortcut shown beside the label. */
 		shortcut?: string;
 		danger?: boolean;
@@ -12,12 +14,18 @@
 </script>
 
 <script lang="ts">
-	/** The actions of a node or line: right-click, long-press, or Shift+F10 / the Menu key. */
+	import SheetDialog from '#lib/ui/SheetDialog.svelte';
+
+	/**
+	 * The actions of a node or line: right-click, long-press, or Shift+F10 /
+	 * the Menu key. On a phone (`sheet`), a bottom sheet with thumb-sized items.
+	 */
 	let {
 		title,
 		items,
 		x,
 		y,
+		sheet = false,
 		onclose
 	}: {
 		title: string;
@@ -25,13 +33,15 @@
 		/** Position inside the canvas, px. */
 		x: number;
 		y: number;
+		sheet?: boolean;
 		onclose: (restoreFocus: boolean) => void;
 	} = $props();
 
-	let menu: HTMLDivElement;
+	let menu = $state<HTMLDivElement>();
+	let open = $state(true);
 
 	function buttons(): HTMLButtonElement[] {
-		return [...menu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')];
+		return [...(menu?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? [])];
 	}
 
 	function focusFirst(node: HTMLDivElement) {
@@ -49,17 +59,18 @@
 		else if (event.key === 'ArrowUp') move(index - 1);
 		else if (event.key === 'Home') move(0);
 		else if (event.key === 'End') move(list.length - 1);
-		else if (event.key === 'Escape' || event.key === 'Tab') {
+		else if (event.key === 'Escape' || (event.key === 'Tab' && !sheet)) {
 			event.preventDefault();
 			event.stopPropagation();
 			onclose(true);
 		}
 	}
 
-	// Close on a press anywhere else.
+	// Close on a press anywhere else (a sheet has its backdrop for that).
 	$effect(() => {
+		if (sheet) return;
 		const away = (event: PointerEvent) => {
-			if (!menu.contains(event.target as Node)) onclose(false);
+			if (!menu?.contains(event.target as Node)) onclose(false);
 		};
 		const id = setTimeout(() => window.addEventListener('pointerdown', away, true));
 		return () => {
@@ -69,18 +80,7 @@
 	});
 </script>
 
-<div
-	class="menu"
-	role="menu"
-	tabindex="-1"
-	aria-label={title}
-	style:left="{x}px"
-	style:top="{y}px"
-	bind:this={menu}
-	{@attach focusFirst}
-	{onkeydown}
->
-	<p class="title" aria-hidden="true">{title}</p>
+{#snippet entries()}
 	{#each items as item (item.label)}
 		<button
 			type="button"
@@ -92,11 +92,44 @@
 			}}
 		>
 			<item.icon size={15} />
-			<span>{item.label}</span>
-			{#if item.shortcut}<kbd>{item.shortcut}</kbd>{/if}
+			<span class="text">
+				<span>{item.label}</span>
+				{#if item.detail}<span class="detail">{item.detail}</span>{/if}
+			</span>
+			{#if item.shortcut && !sheet}<kbd>{item.shortcut}</kbd>{/if}
 		</button>
 	{/each}
-</div>
+{/snippet}
+
+{#if sheet}
+	<SheetDialog bind:open {title} size="sm" oncancel={() => onclose(true)}>
+		<div
+			class="menu in-sheet"
+			role="menu"
+			tabindex="-1"
+			aria-label={title}
+			bind:this={menu}
+			{onkeydown}
+		>
+			{@render entries()}
+		</div>
+	</SheetDialog>
+{:else}
+	<div
+		class="menu"
+		role="menu"
+		tabindex="-1"
+		aria-label={title}
+		style:left="{x}px"
+		style:top="{y}px"
+		bind:this={menu}
+		{@attach focusFirst}
+		{onkeydown}
+	>
+		<p class="title" aria-hidden="true">{title}</p>
+		{@render entries()}
+	</div>
+{/if}
 
 <style>
 	.menu {
@@ -141,8 +174,32 @@
 		flex: none;
 		color: var(--text-2);
 	}
-	button span {
+	.text {
+		display: grid;
 		flex: 1;
+		padding: 6px 0;
+	}
+	.detail {
+		color: var(--text-3);
+		font-size: var(--text-xs);
+		line-height: 1.3;
+	}
+	.danger .detail {
+		color: var(--text-2);
+	}
+	/* In a phone's sheet: the sheet is the frame, items are thumb-sized. */
+	.menu.in-sheet {
+		position: static;
+		min-width: 0;
+		padding: 0;
+		border: 0;
+		box-shadow: none;
+		animation: none;
+		gap: var(--space-1);
+	}
+	.in-sheet button {
+		min-height: 3rem;
+		padding: 0 var(--space-3);
 	}
 	button:hover,
 	button:focus-visible {

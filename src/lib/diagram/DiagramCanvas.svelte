@@ -19,6 +19,8 @@
 		Cable,
 		CircleDot,
 		CircleStop,
+		CopyPlus,
+		EyeOff,
 		FileCode,
 		LayoutGrid,
 		ListTodo,
@@ -26,9 +28,11 @@
 		Pencil,
 		Play,
 		Plus,
+		Shapes,
 		Spline,
 		Trash2,
-		Unlink
+		Unlink,
+		Waypoints
 	} from '@lucide/svelte';
 	import type { Engine } from '#lib/engine/client.ts';
 	import type { DiagramGraph, DiagramView } from '#lib/engine/types.ts';
@@ -36,12 +40,22 @@
 	import type { Workspace } from '#lib/project/workspace.svelte.ts';
 	import { theme } from '#lib/ui/theme.svelte.ts';
 	import { toasts } from '#lib/ui/toasts.svelte.ts';
-	import { addElement, applySteps, deleteElement, renameElement } from '#lib/workbench/actions.ts';
+	import {
+		addElement,
+		applySteps,
+		deleteElement,
+		deleteImpact,
+		duplicateElement,
+		renameElement,
+		undoable
+	} from '#lib/workbench/actions.ts';
 	import AddForm from '#lib/workbench/AddForm.svelte';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
 	import { canOwnMembers, formatName, type AddKind } from '#lib/workbench/templates.ts';
 	import type { WorkbenchUi } from '#lib/workbench/ui.svelte.ts';
 	import ConnectPicker, { type ConnectTarget } from './ConnectPicker.svelte';
+	import ConnectedForm from './ConnectedForm.svelte';
+	import { planDuplicate } from './duplicate.ts';
 	import DiagramExport from './DiagramExport.svelte';
 	import { DiagramEditing, provideEditing } from './editing.svelte.ts';
 	import FlowBridge, { type FlowApi } from './FlowBridge.svelte';
@@ -59,6 +73,7 @@
 	import BehaviorAddForm, { type BehaviorAddChoice } from './BehaviorAddForm.svelte';
 	import BranchForm from './BranchForm.svelte';
 	import FormPanel from './FormPanel.svelte';
+	import HiddenPanel from './HiddenPanel.svelte';
 	import StateActionsForm from './StateActionsForm.svelte';
 	import TransitionForm from './TransitionForm.svelte';
 	import {
@@ -92,13 +107,17 @@
 	import NodeMenu, { type MenuItem } from './NodeMenu.svelte';
 	import {
 		LAYOUT_FILE,
+		NOTHING_CHANGED,
 		diagramKey,
 		freeSpot,
 		parseLayout,
+		parseShown,
 		placeAround,
 		renamedNode,
 		serializeLayout,
 		withPositions,
+		withShown,
+		type DiagramShown,
 		type XY
 	} from './positions.ts';
 	import RelationPopover from './RelationPopover.svelte';
@@ -110,6 +129,18 @@
 		type RelationOption
 	} from './relationships.ts';
 	import SysmlEdge from './SysmlEdge.svelte';
+	import {
+		chooseNeighbours,
+		neighbours,
+		planExpose,
+		planUnexpose,
+		planViewAs,
+		viewAsChoices,
+		withoutHidden,
+		type NeighbourElement,
+		type StandardView
+	} from './viewEdits.ts';
+	import { exposedName, presentationOf } from '#lib/workbench/views.ts';
 	import SysmlNode from './SysmlNode.svelte';
 	import type { SysmlEdgeData, SysmlNodeData } from './types.ts';
 	import { MARK_WORDS, reviewMarks, type ReviewMark } from '#lib/review/marks.svelte.ts';
@@ -117,6 +148,7 @@
 	let {
 		view,
 		scope,
+		viewName,
 		workspace,
 		ui,
 		engine,
@@ -124,6 +156,8 @@
 	}: {
 		view: DiagramView;
 		scope: string | null;
+		/** The saved view drawn, when it is one: it can be shown as another kind of view. */
+		viewName?: string;
 		workspace: Workspace;
 		ui: WorkbenchUi;
 		engine: Engine;
@@ -135,6 +169,7 @@
 	const reducedMotion =
 		typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 	const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+	const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 	const FIT = { padding: 0.15, maxZoom: 1.1 };
 
 	let nodes = $state.raw<Node<SysmlNodeData>[]>([]);
@@ -144,6 +179,8 @@
 	let popover = $state<'add' | 'rename' | null>(null);
 	let renameTo = $state('');
 	let actionError = $state<string | null>(null);
+	/** The nodes this diagram hides (that its scope would draw), with their names. */
+	let hiddenHere = $state.raw<{ id: string; label: string; key: string | null }[]>([]);
 	/** The diagram frame's name, as SysML writes it: "gv [Scope]". */
 	let frameTitle = $state('');
 	let timer: ReturnType<typeof setTimeout> | undefined;
@@ -182,6 +219,8 @@
 	let confirm = $state<{
 		title: string;
 		detail: string;
+		/** What else changes, once it is known ("Checking…" until then). */
+		impact?: string;
 		statement?: string;
 		action: string;
 		run: () => Promise<string | null>;
@@ -363,17 +402,52 @@
 
 	/** Pin positions (merged), or clear this diagram's with `null`. */
 	function savePositions(update: Record<string, XY> | null, drop: string[] = []) {
-		let file = parseLayout(workspace.text(LAYOUT_FILE));
+		const current = workspace.text(LAYOUT_FILE);
+		let file = parseLayout(current);
 		if (drop.length && file[layoutKey]) {
 			const kept = { ...file[layoutKey] };
 			for (const id of drop) delete kept[id];
 			file = { ...file, [layoutKey]: kept };
 		}
 		file = withPositions(file, layoutKey, update);
-		const text = serializeLayout(file);
-		if (text === (workspace.text(LAYOUT_FILE) ?? '{}\n')) return;
+		const text = serializeLayout(file, parseShown(current));
+		if (text === (current ?? '{}\n')) return;
 		workspace.setText(LAYOUT_FILE, text);
 	}
+
+	/** What this diagram hides, and adds to what its scope draws (kept in the layout file). */
+	const shown: DiagramShown = $derived(
+		parseShown(workspace.text(LAYOUT_FILE))[layoutKey] ?? NOTHING_CHANGED
+	);
+
+	/** Change what this diagram hides or adds; part of the caller's undoable step. */
+	function saveShown(change: Partial<DiagramShown>) {
+		const current = workspace.text(LAYOUT_FILE);
+		const text = serializeLayout(
+			parseLayout(current),
+			withShown(parseShown(current), layoutKey, change)
+		);
+		if (text !== (current ?? '{}\n')) workspace.setText(LAYOUT_FILE, text);
+	}
+
+	/**
+	 * The saved view this diagram draws, when it is one (a general view of a
+	 * `view` usage): what it shows is written in its `expose` lines.
+	 */
+	const savedView = $derived.by(() => {
+		if (view !== 'general' || !scope) return undefined;
+		const info = workspace.views.find(
+			(v) => v.isUsage && !v.builtin && (v.qualifiedName ?? v.name) === scope
+		);
+		if (!info) return undefined;
+		return workspace.elements.find(
+			(e) =>
+				e.kind === 'view' &&
+				!e.isDefinition &&
+				e.file === info.file &&
+				(qualifiedName(e, owners) === scope || e.name === info.name)
+		);
+	});
 
 	/**
 	 * Once the person arranges a diagram, keep all of it as they see it:
@@ -440,8 +514,18 @@
 		const current = ++generation;
 		try {
 			const files = workspace.sourceFiles();
-			const graph = await engine.diagram(view, files, scope);
+			const hidden = untrack(() => shown.hidden);
+			const added = untrack(() => shown.added);
+			const full = await engine.diagram(view, files, scope, added.length ? added : undefined);
 			if (current !== generation) return;
+			const graph = withoutHidden(full, hidden);
+			hiddenHere = full.nodes
+				.filter((n) => hidden.includes(n.id))
+				.map((n) => ({
+					id: n.id,
+					label: n.label || n.id,
+					key: n.element ? `${n.element.file}@${n.element.start_byte}` : null
+				}));
 			// Laying out thousands of boxes takes the page minutes and draws nothing readable.
 			if (graph.nodes.length > MAX_NODES) {
 				nodes = [];
@@ -605,6 +689,21 @@
 				else pinAll();
 			}
 			if (!hadNodes || relayout || settle) fit();
+			if (addedCheck && current > addedCheck.after) {
+				const drawnKeys = new Set(
+					graph.nodes.flatMap((n) =>
+						n.element ? [`${n.element.file}@${n.element.start_byte}`] : []
+					)
+				);
+				const missing = addedCheck.keys.filter((k) => !drawnKeys.has(k)).length;
+				addedCheck = null;
+				if (missing)
+					toasts.show(
+						missing === 1
+							? 'One of them is not drawn: this view’s filter leaves it out.'
+							: `${missing} of them are not drawn: this view’s filter leaves them out.`
+					);
+			}
 		} catch (error) {
 			if (current !== generation) return;
 			status = 'error';
@@ -648,7 +747,22 @@
 		const delay = untrack(() => nodes.length) ? 300 : 0;
 		clearTimeout(timer);
 		timer = setTimeout(() => void refresh(), delay);
-		return () => clearTimeout(timer);
+	});
+	// Not on every run above: a write to another file (the layout) in the meantime
+	// would cancel the redraw the model text asked for.
+	$effect(() => () => clearTimeout(timer));
+
+	// Redraw when what the diagram hides or adds changes (also by undo).
+	let lastShown: string | null = null;
+	$effect(() => {
+		const key = JSON.stringify([layoutKey, shown]);
+		if (lastShown === null || lastShown === key) {
+			lastShown = key;
+			return;
+		}
+		lastShown = key;
+		clearTimeout(timer);
+		timer = setTimeout(() => void refresh(), 0);
 	});
 
 	// Reflect the selection without relaying out.
@@ -1291,17 +1405,40 @@
 		if (element) {
 			items.push({ label: 'Show in text', icon: FileCode, run: () => showInText(element) });
 		}
+		if (view === 'general' && element?.id) {
+			items.push({
+				label: 'Add connected elements…',
+				detail: 'What it refers to, or what refers to it',
+				icon: Waypoints,
+				run: () => void askAddConnected(id, point)
+			});
+		}
 		if (element && !isLibrary(element)) {
 			items.push({
-				label: 'Delete',
+				label: 'Duplicate',
+				icon: CopyPlus,
+				shortcut: isMac ? '⌘D' : 'Ctrl+D',
+				run: () => void duplicateNode(id)
+			});
+		}
+		items.push({
+			label: 'Remove from diagram',
+			detail: 'It stays in the model',
+			icon: EyeOff,
+			shortcut: 'H',
+			run: () => void removeFromDiagram(id)
+		});
+		if (element && !isLibrary(element)) {
+			items.push({
+				label: 'Delete from model…',
+				detail: 'Takes it out of the text',
 				icon: Trash2,
 				shortcut: 'Del',
 				danger: true,
 				run: () => askDeleteNode(id)
 			});
 		}
-		if (!items.length) return;
-		const at = inCanvas(point ?? underNode(id), 220, 48 + items.length * 40);
+		const at = inCanvas(point ?? underNode(id), 236, 48 + items.length * 48);
 		menu = { title: node.data.node.label, items, ...at, focus: id };
 	}
 
@@ -1374,12 +1511,249 @@
 		menu = null;
 		confirmError = null;
 		confirm = {
-			title: `Delete ${element.label}?`,
-			detail: `It is removed from ${element.file}. References to it elsewhere will show as problems.`,
+			title: `Delete ${element.label} from the model?`,
+			detail: `Its text is removed from ${element.file}, so it leaves every diagram and table.`,
+			impact: 'Checking what uses it…',
 			action: 'Delete',
 			run: () => deleteElement(workspace, element),
 			focus
 		};
+		void deleteImpact(workspace, element).then((impact) => {
+			if (confirm?.title === `Delete ${element.label} from the model?`) confirm.impact = impact;
+		});
+	}
+
+	/**
+	 * Take a node off this diagram, never out of the model: a saved view loses
+	 * the `expose` line that names it (when another still shows it, or it has
+	 * none of its own, it is hidden); any other diagram hides it. One undoable step.
+	 */
+	async function removeFromDiagram(id: string) {
+		menu = null;
+		const node = nodes.find((n) => n.id === id);
+		if (!node) return;
+		const element = elementOf(id);
+		const name = node.data.node.label || id;
+		const unexposed =
+			savedView && element && !isLibrary(savedView)
+				? planUnexpose(savedView, element, ctx)
+				: { steps: [], removed: [], stillShown: true };
+		// An element added to this diagram goes off its list rather than being hidden.
+		const plain = (q: string) => q.replace(/'/g, '');
+		const wasAdded =
+			!savedView && element
+				? shown.added.filter((q) => plain(q) === plain(qualifiedName(element, owners)))
+				: [];
+		const label =
+			unexposed.steps.length || wasAdded.length
+				? `Removed ${name} from this ${savedView ? 'view' : 'diagram'} (it stays in the model)`
+				: `Hid ${name} on this diagram (it stays in the model)`;
+		const error = await undoable(workspace, label, async () => {
+			if (unexposed.steps.length) {
+				const refused = await applySteps(workspace, label, unexposed.steps, checkSyntax);
+				if (refused) return refused;
+			}
+			if (wasAdded.length) saveShown({ added: shown.added.filter((q) => !wasAdded.includes(q)) });
+			else if (unexposed.stillShown) saveShown({ hidden: [...shown.hidden, id] });
+			return null;
+		});
+		if (error) toasts.show(error, { tone: 'error' });
+		else host.focus({ preventScroll: true });
+	}
+
+	// ---- Adding what an element is connected to ----
+
+	/** The "Add connected elements" choice open for a node. */
+	let connected = $state<{
+		id: string;
+		name: string;
+		list: NeighbourElement[];
+		x: number;
+		y: number;
+	} | null>(null);
+	/** Elements just added, to say which the diagram does not draw (a saved view's filter). */
+	let addedCheck: { keys: string[]; after: number } | null = null;
+
+	async function askAddConnected(id: string, point?: XY) {
+		menu = null;
+		const element = elementOf(id);
+		if (!element?.id) return;
+		const at = formAt(point ?? underNode(id));
+		const related = await engine.related(workspace.sourceFiles(), element.id);
+		const drawn = new Set(nodes.flatMap((n) => (n.data.elementKey ? [n.data.elementKey] : [])));
+		const list = neighbours(related, workspace.elements, drawn);
+		if (!list.length) {
+			toasts.show(`Everything connected to ${element.label} is on this diagram already.`);
+			return;
+		}
+		connected = { id, name: element.label, list, ...at };
+	}
+
+	function closeConnected() {
+		const back = connected?.id;
+		connected = null;
+		focusNode(back);
+	}
+
+	/**
+	 * Put an element's neighbours on the diagram, as one undoable step: a
+	 * saved view gets an `expose` line for each; another diagram adds them in
+	 * the layout file. Hidden ones are shown again. ELK places them.
+	 */
+	async function addConnected(direction: 'out' | 'in' | 'both'): Promise<string | null> {
+		if (!connected) return null;
+		const chosen = chooseNeighbours(connected.list, direction);
+		const keys = new Set(chosen.map((n) => n.element.key));
+		const unhide = hiddenHere.filter((h) => h.key && keys.has(h.key));
+		const rest = chosen.filter((n) => !unhide.some((h) => h.key === n.element.key));
+		const exposed = savedView
+			? planExpose(
+					savedView,
+					rest.map((n) => n.element),
+					ctx
+				)
+			: null;
+		const label =
+			chosen.length === 1
+				? `Added ${chosen[0]!.element.label} to this diagram`
+				: `Added ${chosen.length} connected elements to this diagram`;
+		const after = generation;
+		const error = await undoable(workspace, label, async () => {
+			if (exposed) {
+				const refused = await applySteps(workspace, label, exposed.steps, checkSyntax);
+				if (refused) return refused;
+			}
+			saveShown({
+				hidden: shown.hidden.filter((h) => !unhide.some((u) => u.id === h)),
+				added: savedView ? shown.added : [...shown.added, ...rest.map((n) => n.qualified)]
+			});
+			return null;
+		});
+		if (error) return error;
+		if (savedView) addedCheck = { keys: [...keys], after };
+		closeConnected();
+		return null;
+	}
+
+	/** Copy a node's element under a free name, placed beside it and selected. */
+	async function duplicateNode(id: string) {
+		menu = null;
+		const element = elementOf(id);
+		const node = nodes.find((n) => n.id === id);
+		if (!element || !node || isLibrary(element)) return;
+		const planned = planDuplicate(element, ctx);
+		if (typeof planned !== 'string') {
+			const { x, y } = node.position;
+			pendingPlace = {
+				name: formatName(planned.name),
+				at: { x: x + (node.width ?? 0) / 2 + 48, y: y + (node.height ?? 0) / 2 + 48 },
+				until: Date.now() + 8000
+			};
+		}
+		const { error, copy } = await duplicateElement(workspace, element, checkSyntax);
+		if (error) {
+			pendingPlace = null;
+			toasts.show(error, { tone: 'error' });
+		} else if (copy) ui.select(copy.key, 'diagram');
+	}
+
+	// ---- View as: a saved view shown as another kind of view ----
+
+	const viewInfo = $derived(
+		viewName
+			? workspace.views.find((v) => v.name === viewName && v.isUsage && !v.builtin)
+			: undefined
+	);
+	/** The saved view's own element, whose type "View as" changes. */
+	const viewUsage = $derived(
+		viewInfo
+			? workspace.elements.find(
+					(e) =>
+						e.kind === 'view' &&
+						!e.isDefinition &&
+						e.file === viewInfo.file &&
+						e.name === viewInfo.name
+				)
+			: undefined
+	);
+	const viewAs = $derived.by(() => {
+		if (!viewInfo || !viewUsage) return [];
+		const exposes = viewInfo.exposes ?? [];
+		// The element it exposes: by the name it is written with, qualified as far as it is.
+		const target = `::${(exposes[0] ?? '').replace(/::\*\*?$/, '').replace(/'/g, '')}`;
+		const name = exposes[0] ? exposedName(exposes[0]) : null;
+		const exposed = name
+			? workspace.elements.find(
+					(e) =>
+						e.label === name &&
+						!isLibrary(e) &&
+						`::${qualifiedName(e, owners).replace(/'/g, '')}`.endsWith(target)
+				)
+			: undefined;
+		const current = (viewInfo.standard ?? viewInfo.definition)?.split('::').pop();
+		return viewAsChoices(current, exposes, exposed);
+	});
+
+	function openViewAs(point: XY) {
+		const items: MenuItem[] = viewAs.map((choice) => ({
+			label: choice.label,
+			detail: choice.detail,
+			icon: Shapes,
+			run: () => void showViewAs(choice.name)
+		}));
+		const at = inCanvas({ x: point.x - 236, y: point.y }, 236, 48 + items.length * 52);
+		menu = { title: `Show ${viewInfo?.name ?? 'this view'} as`, items, ...at };
+	}
+
+	/**
+	 * Change the saved view's type in place, as one undoable step; its
+	 * positions and hidden elements go with it to the new kind of diagram.
+	 */
+	async function showViewAs(to: StandardView) {
+		if (!viewInfo || !viewUsage) return;
+		const plan = planViewAs(viewUsage, to, ctx);
+		if (typeof plan === 'string') {
+			toasts.show(plan, { tone: 'error' });
+			return;
+		}
+		const next = presentationOf({ ...viewInfo, definition: to, standard: undefined });
+		const nextKey = next.kind === 'diagram' ? diagramKey(next.view, next.scope) : null;
+		const error = await undoable(workspace, plan.label, async () => {
+			const refused = await applySteps(workspace, plan.label, plan.steps, checkSyntax);
+			if (refused) return refused;
+			if (nextKey && nextKey !== layoutKey) {
+				const current = workspace.text(LAYOUT_FILE);
+				const positions = parseLayout(current);
+				const kept = parseShown(current);
+				const moved = withPositions(
+					positions,
+					nextKey,
+					Object.fromEntries(
+						Object.entries(positions[layoutKey] ?? {}).map(([id, [x, y]]) => [id, { x, y }])
+					)
+				);
+				const text = serializeLayout(
+					moved,
+					kept[layoutKey] ? withShown(kept, nextKey, kept[layoutKey]) : kept
+				);
+				if (text !== (current ?? '{}\n')) workspace.setText(LAYOUT_FILE, text);
+			}
+			return null;
+		});
+		if (error) toasts.show(error, { tone: 'error' });
+	}
+
+	/** Put hidden nodes back on this diagram (one undoable step). */
+	async function showAgain(ids: string[] | 'all') {
+		const names = hiddenHere.filter((h) => ids === 'all' || ids.includes(h.id)).map((h) => h.label);
+		const label =
+			names.length === 1
+				? `Showed ${names[0]} again on this diagram`
+				: `Showed ${names.length} hidden elements again on this diagram`;
+		await undoable(workspace, label, async () => {
+			saveShown({ hidden: ids === 'all' ? [] : shown.hidden.filter((h) => !ids.includes(h)) });
+			return null;
+		});
 	}
 
 	function askDeleteEdge(edge: Edge<SysmlEdgeData>) {
@@ -1530,6 +1904,19 @@
 		} else if (event.key.toLowerCase() === 'c' && plain && !event.shiftKey && id) {
 			event.preventDefault();
 			startConnect(id);
+		} else if (
+			event.key.toLowerCase() === 'd' &&
+			(isMac ? event.metaKey : event.ctrlKey) &&
+			!event.altKey &&
+			!event.shiftKey &&
+			id
+		) {
+			// Before the browser's bookmark shortcut, and the workbench's own (for other panes).
+			event.preventDefault();
+			void duplicateNode(id);
+		} else if (event.key.toLowerCase() === 'h' && plain && !event.shiftKey && id) {
+			event.preventDefault();
+			void removeFromDiagram(id);
 		} else if ((event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey)) && id) {
 			event.preventDefault();
 			openNodeMenu(id);
@@ -1601,6 +1988,15 @@
 		<p class="state" role="alert">This view could not be drawn: {message}</p>
 	{:else if status === 'too-large'}
 		<p class="state" role="status">{message}</p>
+	{:else if status === 'ready' && nodes.length === 0 && hiddenHere.length}
+		<div class="empty-diagram">
+			<EmptyState
+				title="Everything on this diagram is hidden."
+				actions={[{ label: 'Show all', primary: true, run: () => void showAgain('all') }]}
+			>
+				The elements are still in the model; this diagram only leaves them out.
+			</EmptyState>
+		</div>
 	{:else if status === 'ready' && nodes.length === 0}
 		<div class="empty-diagram">
 			<EmptyState
@@ -1649,9 +2045,9 @@
 		connectionLineStyle="stroke: var(--accent); stroke-width: 2; stroke-dasharray: 6 4;"
 		ariaLabelConfig={{
 			'node.a11yDescription.default':
-				'Press Enter to select. Then Enter or F2 renames, C connects it to another element, Delete removes it, and Shift+F10 lists all actions.',
+				'Press Enter to select. Then Enter or F2 renames, C connects it to another element, H removes it from this diagram, Delete deletes it from the model, and Shift+F10 lists all actions.',
 			'node.a11yDescription.keyboardDisabled':
-				'Press Enter to select. Then Enter or F2 renames, C connects, Delete removes, arrow keys move it.',
+				'Press Enter to select. Then Enter or F2 renames, C connects, H removes it from this diagram, Delete deletes it from the model, arrow keys move it.',
 			'edge.a11yDescription.default':
 				'Press Enter to select a relationship, then Delete to remove its statement.'
 		}}
@@ -1736,6 +2132,11 @@
 					{/if}
 					<button type="button" onclick={() => (reviewMarks.visible = false)}>Hide marks</button>
 				</div>
+			</Panel>
+		{/if}
+		{#if hiddenHere.length}
+			<Panel position="bottom-center">
+				<HiddenPanel hidden={hiddenHere} onshow={(ids) => void showAgain(ids)} />
 			</Panel>
 		{/if}
 		{#if lastClick && popover === 'add'}
@@ -1842,6 +2243,19 @@
 				>
 					<LayoutGrid size={14} /> <span>Tidy up</span>
 				</button>
+				{#if viewAs.length}
+					<button
+						type="button"
+						aria-haspopup="menu"
+						title="Show this view as another kind of diagram"
+						onclick={(e) => {
+							const r = e.currentTarget.getBoundingClientRect();
+							openViewAs({ x: r.right, y: r.bottom + 6 });
+						}}
+					>
+						<Shapes size={14} /> <span>View as</span>
+					</button>
+				{/if}
 				<DiagramExport
 					title={label.replace(/ diagram$/, '')}
 					diagram={exportDiagram}
@@ -1983,12 +2397,25 @@
 		/>
 	{/if}
 
+	{#if connected}
+		<ConnectedForm
+			name={connected.name}
+			neighbours={connected.list.map((n) => ({ label: n.element.label, direction: n.direction }))}
+			mode={formMode}
+			x={connected.x}
+			y={connected.y}
+			onapply={addConnected}
+			onclose={closeConnected}
+		/>
+	{/if}
+
 	{#if menu}
 		<NodeMenu
 			title={menu.title}
 			items={menu.items}
 			x={menu.x}
 			y={menu.y}
+			sheet={narrow}
 			onclose={(restore) => {
 				const back = menu?.focus;
 				menu = null;
@@ -2014,7 +2441,10 @@
 			}}
 		>
 			<p class="confirm-title">{confirm.title}</p>
-			<p id="diagram-confirm-detail" class="hint">{confirm.detail}</p>
+			<p id="diagram-confirm-detail" class="hint">
+				{confirm.detail}
+				{#if confirm.impact}<span class="impact" role="status">{confirm.impact}</span>{/if}
+			</p>
 			{#if confirm.statement}<code class="statement">{confirm.statement}</code>{/if}
 			{#if confirmError}<p class="error" role="alert">{confirmError}</p>{/if}
 			<div class="confirm-actions">
@@ -2330,6 +2760,11 @@
 	}
 	.confirm-title {
 		font-weight: 650;
+	}
+	.impact {
+		display: block;
+		margin-top: var(--space-1);
+		color: var(--text-2);
 	}
 	.statement {
 		overflow-wrap: anywhere;

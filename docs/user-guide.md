@@ -51,11 +51,32 @@ Open a model file to see its text and its diagram side by side (**Split**), or c
 
 You don’t have to write SysML. **Add** in a diagram, the forms in the details panel and **New view** write it for you, and show you the text they write, so you learn it as you go.
 
+### Change what a diagram shows
+
+Right-click a box (long-press on a phone) to see its actions. Two of them look alike but do very different things:
+
+- **Remove from diagram** takes the box off this diagram only. The element stays in the model, in the text and in every other diagram and table. Undo puts it back.
+- **Delete from model** takes the element out of the text, so it leaves every diagram and table. Before you confirm, it says what else uses it: those places show as problems until you change them.
+
+In a saved view, removing an element its `expose` line names removes that line (the view’s own record of what it shows). Anything else is hidden on that diagram, and the layout remembers it beside the positions.
+
+Hidden elements are listed at the foot of the diagram (“2 hidden · Show all”): open the list to show one again, or show them all. Other diagrams are not affected.
+
+**Duplicate** (Ctrl D, ⌘ D on a Mac, or in a box’s actions and the details panel) copies the element right after it in the text, with everything inside it, under a free name (`battery2`), and selects the copy.
+
+**Add connected elements** (in a box’s actions, on structure diagrams) puts on the diagram what the element refers to (**Outgoing**: its type, what it specializes, satisfies or is connected to), what refers to it (**Incoming**), or both, in one step. A saved view gets an `expose` line for each; its filter may still leave some out, and it says so.
+
+**View as** (in a saved view’s toolbar) shows the same view as another kind of diagram that fits what it shows: a part’s general view as its interconnection view, an action’s as its action flow, and back. Only the view’s type changes (`view v : GeneralView` becomes `view v : InterconnectionView`); its positions and hidden elements come along.
+
 ### The overview and the details panel
 
 The **Overview** shows the project at a glance: what the model has, how many requirements are met and tested, and any problems.
 
 Select anything (in a diagram, a table, the text or the explorer) and the **details panel** shows what it is, in plain words, with its values and links. On a phone, the details slide up from the bottom.
+
+Its **Related elements** say what it refers to (its type, what it specializes, satisfies or is connected to), what refers to it, and where it is. Choose one to go to it: a quick answer to “what uses this?”.
+
+Give a value with its unit, such as `2 [kg]`, here or in a table. If the package doesn’t know that unit yet, its import (`private import SI::*;`) is added with the value, and one **Undo** takes both back.
 
 **Problems** (bottom of the screen, or in **More** on a phone) lists anything the model gets wrong, such as a name that refers to nothing. Click one to go to it.
 
@@ -345,6 +366,7 @@ On a Mac, use ⌘ where it says Ctrl.
 | <kbd>Ctrl K</kbd> | Search the model, views and commands |
 | <kbd>?</kbd> | Open this help |
 | <kbd>Ctrl S</kbd> | Save to the folder (projects opened from a folder) |
+| <kbd>Ctrl D</kbd> | Duplicate the selected element (not in the text) |
 | <kbd>Ctrl ,</kbd> | Settings |
 | <kbd>Esc</kbd> | Close a dialog or menu |
 
@@ -367,7 +389,9 @@ On a Mac, use ⌘ where it says Ctrl.
 | --- | --- |
 | <kbd>C</kbd> | Connect from the selected element |
 | <kbd>F2</kbd> | Rename |
-| <kbd>Delete</kbd> | Delete |
+| <kbd>H</kbd> | Remove from this diagram (it stays in the model) |
+| <kbd>Ctrl D</kbd> | Duplicate, beside it |
+| <kbd>Delete</kbd> | Delete from the model |
 | <kbd>Arrow keys</kbd> | Move the selected boxes |
 | <kbd>Shift F10</kbd> | The element’s menu |
 | <kbd>+ / − / 0</kbd> | Zoom in, out, fit (sequence diagrams) |

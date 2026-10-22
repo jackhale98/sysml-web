@@ -172,8 +172,14 @@ const handlers: { [M in Method]: Handler } = {
 	codeActions: (host, files: SourceFile[], path: string, from: number, to: number) =>
 		host.codeActions(files, path, from, to),
 	edit: (host, request: EditRequest) => host.edit(request),
-	diagram: (host, view: DiagramView, files: SourceFile[], scope: string | null) =>
-		host.diagram(view, files, scope),
+	diagram: (
+		host,
+		view: DiagramView,
+		files: SourceFile[],
+		scope: string | null,
+		added: string[] | undefined
+	) => host.diagram(view, files, scope, added),
+	related: (host, files: SourceFile[], id: string) => host.related(files, id),
 	listViews: (host, files: SourceFile[]) => host.listViews(files),
 	renderView: (host, files: SourceFile[], name: string) => host.renderView(files, name),
 	viewLibraries: (host) => host.viewLibraries(),
