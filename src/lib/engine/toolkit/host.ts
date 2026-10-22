@@ -14,6 +14,7 @@ import type {
 	CheckReport,
 	CodeAction,
 	Completion,
+	FeatureValue,
 	DefinitionTarget,
 	Diagnostic,
 	DiagramGraph,
@@ -278,6 +279,11 @@ export class ToolkitHost {
 	/** A view rendered as a table by its `@TableRendering`. */
 	renderView(files: SourceFile[], name: string): RenderedTable {
 		return views.renderView(this.viewContext(files), name);
+	}
+
+	/** A usage's attribute values, for the inspector. */
+	featureValues(files: SourceFile[], id: string): FeatureValue[] {
+		return views.featureValues(this.viewContext(files), id);
 	}
 
 	/** The view libraries every project has (`Reporting`, `ModelViews`). */

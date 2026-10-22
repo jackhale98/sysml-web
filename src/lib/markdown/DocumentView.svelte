@@ -1,3 +1,14 @@
+<script lang="ts" module>
+	/** Where each document was scrolled to, so coming back to it returns there. */
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- read on mount only, never rendered
+	const scrolled = new Map<string, number>();
+
+	/** Whether the reader has got some way into a document (to offer to continue it). */
+	export function startedReading(path: string): boolean {
+		return (scrolled.get(path) ?? 0) > 200;
+	}
+</script>
+
 <script lang="ts">
 	import { ArrowUpRight, Pencil } from '@lucide/svelte';
 	import type { ModelElement } from '#lib/project/elements.ts';
@@ -15,6 +26,15 @@
 	let { path, workspace, ui }: { path: string; workspace: Workspace; ui: WorkbenchUi } = $props();
 
 	const blocks = $derived(parseBlocks(workspace.text(path) ?? ''));
+
+	// Back where the reader left it (the page is rebuilt when they come back to it).
+	function remember(page: HTMLElement) {
+		const at = scrolled.get(path);
+		if (at) requestAnimationFrame(() => page.scrollTo({ top: at }));
+		const save = () => scrolled.set(path, page.scrollTop);
+		page.addEventListener('scroll', save, { passive: true });
+		return () => page.removeEventListener('scroll', save);
+	}
 
 	type Reference =
 		| { kind: 'element'; element: ModelElement }
@@ -87,7 +107,7 @@
 	{/each}
 {/snippet}
 
-<article class="document">
+<article class="document" {@attach remember}>
 	<div class="bar">
 		<span class="path">{path}</span>
 		<button type="button" class="edit" onclick={() => ui.open({ kind: 'file', path, raw: true })}>

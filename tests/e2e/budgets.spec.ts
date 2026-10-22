@@ -133,7 +133,7 @@ test('a value that breaks a requirement is a violation and a problem, until undo
 	await expect(problems(page)).toHaveAccessibleName('Problems: 0 errors, 0 warnings');
 	// The drone's own hover power (the second `hoverPower` attribute: DeliveryDrone declares it).
 	const inspector = await select(page, 'hoverPower', 'attribute', 1, 'DroneArchitecture.sysml');
-	const value = inspector.getByLabel(/^Value/);
+	const value = inspector.getByRole('textbox', { name: /^Value \(/ });
 	await expect(value).toHaveValue('400 [W]');
 	await value.fill('450 [W]');
 	await value.press('Enter');
@@ -162,7 +162,7 @@ test('the inspector shows what an expression comes to, and why when it cannot', 
 }) => {
 	await openDemo(page);
 	const endurance = await select(page, 'endurance', 'attribute', 1, 'DroneArchitecture.sysml');
-	await expect(endurance.getByLabel(/^Value/)).toHaveValue(
+	await expect(endurance.getByRole('textbox', { name: /^Value \(/ })).toHaveValue(
 		'HoverEndurance(battery.usableEnergy, hoverPower)'
 	);
 	await expect(endurance.getByText('= 27.54 min')).toBeVisible({ timeout: 10_000 });

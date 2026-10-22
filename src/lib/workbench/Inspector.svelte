@@ -2,6 +2,7 @@
 	import type { Engine } from '#lib/engine/client.ts';
 	import type { Evaluated } from '#lib/engine/types.ts';
 	import { valueText } from '#lib/project/checks.ts';
+	import FeatureValues from './FeatureValues.svelte';
 	import PropertyForm from './PropertyForm.svelte';
 	import TradeSummary from './TradeSummary.svelte';
 	import { BookOpen, CircleAlert, Code, FileCode, Link2, Plus, Trash2 } from '@lucide/svelte';
@@ -37,8 +38,11 @@
 				if (inner) return inner;
 			}
 		};
-		return find(workspace.tree)?.children.map((c) => c.element) ?? [];
+		const all = find(workspace.tree)?.children.map((c) => c.element) ?? [];
+		// A usage's attributes are under Values, with their values.
+		return engine && !element.isDefinition ? all.filter((c) => c.kind !== 'attribute') : all;
 	});
+	let valueCount = $state(0);
 	/** Requirements this element satisfies (matched by name in `satisfy … by`). */
 	const satisfies = $derived(
 		element && !element.isDefinition
@@ -169,7 +173,7 @@
 			</form>
 			{#if engine}
 				{#key element.key}
-					<PropertyForm {element} {workspace} {engine} computed={valueOf(element)} />
+					<PropertyForm {element} {workspace} {engine} {ui} computed={valueOf(element)} />
 				{/key}
 			{/if}
 			<dl>
@@ -190,6 +194,15 @@
 
 		{#if engine && element.kind === 'analysis'}
 			<TradeSummary {element} {workspace} {ui} {engine} />
+		{/if}
+
+		{#if engine && !element.isDefinition}
+			<section aria-labelledby="values-heading" hidden={!valueCount}>
+				<h3 id="values-heading">Values</h3>
+				{#key element.key}
+					<FeatureValues {element} {workspace} {engine} {ui} oncount={(n) => (valueCount = n)} />
+				{/key}
+			</section>
 		{/if}
 
 		{#if requirement}
@@ -493,8 +506,6 @@
 	}
 	.issue,
 	.gap {
-		display: flex;
-		gap: var(--space-1);
 		color: var(--warn);
 	}
 	ul {

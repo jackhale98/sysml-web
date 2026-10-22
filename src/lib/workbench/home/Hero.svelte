@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { startedReading } from '#lib/markdown/DocumentView.svelte';
 	import { onMount } from 'svelte';
 	import { Compass, FileCode, Network, Search, Shapes, Timer } from '@lucide/svelte';
 	import type { ModelElement, TreeNode } from '#lib/project/elements.ts';
@@ -97,7 +98,8 @@
 				class="button primary"
 				onclick={() => ui.open({ kind: 'file', path: tourPath })}
 			>
-				<Compass size={18} aria-hidden="true" /> Start the tour
+				<Compass size={18} aria-hidden="true" />
+				{startedReading(tourPath) ? 'Continue the tour' : 'Start the tour'}
 			</button>
 		{/if}
 		<button

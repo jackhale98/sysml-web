@@ -13,6 +13,7 @@ export function toolkitEngine(toolkit: ToolkitClient): Engine {
 		analyze: (...params) => toolkit.call('analyze', ...params),
 		analyzeProject: (...params) => toolkit.call('analyzeProject', ...params),
 		elementDetails: (...params) => toolkit.call('elementDetails', ...params),
+		featureValues: (...params) => toolkit.call('featureValues', ...params),
 		highlight: (...params) => toolkit.call('highlight', ...params),
 		format: (...params) => toolkit.call('format', ...params),
 		complete: (...params) => toolkit.call('complete', ...params),
