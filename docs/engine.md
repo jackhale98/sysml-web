@@ -621,9 +621,10 @@ and back with no problems and the same 6,291 elements (by qualified name and
 element by element); comments, layout and ids don't survive the trip
 through JSON; values the text can't hold, unknown element types and
 unresolved references are reported, not carried. Export of the demo takes
-about 0.2 s in Node (the full form with derived properties 4.5 s), the
-import about 2 s; with the standard library 1.5 s more and 140 MB of
-WebAssembly memory, in its own worker.
+0.2–0.4 s in Node (the full form with derived properties 1.6–4 s), the
+import about 2 s; with the standard library about 6 s in the browser (a
+54 MB file, 97,826 elements) and 140 MB of WebAssembly memory, in its own
+worker.
 
 ## When the toolkit fails
 
@@ -845,4 +846,4 @@ Found while making model exchange (sysml-toolkit 0.10.10; `docs/interchange.md`)
 - **`toFullJsonStrict` refuses the demo** ("62442 unavailable properties",
   e.g. `definition`: "property has an incomplete derivation"), so the app's
   "derived properties" export uses `toFullJson(false)` (valid against the
-  schema, 12,340 elements, 4.5 s).
+  schema, 12,340 elements, 1.6–4 s on the demo).
