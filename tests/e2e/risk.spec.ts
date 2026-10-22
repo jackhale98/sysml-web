@@ -222,7 +222,11 @@ test('the demo’s worksheet keeps its figures in view beside the details, and f
 	);
 	await expectAccessible(page);
 	await toasts(page).getByRole('button', { name: 'Undo' }).last().click();
-	await expect(sheet.locator('td.problem')).toHaveCount(0, { timeout: 15_000 });
+	// What stays flagged is the demo's review item: the camera's line.
+	await expect(sheet.locator('td.problem')).toHaveCount(2, { timeout: 15_000 });
+	await expect(
+		sheet.locator('tbody tr').filter({ hasText: 'Thermal runaway' }).locator('td.problem')
+	).toHaveCount(0);
 });
 
 test.describe('on a phone', () => {

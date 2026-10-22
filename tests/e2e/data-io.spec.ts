@@ -134,11 +134,11 @@ test('requirements import from a CSV file in one undoable change', async ({ page
 	await expect(table.getByRole('row').filter({ hasText: 'SYS-103' })).toContainText(
 		'Parcel temperature'
 	);
-	await expect(page.getByRole('button', { name: /^Requirements/ }).first()).toContainText('23');
+	await expect(page.getByRole('button', { name: /^Requirements/ }).first()).toContainText('27');
 
 	await page.getByRole('button', { name: 'Undo' }).click();
 	await expect(table.getByRole('button', { name: 'SYS-101' })).toBeHidden({ timeout: 10_000 });
-	await expect(page.getByRole('button', { name: /^Requirements/ }).first()).toContainText('20');
+	await expect(page.getByRole('button', { name: /^Requirements/ }).first()).toContainText('24');
 	await page.getByRole('tab', { name: 'Files' }).click();
 	await expect(page.getByRole('button', { name: /Imported\.sysml/ })).toHaveCount(0);
 });
