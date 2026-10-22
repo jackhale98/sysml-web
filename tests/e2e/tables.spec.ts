@@ -66,7 +66,8 @@ test('a standard table renders from the bundled view library', async ({ page }) 
 	await openDemo(page);
 	await views(page).getByRole('button', { name: 'Trace matrix' }).click();
 	const table = page.getByRole('region', { name: 'Trace matrix view' });
-	await expect(table.getByText('12 rows')).toBeVisible({ timeout: 15_000 });
-	await expect(table.getByRole('columnheader', { name: 'drone.payloadRelease' })).toBeVisible();
+	// Every requirement is a row, linked or not; the columns are named in words.
+	await expect(table.getByText('20 rows')).toBeVisible({ timeout: 15_000 });
+	await expect(table.getByRole('columnheader', { name: 'Payload release (drone)' })).toBeVisible();
 	await expectAccessible(page);
 });
