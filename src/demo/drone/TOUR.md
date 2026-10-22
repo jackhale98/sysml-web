@@ -56,6 +56,8 @@ flows. In `DroneArchitecture::drone`, see how power, commands and sensor signals
 connected, and in `DroneComponents::Rotor` how `bind` passes a port through to a
 nested part.
 Diagram: **`DroneViews::droneInterconnection`**.
+To put a diagram in a document or on a slide, use **Export** in its toolbar: SVG
+for documents, PNG for slides, or copy it straight to the clipboard.
 
 ## 7. The mission: `DeliveryMission::DeliverParcel` and `DeliveryMission::DeliveryFlight`
 

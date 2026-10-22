@@ -17,7 +17,8 @@ Open-MBEE sysml-toolkit engine (decision #16, migration done).**
   export; projects in the browser, folders, `.kpar`/zip; GitHub source
   control; state machine emulator; mass and power budgets and constraint
   checks (does the design meet its requirements?); trade studies compared
-  in a table and summed up in the inspector; library browser; settings; offline and
+  in a table and summed up in the inspector; diagram export (SVG, PNG,
+  clipboard); library browser; settings; offline and
   installable; touch-first phone layout. Lighthouse ≥ 0.9 performance and
   1.0 accessibility on mobile and desktop, enforced in CI.
 - Not yet started: semantic diff and review mode, Sequence view, FMEA and
@@ -336,6 +337,15 @@ Rendering: Svelte Flow for interaction (selection, drag, connect handles,
 minimap, viewport) with hand-built SVG node components faithful to the book's
 notation; elkjs in a worker for layered layout and orthogonal edge routing.
 Export to SVG/PNG/PDF with resolved theme colours (sysml-studio's PNG bug).
+*Done* for SVG and PNG (`src/lib/diagram/export/`): every diagram's toolbar
+has **Export** — SVG for documents, PNG at 2× for slides (white or
+transparent), or either copied to the clipboard; the share sheet on phones.
+The SVG is generated from the graph and the on-screen geometry as plain
+`<rect>`/`<path>`/`<text>` with inline colours, inside the SysML diagram
+frame — no CSS, `<foreignObject>`, `<marker>` or external references, so it
+opens the same in browsers, Inkscape and Office. Light by default, or dark as
+on screen. The PNG is that SVG rasterised with the app's fonts embedded. PDF
+export is not built yet.
 
 ### 5.3 Visual editing
 
