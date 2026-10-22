@@ -15,7 +15,8 @@
 		Gauge,
 		Link2,
 		Plus,
-		Trash2
+		Trash2,
+		X
 	} from '@lucide/svelte';
 	import { conceptFor } from '#lib/learn/concepts.ts';
 	import KindGlyph from '#lib/ui/KindGlyph.svelte';
@@ -25,7 +26,10 @@
 	import { humanize, statusLabel } from '#lib/project/status.ts';
 	import type { Workspace } from '#lib/project/workspace.svelte.ts';
 	import Pill from '#lib/ui/Pill.svelte';
-	import { addElement, deleteElement, renameElement } from './actions.ts';
+	import { addElement, applySteps, deleteElement, renameElement } from './actions.ts';
+	import { ownersOf } from '#lib/diagram/model.ts';
+	import { planLinkRemoval } from '#lib/diagram/relationships.ts';
+	import { toasts } from '#lib/ui/toasts.svelte.ts';
 	import AddForm from './AddForm.svelte';
 	import { canOwnMembers } from './templates.ts';
 	import type { WorkbenchUi } from './ui.svelte.ts';
@@ -63,6 +67,20 @@
 		}
 		const name = by.split('.').pop() ?? by;
 		return workspace.elements.find((e) => e.label === name && !e.isDefinition);
+	}
+
+	/** Take a satisfy or verify statement out of the model (one undoable step, with a toast). */
+	async function unlink(kind: 'satisfy' | 'verify', by: string) {
+		if (!element) return;
+		const plan = planLinkRemoval(kind, element, by, {
+			elements: workspace.elements,
+			owners: ownersOf(workspace.tree),
+			textOf: (path) => workspace.text(path),
+			analyses: Object.values(workspace.analyses)
+		});
+		const error =
+			typeof plan === 'string' ? plan : await applySteps(workspace, plan.label, plan.steps);
+		if (error) toasts.show(error, { tone: 'error' });
 	}
 
 	/** Requirements this element satisfies (matched by name in `satisfy … by`). */
@@ -135,7 +153,7 @@
 </script>
 
 <!-- What satisfies or verifies the requirement, as a link to it when the model resolved it. -->
-{#snippet traced(by: string)}
+{#snippet traced(by: string, kind: 'satisfy' | 'verify')}
 	{@const target = traceTarget(by)}
 	{#if target}
 		<button type="button" class="link" onclick={() => ui.select(target.key, 'inspector')}>
@@ -144,6 +162,19 @@
 		</button>
 	{:else}
 		<Link2 size={13} aria-hidden="true" /> {by}
+	{/if}
+	{#if engine && element}
+		<button
+			type="button"
+			class="unlink"
+			aria-label={kind === 'satisfy'
+				? `${by} no longer satisfies it: remove the link`
+				: `${by} no longer verifies it: remove the link`}
+			title="Remove this link"
+			onclick={() => void unlink(kind, by)}
+		>
+			<X size={14} aria-hidden="true" />
+		</button>
 	{/if}
 {/snippet}
 
@@ -273,7 +304,9 @@
 				<h4>Satisfied by</h4>
 				{#if requirement.satisfiedBy.length}
 					<ul class="links">
-						{#each requirement.satisfiedBy as by (by)}<li>{@render traced(by)}</li>{/each}
+						{#each requirement.satisfiedBy as by (by)}<li>
+								{@render traced(by, 'satisfy')}
+							</li>{/each}
 					</ul>
 				{:else}
 					<p class="gap">Nothing in the design satisfies this yet.</p>
@@ -290,7 +323,7 @@
 				<h4>Verified by</h4>
 				{#if requirement.verifiedBy.length}
 					<ul class="links">
-						{#each requirement.verifiedBy as by (by)}<li>{@render traced(by)}</li>{/each}
+						{#each requirement.verifiedBy as by (by)}<li>{@render traced(by, 'verify')}</li>{/each}
 					</ul>
 				{:else}
 					<p class="gap">No test verifies this yet.</p>
@@ -594,6 +627,28 @@
 		padding: 0;
 		display: grid;
 		gap: var(--space-1);
+	}
+	.unlink {
+		display: inline-grid;
+		place-items: center;
+		width: 1.75rem;
+		height: 1.75rem;
+		margin-left: auto;
+		padding: 0;
+		border: 0;
+		border-radius: var(--radius-sm);
+		background: none;
+		color: var(--text-3);
+		cursor: pointer;
+	}
+	.unlink:hover,
+	.unlink:focus-visible {
+		background: var(--surface-hover);
+		color: var(--danger);
+	}
+	.phone .unlink {
+		width: 2.75rem;
+		height: 2.75rem;
 	}
 	.links li {
 		display: flex;

@@ -219,7 +219,7 @@ test('the inspector goes to the definition of a type', async ({ page }) => {
 test('a requirement links to what satisfies and verifies it', async ({ page }) => {
 	await openDemo(page);
 	const requirement = await select(page, 'Flight endurance');
-	await requirement.getByRole('button', { name: 'enduranceFlightTest' }).click();
+	await requirement.getByRole('button', { name: 'enduranceFlightTest', exact: true }).click();
 	await expect(requirement.getByRole('heading', { level: 2 })).toHaveText(/\benduranceFlightTest$/);
 	const again = await select(page, 'Flight endurance');
 	await again.getByRole('button', { name: 'drone', exact: true }).click();
@@ -260,4 +260,31 @@ test('a requirement gets what satisfies it and a new test from the inspector', a
 	await expect(requirement.getByRole('button', { name: 'deliveryDemo', exact: true })).toBeHidden({
 		timeout: 15_000
 	});
+});
+
+test('a link to what satisfies or verifies a requirement can be removed, and put back', async ({
+	page
+}) => {
+	await openDemo(page);
+	const requirement = await select(page, 'Flight endurance');
+	await requirement
+		.getByRole('button', { name: 'drone no longer satisfies it: remove the link' })
+		.click();
+	await expect(toasts(page)).toContainText('drone no longer satisfies Flight endurance');
+	await expect(requirement).toContainText('Nothing in the design satisfies this yet.', {
+		timeout: 15_000
+	});
+	await requirement
+		.getByRole('button', { name: 'enduranceFlightTest no longer verifies it: remove the link' })
+		.click();
+	await expect(requirement).toContainText('No test verifies this yet.', { timeout: 15_000 });
+	await expect(page.getByRole('button', { name: /^Problems/ })).not.toContainText(/[1-9] error/);
+
+	await toasts(page).getByRole('button', { name: 'Undo' }).last().click();
+	await expect(
+		requirement.getByRole('button', { name: 'enduranceFlightTest', exact: true })
+	).toBeVisible({
+		timeout: 15_000
+	});
+	await expectAccessible(page);
 });
