@@ -11,6 +11,7 @@
 		Ellipsis,
 		FileCode,
 		GitBranch,
+		GitCompareArrows,
 		Info,
 		LayoutDashboard,
 		ListChecks,
@@ -52,6 +53,7 @@
 	import TabIcon from '#lib/mobile/TabIcon.svelte';
 	import ViewsCatalog from '#lib/mobile/ViewsCatalog.svelte';
 	import ViewsDrawer from '#lib/mobile/ViewsDrawer.svelte';
+	import { reviewMarks } from '#lib/review/marks.svelte.ts';
 
 	let {
 		workspace,
@@ -78,6 +80,14 @@
 	const loadEmulator = () => import('#lib/sim/StateEmulator.svelte').then((m) => m.default);
 	const loadLibraryFile = () => import('./LibraryFile.svelte').then((m) => m.default);
 	const loadReport = () => import('#lib/reports/ReportView.svelte').then((m) => m.default);
+	const loadReview = () => import('#lib/review/ReviewView.svelte').then((m) => m.default);
+
+	// Review mode lasts while its tab is open, and ends with the page.
+	$effect(() => {
+		if (reviewMarks.active && !ui.tabs.some((t) => t.kind === 'review'))
+			untrack(() => reviewMarks.end());
+	});
+	$effect(() => () => reviewMarks.end());
 
 	// Deep link: `#emulate=Package::Machine` opens the emulator once the model is read.
 	$effect(() => {
@@ -276,6 +286,7 @@
 				onopensettings={() => (ui.settingsOpen = true)}
 				onopensourcecontrol={() => (ui.sourceControlOpen = true)}
 				onimportrequirements={() => (ui.importOpen = true)}
+				onreview={() => ui.open({ kind: 'review' })}
 			/>
 		{:else}
 			<div class="project"><strong>{workspace.info?.name ?? 'Project'}</strong></div>
@@ -402,6 +413,7 @@
 									{:else if t.kind === 'view'}<Eye size={14} />
 									{:else if t.kind === 'emulator'}<Play size={14} />
 									{:else if t.kind === 'library'}<BookLock size={14} />
+									{:else if t.kind === 'review'}<GitCompareArrows size={14} />
 									{:else}<FileCode size={14} />{/if}
 									<span>{tabTitle(t)}</span>
 									{#if t.kind === 'file' && workspace.dirty.has(t.path)}<span
@@ -508,6 +520,12 @@
 							<StateEmulator machine={tab.machine} {workspace} {ui} {engine} />
 						{/await}
 					{/key}
+				{:else if tab.kind === 'review'}
+					{#await loadReview()}
+						<p class="empty">Loading the review…</p>
+					{:then ReviewView}
+						<ReviewView {workspace} {ui} {engine} {session} />
+					{/await}
 				{:else if tab.kind === 'library'}
 					{#key tab.path}
 						{#await loadLibraryFile()}
@@ -647,7 +665,12 @@
 	{/if}
 	{#if session && sourceControlPrimed}
 		{#await import('#lib/git/SourceControl.svelte') then { default: SourceControl }}
-			<SourceControl {session} {engine} bind:open={ui.sourceControlOpen} />
+			<SourceControl
+				{session}
+				{engine}
+				bind:open={ui.sourceControlOpen}
+				onreview={() => ui.open({ kind: 'review' })}
+			/>
 		{/await}
 	{/if}
 	{#if settingsPrimed}

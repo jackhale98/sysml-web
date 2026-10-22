@@ -12,6 +12,10 @@ export interface SysmlNodeData extends Record<string, unknown> {
 	elementKey: string | null;
 	/** The element's name for display, which the label may decorate (`drone : DeliveryDrone`). */
 	name: string | null;
+	/** The toolkit's id of the element, when it is in the model. */
+	elementId?: string | null;
+	/** In review mode: the element is new or changed since the version compared with. */
+	review?: 'added' | 'changed' | null;
 }
 
 export interface SysmlEdgeData extends Record<string, unknown> {
