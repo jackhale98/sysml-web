@@ -17,6 +17,7 @@
 	} from '@lucide/svelte';
 	import { nameOf } from '#lib/project/filenames.ts';
 	import { isLibraryFile, type Workspace } from '#lib/project/workspace.svelte.ts';
+	import EmptyState from '#lib/ui/EmptyState.svelte';
 	import SheetDialog from '#lib/ui/SheetDialog.svelte';
 	import type { WorkbenchUi } from '../ui.svelte.ts';
 
@@ -197,6 +198,17 @@
 			<Plus size={13} aria-hidden="true" /> New file
 		</button>
 	</div>
+	{#if !folders.length}
+		<EmptyState
+			compact
+			title="No SysML files yet"
+			actions={[
+				{ label: 'New file', primary: true, run: () => (ui.fileRequest = { kind: 'new' }) }
+			]}
+		>
+			A model is one or more <code>.sysml</code> files; packages in one can import from the others.
+		</EmptyState>
+	{/if}
 	<ul class="flat" aria-labelledby="{uid}-heading">
 		{#each folders as [folder, paths] (folder)}
 			{#if folder && isLibraryFile(`${folder}/`)}
