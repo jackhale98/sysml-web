@@ -17,6 +17,9 @@ async function expectAccessible(page: Page) {
 	expect(violations).toEqual([]);
 }
 
+// Each test analyses two versions of the demo (and edits one): more than the default 30 s on a busy machine.
+test.describe.configure({ timeout: 90_000 });
+
 const ROOT = resolve(import.meta.dirname, '../../src/demo/drone');
 
 /** The demo's files, as the app bundles them. */
