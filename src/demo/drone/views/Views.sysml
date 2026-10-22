@@ -103,6 +103,14 @@ package DroneViews {
         doc /* Which requirements are satisfied by the design and verified, and which are not yet. */
     }
 
+    view traceMatrix : TraceMatrix {
+        doc /* Every requirement down the side, the parts of the design that satisfy it across the top. */
+    }
+
+    view verificationMatrix : VerificationMatrix {
+        doc /* Every requirement down the side, the tests that check it across the top. */
+    }
+
     view fmeaWorksheet : FmeaWorksheet {
         doc /* The design FMEA as a table, highest risk priority first. */
     }
