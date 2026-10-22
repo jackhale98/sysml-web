@@ -57,8 +57,11 @@
 
 	$effect(() => {
 		if (!dialog) return;
-		if (open && !dialog.open) dialog.showModal();
-		else if (!open && dialog.open) dialog.close();
+		if (open && !dialog.open) {
+			dialog.showModal();
+			// Start at the question, so Tab goes on to its choices.
+			void tick().then(() => heading?.focus());
+		} else if (!open && dialog.open) dialog.close();
 	});
 
 	async function go(to: number) {

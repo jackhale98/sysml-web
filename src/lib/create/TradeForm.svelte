@@ -139,7 +139,8 @@
 			const better = guessBetter(f.name);
 			const range = rangeOf(valuesOf(f.name, unit), better);
 			next[f.name] = {
-				include: !!range && shared.length <= 4,
+				// The first three that tell the alternatives apart, to start with.
+				include: !!range && Object.values(next).filter((c) => c.include).length < 3,
 				better,
 				weight: 50,
 				unit,
@@ -401,13 +402,13 @@
 </CreateDialog>
 
 <style>
-	.criterion {
+	fieldset.criterion.criterion {
 		padding: var(--space-3);
-		border: 1px solid var(--border-strong) !important;
+		border: 1px solid var(--border-strong);
 		border-radius: var(--radius-md);
 	}
-	.criterion.off {
-		border-style: dashed !important;
+	fieldset.criterion.criterion.off {
+		border-style: dashed;
 	}
 	.head {
 		flex-wrap: wrap;

@@ -130,7 +130,12 @@
 		return from?.features.find((f) => f.name === chosen)?.evaluated ?? attribute?.evaluated ?? null;
 	});
 	const units = $derived(
-		unitChoices(attribute?.valueType ?? null, current?.kind === 'number' ? current.unit : null)
+		unitChoices(
+			attribute?.valueType ?? null,
+			current?.kind === 'number' && current.unit
+				? readable({ value: current.value, unit: current.unit }).unit
+				: null
+		)
 	);
 	$effect(() => {
 		if (!units.includes(unit)) unit = units[0] ?? '';

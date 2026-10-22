@@ -34,7 +34,7 @@
 	import { flatten, qualifiedName } from './model';
 	import ModelPicker from './ModelPicker.svelte';
 	import { librariesWrite, partsOf, planView, viewNameOf, viewNames } from './plans';
-	import { words } from './sysml';
+	import { sentenceCase, words } from './sysml';
 	import {
 		GROUP_TITLES,
 		VIEW_KINDS,
@@ -117,8 +117,9 @@
 	// A fresh name for the kind, until the person types one.
 	$effect(() => {
 		if (!kind || titleEdited) return;
-		let candidate = kind.title;
-		for (let i = 2; taken.has(viewNameOf(candidate)); i++) candidate = `${kind.title} ${i}`;
+		const base = kind.budget ? sentenceCase(`${words(budgetOf)} budget`) : kind.title;
+		let candidate = base;
+		for (let i = 2; taken.has(viewNameOf(candidate)); i++) candidate = `${base} ${i}`;
 		title = candidate;
 	});
 

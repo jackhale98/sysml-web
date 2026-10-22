@@ -12,7 +12,13 @@ import { packageName } from '#lib/project/sources.ts';
 import { isLibraryFile, type Workspace } from '#lib/project/workspace.svelte.ts';
 import { applySteps, type WriteStep } from '#lib/workbench/actions.ts';
 import { enclosingPackage, qualifiedName } from './model';
-import { References, docComment, uniqueName, withImports } from './sysml';
+import {
+	References,
+	docComment,
+	imports as importsAlready,
+	uniqueName,
+	withImports
+} from './sysml';
 
 export interface Write {
 	/** New files: the path asked for (made unique) and the text. */
@@ -57,6 +63,18 @@ export function stepsOf(workspace: Workspace, write: Write): WriteStep[] | strin
 	for (const m of write.members ?? [])
 		steps.push({ kind: 'member', path: m.parent.file, parent: m.parent, text: m.text });
 	return steps;
+}
+
+/** The imports a package still needs of `targets` (those its text doesn't import yet). */
+export function importsFor(
+	workspace: Workspace,
+	pkg: ModelElement,
+	targets: readonly string[]
+): { pkg: ModelElement; targets: string[] }[] {
+	const text = workspace.text(pkg.file) ?? '';
+	const own = text.slice(pkg.span.from ?? 0, pkg.span.to ?? text.length);
+	const missing = [...new Set(targets)].filter((t) => !importsAlready(own, t));
+	return missing.length ? [{ pkg, targets: missing }] : [];
 }
 
 /** Apply a write as one undoable change, confirmed by a toast with Undo. */
@@ -145,7 +163,7 @@ export function viewWrite(
 	const texts = views(spell);
 	if (pkg)
 		return {
-			imports: [{ pkg, targets: refs.imports }],
+			imports: importsFor(workspace, pkg, refs.imports),
 			members: texts.map((text) => ({ parent: pkg, text: `\n${text}` }))
 		};
 	const name = uniqueName(

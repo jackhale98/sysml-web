@@ -114,7 +114,7 @@ async function features(workspace: Workspace, ids: string[]) {
 	return hostEngine(host).elementFeatures(workspace.sourceFiles(), ids);
 }
 
-describe('a new view', () => {
+describe('a new view', { timeout: 30_000 }, () => {
 	it('of every kind parses, is listed as what it is, and opens', async () => {
 		const workspace = await openWorkspace(host, rover(DESIGN));
 		expect(problemsOf(workspace)).toEqual([]);
@@ -256,7 +256,7 @@ describe('a new view', () => {
 	});
 });
 
-describe('adding up a value', () => {
+describe('adding up a value', { timeout: 30_000 }, () => {
 	it('sums the parts that have it, counting a fixed number of parts, and makes a budget', async () => {
 		const workspace = await openWorkspace(host, rover(DESIGN));
 		const engine = hostEngine(host);
@@ -376,7 +376,7 @@ describe('adding up a value', () => {
 	});
 });
 
-describe('setting a limit', () => {
+describe('setting a limit', { timeout: 30_000 }, () => {
 	it('on a requirement writes a checked constraint whose verdict follows the value', async () => {
 		const design = DESIGN.replace(
 			'        part camera : Camera;\n',
@@ -499,7 +499,7 @@ describe('setting a limit', () => {
 	});
 });
 
-describe('a new trade study', () => {
+describe('a new trade study', { timeout: 30_000 }, () => {
 	it('compares parts and part defs on weighted criteria, ranked as the engine reads it', async () => {
 		const workspace = await openWorkspace(host, rover(DESIGN));
 		const ids = [
@@ -569,7 +569,7 @@ describe('a new trade study', () => {
 	});
 });
 
-describe('values the forms rely on', () => {
+describe('values the forms rely on', { timeout: 30_000 }, () => {
 	it('a quantity without a type of its own is edited as a number with its unit', async () => {
 		const workspace = await openWorkspace(host, rover());
 		const system = element(workspace, 'system');

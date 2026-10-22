@@ -10,6 +10,7 @@ import { isLibraryFile, type Workspace } from '#lib/project/workspace.svelte.ts'
 import { viewTitle } from '#lib/workbench/views.ts';
 import {
 	freePath,
+	importsFor,
 	merge,
 	missingLibraries,
 	takenNames,
@@ -174,7 +175,7 @@ export function planRollup(
 				}
 			]
 		});
-	if (pkg && refs.imports.length) writes.push({ imports: [{ pkg, targets: refs.imports }] });
+	if (pkg) writes.push({ imports: importsFor(workspace, pkg, refs.imports) });
 	let open: Plan['open'];
 	if (input.budget && !input.element.isDefinition) {
 		const name = uniqueName(viewNameOf(input.budget.title), viewNames(workspace));
@@ -296,7 +297,7 @@ export function planLimit(workspace: Workspace, input: LimitInput): Plan {
 		label = `${r.shortName ? `${r.shortName} ` : ''}${r.label} now checks ${comparisons(feature, input.limit).join(' and ')}`;
 	}
 	const write: Write = {
-		...(pkg && refs.imports.length ? { imports: [{ pkg, targets: refs.imports }] } : {}),
+		...(pkg ? { imports: importsFor(workspace, pkg, refs.imports) } : {}),
 		members
 	};
 	return { write, preview: previewOf(write), label };

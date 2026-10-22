@@ -415,6 +415,39 @@ toolkit's `conforms`).
 - **Cost on the demo in Node**: about 60 ms for the study the first time in
   an analysis (the first `query` warms the toolkit up), then cached.
 
+## Guided forms
+
+The forms that make views, roll-ups, limits and trade studies
+(`src/lib/create/`) write standard SysML through the edit actions; the
+engine tells them about the model with `EngineApi.elementFeatures(files,
+ids)` (`toolkit/views/features.ts`):
+
+- **What an element is one of**: its type (a usage) or itself (a
+  definition), with their supertypes, from the model adapter's records
+  (`ViewContext.supers`). A trade study's alternatives are compared by it.
+- **How to refer to it** from another package: the outermost element a
+  package owns is imported and the rest is a feature chain
+  (`drone.battery`), or a membership path through a definition or a
+  variation (`batteryOptions::lithiumPolymer`).
+- **Its features**: its own, then those its type, specializations and
+  subsetted usages give it (nearest first), each with its value as written,
+  its multiplicity, whether it is a `ref` or a `variation`, where it is
+  first declared, and, for an attribute, its value evaluated in the element
+  (`Evaluation.valueAt`) and its value type. The value type is the toolkit's
+  derived `type` of the attribute's declaration (`mass :> ISQ::mass` is a
+  `MassValue`; `typings` is empty for a feature that only subsets one), which
+  costs a derivation pass the first time in a session (~180 ms on the demo in
+  Node); it is read only for attributes and cached per analysis.
+
+What the forms write is tested by applying each form's plan to a new
+project on the real toolkit, through the workspace as the app does
+(`create/create.test.ts`): no new problems, and the values, verdicts and
+rankings the views then show. Roll-ups follow the toolkit's semantics: a
+fixed number of parts not given one by one is added with `sum(wheels.mass)`
+(the app adds it up while the toolkit leaves it undecided, request 2); a
+collection bound to named parts with `collect` (request 3); parts that are
+also counted where they are owned are left out.
+
 ## Comparing versions (semantic diff)
 
 `EngineApi.compareModels(base, current)` says what changed between two
@@ -621,3 +654,18 @@ Found while making the Sequence view (sysml-toolkit 0.10.10):
   declares has no `memberExtent`, so the model adapter, which keeps the
   elements written in the text, has no record of it; `event
   m.sourceEvent;` without `then` has one.
+
+Found while making the guided forms (sysml-toolkit 0.10.10):
+
+- **A feature's types through subsetting, cheaply.** `typings` of
+  `attribute mass :> ISQ::mass` is empty; its types (`MassValue`) come only
+  from the derived `type` property, which costs a derivation pass over the
+  whole model the first time (~180 ms on the demo). The edit operations
+  (`setField`) classify a value by `typings`, so before this the app wrote
+  `30 [kg]` typed into such an attribute as a string; it now treats a number
+  with a unit as a quantity, and a quantity-subsetting attribute as a number.
+  A per-feature `types` read without the pass would let both use the model.
+- **`collect` over parts that a package owns directly** (`part w : W[2] =
+  (P::a, P::b)` with `a` and `b` declared in package `P`) is undecided, while
+  the same parts nested in a part give the sum; another case of request 6.
+
