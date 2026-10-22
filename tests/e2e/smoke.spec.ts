@@ -309,6 +309,22 @@ test.describe('on a phone', () => {
 		await expect(menu).toHaveAttribute('aria-expanded', 'false');
 	});
 
+	test('on a phone, a sheet opened again before its late close event stays open', async ({
+		page
+	}) => {
+		await openDemo(page);
+		await page.getByRole('button', { name: /Switch view$/ }).click();
+		const drawer = page.getByRole('dialog', { name: 'Views' });
+		await expect(drawer).toBeVisible();
+		// The close event is queued after close(): reopening in between must not be undone by it.
+		await drawer.evaluate((dialog: HTMLDialogElement) => {
+			dialog.close();
+			dialog.showModal();
+		});
+		await page.waitForTimeout(600);
+		await expect(drawer).toBeVisible();
+	});
+
 	test('on a phone, the views drawer switches views and tables show as cards', async ({ page }) => {
 		await openDemo(page);
 		await page.getByRole('button', { name: /Switch view$/ }).click();
