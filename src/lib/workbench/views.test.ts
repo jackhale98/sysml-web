@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ViewInfo } from '#lib/engine/types.ts';
-import { exposedName, presentationOf, viewTitle } from './views.ts';
+import { exposedName, groupViews, presentationOf, viewFamily, viewTitle } from './views.ts';
 
 const view = (over: Partial<ViewInfo>): ViewInfo => ({
 	name: 'v',
@@ -53,5 +53,35 @@ describe('names', () => {
 		expect(exposedName("P::'my part'::**")).toBe('my part');
 		expect(viewTitle('requirementCoverage')).toBe('Requirement coverage');
 		expect(viewTitle('RequirementGaps')).toBe('Requirement gaps');
+	});
+});
+
+describe('families', () => {
+	it('puts each saved view under a heading by its definition', () => {
+		const family = (definition: string | undefined, over: Partial<ViewInfo> = {}) =>
+			viewFamily(view({ ...(definition ? { definition } : {}), ...over }));
+		expect(family('RequirementsTable')).toBe('requirements');
+		expect(family('BillOfMaterials')).toBe('structure');
+		expect(family('InterconnectionView')).toBe('interfaces');
+		expect(family('StateTransitionView')).toBe('behaviour');
+		expect(family('MassBudget')).toBe('analysis');
+		expect(family('FmeaWorksheet')).toBe('risk');
+		expect(family('SpecificationDocument')).toBe('documents');
+		expect(family(undefined, { name: 'priceBudget', hasTable: true })).toBe('analysis');
+		expect(family('Whatever')).toBe('other');
+	});
+
+	it('groups in order and leaves out empty groups', () => {
+		const views = [
+			view({ name: 'a', definition: 'MassBudget' }),
+			view({ name: 'b', definition: 'GeneralView' }),
+			view({ name: 'c', definition: 'RequirementGaps' }),
+			view({ name: 'd', definition: 'GeneralView' })
+		];
+		expect(groupViews(views, (v) => v).map((g) => [g.title, g.views.map((v) => v.name)])).toEqual([
+			['Requirements', ['c']],
+			['Structure', ['b', 'd']],
+			['Budgets & analysis', ['a']]
+		]);
 	});
 });

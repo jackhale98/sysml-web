@@ -74,7 +74,9 @@
 	let sourceControlPrimed = $state(false);
 	let settingsPrimed = $state(false);
 	let importPrimed = $state(false);
+	let createPrimed = $state(false);
 	$effect(() => {
+		if (ui.create) createPrimed = true;
 		if (ui.paletteOpen) palettePrimed = true;
 		if (ui.sourceControlOpen) sourceControlPrimed = true;
 		if (ui.settingsOpen) settingsPrimed = true;
@@ -687,6 +689,11 @@
 		{/await}
 	{/if}
 
+	{#if createPrimed}
+		{#await import('#lib/create/CreateHost.svelte') then { default: CreateHost }}
+			<CreateHost {workspace} {ui} {engine} />
+		{/await}
+	{/if}
 	{#if phone}
 		<div class="bar">
 			<MobileNav

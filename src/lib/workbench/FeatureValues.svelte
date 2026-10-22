@@ -3,6 +3,7 @@
 	import type { FeatureValue } from '#lib/engine/types.ts';
 	import type { ModelElement } from '#lib/project/elements.ts';
 	import type { Workspace } from '#lib/project/workspace.svelte.ts';
+	import { Gauge, Sigma } from '@lucide/svelte';
 	import { toasts } from '#lib/ui/toasts.svelte.ts';
 	import { setField } from './actions.ts';
 	import CellEditor from './CellEditor.svelte';
@@ -84,6 +85,13 @@
 		if (error) toasts.show(error, { tone: 'error' });
 	}
 
+	/** Whether a value can be a number (to offer adding it up and limiting it). */
+	function numeric(v: FeatureValue): boolean {
+		if (v.edit && ['enum', 'enumList', 'longText'].includes(v.edit.kind)) return false;
+		const text = v.value?.trim() ?? '';
+		return !/^(".*"|true|false|\(?\s*[\w']+::[\w']+\s*\)?)$/s.test(text);
+	}
+
 	function open(v: FeatureValue) {
 		const own = v.elementId ? workspace.elements.find((e) => e.id === v.elementId) : undefined;
 		if (own) ui.select(own.key, 'inspector');
@@ -96,8 +104,30 @@
 			{@const text = shown(v)}
 			<div class="row" class:inherited={!v.own}>
 				<dt>
-					{v.name}
-					{#if !v.own && v.declaredBy}<small>from {v.declaredBy}</small>{/if}
+					<span class="dt-name">
+						{v.name}
+						{#if !v.own && v.declaredBy}<small>from {v.declaredBy}</small>{/if}
+					</span>
+					{#if numeric(v)}
+						<button
+							type="button"
+							class="act"
+							aria-label="Add up {v.name} over the parts of {element.label}"
+							title="Add up over its parts"
+							onclick={() =>
+								(ui.create = { kind: 'rollup', element: element.key, attribute: v.name })}
+							><Sigma size={14} aria-hidden="true" /></button
+						>
+						<button
+							type="button"
+							class="act"
+							aria-label="Set a limit on {v.name} of {element.label}"
+							title="Set a limit"
+							onclick={() =>
+								(ui.create = { kind: 'limit', element: element.key, attribute: v.name })}
+							><Gauge size={14} aria-hidden="true" /></button
+						>
+					{/if}
 				</dt>
 				<dd>
 					{#if editing === v.name && v.edit}
@@ -145,6 +175,38 @@
 	dt {
 		color: var(--text-2);
 		font-size: var(--text-sm);
+	}
+	dt {
+		display: flex;
+		align-items: center;
+		gap: 2px;
+	}
+	.dt-name {
+		flex: 1;
+		min-width: 0;
+	}
+	.act {
+		display: grid;
+		flex: none;
+		place-items: center;
+		width: 1.75rem;
+		height: 1.75rem;
+		border: 0;
+		border-radius: var(--radius-sm);
+		background: transparent;
+		color: var(--text-3);
+		cursor: pointer;
+	}
+	.act:hover,
+	.act:focus-visible {
+		background: var(--surface-hover);
+		color: var(--accent);
+	}
+	@media (pointer: coarse) {
+		.act {
+			width: 2.75rem;
+			height: 2.75rem;
+		}
 	}
 	dt small {
 		margin-left: var(--space-1);

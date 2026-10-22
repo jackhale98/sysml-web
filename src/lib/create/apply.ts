@@ -10,7 +10,7 @@ import type { DeclarationSet } from '#lib/engine/types.ts';
 import type { ModelElement } from '#lib/project/elements.ts';
 import { packageName } from '#lib/project/sources.ts';
 import { isLibraryFile, type Workspace } from '#lib/project/workspace.svelte.ts';
-import { applySteps, type EditStep } from '#lib/workbench/actions.ts';
+import { applySteps, type WriteStep } from '#lib/workbench/actions.ts';
 import { enclosingPackage, qualifiedName } from './model';
 import { References, docComment, uniqueName, withImports } from './sysml';
 
@@ -26,8 +26,8 @@ export interface Write {
 }
 
 /** The steps of a write, in the order they can be applied: files, imports, declarations, members. */
-export function stepsOf(workspace: Workspace, write: Write): EditStep[] | string {
-	const steps: EditStep[] = [];
+export function stepsOf(workspace: Workspace, write: Write): WriteStep[] | string {
+	const steps: WriteStep[] = [];
 	for (const f of write.files ?? []) steps.push({ kind: 'file', path: f.path, text: f.text });
 	// One patch per file, with every package's imports in it.
 	const byFile = new Map<string, { pkg: ModelElement; targets: string[] }[]>();
@@ -181,6 +181,20 @@ export async function viewReady(
 		await new Promise((r) => setTimeout(r, 80));
 	}
 	return false;
+}
+
+/**
+ * Open a new view once the analysis has it. Called before the form closes:
+ * the workspace and the UI are taken now, while the form still has them.
+ */
+export function openView(
+	workspace: Workspace,
+	ui: { open(tab: { kind: 'view'; name: string; title: string }): void },
+	view: { name: string; title: string }
+): Promise<void> {
+	return viewReady(workspace, view.name).then(() =>
+		ui.open({ kind: 'view', name: view.name, title: view.title })
+	);
 }
 
 /** Combine writes into one. */

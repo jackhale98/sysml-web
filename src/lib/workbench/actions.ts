@@ -162,9 +162,10 @@ export type EditStep =
 	| { kind: 'member'; path: string; parent: ModelElement; text: string }
 	| { kind: 'declaration'; path: string; element: ModelElement; set: DeclarationSet }
 	| { kind: 'remove'; path: string; element: ModelElement }
-	| { kind: 'patch'; path: string; before: string; after: string }
-	/** A new file of the project (undo removes it again). */
-	| { kind: 'file'; path: string; text: string };
+	| { kind: 'patch'; path: string; before: string; after: string };
+
+/** An edit step, or a new file of the project (undo removes it again). */
+export type WriteStep = EditStep | { kind: 'file'; path: string; text: string };
 
 /**
  * Apply edit steps as one undoable change, confirmed by a toast with Undo
@@ -174,7 +175,7 @@ export type EditStep =
 export async function applySteps(
 	workspace: Workspace,
 	label: string,
-	steps: EditStep[],
+	steps: WriteStep[],
 	check?: (path: string, before: string, after: string) => Promise<string | null>
 ): Promise<string | null> {
 	if (!steps.length) return 'Nothing to change.';

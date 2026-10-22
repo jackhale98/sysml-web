@@ -105,6 +105,11 @@ ${about}
   \`part def\` and \`part\` in the text. Text and diagrams are the same model.
 - **Traceability**: \`satisfy 'Requirement' by part;\` links the design to a
   requirement; the *Gaps* table shows what is not covered yet.
+- **More views**: **New view** (in the explorer's Views, or the search box)
+  makes a table, diagram, budget or report, saved in \`views/Views.sysml\`.
+- **Numbers**: on a value in the inspector, **Add up** sums it over a part's
+  parts and **Set a limit** writes a checked requirement. **New trade study**
+  compares alternatives on weighted criteria.
 
 Everything here is standard SysML v2 text, readable by any SysML v2 tool.
 `;

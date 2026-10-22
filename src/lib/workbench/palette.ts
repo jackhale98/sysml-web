@@ -5,7 +5,7 @@
 import type { ModelElement, TreeNode } from '#lib/project/elements.ts';
 import { keywordOf } from '#lib/ui/kinds.ts';
 import type { ViewInfo } from '#lib/engine/types.ts';
-import type { FileLayout, Tab } from './ui.svelte.ts';
+import type { CreateRequest, FileLayout, Tab } from './ui.svelte.ts';
 import { viewTitle } from './views.ts';
 
 /** A half-open `[start, end)` range of UTF-16 offsets into a string. */
@@ -42,7 +42,9 @@ export type PaletteAction =
 	| { type: 'toggle-inspector' }
 	| { type: 'show-problems' }
 	| { type: 'switch-theme' }
-	| { type: 'import-requirements' };
+	| { type: 'import-requirements' }
+	/** Open a guided form (`#lib/create`). */
+	| { type: 'create'; request: CreateRequest };
 
 export interface PaletteItem {
 	/** Unique across all groups. */
@@ -62,6 +64,8 @@ export interface PaletteItem {
 	isDefinition?: boolean;
 	/** Element from a library file. */
 	library?: boolean;
+	/** Only offered for a query, not in the list shown before typing. */
+	quiet?: boolean;
 	action: PaletteAction;
 }
 
@@ -340,21 +344,24 @@ export function machineItems(
 
 /** The model's own views (saved diagrams and tables) and the standard tables. */
 export function modelViewItems(views: readonly ViewInfo[]): PaletteItem[] {
-	return views
-		.filter((v) => (v.isUsage && !v.builtin) || (v.hasTable && !v.isUsage))
-		.map((v) => ({
-			id: `model-view:${v.qualifiedName ?? v.name}`,
-			group: 'views' as const,
-			label: viewTitle(v.name),
-			keyword: v.isUsage ? `view : ${v.definition ?? ''}` : 'standard table',
-			aliases: v.name,
-			kind: 'view',
-			isDefinition: !v.isUsage,
-			action: {
-				type: 'open' as const,
-				tab: { kind: 'view' as const, name: v.name, title: viewTitle(v.name) }
-			}
-		}));
+	return (
+		views
+			// The bare view defs (`BillOfMaterials`) are made into saved views with "New view: …".
+			.filter((v) => v.isUsage && !v.builtin && !v.file.startsWith('libraries/'))
+			.map((v) => ({
+				id: `model-view:${v.qualifiedName ?? v.name}`,
+				group: 'views' as const,
+				label: viewTitle(v.name),
+				keyword: `view : ${v.definition ?? ''}`,
+				aliases: v.name,
+				kind: 'view',
+				isDefinition: false,
+				action: {
+					type: 'open' as const,
+					tab: { kind: 'view' as const, name: v.name, title: viewTitle(v.name) }
+				}
+			}))
+	);
 }
 
 /** A general view per package, the busiest packages first. */
@@ -448,12 +455,40 @@ export function commandItems(themeChoice: string): PaletteItem[] {
 			{ aliases: 'diff compare semantic what changed version pull request' }
 		),
 		command(
+			'new-view',
+			'New view…',
+			{ type: 'create', request: { kind: 'view' } },
+			{ aliases: 'create add table diagram budget report saved view', kind: 'view' }
+		),
+		command(
+			'new-trade-study',
+			'New trade study…',
+			{ type: 'create', request: { kind: 'trade' } },
+			{ aliases: 'create compare alternatives options choose decision matrix weighted score' }
+		),
+		command(
 			'import-requirements',
 			'Import requirements…',
 			{ type: 'import-requirements' },
 			{ aliases: 'excel xlsx csv spreadsheet paste upload' }
 		)
 	];
+}
+
+/** "New view: Bill of materials", one per kind of view the form makes (offered for a query). */
+export function newViewItems(
+	kinds: readonly { id: string; label: string; description: string }[]
+): PaletteItem[] {
+	return kinds.map((k) => ({
+		id: `command:new-view:${k.id}`,
+		group: 'commands' as const,
+		label: `New view: ${k.label}`,
+		detail: k.description,
+		aliases: 'create add saved view',
+		kind: 'view',
+		quiet: true,
+		action: { type: 'create' as const, request: { kind: 'view' as const, viewKind: k.id } }
+	}));
 }
 
 /**
@@ -507,7 +542,10 @@ export function rank(items: readonly PaletteItem[], query: string): PaletteResul
 export function search(sources: PaletteSources, query: string): PaletteResult[] {
 	const q = query.trim();
 	if (!q) {
-		return [...sources.views.slice(0, DEFAULT_VIEWS), ...sources.commands].map((item) => ({
+		return [
+			...sources.views.slice(0, DEFAULT_VIEWS),
+			...sources.commands.filter((c) => !c.quiet)
+		].map((item) => ({
 			item,
 			match: null
 		}));

@@ -26,6 +26,7 @@
 	import { toasts } from '#lib/ui/toasts.svelte.ts';
 	import type { WorkbenchUi } from './ui.svelte.ts';
 	import { renameElement, setField, setTableColumns } from './actions.ts';
+	import ColumnChooser from './ColumnChooser.svelte';
 	import CellEditor from './CellEditor.svelte';
 	import TradeMatrix from './TradeMatrix.svelte';
 	import { viewTitle } from './views.ts';
@@ -297,13 +298,6 @@
 		columnsOpen = true;
 	}
 
-	function moveColumn(index: number, by: number) {
-		const next = [...columnChoice];
-		const [item] = next.splice(index, 1);
-		next.splice(index + by, 0, item!);
-		columnChoice = next;
-	}
-
 	async function applyColumns() {
 		if (!info) return;
 		const columns = columnChoice.filter((c) => c.shown).map((c) => c.field);
@@ -522,30 +516,7 @@
 								Saved in the view's <code>@TableRendering</code>, so the table stays part of the
 								model.
 							</p>
-							<ul>
-								{#each columnChoice as choice, i (choice.field)}
-									<li>
-										<label>
-											<input type="checkbox" bind:checked={choice.shown} />
-											{heading(choice.field)}
-										</label>
-										<button
-											type="button"
-											class="move"
-											aria-label="Move {heading(choice.field)} up"
-											disabled={i === 0}
-											onclick={() => moveColumn(i, -1)}><ArrowUp size={13} /></button
-										>
-										<button
-											type="button"
-											class="move"
-											aria-label="Move {heading(choice.field)} down"
-											disabled={i === columnChoice.length - 1}
-											onclick={() => moveColumn(i, 1)}><ArrowDown size={13} /></button
-										>
-									</li>
-								{/each}
-							</ul>
+							<ColumnChooser bind:choice={columnChoice} {heading} />
 							<div class="panel-buttons">
 								<button type="button" class="source" onclick={() => (columnsOpen = false)}
 									>Cancel</button
@@ -964,45 +935,6 @@
 	.panel-hint {
 		color: var(--text-2);
 		font-size: var(--text-xs);
-	}
-	.columns-panel ul {
-		display: grid;
-		gap: 2px;
-		max-height: 18rem;
-		margin: 0;
-		padding: 0;
-		overflow-y: auto;
-		list-style: none;
-	}
-	.columns-panel li {
-		display: flex;
-		align-items: center;
-		gap: 4px;
-	}
-	.columns-panel label {
-		display: flex;
-		flex: 1;
-		align-items: center;
-		gap: var(--space-2);
-		font-size: var(--text-sm);
-	}
-	.move {
-		display: grid;
-		place-items: center;
-		width: 1.75rem;
-		height: 1.75rem;
-		border: 0;
-		border-radius: var(--radius-sm);
-		background: transparent;
-		color: var(--text-2);
-		cursor: pointer;
-	}
-	.move:hover:not(:disabled) {
-		background: var(--surface-hover);
-	}
-	.move:disabled {
-		opacity: 0.35;
-		cursor: default;
 	}
 	.panel-buttons {
 		display: flex;

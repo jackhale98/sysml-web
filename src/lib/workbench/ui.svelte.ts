@@ -16,6 +16,17 @@ export type Tab =
 	/** What changed in the model since another version (review mode). */
 	| { kind: 'review' };
 
+/**
+ * A guided form to open (`#lib/create`): a new view (optionally of a kind,
+ * over an element), "add up this value" and "set a limit" on an element's
+ * attribute (or a requirement), or a new trade study.
+ */
+export type CreateRequest =
+	| { kind: 'view'; viewKind?: string; target?: string }
+	| { kind: 'rollup'; element: string; attribute: string }
+	| { kind: 'limit'; element: string; attribute?: string }
+	| { kind: 'trade'; alternatives?: string[] };
+
 export type SelectionSource = 'text' | 'diagram' | 'explorer' | 'inspector' | 'table';
 
 export interface Selection {
@@ -94,6 +105,8 @@ export class WorkbenchUi {
 	sourceControlOpen = $state(false);
 	/** The "import requirements from a spreadsheet" dialog (mounted by the host). */
 	importOpen = $state(false);
+	/** The guided form on show, if any (mounted by the host). */
+	create = $state.raw<CreateRequest | null>(null);
 
 	// ── Phone layout ──────────────────────────────────────────────────────────
 	#pane = $state<MobilePane>('home');

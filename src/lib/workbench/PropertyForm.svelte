@@ -1,7 +1,8 @@
 <script lang="ts">
 	import type { Engine } from '#lib/engine/client.ts';
 	import type { DeclarationSet, ElementDetails, Evaluated } from '#lib/engine/types.ts';
-	import { CornerDownRight } from '@lucide/svelte';
+	import { CornerDownRight, Gauge, Sigma } from '@lucide/svelte';
+	import { ownerOf } from '#lib/create/model.ts';
 	import { computedText } from '#lib/project/checks.ts';
 	import { elementAt, utf16ToByte, type ModelElement } from '#lib/project/elements.ts';
 	import type { Workspace } from '#lib/project/workspace.svelte.ts';
@@ -64,6 +65,12 @@
 		typed && ['port', 'attribute', 'item', 'part', 'ref'].includes(kind)
 	);
 	const hasValue = $derived(typed && ['attribute', 'ref', 'part', 'item'].includes(kind));
+	/** The part (or part def) an attribute belongs to: it can add the value up or limit it. */
+	const valueOwner = $derived.by(() => {
+		if (kind !== 'attribute' || isDef) return null;
+		const owner = ownerOf(workspace.tree, element.key);
+		return owner?.kind === 'part' ? owner : null;
+	});
 
 	const uid = $props.id();
 	const fileText = $derived(workspace.text(element.file) ?? '');
@@ -308,6 +315,24 @@
 						{/if}
 					</div>
 				{/if}
+				{#if ui && valueOwner}
+					<div class="value-actions">
+						<button
+							type="button"
+							onclick={() =>
+								(ui.create = { kind: 'rollup', element: valueOwner.key, attribute: element.name })}
+						>
+							<Sigma size={14} aria-hidden="true" /> Add up over its parts
+						</button>
+						<button
+							type="button"
+							onclick={() =>
+								(ui.create = { kind: 'limit', element: valueOwner.key, attribute: element.name })}
+						>
+							<Gauge size={14} aria-hidden="true" /> Set a limit
+						</button>
+					</div>
+				{/if}
 			{/if}
 		{:else if isDef}
 			<div class="field">
@@ -432,6 +457,35 @@
 		font-family: var(--font-mono);
 	}
 	/* What the value's expression comes to: quiet, under the field it explains. */
+	.value-actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--space-2);
+	}
+	.value-actions button {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-1);
+		min-height: 2rem;
+		padding: 0 var(--space-3);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-pill);
+		background: var(--surface);
+		color: var(--text-2);
+		font: inherit;
+		font-size: var(--text-xs);
+		font-weight: 600;
+		cursor: pointer;
+	}
+	.value-actions button:hover {
+		border-color: var(--accent);
+		color: var(--accent);
+	}
+	@media (pointer: coarse) {
+		.value-actions button {
+			min-height: 2.75rem;
+		}
+	}
 	.computed {
 		display: flex;
 		flex-wrap: wrap;

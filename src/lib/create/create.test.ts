@@ -568,3 +568,24 @@ describe('a new trade study', () => {
 		expect(workspace.text('analysis/MotorChoice.sysml')).toBeUndefined();
 	});
 });
+
+describe('values the forms rely on', () => {
+	it('a quantity without a type of its own is edited as a number with its unit', async () => {
+		const workspace = await openWorkspace(host, rover());
+		const system = element(workspace, 'system');
+		const [mass] = await hostEngine(host).featureValues(workspace.sourceFiles(), system.id!);
+		expect(mass).toMatchObject({ name: 'mass', edit: { field: 'feature:mass', kind: 'number' } });
+		const error = await analysed(workspace, async () => {
+			const { setField } = await import('#lib/workbench/actions.ts');
+			return setField(
+				workspace,
+				{ element: system.name, file: system.file, line: system.span.start_row, id: system.id! },
+				'feature:mass',
+				'30 [kg]',
+				'Set mass of system'
+			);
+		});
+		expect(error).toBeNull();
+		expect(workspace.text('model/Rover.sysml')).toContain(':>> mass = 30 [kg];');
+	});
+});
