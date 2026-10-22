@@ -802,48 +802,51 @@ Found while making the guided forms (sysml-toolkit 0.10.10):
   (P::a, P::b)` with `a` and `b` declared in package `P`) is undecided, while
   the same parts nested in a part give the sum; another case of request 6.
 
-Found while making model exchange (sysml-toolkit 0.10.10; `docs/interchange.md`):
+Found while making model exchange (sysml-toolkit 0.10.10; `docs/interchange.md`).
+Sorted by how sure we are, after re-checking each against the toolkit alone.
 
-- **The printer writes a decision's `else` branch as `transition then X;`**,
-  which an action body doesn't allow. `package P { action def A { attribute
-  x : ScalarValues::Boolean; first start; then decide; if x then b; else c;
-  action b; action c; } }` → `toCompactJson` → `fromInterchangeJson…` →
-  `units()` has `transition then c;`, and checking it gives "a transition
-  usage is not allowed in an action body". The app mends it to `else c;`.
-- **The printer writes a `message` as a `flow`.** `package Q { part def T;
-  occurrence def S { part a; part b; message m of T from a to b; } }` lifts
-  to `flow m  of : T  from a to b;`, which fails
-  `validateFlowEndSubsetting` ("A flow end must identify a participant's
-  payload feature using dot notation"). The app mends it to `message m of T
-  from a to b;`. (The printer also leaves double spaces around `of :` and
-  `connect`, which the app collapses.)
-- **`canonicalizeCompact` spells redefined properties as null.** KerML
-  10.4.5 says a property redefined under another name is written too, with
-  the redefining value; the canonical form writes `memberElement`,
-  `general`/`specific`, `subsettedFeature`/`subsettingFeature` and
-  `conjugatedPortDefinition` as `null`, which fails the OMG schema
-  (`SysML.json` requires an object). The app fills them in.
-- **Unresolved references serialize as `{"@ref": "Name"}`** in the compact
-  form, which is not KerML 10.4 (a reference is `{"@id"}`) and fails the
-  schema. An option to omit them, or to report them separately, would do;
-  the app leaves them out and lists them.
-- **No way to serialize the standard library with its ids.** Only user
-  units serialize. The app opens the library's sources as user units in a
-  second session (1.5 s, 140 MB) and maps each element to the prepared
-  library's by place. A `toCompactJson` over library units (or the prepared
-  library) would be cheaper and exact by construction.
-- **User-model ids come from the unit name, opaquely.** They are UUIDv5s,
-  but not KerML 9.1's `uuid5(NAMESPACE_URL, base + topLevelName)` /
-  `uuid5(topId, path())`, and a host can't give a base URI per unit. With
-  one, a project could keep its ids through file renames and keep a
-  server's ids after a round trip; the app matches by place instead.
-- **`minimizeQualifications` reverts some sites to `$::…`**: on the lifted
-  demo it respells 1,057 references and reverts 4, the `expose
-  $::DroneArchitecture::drone::**` lines of the saved views (a feature chain
-  `r.$::DroneComponents::Rotor::mass` also stays). The app writes `expose
-  A::…` when the re-checked model is the same, and its view reader accepts
-  `$::`.
-- **`toFullJsonStrict` refuses the demo** ("62442 unavailable properties",
-  e.g. `definition`: "property has an incomplete derivation"), so the app's
-  "derived properties" export uses `toFullJson(false)` (valid against the
-  schema, 12,340 elements, 1.6–4 s on the demo).
+**Confirmed bugs** — the toolkit's own printer writes text its own checker
+rejects, from a model its checker accepted (no app code in between; pinned
+by `interchange.test.ts` → "the toolkit printer (upstream bugs)"):
+
+- **A decision's `else` branch prints as `transition then X;`.** `package P {
+  action def A { attribute x : ScalarValues::Boolean; first start; then
+  decide; if x then b; else c; action b; action c; } }` (no findings) →
+  `toCompactJson` → `fromInterchangeJson…` → `units()` has `transition then
+  c;`, and checking that gives "a transition usage is not allowed in an
+  action body". The model is right (a guarded succession is a
+  `TransitionUsage`); the printer picks the state-machine spelling. The app
+  mends it to `else c;`.
+- **A `message` prints as a `flow`.** `package Q { part def T; occurrence
+  def S { part a; part b; message m of T from a to b; } }` (no findings)
+  prints `flow m  of : T  from a to b;`, which fails
+  `validateFlowEndSubsetting`. The app mends it to `message m of T from a to
+  b;` and collapses the double spaces.
+
+**Probably a bug, possibly intended** — `canonicalizeCompact` writes some
+properties as `null` (`memberElement`, `general`/`specific`,
+`subsettedFeature`/`subsettingFeature`, `conjugatedPortDefinition`) that
+the OMG schema requires as objects, and that KerML 10.4.5 asks to be written
+under their redefining names. If the canonical form is meant for comparing
+models rather than exchanging them, that is by design; for exchange the app
+fills them in.
+
+**Requests, not bugs** — the toolkit works as designed; these would save
+the app work:
+
+- Unresolved references serialize as `{"@ref": "Name"}`, a toolkit
+  extension rather than KerML 10.4's `{"@id"}`. An option to omit or report
+  them would do; the app leaves them out and lists them.
+- No way to serialize the standard library with its ids: only user units
+  serialize. The app opens the library's sources in a second session and
+  maps each element by place.
+- User-model ids come from the unit name, and a host can't give a base URI,
+  so ids don't survive a file rename or a server round trip; the app
+  matches by place.
+- `toFullJsonStrict` refuses a model with incomplete derivations (the demo
+  has 62,442), as its name says; the app uses `toFullJson(false)`.
+
+**Not a toolkit issue** — `minimizeQualifications` leaves `expose $::A::…`
+on four saved views. `$::` is valid KerML (the global namespace), so the
+text is correct, just longer; it was the app's view reader that didn't
+accept `$::`, now fixed.

@@ -295,3 +295,54 @@ describe('mending printed text', () => {
 		);
 	});
 });
+
+/**
+ * The toolkit on its own, with none of the app's code in between: text it
+ * accepts → its JSON → its printed text, which it then rejects. These pin the
+ * two printer bugs `mendPrinted` works around; when one fails, the toolkit
+ * has fixed it and the mend can go.
+ */
+describe('the toolkit printer (upstream bugs)', () => {
+	function roundTrip(text: string): { before: string[]; printed: string; after: string[] } {
+		const { tk, library } = host;
+		const findings = (s: { check(): string }) =>
+			(JSON.parse(s.check()) as { message: string }[]).map((f) => f.message);
+		const source = tk.Session.fromSourcesWithPreparedLibrary(
+			JSON.stringify([{ name: 'a.sysml', text }]),
+			library
+		);
+		const lifted = tk.Session.fromInterchangeJsonWithPreparedLibrary(
+			source.toCompactJson(),
+			library,
+			'4'
+		);
+		const printed = (JSON.parse(lifted.units()) as { text: string }[])
+			.map((u) => u.text)
+			.join('\n');
+		const reread = tk.Session.fromSourcesWithPreparedLibrary(
+			JSON.stringify([{ name: 'b.sysml', text: printed }]),
+			library
+		);
+		const result = { before: findings(source), printed, after: findings(reread) };
+		for (const s of [source, lifted, reread]) s.free();
+		return result;
+	}
+
+	it('prints a decision’s else branch as a transition, which it then rejects', () => {
+		const r = roundTrip(
+			'package P { action def A { attribute x : ScalarValues::Boolean; first start; then decide; if x then b; else c; action b; action c; } }'
+		);
+		expect(r.before).toEqual([]);
+		expect(r.printed).toContain('transition then');
+		expect(r.after).toContain('a transition usage is not allowed in an action body');
+	});
+
+	it('prints a message as a flow, which it then rejects', () => {
+		const r = roundTrip(
+			'package Q { part def T; occurrence def S { part a; part b; message m of T from a to b; } }'
+		);
+		expect(r.before).toEqual([]);
+		expect(r.printed).toMatch(/flow m\s+of :/);
+		expect(r.after.join(' ')).toMatch(/validateFlowEndSubsetting/);
+	});
+});
