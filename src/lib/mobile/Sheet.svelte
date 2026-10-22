@@ -65,6 +65,9 @@
 	}
 
 	function onDialogClose() {
+		// The close event comes a moment after the dialog closed: a sheet opened again in that
+		// moment (Views tapped right after choosing a view) stays open.
+		if (dialog?.open) return;
 		clearTimeout(closeTimer);
 		closing = false;
 		offset = 0;
