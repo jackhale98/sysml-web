@@ -1,20 +1,24 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { ADD_OPTIONS, elementText, type AddKind } from './templates.ts';
 
 	let {
 		ownerLabel,
 		kinds = ADD_OPTIONS.map((o) => o.kind),
+		initialKind,
 		onadd,
 		oncancel
 	}: {
 		ownerLabel: string;
 		kinds?: AddKind[];
+		/** The kind chosen to start with (a part when not given). */
+		initialKind?: AddKind;
 		onadd: (kind: AddKind, name: string, type: string) => Promise<string | null>;
 		oncancel: () => void;
 	} = $props();
 
 	const options = $derived(ADD_OPTIONS.filter((o) => kinds.includes(o.kind)));
-	let kind = $state<AddKind>('part');
+	let kind = $state<AddKind>(untrack(() => initialKind) ?? 'part');
 	// Keep the chosen kind valid for this owner.
 	$effect.pre(() => {
 		if (!kinds.includes(kind)) kind = kinds[0] ?? 'part';

@@ -5,10 +5,14 @@
 	import { resolve } from '$app/paths';
 	import {
 		ArrowRight,
+		CircleQuestionMark,
 		FileArchive,
+		FilePlus,
+		Flashlight,
 		FolderOpen,
 		FolderUp,
 		GitBranch,
+		ListChecks,
 		Plus,
 		Rocket,
 		Settings as SettingsIcon,
@@ -28,9 +32,14 @@
 		infoFromFiles,
 		isProjectFile,
 		pickFolder,
-		readUploadedFolder,
-		starterProject
+		readUploadedFolder
 	} from '#lib/project/sources.ts';
+	import {
+		isTemplateId,
+		loadTemplate,
+		TEMPLATES,
+		type TemplateId
+	} from '#lib/project/templates/catalog.ts';
 	import {
 		deleteProject,
 		listProjects,
@@ -51,6 +60,8 @@
 	let projects = $state<ProjectSummary[] | null>(null);
 	let name = $state('');
 	let description = $state('');
+	let template = $state<TemplateId>('blank');
+	const TEMPLATE_ICONS = { blank: FilePlus, requirements: ListChecks, flashlight: Flashlight };
 	let busy = $state<string | null>(null);
 	let error = $state<string | null>(null);
 	let folderAccess = $state(false);
@@ -68,6 +79,8 @@
 		if (params.has('github') || location.hash === '#github' || takeResume('open-repository'))
 			githubOpen = true;
 		if (params.has('settings')) settingsOpen = true;
+		const asked = params.get('template');
+		if (isTemplateId(asked)) template = asked;
 		void (async () => {
 			await refresh();
 			// The installed app was just opened: back into the project that was open, if any.
@@ -84,7 +97,8 @@
 				if (launched) history.replaceState(history.state, '', location.pathname);
 			}
 		})();
-		if (params.has('new') || location.hash === '#new') void tick().then(() => nameField?.focus());
+		if (params.has('new') || params.has('template') || location.hash === '#new')
+			void tick().then(() => nameField?.focus());
 	});
 
 	async function refresh() {
@@ -116,9 +130,12 @@
 		event.preventDefault();
 		if (!name.trim()) return;
 		busy = 'Creating…';
-		const libraries = await getEngine().viewLibraries();
-		const starter = starterProject(name.trim(), description, libraries);
-		await keep({ ...starter, origin: 'new' }, 'Creating…');
+		const [libraries, { make }] = await Promise.all([
+			getEngine().viewLibraries(),
+			loadTemplate(template)
+		]);
+		const starter = make(name.trim(), description, libraries);
+		await keep({ ...starter, origin: 'new', template }, 'Creating…');
 	}
 
 	/** Model files only: `.project.json` is kept as the project's info. */
@@ -231,6 +248,9 @@
 	<header class="top">
 		<a class="brand" href={resolve('/')}><Logo size={26} /> <Wordmark height={19} /></a>
 		<span class="tools">
+			<a class="icon-button" href={resolve('/help')} aria-label="Help" title="Help">
+				<CircleQuestionMark size={17} />
+			</a>
 			<button
 				type="button"
 				class="icon-button"
@@ -260,7 +280,7 @@
 		<section class="start" aria-label="Start">
 			<form class="card new" onsubmit={create} id="new">
 				<h2><Plus size={18} aria-hidden="true" /> New project</h2>
-				<p>A starter model with a first requirement, the system part and saved views.</p>
+				<p>Name it, choose where to start, and it opens with a short tour of what to do next.</p>
 				<label>
 					<span>Name</span>
 					<input
@@ -274,6 +294,33 @@
 					<span>What is it? <small>(optional)</small></span>
 					<input bind:value={description} placeholder="One sentence about the system" />
 				</label>
+				<fieldset class="templates">
+					<legend>Start from</legend>
+					{#each TEMPLATES as t (t.id)}
+						{@const Icon = TEMPLATE_ICONS[t.id]}
+						<label class="template" class:chosen={template === t.id}>
+							<input type="radio" name="template" value={t.id} bind:group={template} />
+							<span class="template-icon" aria-hidden="true"><Icon size={18} /></span>
+							<span class="template-text">
+								<strong>{t.title}</strong>
+								<span>{t.summary}</span>
+							</span>
+						</label>
+					{/each}
+					<button
+						type="button"
+						class="template from-github"
+						onclick={() => (githubOpen = true)}
+						disabled={!!busy || !pwa.online}
+					>
+						<span class="template-icon" aria-hidden="true"><GitHubMark size={18} /></span>
+						<span class="template-text">
+							<strong>From GitHub</strong>
+							<span>Open a repository's models you already have.</span>
+						</span>
+						<ArrowRight size={16} aria-hidden="true" />
+					</button>
+				</fieldset>
 				<button type="submit" class="primary" disabled={!!busy || !name.trim()}>
 					Create project <ArrowRight size={16} />
 				</button>
@@ -534,6 +581,95 @@
 		gap: 4px;
 		color: var(--text-2);
 		font-size: var(--text-sm);
+	}
+	.templates {
+		display: grid;
+		gap: var(--space-2);
+		margin: 0;
+		padding: 0;
+		border: 0;
+	}
+	.templates legend {
+		margin-bottom: 4px;
+		padding: 0;
+		color: var(--text-2);
+		font-size: var(--text-sm);
+	}
+	.template {
+		position: relative;
+		display: flex;
+		align-items: center;
+		gap: var(--space-3);
+		width: 100%;
+		justify-content: flex-start;
+		min-height: 2.75rem;
+		padding: var(--space-2) var(--space-3);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-md);
+		background: var(--surface);
+		color: var(--text);
+		font: inherit;
+		font-weight: 400;
+		text-align: left;
+		cursor: pointer;
+	}
+	.template:hover {
+		border-color: var(--border-strong);
+	}
+	.template.chosen {
+		border-color: var(--accent);
+		background: var(--accent-weak);
+		box-shadow: inset 0 0 0 1px var(--accent);
+	}
+	/* The radio covers the card, so a tap anywhere on it chooses it. */
+	.template input {
+		position: absolute;
+		inset: 0;
+		z-index: 1;
+		width: 100%;
+		height: 100%;
+		margin: 0;
+		opacity: 0;
+		cursor: pointer;
+	}
+	.template:focus-within {
+		outline: 2px solid var(--focus);
+		outline-offset: 1px;
+	}
+	.template-icon {
+		display: inline-grid;
+		flex: none;
+		place-items: center;
+		width: 2rem;
+		height: 2rem;
+		border-radius: var(--radius-sm);
+		background: var(--surface-2);
+		color: var(--text-2);
+	}
+	.chosen .template-icon {
+		background: var(--accent);
+		color: var(--accent-text);
+	}
+	.template-text {
+		display: grid;
+		flex: 1;
+		min-width: 0;
+		gap: 1px;
+	}
+	.template-text strong {
+		font-size: var(--text-sm);
+	}
+	.template-text span {
+		color: var(--text-2);
+		font-size: var(--text-xs);
+		line-height: 1.35;
+	}
+	.from-github {
+		border-style: dashed;
+	}
+	.from-github:disabled {
+		opacity: 0.55;
+		cursor: not-allowed;
 	}
 	small {
 		color: var(--text-3);

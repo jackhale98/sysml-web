@@ -17,6 +17,9 @@
 	import CoverageRing from './home/CoverageRing.svelte';
 	import Glance from './home/Glance.svelte';
 	import Hero from './home/Hero.svelte';
+	import NextSteps from './home/NextSteps.svelte';
+	import { runGuideAction, type GuideAction } from './guide.ts';
+	import type { ProjectSession } from '#lib/project/session.svelte.ts';
 	import {
 		architecturePackage,
 		countFamilies,
@@ -27,8 +30,12 @@
 	} from './home/model.ts';
 	import type { WorkbenchUi } from './ui.svelte.ts';
 
-	let { workspace, ui, engine }: { workspace: Workspace; ui: WorkbenchUi; engine: Engine } =
-		$props();
+	let {
+		workspace,
+		ui,
+		engine,
+		session
+	}: { workspace: Workspace; ui: WorkbenchUi; engine: Engine; session?: ProjectSession } = $props();
 	const ready = $derived(workspace.state.phase === 'ready');
 
 	/** Without a project description, the main package's doc comment stands in. */
@@ -130,6 +137,9 @@
 		ui.open({ kind: 'file', path: element.file });
 		ui.select(element.key, 'explorer');
 	}
+	function guide(action: GuideAction) {
+		void runGuideAction(action, { ui, workspace, engine, session });
+	}
 	function showProblems() {
 		ui.problemsOpen = true;
 		ui.mobilePane = 'problems';
@@ -145,6 +155,8 @@
 	{#if workspace.info}
 		<div class="page" aria-busy={!ready}>
 			<Hero {workspace} {ui} {description} {tourPath} {architecture} {showcase} {ownElements} />
+
+			{#if session}<NextSteps {workspace} {ui} {engine} {session} />{/if}
 
 			<Glance {families} {ready} onpick={showElement} />
 
@@ -202,7 +214,15 @@
 								{/each}
 							</ul>
 						{:else if workspace.requirements.length === 0}
-							<p class="empty">No requirements yet. Add one in text or on a diagram.</p>
+							<p class="empty">No requirements yet. Write one, or bring in a spreadsheet.</p>
+							<span class="empty-actions">
+								<button type="button" class="small primary" onclick={() => guide('add-requirement')}
+									>Add a requirement</button
+								>
+								<button type="button" class="small" onclick={() => guide('import-requirements')}
+									>Import</button
+								>
+							</span>
 						{:else}
 							<div class="bar" aria-hidden="true">
 								{#each byStatus as s (s.label)}
@@ -246,6 +266,10 @@
 									</li>
 								{/each}
 							</ul>
+						{:else if coverage.total === 0}
+							<p class="empty">
+								Nothing to follow up yet. Requirements that nothing meets or tests will show here.
+							</p>
 						{:else if gaps.length === 0}
 							<p class="all-good">
 								<CircleCheck size={18} aria-hidden="true" />
@@ -508,6 +532,31 @@
 	}
 	.empty {
 		color: var(--text-3);
+	}
+	.empty-actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--space-2);
+	}
+	.small {
+		min-height: 2.75rem;
+		padding: 0 var(--space-3);
+		border: 1px solid var(--border-strong);
+		border-radius: var(--radius-sm);
+		background: var(--surface);
+		color: var(--text);
+		font: inherit;
+		font-size: var(--text-sm);
+		font-weight: 600;
+		cursor: pointer;
+	}
+	.small:hover {
+		background: var(--surface-hover);
+	}
+	.small.primary {
+		border-color: transparent;
+		background: var(--accent);
+		color: var(--accent-text);
 	}
 
 	/* ── Requirements ──────────────────────────────────────────────────── */

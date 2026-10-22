@@ -154,6 +154,9 @@
 			<p>
 				Select an element in the text, a diagram or the explorer to see what it is and change it.
 			</p>
+			<button type="button" class="help-link" onclick={() => ui.showHelp('definition-usage')}>
+				New here? The ideas in plain words
+			</button>
 		</div>
 	{:else}
 		<header style:--fam={familyColor(element.kind)} data-sheet-drag data-sheet-peek>
@@ -425,6 +428,21 @@
 		overflow-y: auto;
 		padding: var(--space-4);
 		font-size: var(--text-sm);
+	}
+	.help-link {
+		min-height: 2.75rem;
+		padding: 0 var(--space-2);
+		border: 0;
+		border-radius: var(--radius-sm);
+		background: transparent;
+		color: var(--accent);
+		font: inherit;
+		font-size: var(--text-sm);
+		font-weight: 600;
+		cursor: pointer;
+	}
+	.help-link:hover {
+		background: var(--accent-weak);
 	}
 	.empty {
 		display: grid;

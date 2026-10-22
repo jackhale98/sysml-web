@@ -9,9 +9,12 @@
 		Columns3,
 		FileCode,
 		FilePlus,
+		Gauge,
 		Info,
+		ListChecks,
 		Minus,
 		Search,
+		Table2,
 		TriangleAlert,
 		Upload
 	} from '@lucide/svelte';
@@ -21,6 +24,8 @@
 	import type { CheckStatus, RenderedTable, RowInfo, ViewInfo } from '#lib/engine/types.ts';
 	import { byteToUtf16, elementAt, type ModelElement } from '#lib/project/elements.ts';
 	import CheckChip from '#lib/ui/CheckChip.svelte';
+	import EmptyState from '#lib/ui/EmptyState.svelte';
+	import { runGuideAction, type GuideAction } from './guide.ts';
 	import type { Workspace } from '#lib/project/workspace.svelte.ts';
 	import KindGlyph from '#lib/ui/KindGlyph.svelte';
 	import { toasts } from '#lib/ui/toasts.svelte.ts';
@@ -34,6 +39,11 @@
 	import TraceRefs from './TraceRefs.svelte';
 	import { matrixExport } from './traceGrid.ts';
 	import { viewTitle } from './views.ts';
+
+	/** Do what an empty table suggests (add a requirement, set a limit). */
+	function guide(action: GuideAction) {
+		void runGuideAction(action, { ui, workspace, engine });
+	}
 
 	/**
 	 * A SysML view rendered as a table by the engine: the view's
@@ -619,7 +629,48 @@
 			{flash}
 		/>
 	{:else if table.rows.length === 0}
-		<p class="state">No rows. Nothing in the model matches this view yet.</p>
+		{@const definition = (info?.definition ?? name).split('::').pop()}
+		{#if listsRequirements}
+			<EmptyState
+				icon={ListChecks}
+				title="No requirements yet"
+				actions={[
+					{ label: 'Add a requirement', primary: true, run: () => guide('add-requirement') },
+					{ label: 'Import from a spreadsheet', run: () => guide('import-requirements') }
+				]}
+			>
+				A requirement is a “shall” statement with an ID. Add one, or bring in the ones you have from
+				Excel or a CSV file.
+			</EmptyState>
+		{:else if definition === 'ConstraintChecks'}
+			<EmptyState
+				icon={Gauge}
+				title="No limits to check yet"
+				actions={[{ label: 'Set a limit', primary: true, run: () => guide('limit') }]}
+			>
+				A limit, such as “mass at most 150 g”, turns a requirement into a check. Each one shows here
+				with whether the design meets it.
+			</EmptyState>
+		{:else}
+			<EmptyState
+				icon={Table2}
+				title="Nothing to show yet"
+				actions={[
+					...(info && !info.builtin
+						? [
+								{
+									label: 'Show what it covers',
+									run: () => ui.open({ kind: 'file', path: info.file })
+								}
+							]
+						: []),
+					{ label: 'About views', run: () => ui.showHelp('concept-view') }
+				]}
+			>
+				Nothing in the model matches this view yet. Add elements to the model, or change what the
+				view covers (its <code>expose</code> lines) in its text.
+			</EmptyState>
+		{/if}
 	{:else if ui.phone}
 		<!-- Phones: one card per row, full width, scrolling down rather than sideways. -->
 		{@const subtitled = !isPivot && table.columns.length > 2 && !table.editable?.[1]}

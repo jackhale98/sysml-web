@@ -11,18 +11,31 @@ import { viewTitle } from './views.ts';
 /** A half-open `[start, end)` range of UTF-16 offsets into a string. */
 export type Range = readonly [start: number, end: number];
 
-export type PaletteGroup = 'rows' | 'elements' | 'views' | 'files' | 'commands';
+export type PaletteGroup = 'rows' | 'elements' | 'views' | 'files' | 'commands' | 'help';
 
 /** Display order of the groups. */
-export const GROUPS: readonly PaletteGroup[] = ['rows', 'elements', 'views', 'files', 'commands'];
+export const GROUPS: readonly PaletteGroup[] = [
+	'rows',
+	'elements',
+	'views',
+	'files',
+	'commands',
+	'help'
+];
 
 export const GROUP_HEADINGS: Record<PaletteGroup, string> = {
 	rows: 'In this table',
 	elements: 'Elements',
 	views: 'Views',
 	files: 'Files',
-	commands: 'Commands'
+	commands: 'Commands',
+	help: 'Help'
 };
+
+/** A query starting with this searches the help only. */
+export const HELP_PREFIX = '?';
+/** Help topics offered for a query (all of them for a bare `?`). */
+export const MAX_HELP = 8;
 
 export const MAX_ELEMENTS = 8;
 /** Rows of the open table offered before everything else. */
@@ -44,7 +57,9 @@ export type PaletteAction =
 	| { type: 'switch-theme' }
 	| { type: 'import-requirements' }
 	/** Open a guided form (`#lib/create`). */
-	| { type: 'create'; request: CreateRequest };
+	| { type: 'create'; request: CreateRequest }
+	/** Open the help, at a topic or at the start. */
+	| { type: 'help'; topic: string | null };
 
 export interface PaletteItem {
 	/** Unique across all groups. */
@@ -88,6 +103,8 @@ export interface PaletteSources {
 	views: readonly PaletteItem[];
 	files: readonly PaletteItem[];
 	commands: readonly PaletteItem[];
+	/** The help's topics. */
+	help?: readonly PaletteItem[];
 	/** Rows of the table on screen, when one is. */
 	rows?: readonly PaletteItem[];
 	/** That table, to offer filtering it: `count` is how many rows its own search keeps. */
@@ -471,8 +488,32 @@ export function commandItems(themeChoice: string): PaletteItem[] {
 			'Import requirements…',
 			{ type: 'import-requirements' },
 			{ aliases: 'excel xlsx csv spreadsheet paste upload' }
+		),
+		command(
+			'help',
+			'Help',
+			{ type: 'help', topic: null },
+			{
+				keyword: '?',
+				detail: 'Type ? to search it',
+				aliases: 'guide how do i learn explain shortcuts keyboard'
+			}
 		)
 	];
+}
+
+/** "Help: Add a part", one per topic of the help (offered for a query, or after `?`). */
+export function helpItems(
+	topics: readonly { id: string; title: string; keywords?: string }[]
+): PaletteItem[] {
+	return topics.map((t) => ({
+		id: `help:${t.id}`,
+		group: 'help' as const,
+		label: `Help: ${t.title}`,
+		aliases: t.keywords ?? '',
+		quiet: true,
+		action: { type: 'help' as const, topic: t.id }
+	}));
 }
 
 /** "New view: Bill of materials", one per kind of view the form makes (offered for a query). */
@@ -541,6 +582,11 @@ export function rank(items: readonly PaletteItem[], query: string): PaletteResul
  */
 export function search(sources: PaletteSources, query: string): PaletteResult[] {
 	const q = query.trim();
+	if (q.startsWith(HELP_PREFIX)) {
+		const rest = q.slice(HELP_PREFIX.length).trim();
+		const help = sources.help ?? [];
+		return rest ? rank(help, rest) : help.map((item) => ({ item, match: null }));
+	}
 	if (!q) {
 		return [
 			...sources.views.slice(0, DEFAULT_VIEWS),
@@ -584,8 +630,13 @@ export function search(sources: PaletteSources, query: string): PaletteResult[] 
 		});
 	}
 
-	return [...rows, ...elements.slice(0, MAX_ELEMENTS), ...views, ...files, ...commands].slice(
-		0,
-		MAX_RESULTS
-	);
+	const help = rank(sources.help ?? [], q).slice(0, MAX_HELP);
+	return [
+		...rows,
+		...elements.slice(0, MAX_ELEMENTS),
+		...views,
+		...files,
+		...commands,
+		...help
+	].slice(0, MAX_RESULTS);
 }

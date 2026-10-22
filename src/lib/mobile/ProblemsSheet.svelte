@@ -53,7 +53,10 @@
 			{/each}
 		</ul>
 	{:else}
-		<p class="none"><CircleCheck size={20} /> No problems. The model is consistent.</p>
+		<p class="none">
+			<CircleCheck size={20} /> No problems. The model is consistent. Mistakes in the text show here as
+			you type.
+		</p>
 	{/if}
 </Sheet>
 

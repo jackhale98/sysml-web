@@ -24,104 +24,14 @@ export function packageName(projectName: string): string {
 	return `'${projectName.trim().replace(/'/g, '') || 'Model'}'`;
 }
 
-/**
- * A new project that is ready to use: a model with a first requirement and
- * the system part, saved table and diagram views over it, the view
- * libraries those use, and a short guide.
- */
-export function starterProject(
-	name: string,
-	description: string,
-	viewLibraries: ProjectFile[]
-): { info: ProjectInfo; files: ProjectFile[] } {
-	const pkg = packageName(name);
-	const about = description.trim() || `The ${name} system model.`;
-	const model = `package ${pkg} {
-    doc /* ${about.replace(/\*\//g, '* /')} */
-
-    private import ScalarValues::*;
-    private import ISQ::*;
-    private import SI::*;
-
-    // --- Requirements: what the system must do -------------------------
-    // Each has an ID in <'...'>, a title and a "shall" statement. Add more
-    // here or from the Requirements table.
-
-    requirement def SystemRequirement {
-        doc /* A requirement on the system. */
-        subject system : System;
-    }
-
-    requirement <'REQ-001'> 'First requirement' : SystemRequirement {
-        doc /* The system shall ... */
-    }
-
-    // --- Structure: what the system is made of -------------------------
-    // A part def is a kind of thing (like a datasheet); a part is one used
-    // in a design. Draw them in the diagram or type them here.
-
-    part def System {
-        doc /* The system being designed. */
-        attribute mass :> ISQ::mass;
-    }
-
-    part system : System;
-
-    // --- Traceability: which part of the design meets which requirement --
-    satisfy 'First requirement' by system;
+/** A package named after the project's, with a suffix: `RoverViews`, `'2024 rig Views'`. */
+export function relatedPackage(pkg: string, suffix: string): string {
+	return pkg.startsWith("'") ? `${pkg.slice(0, -1)} ${suffix}'` : `${pkg}${suffix}`;
 }
-`;
-	const views = `package ${pkg}Views {
-    doc /* Saved views: tables and diagrams that are part of the model. */
 
-    private import StandardViewDefinitions::*;
-    private import ModelViews::*;
-
-    view requirements : RequirementsTable {
-        doc /* Every requirement with its status and trace links. */
-        expose ${pkg}::*;
-    }
-
-    view gaps : RequirementGaps {
-        doc /* Requirements that nothing satisfies or verifies yet. */
-        expose ${pkg}::*;
-    }
-
-    view structure : GeneralView {
-        doc /* The system and what it is made of. */
-        expose ${pkg}::*;
-    }
-}
-`;
-	const readme = `# ${name}
-
-${about}
-
-## Getting started
-
-- **Requirements**: open *Requirements* in the explorer and edit cells, or
-  write \`requirement\` elements in \`model/${pkg.replace(/'/g, '')}.sysml\`.
-- **Structure**: open the *Structure* view and use **Add**, or type
-  \`part def\` and \`part\` in the text. Text and diagrams are the same model.
-- **Traceability**: \`satisfy 'Requirement' by part;\` links the design to a
-  requirement; the *Gaps* table shows what is not covered yet.
-- **More views**: **New view** (in the explorer's Views, or the search box)
-  makes a table, diagram, budget or report, saved in \`views/Views.sysml\`.
-- **Numbers**: on a value in the inspector, **Add up** sums it over a part's
-  parts and **Set a limit** writes a checked requirement. **New trade study**
-  compares alternatives on weighted criteria.
-
-Everything here is standard SysML v2 text, readable by any SysML v2 tool.
-`;
-	return {
-		info: { name, description: about, version: '0.1.0' },
-		files: [
-			{ path: `model/${pkg.replace(/'/g, '').replace(/\s+/g, '')}.sysml`, text: model },
-			{ path: 'views/Views.sysml', text: views },
-			...viewLibraries,
-			{ path: 'README.md', text: readme }
-		]
-	};
+/** A file name for a package: `Rover`, `2024rig` (no quotes or spaces). */
+export function fileStem(pkg: string): string {
+	return pkg.replace(/'/g, '').replace(/\s+/g, '');
 }
 
 // --- Folders ---------------------------------------------------------------
