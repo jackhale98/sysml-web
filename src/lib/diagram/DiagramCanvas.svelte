@@ -26,6 +26,7 @@
 	import { canOwnMembers, formatName, type AddKind } from '#lib/workbench/templates.ts';
 	import type { WorkbenchUi } from '#lib/workbench/ui.svelte.ts';
 	import ConnectPicker, { type ConnectTarget } from './ConnectPicker.svelte';
+	import DiagramExport from './DiagramExport.svelte';
 	import { DiagramEditing, provideEditing } from './editing.svelte.ts';
 	import FlowBridge, { type FlowApi } from './FlowBridge.svelte';
 	import { LABEL_HEIGHT, labelWidth, provideLabels } from './labels.svelte.ts';
@@ -796,6 +797,14 @@
 		}
 	}
 
+	// ---- Export ----
+
+	/** The whole drawing, for an SVG or PNG (the export code loads on first use). */
+	async function exportDiagram() {
+		const { collectDiagram } = await import('./export/collect.ts');
+		return collectDiagram(host, frameTitle, view, nodes, edges, labels.positions);
+	}
+
 	// ---- Input ----
 
 	const isTyping = (event: Event) =>
@@ -1108,6 +1117,12 @@
 				>
 					<LayoutGrid size={14} /> <span>Tidy up</span>
 				</button>
+				<DiagramExport
+					title={label.replace(/ diagram$/, '')}
+					diagram={exportDiagram}
+					share={ui.phone}
+					disabled={status !== 'ready' || nodes.length === 0}
+				/>
 			</div>
 			{#if popover === 'add' && owner}
 				<div class="popover">
