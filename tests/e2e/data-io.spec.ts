@@ -57,7 +57,7 @@ test('a table exports as CSV that Excel reads', async ({ page }) => {
 	const file = await download;
 	expect(file.suggestedFilename()).toBe('Requirements table.csv');
 	const csv = readFileSync(await file.path(), 'utf8');
-	expect(csv.startsWith('﻿Id,Title,Text,Kind,Priority,Verification method,Status')).toBe(true);
+	expect(csv.startsWith('﻿ID,Title,Text,Kind,Priority,Verification method,Status')).toBe(true);
 	expect(csv).toContain('\r\nSYS-001,Flight endurance,');
 	expect(csv).toContain(',performance,high,"analysis, test",done,J. Hale,');
 });
@@ -74,7 +74,7 @@ test('a searched table exports only its rows, as an Excel workbook', async ({ pa
 	expect(file.suggestedFilename()).toBe('Requirements table.xlsx');
 	const [sheet] = await readXlsx(new Uint8Array(readFileSync(await file.path())));
 	expect(sheet!.name).toBe('Requirements table');
-	expect(sheet!.rows[0]!.slice(0, 3)).toEqual(['Id', 'Title', 'Text']);
+	expect(sheet!.rows[0]!.slice(0, 3)).toEqual(['ID', 'Title', 'Text']);
 	const shown = await table.locator('tbody tr td:first-child').allTextContents();
 	expect(shown.length).toBeGreaterThan(1);
 	expect(shown.length).toBeLessThan(20);

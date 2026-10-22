@@ -151,6 +151,21 @@
 	});
 </script>
 
+{#snippet fileItem(folder: string, path: string)}
+	<li>
+		<button
+			type="button"
+			class="item"
+			style:padding-left={folder ? '1.5rem' : undefined}
+			onclick={() => ui.open({ kind: 'file', path })}
+		>
+			<FileCode size={14} />
+			<span class="label">{path.slice(folder ? folder.length + 1 : 0)}</span>
+			{#if workspace.dirty.has(path)}<span class="dot" title="Edited"></span>{/if}
+		</button>
+	</li>
+{/snippet}
+
 {#snippet tree(nodes: TreeNode[], depth: number, owner: string)}
 	{@const listed = nodes.filter(matches)}
 	{@const limit = shownCount[owner] ?? PAGE}
@@ -351,7 +366,7 @@
 												title: m.name
 											})}
 									>
-										<Play size={14} /> <span class="label">Run {m.name}</span>
+										<Play size={14} /> <span class="label">Run {viewTitle(m.name)}</span>
 									</button>
 								</li>
 							{/each}
@@ -457,23 +472,28 @@
 	{:else}
 		<ul class="flat files">
 			{#each folders as [folder, paths] (folder)}
-				{#if folder}
-					<li class="folder"><Folder size={14} /> {folder}</li>
-				{/if}
-				{#each paths as path (path)}
+				{#if folder && isLibraryFile(`${folder}/`)}
+					<!-- Libraries the model builds on: out of the way until wanted. -->
 					<li>
-						<button
-							type="button"
-							class="item"
-							style:padding-left={folder ? '1.5rem' : undefined}
-							onclick={() => ui.open({ kind: 'file', path })}
-						>
-							<FileCode size={14} />
-							<span class="label">{path.slice(folder ? folder.length + 1 : 0)}</span>
-							{#if workspace.dirty.has(path)}<span class="dot" title="Edited"></span>{/if}
-						</button>
+						<details class="library-folder">
+							<summary class="folder"
+								><ChevronRight size={14} class="chevron" /><Folder size={14} /> {folder}</summary
+							>
+							<ul class="flat">
+								{#each paths as path (path)}
+									{@render fileItem(folder, path)}
+								{/each}
+							</ul>
+						</details>
 					</li>
-				{/each}
+				{:else}
+					{#if folder}
+						<li class="folder"><Folder size={14} /> {folder}</li>
+					{/if}
+					{#each paths as path (path)}
+						{@render fileItem(folder, path)}
+					{/each}
+				{/if}
 			{/each}
 		</ul>
 	{/if}
@@ -632,6 +652,20 @@
 		text-transform: uppercase;
 		letter-spacing: 0.06em;
 		cursor: pointer;
+	}
+	.library-folder > summary {
+		cursor: pointer;
+		list-style: none;
+	}
+	.library-folder > summary::-webkit-details-marker {
+		display: none;
+	}
+	.library-folder > summary :global(.chevron) {
+		margin-left: -2px;
+		transition: transform 0.15s;
+	}
+	.library-folder[open] > summary :global(.chevron) {
+		transform: rotate(90deg);
 	}
 	.folder {
 		display: flex;

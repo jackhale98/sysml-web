@@ -23,14 +23,19 @@ const manifest = {
 		'toolkit/stdlib/sysml-library.libcache.gz',
 		'toolkit/stdlib/sysml-library.prepared.gz'
 	],
-	prerendered: ['', 'projects', 'p/demo']
+	prerendered: ['', 'projects', 'p/demo', 'auth/callback/']
 };
 
 describe('planCaches', () => {
 	it('precaches the shell and leaves the engine for first use', () => {
 		const plan = planCaches({ base: '/sysml-web/', ...manifest });
 		expect(plan.base).toBe('/sysml-web');
-		expect(plan.pages).toEqual(['/sysml-web/', '/sysml-web/projects', '/sysml-web/p/demo']);
+		expect(plan.pages).toEqual([
+			'/sysml-web/',
+			'/sysml-web/projects',
+			'/sysml-web/p/demo',
+			'/sysml-web/auth/callback/'
+		]);
 		expect(plan.fallback).toBe('/sysml-web/404.html');
 		expect(plan.shell).toEqual([
 			'/sysml-web/_app/immutable/entry/app.abc.js',
@@ -51,7 +56,7 @@ describe('planCaches', () => {
 	it('works at the site root', () => {
 		const plan = planCaches({ base: '/', ...manifest });
 		expect(plan.base).toBe('');
-		expect(plan.pages).toEqual(['/', '/projects', '/p/demo']);
+		expect(plan.pages).toEqual(['/', '/projects', '/p/demo', '/auth/callback/']);
 		expect(plan.fallback).toBe('/404.html');
 		expect(plan.engine).toContain('/toolkit/sysmlv2_bg.wasm');
 	});
@@ -110,6 +115,13 @@ describe('routeRequest', () => {
 					key: `${base}/p/demo`
 				});
 				expect(navigate(`${base}/index.html`)).toEqual({ strategy: 'page', key: `${base}/` });
+			});
+
+			it('serves the sign-in callback (a page kept with its trailing slash) in the installed app', () => {
+				const callback = { strategy: 'page', key: `${base}/auth/callback/` };
+				expect(navigate(`${base}/auth/callback/?code=c&state=s`)).toEqual(callback);
+				expect(navigate(`${base}/auth/callback`)).toEqual(callback);
+				expect(navigate(`${base}/auth/callback/index.html`)).toEqual(callback);
 			});
 
 			it('opens other routes, such as stored projects, from the SPA fallback', () => {

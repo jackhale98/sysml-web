@@ -122,7 +122,7 @@
 				{#each workspace.machines as m (m.qualifiedName ?? m.name)}
 					{@render row(
 						Play,
-						`Run ${m.name}`,
+						`Run ${viewTitle(m.name)}`,
 						{ kind: 'emulator', machine: m.qualifiedName ?? m.name, title: m.name },
 						undefined,
 						'var(--kind-behavior)'

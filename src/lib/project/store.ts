@@ -129,7 +129,7 @@ export async function deleteAllData(): Promise<void> {
 		request.onsuccess = () => resolve();
 		request.onerror = () => reject(request.error ?? new Error('Browser storage failed.'));
 		request.onblocked = () =>
-			reject(new Error('SysML Web is open in another tab. Close it, then try again.'));
+			reject(new Error('Fairtide is open in another tab. Close it, then try again.'));
 	});
 	try {
 		for (const key of Object.keys(localStorage))

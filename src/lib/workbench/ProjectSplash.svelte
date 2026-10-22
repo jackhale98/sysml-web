@@ -1,4 +1,5 @@
 <script lang="ts">
+	import FairtideLoader from '#lib/ui/FairtideLoader.svelte';
 	import Logo from '#lib/ui/Logo.svelte';
 
 	/**
@@ -27,7 +28,10 @@
 			<h1 id="splash-title">{name}</h1>
 			<p class="lead">{lead}</p>
 			{#if rest}<p class="rest">{rest}</p>{/if}
-			<p class="status" role="status">Opening the workbench…</p>
+			<div class="loading">
+				<FairtideLoader size={72} label="" />
+				<p class="status" role="status">Opening the workbench…</p>
+			</div>
 		</section>
 	</main>
 </div>
@@ -95,8 +99,14 @@
 		color: var(--text-2);
 		line-height: 1.6;
 	}
-	.status {
+	.loading {
+		display: grid;
+		justify-items: start;
+		gap: var(--space-2);
 		margin-top: var(--space-5);
+		color: var(--text);
+	}
+	.status {
 		color: var(--text-3);
 		font-size: var(--text-sm);
 	}

@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
 	import { untrack } from 'svelte';
 	import {
 		BookLock,
@@ -283,7 +282,13 @@
 	data-details={phone ? ui.details : undefined}
 >
 	<header class="topbar">
-		<a class="brand" href={resolve('/')} aria-label="SysML Web home"><Logo size={24} /></a>
+		<button
+			type="button"
+			class="brand"
+			aria-label="Project overview"
+			title="Project overview"
+			onclick={() => navigate('home')}><Logo size={24} /></button
+		>
 		{#if session}
 			<ProjectMenu
 				{workspace}
@@ -747,7 +752,11 @@
 		place-items: center;
 		width: 2.25rem;
 		height: 2.25rem;
+		padding: 0;
+		border: 0;
 		border-radius: var(--radius-sm);
+		background: none;
+		cursor: pointer;
 	}
 	.project {
 		flex: 1 1 0;

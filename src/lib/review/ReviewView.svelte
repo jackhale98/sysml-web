@@ -1,4 +1,5 @@
 <script lang="ts">
+	import FairtideLoader from '#lib/ui/FairtideLoader.svelte';
 	/**
 	 * Review changes: what changed in the model between two versions, in
 	 * plain language and grouped as an engineer reads a change — what it
@@ -14,7 +15,6 @@
 		Code,
 		FileDiff,
 		GitCompareArrows,
-		LoaderCircle,
 		Network,
 		RefreshCw,
 		Stamp,
@@ -350,7 +350,7 @@
 	<div class="body">
 		{#if review.status === 'loading' || review.status === 'idle'}
 			<div class="state" role="status">
-				<LoaderCircle size={18} class="spin" aria-hidden="true" />
+				<FairtideLoader size={40} label="" />
 				<span>
 					{#if review.progress}Getting the other version from GitHub… {review.progress.done}/{review
 							.progress.total}

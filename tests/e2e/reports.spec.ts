@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import AxeBuilder from '@axe-core/playwright';
+import { viewTitle } from '../../src/lib/workbench/views.ts';
 import { expect, test, type Page } from '@playwright/test';
 
 async function expectAccessible(page: Page) {
@@ -127,21 +128,25 @@ test('the interface control document draws the interconnection and lists connect
 });
 
 test('a standard report can be saved into the model as a view', async ({ page }) => {
-	await openDemo(page);
-	await page
-		.getByRole('navigation', { name: 'Explorer' })
-		.getByRole('button', { name: 'Specification', exact: true })
-		.click();
+	// A new project has no saved reports, so the standard specification is offered.
+	await page.goto('/projects');
+	await page.getByLabel('Name').fill('Report bench');
+	await page.getByRole('button', { name: /Create project/ }).click();
+	await expect(page.getByRole('status').filter({ hasText: 'Model ready' })).toBeVisible({
+		timeout: 30_000
+	});
+	const explorer = page.getByRole('navigation', { name: 'Explorer' });
+	await explorer.getByRole('button', { name: 'Specification', exact: true }).click();
 	await expect(
-		page.getByRole('article', { name: 'Drone UAV requirements specification' })
+		page.getByRole('article', { name: 'Report bench requirements specification' })
 	).toBeVisible({ timeout: 15_000 });
 	await page.getByRole('button', { name: 'Save to model' }).click();
-	await expect(page.getByText(/Saved as the view systemSpecification/)).toBeVisible();
-	await expect(
-		page
-			.getByRole('navigation', { name: 'Explorer' })
-			.getByRole('button', { name: 'System specification', exact: true })
-	).toBeVisible();
+	const saved = page.getByText(/Saved as the view (\w+)/);
+	await expect(saved).toBeVisible();
+	const name = (await saved.textContent())!.match(/Saved as the view (\w+)/)![1]!;
+	// The saved copy takes the standard one's place in the list.
+	await expect(explorer.getByRole('button', { name: viewTitle(name), exact: true })).toBeVisible();
+	await expect(explorer.getByRole('button', { name: 'Specification', exact: true })).toBeHidden();
 	await expect(page.getByRole('button', { name: 'SysML' })).toBeVisible();
 });
 

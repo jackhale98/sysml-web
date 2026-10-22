@@ -53,6 +53,6 @@ export default defineConfig({
 	],
 	test: {
 		environment: 'node',
-		include: ['src/**/*.test.ts', 'tests/unit/**/*.test.ts']
+		include: ['src/**/*.test.ts', 'tests/unit/**/*.test.ts', 'worker/src/**/*.test.ts']
 	}
 });

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Wordmark from '#lib/ui/Wordmark.svelte';
 	import { resolve } from '$app/paths';
 	import {
 		ArrowLeftRight,
@@ -122,7 +123,7 @@
 </script>
 
 <svelte:head>
-	<title>SysML Web — SysML v2 in text and diagrams</title>
+	<title>Fairtide — SysML v2 in text and diagrams</title>
 	<meta
 		name="description"
 		content="A web workbench for SysML v2: build models in text or diagrams, live-synced, with every element explained in plain language. Standard SysML in your own git repository; no server holds your data."
@@ -131,7 +132,7 @@
 
 <header class="bar">
 	<div class="wrap bar-inner">
-		<a class="brand" href={resolve('/')}><Logo size={28} /> <span>SysML Web</span></a>
+		<a class="brand" href={resolve('/')}><Logo size={28} /> <Wordmark height={20} /></a>
 		<nav aria-label="Site">
 			<a class="nav-link" href="#how">How it works</a>
 			<a class="nav-link" href="#standard">Standard</a>
@@ -315,7 +316,7 @@
 
 <footer class="foot">
 	<div class="wrap foot-inner">
-		<p class="foot-brand"><Logo size={22} /> <span>SysML Web</span></p>
+		<p class="foot-brand"><Logo size={22} /> <Wordmark height={16} /></p>
 		<p>Open source under Apache-2.0 OR MIT.</p>
 		<p>SysML is a registered trademark of the Object Management Group.</p>
 	</div>

@@ -1,7 +1,7 @@
 /**
- * Git hosting, as the app sees it. Every host (GitHub today; GitLab or an
- * OAuth-backed GitHub later) implements `GitProvider`, so the rest of the
- * app never speaks a host's API directly.
+ * Git hosting, as the app sees it. Every host (GitHub today, with an access
+ * token or by signing in; GitLab later) implements `GitProvider`, so the rest
+ * of the app never speaks a host's API directly.
  *
  * The model is deliberately simple: a project remembers the commit its files
  * came from (the *base*). Changes are the difference between the files now

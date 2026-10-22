@@ -23,11 +23,6 @@ package DroneViews {
         expose SystemRequirements::*;
     }
 
-    view designGaps : RequirementGaps {
-        doc /* System requirements the design does not satisfy yet, or that no test verifies. */
-        expose SystemRequirements::*;
-    }
-
     view droneInterfaces : InterfaceTable {
         doc /* Every port of the drone's components and what it is connected to. */
         expose DroneComponents::**;
