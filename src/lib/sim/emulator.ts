@@ -36,7 +36,8 @@
  * at its time, that time signal is lost until the state is entered again.
  * Durations are numbers with time units (`5 [s]`, `2 [SI::min]`); a bare
  * number counts seconds. One that cannot be evaluated is noted in the trace
- * and does not fire; variables changed later evaluate it again, from then.
+ * and does not fire; values given to variables later (in the Variables
+ * panel) evaluate it again, counting from then.
  * `docs/simulator.md` says more, with the parts of the specifications used.
  *
  * A `do` action starts after its state's entry action and runs while the

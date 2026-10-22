@@ -192,7 +192,16 @@
 	const active = $derived(activeSet(def, current));
 	const leaves = $derived(new Set(current));
 	const edgeState = $derived(
-		new Map(enabled.map((e) => [e.index, e.ready ? ('ready' as const) : ('blocked' as const)]))
+		new Map(
+			enabled.map((e) => [
+				e.index,
+				e.ready
+					? ('ready' as const)
+					: e.due !== undefined && e.due > (view?.time ?? 0)
+						? ('waiting' as const)
+						: ('blocked' as const)
+			])
+		)
 	);
 	const shortcuts = $derived(
 		new Map(
