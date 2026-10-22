@@ -442,7 +442,8 @@ const ICON_ATTRS = new Set([
 /** Fonts of a node (SysmlNode.svelte). */
 const F = {
 	keyword: { size: 11 },
-	name: { size: 13, weight: 650 },
+	// 600, not the canvas's 650: SVG 1.1 consumers (Inkscape, Office) take only whole hundreds.
+	name: { size: 13, weight: 600 },
 	title: { size: 11, italic: true },
 	row: { size: 11.5, mono: true },
 	more: { size: 11 },
