@@ -18,12 +18,18 @@ export function exposedName(expose: string): string {
 	return last.replace(/^'|'$/g, '');
 }
 
+/** A view with no view def, drawn by how it says to render: `render asTreeDiagram;`. */
+const RENDERED_AS: Record<string, string> = {
+	asTreeDiagram: 'GeneralView',
+	asInterconnectionDiagram: 'InterconnectionView'
+};
+
 export function presentationOf(view: ViewInfo): Presentation {
 	if (view.hasTable) return { kind: 'table' };
 	if (!view.isUsage) return { kind: 'none' };
 	const exposes = view.exposes ?? [];
 	const scope = exposes.length === 1 ? exposedName(exposes[0]!) : null;
-	switch (view.definition) {
+	switch (view.standard ?? view.definition ?? RENDERED_AS[view.renderAs ?? '']) {
 		case 'GeneralView':
 			// The view itself is the scope: the engine draws what it exposes, filtered.
 			if (exposes.length && !view.builtin)

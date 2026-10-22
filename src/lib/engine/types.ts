@@ -149,6 +149,11 @@ export interface ViewInfo {
 	hasTable: boolean;
 	/** For a usage, the view def it is typed by (e.g. `GeneralView`). */
 	definition?: string;
+	/**
+	 * The standard view it comes down to (`GeneralView`, `InterconnectionView`…)
+	 * when it is typed by a view def of the project's that specializes one.
+	 */
+	standard?: string;
 	doc?: string;
 	renderAs?: string;
 	/** The `expose` targets as written (`P`, `P::*`, `P::**`). */
