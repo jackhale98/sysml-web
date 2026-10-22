@@ -1,4 +1,6 @@
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import { join, relative, resolve } from 'node:path';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
@@ -130,4 +132,98 @@ test('a sequence diagram exports as a standalone SVG and a PNG', async ({ page }
 	expect(pngFile.suggestedFilename()).toBe('delivery-sequence.png');
 	const png = await readFile((await pngFile.path())!);
 	expect(png.subarray(1, 4).toString()).toBe('PNG');
+});
+
+/** The demo's files with `edit` applied, kept in this browser as if edited earlier. */
+async function seedEditedDemo(page: Page, edit: (path: string, text: string) => string) {
+	const root = resolve(import.meta.dirname, '../../src/demo/drone');
+	const files: { path: string; text: string }[] = [];
+	const walk = (dir: string) => {
+		for (const name of readdirSync(dir).sort()) {
+			const path = join(dir, name);
+			if (statSync(path).isDirectory()) walk(path);
+			else if (/\.(sysml|kerml|md)$/.test(name)) {
+				const at = relative(root, path);
+				files.push({ path: at, text: edit(at, readFileSync(path, 'utf8')) });
+			}
+		}
+	};
+	walk(root);
+	const info = JSON.parse(readFileSync(join(root, '.project.json'), 'utf8')) as unknown;
+	await page.goto('/');
+	await page.evaluate(
+		async ({ files, info }) => {
+			await new Promise<void>((done, fail) => {
+				const open = indexedDB.open('sysml-web', 1);
+				open.onupgradeneeded = () => open.result.createObjectStore('projects', { keyPath: 'id' });
+				open.onsuccess = () => {
+					const tx = open.result.transaction('projects', 'readwrite');
+					const now = new Date().toISOString();
+					tx.objectStore('projects').put({
+						id: 'demo',
+						info,
+						files,
+						origin: 'demo',
+						created: now,
+						updated: now
+					});
+					tx.oncomplete = () => {
+						open.result.close();
+						done();
+					};
+					tx.onerror = () => fail(tx.error);
+				};
+				open.onerror = () => fail(open.error);
+			});
+		},
+		{ files, info }
+	);
+}
+
+test('in a review, the sequence marks the messages that are new or changed', async ({ page }) => {
+	test.setTimeout(90_000);
+	await seedEditedDemo(page, (path, text) =>
+		path === 'behaviour/DeliverySequence.sysml'
+			? text
+					.replace(
+						'The operator checks the report and clears the drone for take-off.',
+						'The operator checks the report and the weather, then clears the drone.'
+					)
+					.replace(
+						'            doc /* The parcel is delivered and the drone is on its way home. */\n        }',
+						'            doc /* The parcel is delivered and the drone is on its way home. */\n        }\n        then message landed of Telemetry from drone to groundStation;'
+					)
+			: text
+	);
+	await page.goto('/p/demo');
+	await expect(page.getByRole('status').filter({ hasText: 'Model ready' })).toBeVisible({
+		timeout: 30_000
+	});
+	await page.keyboard.press('Control+k');
+	const palette = page.getByRole('dialog', { name: 'Command palette' });
+	await palette.getByRole('combobox').fill('Review changes');
+	await palette.getByRole('option').filter({ hasText: 'Review changes' }).first().click();
+	const review = page.getByRole('region', { name: 'Review changes' });
+	await expect(review.getByText('landed', { exact: false }).first()).toBeVisible({
+		timeout: 30_000
+	});
+
+	await page
+		.locator('section[aria-labelledby="views-heading"]')
+		.getByRole('button', { name: 'Delivery sequence', exact: true })
+		.click();
+	const diagram = page.getByRole('group', { name: 'Delivery sequence diagram' });
+	await expect(
+		diagram.getByRole('button', { name: /^Message 9: landed .*, added in this review$/ })
+	).toBeVisible({ timeout: 15_000 });
+	await expect(
+		diagram.getByRole('button', {
+			name: /^Message 4: launch of TakeOffCommand.*, changed in this review$/
+		})
+	).toBeVisible();
+	await expect(diagram.locator('.review-badge')).not.toHaveCount(0);
+	const results = await new AxeBuilder({ page }).analyze();
+	expect(
+		results.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)
+	).toEqual([]);
 });

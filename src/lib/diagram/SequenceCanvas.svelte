@@ -15,6 +15,7 @@
 	import type { Workspace } from '#lib/project/workspace.svelte.ts';
 	import { iconOf } from '#lib/ui/kinds.ts';
 	import type { WorkbenchUi } from '#lib/workbench/ui.svelte.ts';
+	import { MARK_WORDS, reviewMarks } from '#lib/review/marks.svelte.ts';
 	import DiagramExport from './DiagramExport.svelte';
 	import type { IconShape } from './export/svg.ts';
 	import {
@@ -397,12 +398,18 @@
 	const headsY = $derived(Math.max(view.y, TOP - SEQUENCE.headTop * view.k));
 	const stuck = $derived(view.y < TOP - SEQUENCE.headTop * view.k);
 
+	/** Review mode: whether what a lifeline or message draws is new or changed. */
+	const reviewOf = (at: { element?: { file: string; start_byte: number } }) =>
+		reviewMarks.markOf(elementOf(at)?.id);
+
 	function messageName(m: MessageArrow) {
 		const what = [m.name, m.payload ? `of ${m.payload}` : null].filter(Boolean).join(' ');
 		const from = layout?.lifelines[m.from]?.name ?? '';
 		const to = layout?.lifelines[m.to]?.name ?? '';
 		const ends = m.self ? `, from ${from} to itself` : `, from ${from} to ${to}`;
-		return `Message ${m.index + 1}: ${what || 'unnamed'}${ends}`;
+		const mark = reviewOf(m.edge);
+		const review = mark ? `, ${MARK_WORDS[mark].said}` : '';
+		return `Message ${m.index + 1}: ${what || 'unnamed'}${ends}${review}`;
 	}
 	function messageTitle(m: MessageArrow) {
 		const parts = [m.edge.message?.doc];
@@ -456,10 +463,11 @@
 				{#each layout.lifelines as l (l.node.id)}
 					{@const Icon = iconOf(l.keyword.replace(/^ref\s+/, '').replace(/ /g, '_'))}
 					{@const state = lifelineState(l)}
+					{@const mark = reviewOf(l.node)}
 					<li>
 						<button
 							type="button"
-							class="head {state ?? ''}"
+							class="head {state ?? ''} {mark ? `review-${mark}` : ''}"
 							style:--fam="var(--kind-{l.family})"
 							style:left="{l.head.x}px"
 							style:top="{l.head.y}px"
@@ -479,6 +487,10 @@
 										>{` : ${l.type}`}</span
 									>{/if}
 							</span>
+							{#if mark}
+								<span class="review-badge" data-badge={MARK_WORDS[mark].badge}></span>
+								<span class="visually-hidden">, {MARK_WORDS[mark].said}</span>
+							{/if}
 						</button>
 					</li>
 				{/each}
@@ -563,10 +575,11 @@
 			<ol class="messages" aria-label="Messages, in time order">
 				{#each layout.messages as m (m.index)}
 					{@const state = messageState(m)}
+					{@const mark = reviewOf(m.edge)}
 					<li>
 						<button
 							type="button"
-							class="message {state ?? ''}"
+							class="message {state ?? ''} {mark ? `review-${mark}` : ''}"
 							class:self={m.self}
 							style:left="{m.label.x}px"
 							style:top="{m.label.y}px"
@@ -582,6 +595,8 @@
 							{#if m.name}<span class="name">{m.name}</span>{/if}
 							{#if m.payload}<span class="payload"><span class="of">of</span> {m.payload}</span
 								>{/if}
+							<!-- The badge is drawn by CSS, so the visible text stays the label's start. -->
+							{#if mark}<span class="review-badge" data-badge={MARK_WORDS[mark].badge}></span>{/if}
 						</button>
 					</li>
 				{/each}
@@ -898,6 +913,42 @@
 		fill: var(--text-2);
 		font-family: var(--font-mono);
 		font-size: 12px;
+	}
+
+	/* Review mode: a ring and a badge, as on the other diagrams' nodes (the badge says it). */
+	.review-added {
+		--review: var(--ok);
+	}
+	.review-changed {
+		--review: var(--warn);
+	}
+	.heads .head.review-added,
+	.heads .head.review-changed,
+	.message.review-added,
+	.message.review-changed {
+		border-color: var(--review);
+		box-shadow:
+			0 0 0 3px color-mix(in oklab, var(--review) 55%, transparent),
+			var(--shadow-sm);
+	}
+	.review-badge::after {
+		content: attr(data-badge);
+	}
+	.review-badge {
+		position: absolute;
+		z-index: 2;
+		top: -9px;
+		right: 8px;
+		padding: 0 6px;
+		border-radius: var(--radius-pill);
+		background: var(--review);
+		color: var(--surface);
+		font-size: 9.5px;
+		font-weight: 800;
+		letter-spacing: 0.04em;
+		line-height: 16px;
+		text-transform: uppercase;
+		pointer-events: none;
 	}
 
 	/* The same toolbar as the other diagrams have, top right. */
