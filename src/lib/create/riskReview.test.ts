@@ -15,7 +15,14 @@ import { applySteps } from '#lib/workbench/actions.ts';
 import { whereOf } from '#lib/workbench/tableFilters.ts';
 import { write } from './apply';
 import { flatten } from './model';
-import { planLineLinks, planSavedReview, type Linked, type PatchPlan } from './plans';
+import { fmeaKind } from './fmea';
+import {
+	planFmeaLine,
+	planLineLinks,
+	planSavedReview,
+	type Linked,
+	type PatchPlan
+} from './plans';
 import { annotationAt, mitigationText, withLineField } from './riskControls';
 import { analysed, hostEngine, openWorkspace, problemsOf } from './testing';
 
@@ -224,6 +231,41 @@ describe('on the demo', { timeout: 60_000 }, () => {
 			'rotorHealthMonitor inProgress',
 			'currentLimiter proposed'
 		]);
+	});
+
+	it('a new line names its controls and mitigations, and can bring a new control', async () => {
+		const workspace = await openWorkspace(host, demoFiles());
+		const pkg = workspace.elements.find((e) => e.kind === 'package' && e.name === 'DroneFmea')!;
+		const node = flatten(workspace.tree).find(
+			(n) => n.qualifiedName === 'DroneArchitecture::drone::camera'
+		)!;
+		const plan = planFmeaLine(workspace, {
+			pkg,
+			kind: fmeaKind('design')!,
+			element: { qualifiedName: node.qualifiedName, label: 'camera' },
+			failureMode: 'Lens fogs up',
+			effect: 'No picture of the drop zone',
+			cause: 'Humidity',
+			severity: 4,
+			likelihood: 5,
+			detection: 3,
+			controls: [linked(workspace, "DroneFmea::'Navigation integrity monitoring'")],
+			mitigations: [linked(workspace, 'DroneFmea::navigationIntegrityMonitor')],
+			newControl: {
+				id: 'RC-004',
+				title: 'Lens heater',
+				statement: 'The camera shall keep its lens above the dew point.',
+				hierarchy: 'inherentSafety'
+			}
+		});
+		expect(plan.preview).toMatchSnapshot();
+		await analysed(workspace, () => write(workspace, plan.label, plan.write));
+		expect(problemsOf(workspace)).toEqual([]);
+		const sheet = await render(workspace, 'fmeaWorksheet');
+		const row = sheet.rows.find((r) => r[1] === 'Lens fogs up')!;
+		expect(row[sheet.columns.indexOf('riskControls')]).toBe(
+			'RC-003 Navigation integrity monitoring, RC-004 Lens heater'
+		);
 	});
 
 	it('flags a high-priority line without a verified control, until one is', async () => {

@@ -518,6 +518,11 @@ export interface FmeaLineInput {
 	hazard?: Chosen | null;
 	preventionControls?: string;
 	detectionControls?: string;
+	/** Risk controls and mitigations of the model that address it. */
+	controls?: Linked[];
+	mitigations?: Linked[];
+	/** A new risk control for it, on its hazard, in the line's package. */
+	newControl?: ControlSpec | null;
 }
 
 export function planFmeaLine(workspace: Workspace, input: FmeaLineInput): Plan {
@@ -526,6 +531,15 @@ export function planFmeaLine(workspace: Workspace, input: FmeaLineInput): Plan {
 	const about = spellFrom(workspace.tree, refs, input.element.qualifiedName);
 	if (!about) return { write: {}, preview: '', label: '' };
 	const hazard = input.hazard ? spellFrom(workspace.tree, refs, input.hazard.qualifiedName) : null;
+	const controls = (input.controls ?? []).map((c) => spellLinked(workspace, refs, c));
+	const mitigations = (input.mitigations ?? []).map((m) => spellLinked(workspace, refs, m));
+	const members: string[] = [];
+	if (input.newControl) {
+		controls.push(sysmlName(input.newControl.id.trim()));
+		const lines = controlText(input.newControl, hazard ?? '').split('\n');
+		members.push((hazard ? lines : lines.filter((l) => !l.includes('ref :>> hazard'))).join('\n'));
+		refs.library('HazardAnalysis::*');
+	}
 	const text = fmeaLineText({
 		about,
 		failureMode: input.failureMode,
@@ -537,11 +551,13 @@ export function planFmeaLine(workspace: Workspace, input: FmeaLineInput): Plan {
 		detection: input.detection,
 		hazard,
 		...(input.preventionControls ? { preventionControls: input.preventionControls } : {}),
-		...(input.detectionControls ? { detectionControls: input.detectionControls } : {})
+		...(input.detectionControls ? { detectionControls: input.detectionControls } : {}),
+		riskControls: controls,
+		mitigations
 	});
 	const write: Write = {
 		imports: importsFor(workspace, input.pkg, refs.imports),
-		members: [{ parent: input.pkg, text: `\n${text}` }]
+		members: [text, ...members].map((t) => ({ parent: input.pkg, text: `\n${t}` }))
 	};
 	return {
 		write,
@@ -689,6 +705,15 @@ export interface LineLinksInput {
 	label: string;
 }
 
+/** How a package refers to a control (by its ID, `'RC-001'`) or a mitigation, importing it when needed. */
+function spellLinked(workspace: Workspace, refs: References, l: Linked): string {
+	const at = l.qualifiedName.lastIndexOf('::');
+	const owner = at < 0 ? '' : l.qualifiedName.slice(0, at);
+	if (l.shortName)
+		return refs.name(owner ? `${owner}::${sysmlName(l.shortName)}` : sysmlName(l.shortName));
+	return spellFrom(workspace.tree, refs, l.qualifiedName) ?? refs.name(l.qualifiedName);
+}
+
 /** The plan as one patch of the line's file, for `applySteps`. */
 export interface PatchPlan {
 	steps: WriteStep[];
@@ -707,15 +732,8 @@ export function planLineLinks(workspace: Workspace, input: LineLinksInput): Patc
 	if (before === undefined) return `${input.file} is not in the project.`;
 	const pkgName = qualifiedName(workspace.tree, input.pkg.key);
 	const refs = new References(pkgName);
-	const spellLinked = (l: Linked) => {
-		const at = l.qualifiedName.lastIndexOf('::');
-		const owner = at < 0 ? '' : l.qualifiedName.slice(0, at);
-		if (l.shortName)
-			return refs.name(owner ? `${owner}::${sysmlName(l.shortName)}` : sysmlName(l.shortName));
-		return spellFrom(workspace.tree, refs, l.qualifiedName) ?? refs.name(l.qualifiedName);
-	};
-	const controls = input.controls.map(spellLinked);
-	const mitigations = input.mitigations.map(spellLinked);
+	const controls = input.controls.map((c) => spellLinked(workspace, refs, c));
+	const mitigations = input.mitigations.map((m) => spellLinked(workspace, refs, m));
 	const members: string[] = [];
 	if (input.newControl) {
 		controls.push(sysmlName(input.newControl.id.trim()));

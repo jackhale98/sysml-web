@@ -67,6 +67,8 @@
 		return engine && !element.isDefinition ? all.filter((c) => c.kind !== 'attribute') : all;
 	});
 	let valueCount = $state(0);
+	/** Whether the project has FMEA lines to show (its risk library's `Fmea`). */
+	const hasRisk = $derived(workspace.elements.some((e) => e.isDefinition && e.name === 'Fmea'));
 	/** The element a `satisfy … by` or verification names: by its resolved id, else by its name. */
 	function traceTarget(by: string): ModelElement | undefined {
 		const id = requirement?.linkIds[by];
@@ -298,6 +300,13 @@
 					<FeatureValues {element} {workspace} {engine} {ui} oncount={(n) => (valueCount = n)} />
 				{/key}
 			</section>
+		{/if}
+
+		{#if engine && !element.isDefinition && hasRisk}
+			<!-- The FMEA lines about it, with their controls (loaded when a project has the risk library). -->
+			{#await import('./FmeaLines.svelte') then { default: FmeaLines }}
+				{#key element.key}<FmeaLines {element} {workspace} {ui} {engine} />{/key}
+			{/await}
 		{/if}
 
 		{#if requirement}

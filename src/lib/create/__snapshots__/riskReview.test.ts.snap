@@ -9,6 +9,27 @@ exports[`a line’s controls > are written as references in the line, added, rep
 }"
 `;
 
+exports[`on the demo > a new line names its controls and mitigations, and can bring a new control 1`] = `
+"// in DroneFmea
+
+@Fmea about drone::camera {
+    failureMode = "Lens fogs up";
+    effect = "No picture of the drop zone";
+    cause = "Humidity";
+    category = RiskCategory::design;
+    severity = 4; likelihood = 5; detection = 3;
+    riskControls = ('RC-003', 'RC-004');
+    mitigations = navigationIntegrityMonitor;
+}
+
+// in DroneFmea
+
+requirement <'RC-004'> 'Lens heater' : RiskControl {
+    doc /* The camera shall keep its lens above the dew point. */
+    :>> hierarchy = ControlHierarchy::inherentSafety;
+}"
+`;
+
 exports[`on the demo > links a line to more controls and a mitigation, and makes new ones, in one step each 1`] = `
 "requirement <'RC-004'> 'Motor current limit' : RiskControl {
     doc /* The motor driver shall limit the current to 30 A. */
