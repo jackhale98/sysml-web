@@ -85,7 +85,7 @@ async function chargeCycle(page: Page) {
 	await expect(emulator.getByText(/Now in charging/)).toBeVisible();
 
 	// Wait until the next timer: 10 minutes on the charger.
-	await emulator.getByRole('button', { name: 'Wait' }).click();
+	await emulator.getByRole('button', { name: 'Wait', exact: true }).click();
 	await expect(emulator.getByText('Now in charging after addCharge, at 35 min')).toBeVisible();
 	await step.click();
 	await expect(emulator.getByText(/at 45 min/)).toBeVisible();
