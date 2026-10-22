@@ -51,6 +51,15 @@ Open a model file to see its text and its diagram side by side (**Split**), or c
 
 You don’t have to write SysML. **Add** in a diagram, the forms in the details panel and **New view** write it for you, and show you the text they write, so you learn it as you go.
 
+### Change what a diagram shows
+
+Right-click a box (long-press on a phone) to see its actions. Two of them look alike but do very different things:
+
+- **Remove from diagram** takes the box off this diagram only. The element stays in the model, in the text and in every other diagram and table. Undo puts it back.
+- **Delete from model** takes the element out of the text, so it leaves every diagram and table. Before you confirm, it says what else uses it: those places show as problems until you change them.
+
+In a saved view, removing an element its `expose` line names removes that line (the view’s own record of what it shows). Anything else is hidden on that diagram, and the layout remembers it beside the positions.
+
 ### The overview and the details panel
 
 The **Overview** shows the project at a glance: what the model has, how many requirements are met and tested, and any problems.
@@ -367,7 +376,8 @@ On a Mac, use ⌘ where it says Ctrl.
 | --- | --- |
 | <kbd>C</kbd> | Connect from the selected element |
 | <kbd>F2</kbd> | Rename |
-| <kbd>Delete</kbd> | Delete |
+| <kbd>H</kbd> | Remove from this diagram (it stays in the model) |
+| <kbd>Delete</kbd> | Delete from the model |
 | <kbd>Arrow keys</kbd> | Move the selected boxes |
 | <kbd>Shift F10</kbd> | The element’s menu |
 | <kbd>+ / − / 0</kbd> | Zoom in, out, fit (sequence diagrams) |

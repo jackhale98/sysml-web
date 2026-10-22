@@ -3,6 +3,11 @@
  * kept per diagram in the project file `layout/diagrams.json`
  * (`{ "<view>:<scope>": { "<nodeId>": [x, y] } }`). Layout is not SysML, so
  * it lives beside the model, but it is saved and exported with it.
+ *
+ * Beside the positions, a diagram can keep what it shows: the nodes taken
+ * off it (`"#hidden": [ids]`) and, for a diagram that is not a saved view,
+ * elements added to it (`"#added": [qualified names]`). A saved view says
+ * what it shows in its `expose` lines instead, where it can.
  */
 
 export const LAYOUT_FILE = 'layout/diagrams.json';
@@ -21,6 +26,19 @@ export interface Box extends XY {
 	width: number;
 	height: number;
 }
+
+/** What a diagram leaves out of, or adds to, what its scope draws. */
+export interface DiagramShown {
+	/** Node ids taken off the diagram (the elements stay in the model). */
+	hidden: string[];
+	/** Qualified names of elements drawn besides the scope's own. */
+	added: string[];
+}
+export type ShownFile = Record<string, DiagramShown>;
+
+const HIDDEN = '#hidden';
+const ADDED = '#added';
+export const NOTHING_CHANGED: DiagramShown = { hidden: [], added: [] };
 
 /** The key of one diagram in the layout file. */
 export function diagramKey(view: string, scope: string | null): string {
@@ -55,23 +73,66 @@ export function parseLayout(text: string | undefined): LayoutFile {
 	return file;
 }
 
-/** Stable, diff-friendly JSON: one node per line, keys sorted. */
-export function serializeLayout(file: LayoutFile): string {
-	const keys = Object.keys(file)
-		.filter((k) => Object.keys(file[k] ?? {}).length)
+/** Read what each diagram hides and adds, ignoring anything else. */
+export function parseShown(text: string | undefined): ShownFile {
+	if (!text?.trim()) return {};
+	let raw: unknown;
+	try {
+		raw = JSON.parse(text);
+	} catch {
+		return {};
+	}
+	if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+	const names = (list: unknown) =>
+		Array.isArray(list) ? list.filter((s): s is string => typeof s === 'string' && !!s) : [];
+	const file: ShownFile = {};
+	for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+		if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
+		const entry = value as Record<string, unknown>;
+		const shown = { hidden: names(entry[HIDDEN]), added: names(entry[ADDED]) };
+		if (shown.hidden.length || shown.added.length) file[key] = shown;
+	}
+	return file;
+}
+
+/** Stable, diff-friendly JSON: one node per line, keys sorted; what is hidden or added first. */
+export function serializeLayout(file: LayoutFile, shown: ShownFile = {}): string {
+	const keys = [...new Set([...Object.keys(file), ...Object.keys(shown)])]
+		.filter(
+			(k) => Object.keys(file[k] ?? {}).length || shown[k]?.hidden.length || shown[k]?.added.length
+		)
 		.sort();
 	if (!keys.length) return '{}\n';
-	const diagrams = keys.map((key) => {
-		const positions = file[key]!;
-		const lines = Object.keys(positions)
+	const list = (names: string[]) =>
+		`[${[...names]
 			.sort()
-			.map((id) => {
-				const [x, y] = positions[id]!;
-				return `\t\t${JSON.stringify(id)}: [${Math.round(x)}, ${Math.round(y)}]`;
-			});
+			.map((n) => JSON.stringify(n))
+			.join(', ')}]`;
+	const diagrams = keys.map((key) => {
+		const positions = file[key] ?? {};
+		const lines: string[] = [];
+		if (shown[key]?.added.length) lines.push(`\t\t"${ADDED}": ${list(shown[key].added)}`);
+		if (shown[key]?.hidden.length) lines.push(`\t\t"${HIDDEN}": ${list(shown[key].hidden)}`);
+		for (const id of Object.keys(positions).sort()) {
+			const [x, y] = positions[id]!;
+			lines.push(`\t\t${JSON.stringify(id)}: [${Math.round(x)}, ${Math.round(y)}]`);
+		}
 		return `\t${JSON.stringify(key)}: {\n${lines.join(',\n')}\n\t}`;
 	});
 	return `{\n${diagrams.join(',\n')}\n}\n`;
+}
+
+/** The file with one diagram's hidden and added elements changed (unknown ids kept as they are). */
+export function withShown(file: ShownFile, key: string, change: Partial<DiagramShown>): ShownFile {
+	const was = file[key] ?? NOTHING_CHANGED;
+	const next = {
+		hidden: [...new Set(change.hidden ?? was.hidden)].sort(),
+		added: [...new Set(change.added ?? was.added)].sort()
+	};
+	const rest = { ...file };
+	if (next.hidden.length || next.added.length) rest[key] = next;
+	else delete rest[key];
+	return rest;
 }
 
 /** The file with one diagram's positions merged in (`null` clears that diagram). */

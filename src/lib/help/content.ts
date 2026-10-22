@@ -104,6 +104,21 @@ export const HELP: HelpSection[] = [
 				]
 			},
 			{
+				id: 'diagram-show-hide',
+				title: 'Change what a diagram shows',
+				keywords: 'hide remove delete diagram view expose model',
+				blocks: [
+					'Right-click a box (long-press on a phone) to see its actions. Two of them look alike but do very different things:',
+					{
+						list: [
+							'**Remove from diagram** takes the box off this diagram only. The element stays in the model, in the text and in every other diagram and table. Undo puts it back.',
+							'**Delete from model** takes the element out of the text, so it leaves every diagram and table. Before you confirm, it says what else uses it: those places show as problems until you change them.'
+						]
+					},
+					'In a saved view, removing an element its `expose` line names removes that line (the view’s own record of what it shows). Anything else is hidden on that diagram, and the layout remembers it beside the positions.'
+				]
+			},
+			{
 				id: 'overview',
 				title: 'The overview and the details panel',
 				keywords: 'home inspector selection problems status bar',
@@ -479,7 +494,8 @@ export const HELP: HelpSection[] = [
 						keys: [
 							['C', 'Connect from the selected element'],
 							['F2', 'Rename'],
-							['Delete', 'Delete'],
+							['H', 'Remove from this diagram (it stays in the model)'],
+							['Delete', 'Delete from the model'],
 							['Arrow keys', 'Move the selected boxes'],
 							['Shift F10', 'The element’s menu'],
 							['+ / − / 0', 'Zoom in, out, fit (sequence diagrams)']

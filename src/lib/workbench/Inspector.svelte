@@ -26,7 +26,7 @@
 	import { humanize, statusLabel } from '#lib/project/status.ts';
 	import type { Workspace } from '#lib/project/workspace.svelte.ts';
 	import Pill from '#lib/ui/Pill.svelte';
-	import { addElement, applySteps, deleteElement, renameElement } from './actions.ts';
+	import { addElement, applySteps, deleteElement, deleteImpact, renameElement } from './actions.ts';
 	import { ownersOf } from '#lib/diagram/model.ts';
 	import { planLinkRemoval } from '#lib/diagram/relationships.ts';
 	import { toasts } from '#lib/ui/toasts.svelte.ts';
@@ -122,6 +122,8 @@
 	let name = $state('');
 	let adding = $state(false);
 	let confirmDelete = $state(false);
+	/** What else deleting it affects, once known. */
+	let impact = $state<string | null>(null);
 	let message = $state<string | null>(null);
 	let learnMore = $state(false);
 
@@ -129,8 +131,19 @@
 		name = element?.label ?? '';
 		adding = false;
 		confirmDelete = false;
+		impact = null;
 		message = null;
 	});
+
+	function askDelete() {
+		if (!element) return;
+		const asked = element;
+		confirmDelete = true;
+		impact = 'Checking what uses it…';
+		void deleteImpact(workspace, asked).then((line) => {
+			if (confirmDelete && element?.key === asked.key) impact = line;
+		});
+	}
 
 	async function rename() {
 		if (!element || name.trim() === element.label) return;
@@ -432,7 +445,11 @@
 			{/if}
 			{#if confirmDelete}
 				<div class="confirm" role="alert">
-					<p>Delete <strong>{element.label}</strong>? References to it will show as problems.</p>
+					<p>
+						Delete <strong>{element.label}</strong> from the model? Its text is removed, so it leaves
+						every diagram and table.
+					</p>
+					{#if impact}<p class="impact" role="status">{impact}</p>{/if}
 					<button
 						type="button"
 						class="button danger"
@@ -443,8 +460,8 @@
 					<button type="button" class="button" onclick={() => (confirmDelete = false)}>Keep</button>
 				</div>
 			{:else}
-				<button type="button" class="button quiet" onclick={() => (confirmDelete = true)}>
-					<Trash2 size={15} /> Delete
+				<button type="button" class="button quiet" onclick={askDelete}>
+					<Trash2 size={15} /> Delete from model
 				</button>
 			{/if}
 			{#if message}<p class="error" role="alert">{message}</p>{/if}
@@ -714,6 +731,9 @@
 	.confirm {
 		display: grid;
 		gap: var(--space-2);
+	}
+	.impact {
+		color: var(--text-2);
 	}
 	.error {
 		color: var(--danger);

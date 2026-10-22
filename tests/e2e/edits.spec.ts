@@ -164,7 +164,7 @@ test('diagram edits: add, specialize, rename and delete', async ({ page }) => {
 	await expect(text).toContainText('part drone : Quadcopter {');
 
 	// Delete: the new definition (once the rename's re-analysis has settled the diagram).
-	const confirm = page.getByRole('alertdialog', { name: 'Delete Payload?' });
+	const confirm = page.getByRole('alertdialog', { name: 'Delete Payload from the model?' });
 	await expect(async () => {
 		await diagram.getByText('Payload', { exact: true }).click();
 		await diagram.getByRole('button', { name: 'Delete' }).click({ timeout: 2_000 });

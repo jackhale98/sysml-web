@@ -115,6 +115,15 @@ export async function deleteElement(
 	);
 }
 
+/** What else a delete affects, in a line for its confirmation. */
+export async function deleteImpact(workspace: Workspace, element: ModelElement): Promise<string> {
+	const broken = await workspace.whatBreaksWithoutElement(element);
+	if (broken === '') return 'Nothing else in the model refers to it.';
+	if (broken === null) return 'Anything that refers to it will show as a problem.';
+	const would = broken.replace(/\bno longer resolves?\b/, 'would no longer resolve');
+	return `Other elements use it: ${would.charAt(0).toLowerCase()}${would.slice(1)} They will show as problems until you change them.`;
+}
+
 /** Change one table cell: the model value behind it, as a minimal SysML edit. */
 export async function setField(
 	workspace: Workspace,

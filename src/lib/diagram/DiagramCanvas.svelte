@@ -19,6 +19,7 @@
 		Cable,
 		CircleDot,
 		CircleStop,
+		EyeOff,
 		FileCode,
 		LayoutGrid,
 		ListTodo,
@@ -36,7 +37,14 @@
 	import type { Workspace } from '#lib/project/workspace.svelte.ts';
 	import { theme } from '#lib/ui/theme.svelte.ts';
 	import { toasts } from '#lib/ui/toasts.svelte.ts';
-	import { addElement, applySteps, deleteElement, renameElement } from '#lib/workbench/actions.ts';
+	import {
+		addElement,
+		applySteps,
+		deleteElement,
+		deleteImpact,
+		renameElement,
+		undoable
+	} from '#lib/workbench/actions.ts';
 	import AddForm from '#lib/workbench/AddForm.svelte';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
 	import { canOwnMembers, formatName, type AddKind } from '#lib/workbench/templates.ts';
@@ -92,13 +100,17 @@
 	import NodeMenu, { type MenuItem } from './NodeMenu.svelte';
 	import {
 		LAYOUT_FILE,
+		NOTHING_CHANGED,
 		diagramKey,
 		freeSpot,
 		parseLayout,
+		parseShown,
 		placeAround,
 		renamedNode,
 		serializeLayout,
 		withPositions,
+		withShown,
+		type DiagramShown,
 		type XY
 	} from './positions.ts';
 	import RelationPopover from './RelationPopover.svelte';
@@ -110,6 +122,7 @@
 		type RelationOption
 	} from './relationships.ts';
 	import SysmlEdge from './SysmlEdge.svelte';
+	import { planUnexpose, withoutHidden } from './viewEdits.ts';
 	import SysmlNode from './SysmlNode.svelte';
 	import type { SysmlEdgeData, SysmlNodeData } from './types.ts';
 	import { MARK_WORDS, reviewMarks, type ReviewMark } from '#lib/review/marks.svelte.ts';
@@ -182,6 +195,8 @@
 	let confirm = $state<{
 		title: string;
 		detail: string;
+		/** What else changes, once it is known ("Checking…" until then). */
+		impact?: string;
 		statement?: string;
 		action: string;
 		run: () => Promise<string | null>;
@@ -363,17 +378,52 @@
 
 	/** Pin positions (merged), or clear this diagram's with `null`. */
 	function savePositions(update: Record<string, XY> | null, drop: string[] = []) {
-		let file = parseLayout(workspace.text(LAYOUT_FILE));
+		const current = workspace.text(LAYOUT_FILE);
+		let file = parseLayout(current);
 		if (drop.length && file[layoutKey]) {
 			const kept = { ...file[layoutKey] };
 			for (const id of drop) delete kept[id];
 			file = { ...file, [layoutKey]: kept };
 		}
 		file = withPositions(file, layoutKey, update);
-		const text = serializeLayout(file);
-		if (text === (workspace.text(LAYOUT_FILE) ?? '{}\n')) return;
+		const text = serializeLayout(file, parseShown(current));
+		if (text === (current ?? '{}\n')) return;
 		workspace.setText(LAYOUT_FILE, text);
 	}
+
+	/** What this diagram hides, and adds to what its scope draws (kept in the layout file). */
+	const shown: DiagramShown = $derived(
+		parseShown(workspace.text(LAYOUT_FILE))[layoutKey] ?? NOTHING_CHANGED
+	);
+
+	/** Change what this diagram hides or adds; part of the caller's undoable step. */
+	function saveShown(change: Partial<DiagramShown>) {
+		const current = workspace.text(LAYOUT_FILE);
+		const text = serializeLayout(
+			parseLayout(current),
+			withShown(parseShown(current), layoutKey, change)
+		);
+		if (text !== (current ?? '{}\n')) workspace.setText(LAYOUT_FILE, text);
+	}
+
+	/**
+	 * The saved view this diagram draws, when it is one (a general view of a
+	 * `view` usage): what it shows is written in its `expose` lines.
+	 */
+	const savedView = $derived.by(() => {
+		if (view !== 'general' || !scope) return undefined;
+		const info = workspace.views.find(
+			(v) => v.isUsage && !v.builtin && (v.qualifiedName ?? v.name) === scope
+		);
+		if (!info) return undefined;
+		return workspace.elements.find(
+			(e) =>
+				e.kind === 'view' &&
+				!e.isDefinition &&
+				e.file === info.file &&
+				(qualifiedName(e, owners) === scope || e.name === info.name)
+		);
+	});
 
 	/**
 	 * Once the person arranges a diagram, keep all of it as they see it:
@@ -440,7 +490,8 @@
 		const current = ++generation;
 		try {
 			const files = workspace.sourceFiles();
-			const graph = await engine.diagram(view, files, scope);
+			const hidden = untrack(() => shown.hidden);
+			const graph = withoutHidden(await engine.diagram(view, files, scope), hidden);
 			if (current !== generation) return;
 			// Laying out thousands of boxes takes the page minutes and draws nothing readable.
 			if (graph.nodes.length > MAX_NODES) {
@@ -649,6 +700,19 @@
 		clearTimeout(timer);
 		timer = setTimeout(() => void refresh(), delay);
 		return () => clearTimeout(timer);
+	});
+
+	// Redraw when what the diagram hides or adds changes (also by undo).
+	let lastShown: string | null = null;
+	$effect(() => {
+		const key = JSON.stringify([layoutKey, shown]);
+		if (lastShown === null || lastShown === key) {
+			lastShown = key;
+			return;
+		}
+		lastShown = key;
+		clearTimeout(timer);
+		timer = setTimeout(() => void refresh(), 0);
 	});
 
 	// Reflect the selection without relaying out.
@@ -1291,17 +1355,24 @@
 		if (element) {
 			items.push({ label: 'Show in text', icon: FileCode, run: () => showInText(element) });
 		}
+		items.push({
+			label: 'Remove from diagram',
+			detail: 'It stays in the model',
+			icon: EyeOff,
+			shortcut: 'H',
+			run: () => void removeFromDiagram(id)
+		});
 		if (element && !isLibrary(element)) {
 			items.push({
-				label: 'Delete',
+				label: 'Delete from model…',
+				detail: 'Takes it out of the text',
 				icon: Trash2,
 				shortcut: 'Del',
 				danger: true,
 				run: () => askDeleteNode(id)
 			});
 		}
-		if (!items.length) return;
-		const at = inCanvas(point ?? underNode(id), 220, 48 + items.length * 40);
+		const at = inCanvas(point ?? underNode(id), 236, 48 + items.length * 48);
 		menu = { title: node.data.node.label, items, ...at, focus: id };
 	}
 
@@ -1374,12 +1445,46 @@
 		menu = null;
 		confirmError = null;
 		confirm = {
-			title: `Delete ${element.label}?`,
-			detail: `It is removed from ${element.file}. References to it elsewhere will show as problems.`,
+			title: `Delete ${element.label} from the model?`,
+			detail: `Its text is removed from ${element.file}, so it leaves every diagram and table.`,
+			impact: 'Checking what uses it…',
 			action: 'Delete',
 			run: () => deleteElement(workspace, element),
 			focus
 		};
+		void deleteImpact(workspace, element).then((impact) => {
+			if (confirm?.title === `Delete ${element.label} from the model?`) confirm.impact = impact;
+		});
+	}
+
+	/**
+	 * Take a node off this diagram, never out of the model: a saved view loses
+	 * the `expose` line that names it (when another still shows it, or it has
+	 * none of its own, it is hidden); any other diagram hides it. One undoable step.
+	 */
+	async function removeFromDiagram(id: string) {
+		menu = null;
+		const node = nodes.find((n) => n.id === id);
+		if (!node) return;
+		const element = elementOf(id);
+		const name = node.data.node.label || id;
+		const unexposed =
+			savedView && element && !isLibrary(savedView)
+				? planUnexpose(savedView, element, ctx)
+				: { steps: [], removed: [], stillShown: true };
+		const label = unexposed.steps.length
+			? `Removed ${name} from this view (it stays in the model)`
+			: `Hid ${name} on this diagram (it stays in the model)`;
+		const error = await undoable(workspace, label, async () => {
+			if (unexposed.steps.length) {
+				const refused = await applySteps(workspace, label, unexposed.steps, checkSyntax);
+				if (refused) return refused;
+			}
+			if (unexposed.stillShown) saveShown({ hidden: [...shown.hidden, id] });
+			return null;
+		});
+		if (error) toasts.show(error, { tone: 'error' });
+		else host.focus({ preventScroll: true });
 	}
 
 	function askDeleteEdge(edge: Edge<SysmlEdgeData>) {
@@ -1530,6 +1635,9 @@
 		} else if (event.key.toLowerCase() === 'c' && plain && !event.shiftKey && id) {
 			event.preventDefault();
 			startConnect(id);
+		} else if (event.key.toLowerCase() === 'h' && plain && !event.shiftKey && id) {
+			event.preventDefault();
+			void removeFromDiagram(id);
 		} else if ((event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey)) && id) {
 			event.preventDefault();
 			openNodeMenu(id);
@@ -1649,9 +1757,9 @@
 		connectionLineStyle="stroke: var(--accent); stroke-width: 2; stroke-dasharray: 6 4;"
 		ariaLabelConfig={{
 			'node.a11yDescription.default':
-				'Press Enter to select. Then Enter or F2 renames, C connects it to another element, Delete removes it, and Shift+F10 lists all actions.',
+				'Press Enter to select. Then Enter or F2 renames, C connects it to another element, H removes it from this diagram, Delete deletes it from the model, and Shift+F10 lists all actions.',
 			'node.a11yDescription.keyboardDisabled':
-				'Press Enter to select. Then Enter or F2 renames, C connects, Delete removes, arrow keys move it.',
+				'Press Enter to select. Then Enter or F2 renames, C connects, H removes it from this diagram, Delete deletes it from the model, arrow keys move it.',
 			'edge.a11yDescription.default':
 				'Press Enter to select a relationship, then Delete to remove its statement.'
 		}}
@@ -1989,6 +2097,7 @@
 			items={menu.items}
 			x={menu.x}
 			y={menu.y}
+			sheet={narrow}
 			onclose={(restore) => {
 				const back = menu?.focus;
 				menu = null;
@@ -2014,7 +2123,10 @@
 			}}
 		>
 			<p class="confirm-title">{confirm.title}</p>
-			<p id="diagram-confirm-detail" class="hint">{confirm.detail}</p>
+			<p id="diagram-confirm-detail" class="hint">
+				{confirm.detail}
+				{#if confirm.impact}<span class="impact" role="status">{confirm.impact}</span>{/if}
+			</p>
 			{#if confirm.statement}<code class="statement">{confirm.statement}</code>{/if}
 			{#if confirmError}<p class="error" role="alert">{confirmError}</p>{/if}
 			<div class="confirm-actions">
@@ -2330,6 +2442,11 @@
 	}
 	.confirm-title {
 		font-weight: 650;
+	}
+	.impact {
+		display: block;
+		margin-top: var(--space-1);
+		color: var(--text-2);
 	}
 	.statement {
 		overflow-wrap: anywhere;

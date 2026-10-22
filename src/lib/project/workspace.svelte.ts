@@ -465,6 +465,31 @@ export class Workspace {
 	}
 
 	/**
+	 * What would stop resolving without this element: the warning its
+	 * removal would give, worked out without changing anything ('' when
+	 * nothing refers to it, null when it can't be told).
+	 */
+	async whatBreaksWithoutElement(element: ModelElement): Promise<string | null> {
+		const engine = this.engine;
+		const source = this.files[element.file];
+		if (!engine || source === undefined) return null;
+		try {
+			const result = await engine.edit({
+				op: 'remove',
+				path: element.file,
+				source,
+				name: element.name,
+				line: element.span.start_row,
+				...(element.id ? { id: element.id } : {}),
+				files: this.sourceFiles()
+			});
+			return result.warning ?? '';
+		} catch {
+			return null;
+		}
+	}
+
+	/**
 	 * What would stop resolving without this file: the warnings of removing
 	 * each of its top-level elements (the check an element's delete makes),
 	 * worked out without changing anything.

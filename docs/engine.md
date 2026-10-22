@@ -271,7 +271,8 @@ its resolver recorded, reparses, and refuses an edit that doesn't parse
   Svelte Flow and ELK.
 
 Node ids are names as written, because `layout/diagrams.json` keys positions
-by them: a definition `Battery`, a usage its path `drone.battery`, a state or
+by them (and the nodes a diagram hides, its `#hidden` list; see
+`diagram/positions.ts`): a definition `Battery`, a usage its path `drone.battery`, a state or
 action its path in the machine, `__initial__`/`__final__`, unnamed control
 nodes `fork#1`, `decide#1`; a clash takes the qualified name. Each node also
 carries `element` (file and declaration byte), which the canvas uses to find
