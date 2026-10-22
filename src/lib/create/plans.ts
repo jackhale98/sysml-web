@@ -22,13 +22,7 @@ import { comparisons, requireConstraints, requirementText, satisfyText, type Lim
 import { enclosingPackage, qualifiedName } from './model';
 import { rollupExpression, rollupMember, rollupPlan, type RollupPlan } from './rollup';
 import { References, camelName, name as sysmlName, pascalName, uniqueName } from './sysml';
-import {
-	tradeImports,
-	tradeStudyText,
-	tradeViewText,
-	type CriterionSpec,
-	type TradeSpec
-} from './trade';
+import { tradeStudyText, tradeViewText, type CriterionSpec, type TradeSpec } from './trade';
 import { viewText, type Target, type ViewKind } from './view';
 
 export interface Plan {
@@ -376,7 +370,6 @@ export function planTrade(
 		criteria: input.criteria,
 		imports: refs.imports
 	};
-	void tradeImports;
 	const text = tradeStudyText(spec);
 	const path = freePath(workspace, `analysis/${packageName}.sysml`);
 	const viewName = uniqueName(base, viewNames(workspace));
