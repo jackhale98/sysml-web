@@ -399,7 +399,7 @@
 						<h3>Where your projects are kept</h3>
 						<p>
 							In <strong>this browser, on this device</strong>. Every change is saved here as you
-							work; nothing is uploaded to a SysML Web server (there isn't one).
+							work; nothing is uploaded to a Fairtide server (there isn't one).
 						</p>
 						<ul class="facts">
 							<li>
@@ -522,8 +522,8 @@
 							{#if signedIn}
 								<p class="muted">
 									You signed in with GitHub. Your sign-in is kept only in this browser and renews
-									itself while you use SysML Web. SysML Web can use only the repositories you chose
-									on GitHub.
+									itself while you use Fairtide. Fairtide can use only the repositories you chose on
+									GitHub.
 								</p>
 								<div class="row">
 									<button type="button" class="button" onclick={() => accounts.signOut()}>
@@ -537,7 +537,7 @@
 									{/if}
 								</div>
 								<p class="muted small">
-									Signing out forgets your sign-in here. To remove SysML Web's access everywhere,
+									Signing out forgets your sign-in here. To remove Fairtide's access everywhere,
 									revoke it on GitHub under
 									<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external link -->
 									<a
@@ -580,9 +580,9 @@
 				{:else if section === 'about'}
 					<section class="block about">
 						<div class="brand">
-							<Logo size={40} />
+							<Logo size={48} variant="tile" />
 							<div>
-								<strong>SysML Web</strong>
+								<strong>Fairtide</strong>
 								<span class="muted">Version {version}</span>
 							</div>
 						</div>
@@ -605,7 +605,7 @@
 					<section class="block">
 						<h3>Licences</h3>
 						<p>
-							SysML Web is free software, available under either the
+							Fairtide is free software, available under either the
 							<a
 								href="https://spdx.org/licenses/Apache-2.0.html"
 								target="_blank"
@@ -669,7 +669,7 @@
 					<section class="block">
 						<h3>Trademarks</h3>
 						<p class="muted">
-							SysML is a registered trademark of the Object Management Group (OMG). SysML Web is an
+							SysML is a registered trademark of the Object Management Group (OMG). Fairtide is an
 							independent project, not affiliated with or endorsed by OMG.
 						</p>
 					</section>

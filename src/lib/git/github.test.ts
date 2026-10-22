@@ -360,7 +360,7 @@ describe('GitHubProvider', () => {
 		}
 		expect((await failing(401)).message).toMatch(/Sign in again/);
 		expect((await failing(403)).message).toMatch(/choose repositories on GitHub/);
-		expect((await failing(404)).message).toMatch(/SysML Web can use this repository/);
+		expect((await failing(404)).message).toMatch(/Fairtide can use this repository/);
 	});
 
 	it('retries once with a renewed token when GitHub refuses one', async () => {

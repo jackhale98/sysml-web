@@ -68,12 +68,12 @@
 	<form class="connect" class:fallback onsubmit={connect}>
 		{#if fallback}
 			<p class="intro">
-				Rather not sign in? Give SysML Web an <strong>access token</strong> instead: a password just for
+				Rather not sign in? Give Fairtide an <strong>access token</strong> instead: a password just for
 				this app, limited to the repositories you choose.
 			</p>
 		{:else}
 			<p class="intro">
-				SysML Web works with GitHub straight from your browser. To let it open and save your models,
+				Fairtide works with GitHub straight from your browser. To let it open and save your models,
 				give it an <strong>access token</strong>: a password just for this app, limited to the
 				repositories you choose.
 			</p>
@@ -149,7 +149,7 @@
 	<div class="connect">
 		<p class="intro">
 			Sign in with GitHub to open your models and save them back. You choose which repositories
-			SysML Web can use.
+			Fairtide can use.
 		</p>
 		<button
 			type="button"

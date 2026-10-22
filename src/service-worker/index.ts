@@ -1,5 +1,5 @@
 /**
- * Keeps SysML Web working offline once visited. What is cached and how each
+ * Keeps Fairtide working offline once visited. What is cached and how each
  * request is answered is decided in `#lib/offline/caching.ts`; this file only
  * talks to the Cache API. Registered by `#lib/offline/pwa.svelte.ts` after the
  * page has loaded, so it never competes with the first paint.

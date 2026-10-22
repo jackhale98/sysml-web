@@ -63,6 +63,28 @@ test('the inspector suggests types from the project and the standard library', a
 test.describe('on a phone', () => {
 	test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 
+	test('a tapped type suggestion fills the field', async ({ page }) => {
+		await openDemo(page);
+		await searchFor(page, 'powerDistribution');
+		await page
+			.getByRole('option', { name: /powerDistribution/ })
+			.first()
+			.tap();
+		const partType = page.getByRole('combobox', { name: /^Type/ });
+		await partType.tap();
+		await partType.fill('Batt');
+		const suggestion = page
+			.getByRole('listbox', { name: 'Suggestions' })
+			.getByRole('option', { name: /^Battery\b/ })
+			.first();
+		// The field loses focus as the finger lifts, as it does on a phone.
+		await suggestion.dispatchEvent('pointerdown', { pointerType: 'touch', isPrimary: true });
+		await partType.evaluate((el) => (el as HTMLInputElement).blur());
+		await suggestion.dispatchEvent('pointerup', { pointerType: 'touch', isPrimary: true });
+		await expect(partType).toHaveValue('Battery');
+		await expect(page.getByRole('region', { name: 'Notifications' })).toContainText(/Battery/);
+	});
+
 	test('search in a table takes you to the row, or shows only the matches', async ({ page }) => {
 		await openDemo(page);
 		await page

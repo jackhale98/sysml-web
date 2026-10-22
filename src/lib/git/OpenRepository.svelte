@@ -1,11 +1,12 @@
 <script lang="ts">
+	import FairtideLoader from '#lib/ui/FairtideLoader.svelte';
 	/**
 	 * Choose a GitHub repository and branch: from the account's repositories
 	 * (searchable) or a pasted URL. Connects the account first if needed.
 	 * `run` does the work (open as a project, or connect the current one)
 	 * while the dialog shows progress and any error.
 	 */
-	import { ExternalLink, GitBranch, LoaderCircle, Lock, Search, X } from '@lucide/svelte';
+	import { ExternalLink, GitBranch, Lock, Search, X } from '@lucide/svelte';
 	import { pwa } from '#lib/offline/pwa.svelte.ts';
 	import { accounts } from './account.svelte.ts';
 	import ConnectGitHub from './ConnectGitHub.svelte';
@@ -221,13 +222,13 @@
 					<fieldset class="repos" id="{uid}-repos">
 						<legend class="visually-hidden">Repository</legend>
 						{#if repos === null}
-							<p class="muted pad" role="status">
-								<LoaderCircle size={14} class="spin" aria-hidden="true" /> Loading your repositories…
+							<p class="muted pad loading" role="status">
+								<FairtideLoader size={28} label="" /> Loading your repositories…
 							</p>
 						{:else if !results.length && !repos.length && installLink}
 							<div class="none">
 								<p>
-									<strong>Choose the repositories SysML Web can use.</strong>
+									<strong>Choose the repositories Fairtide can use.</strong>
 									GitHub asks you once which of your repositories (or your organisation’s) to open here.
 									You’ll come straight back.
 								</p>

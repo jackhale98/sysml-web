@@ -344,7 +344,7 @@ export async function completeSignIn(
 	if (!pending || now() - pending.startedAt > PENDING_TTL)
 		throw new GitError(
 			'invalid',
-			'This sign-in has expired or was started somewhere else. Start again from SysML Web.'
+			'This sign-in has expired or was started somewhere else. Start again from Fairtide.'
 		);
 	const denied = params.get('error');
 	if (denied)
@@ -359,7 +359,7 @@ export async function completeSignIn(
 	if (params.get('state') !== pending.state)
 		throw new GitError(
 			'invalid',
-			'This sign-in doesn’t match the one started here, so it was stopped to keep your account safe. Start again from SysML Web.'
+			'This sign-in doesn’t match the one started here, so it was stopped to keep your account safe. Start again from Fairtide.'
 		);
 	const code = params.get('code');
 	if (!code) throw new GitError('invalid', 'GitHub didn’t send a sign-in code back. Try again.');

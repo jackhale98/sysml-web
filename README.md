@@ -1,4 +1,4 @@
-# SysML Web
+# Fairtide
 
 A web workbench that makes **SysML v2** approachable. Build models in text or
 diagrams — both edit the same SysML, live — with plain-language explanations

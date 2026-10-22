@@ -2,7 +2,7 @@
 
 You register two things once, a Cloudflare worker and a GitHub App, then put
 their IDs into the worker and into the site's build variables. After that,
-anyone can tap **Sign in with GitHub** wherever SysML Web asks to connect
+anyone can tap **Sign in with GitHub** wherever Fairtide asks to connect
 GitHub, instead of creating an access token.
 
 Until this is set up the site works as before: people connect with a
@@ -23,7 +23,7 @@ to the GitHub API.
 
 ```mermaid
 sequenceDiagram
-    participant B as Browser (SysML Web)
+    participant B as Browser (Fairtide)
     participant G as GitHub
     participant W as Worker
     B->>G: 1. Sign in (authorize, PKCE challenge)
@@ -124,7 +124,7 @@ refresh automatically (for about 6 months, after which people sign in again).
 
    | Field                                                  | Value                                                   |
    | ------------------------------------------------------ | ------------------------------------------------------- |
-   | GitHub App name                                        | `SysML Web` (must be unique on GitHub; any name works)  |
+   | GitHub App name                                        | `Fairtide` (must be unique on GitHub; any name works)  |
    | Homepage URL                                           | `https://jackhale98.github.io/sysml-web/`               |
    | Callback URL                                           | `https://jackhale98.github.io/sysml-web/auth/callback/` |
    | Expire user authorization tokens                       | Checked                                                 |
@@ -147,7 +147,7 @@ refresh automatically (for about 6 months, after which people sign in again).
 You don't need a private key: the app never acts on its own, only on behalf of
 the signed-in person.
 
-The first time someone signs in, GitHub asks them to approve SysML Web. If the
+The first time someone signs in, GitHub asks them to approve Fairtide. If the
 app isn't on any of their repositories yet, the app shows **Choose
 repositories on GitHub**, which installs it on the repositories they pick and
 brings them straight back. They can add or remove repositories later the same

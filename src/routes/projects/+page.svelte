@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Wordmark from '#lib/ui/Wordmark.svelte';
 	import { onMount, tick } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
@@ -201,13 +202,13 @@
 </script>
 
 <svelte:head>
-	<title>Your projects · SysML Web</title>
+	<title>Your projects · Fairtide</title>
 	<meta name="description" content="Create, open and import SysML v2 projects." />
 </svelte:head>
 
 <div class="page">
 	<header class="top">
-		<a class="brand" href={resolve('/')}><Logo size={26} /> <span>SysML Web</span></a>
+		<a class="brand" href={resolve('/')}><Logo size={26} /> <Wordmark height={19} /></a>
 		<span class="tools">
 			<button
 				type="button"

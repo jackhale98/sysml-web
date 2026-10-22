@@ -1,13 +1,14 @@
 <script lang="ts">
+	import FairtideLoader from '#lib/ui/FairtideLoader.svelte';
 	/**
 	 * Back from GitHub: finish signing in, then return to the page the person
 	 * started from. Also where GitHub lands after someone chooses which
-	 * repositories SysML Web may use.
+	 * repositories Fairtide may use.
 	 */
 	import { onMount } from 'svelte';
 	import { goto, replaceState } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { CircleAlert, LoaderCircle } from '@lucide/svelte';
+	import { CircleAlert } from '@lucide/svelte';
 	import { accounts } from '#lib/git/account.svelte.ts';
 	import { messageOf } from '#lib/git/errors.ts';
 	import GitHubMark from '#lib/git/GitHubMark.svelte';
@@ -87,7 +88,7 @@
 </script>
 
 <svelte:head>
-	<title>Signing in · SysML Web</title>
+	<title>Signing in · Fairtide</title>
 	<meta name="robots" content="noindex" />
 </svelte:head>
 
@@ -115,12 +116,12 @@
 					</button>
 				{/if}
 				<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- a page on this site, checked by safeReturn -->
-				<a class="button" href={back}>Back to SysML Web</a>
+				<a class="button" href={back}>Back to Fairtide</a>
 			</div>
 		{:else}
 			<h1 class="visually-hidden">Signing in</h1>
 			<p class="status" role="status">
-				<LoaderCircle size={18} class="spin" aria-hidden="true" />
+				<FairtideLoader size={32} label="" />
 				{status}
 			</p>
 		{/if}

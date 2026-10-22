@@ -1,6 +1,6 @@
 # Table rendering
 
-How SysML Web turns a SysML v2 view into a table. The `TableRendering`
+How Fairtide turns a SysML v2 view into a table. The `TableRendering`
 metadata is defined in the `Reporting` library (`libraries/Reporting.sysml`
 in the demo and in new projects); this page documents it for anyone writing
 view definitions by hand or building another tool that reads them.

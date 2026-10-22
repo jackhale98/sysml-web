@@ -71,7 +71,7 @@
 </script>
 
 <svelte:head>
-	<title>{workspace.info?.name ?? 'Project'} · SysML Web</title>
+	<title>{workspace.info?.name ?? 'Project'} · Fairtide</title>
 </svelte:head>
 
 {#if missing}

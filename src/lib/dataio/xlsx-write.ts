@@ -171,7 +171,7 @@ export async function writeXlsx(sheet: SheetData): Promise<Uint8Array> {
 		XML_HEAD +
 		'<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">' +
 		`<dc:title>${escapeXml(sheet.title ?? name)}</dc:title>` +
-		'<dc:creator>SysML Web</dc:creator>' +
+		'<dc:creator>Fairtide</dc:creator>' +
 		'</cp:coreProperties>';
 
 	const contentTypes =

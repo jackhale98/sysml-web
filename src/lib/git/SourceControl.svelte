@@ -1,4 +1,5 @@
 <script lang="ts">
+	import FairtideLoader from '#lib/ui/FairtideLoader.svelte';
 	/**
 	 * The project's GitHub side sheet: what changed (with diffs and Discard),
 	 * Save to GitHub (commit & push), Get latest (pull, with a per-file choice
@@ -71,7 +72,7 @@
 	const connected = $derived(accounts.connected);
 	/** Signed in with GitHub (rather than with an access token). */
 	const signedIn = $derived(accounts.github?.via === 'app');
-	/** Signed in: where to choose the repositories SysML Web can use. */
+	/** Signed in: where to choose the repositories Fairtide can use. */
 	const installLink = $derived(signedIn ? chooseRepositoriesUrl() : null);
 
 	function chooseOnGitHub(event: MouseEvent) {
@@ -349,7 +350,7 @@
 				</span>
 				{#if busy === 'checking'}
 					<span class="sync muted" role="status">
-						<LoaderCircle size={14} class="spin" aria-hidden="true" /> Checking GitHub…
+						<FairtideLoader size={24} label="" /> Checking GitHub…
 					</span>
 				{:else if git.behind > 0}
 					<span class="sync warn" role="status">

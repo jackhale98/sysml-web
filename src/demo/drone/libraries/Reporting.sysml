@@ -3,7 +3,7 @@ package Reporting {
     /*
      * The table-rendering convention for SysML v2 views: attach
      * @TableRendering to a view def to say which rows and columns its table
-     * has. Documented in docs/table-rendering.md of SysML Web.
+     * has. Documented in docs/table-rendering.md of Fairtide.
      */
 
     private import ScalarValues::*;

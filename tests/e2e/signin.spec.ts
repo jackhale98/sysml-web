@@ -182,7 +182,7 @@ test.describe('with sign-in set up', () => {
 		await dialog.getByRole('button', { name: 'Sign in with GitHub' }).click();
 
 		const reopened = page.getByRole('dialog', { name: 'Open from GitHub' });
-		await expect(reopened.getByText('Choose the repositories SysML Web can use.')).toBeVisible({
+		await expect(reopened.getByText('Choose the repositories Fairtide can use.')).toBeVisible({
 			timeout: 15_000
 		});
 		const choose = reopened.getByRole('link', { name: /Choose repositories on GitHub/ });
@@ -212,7 +212,7 @@ test.describe('with sign-in set up', () => {
 		await page.goto('/auth/callback/?code=stolen&state=forged');
 		await expect(page.getByRole('heading', { name: 'Couldn’t sign you in' })).toBeVisible();
 		await expect(page.getByRole('alert')).toContainText(/expired or was started somewhere else/);
-		await expect(page.getByRole('link', { name: 'Back to SysML Web' })).toBeVisible();
+		await expect(page.getByRole('link', { name: 'Back to Fairtide' })).toBeVisible();
 		await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
 		expect(seen.worker).toEqual([]);
 		await expectAccessible(page);

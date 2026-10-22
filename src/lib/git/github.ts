@@ -48,8 +48,8 @@ export interface TokenSource {
  */
 export function tokenUrl(): string {
 	const params = new URLSearchParams({
-		name: 'SysML Web',
-		description: 'Open and save SysML models from SysML Web (sysml-web).',
+		name: 'Fairtide',
+		description: 'Open and save SysML models from Fairtide.',
 		expires_in: '90',
 		contents: 'write',
 		pull_requests: 'write',
