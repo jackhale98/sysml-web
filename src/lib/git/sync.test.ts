@@ -51,6 +51,30 @@ describe('local changes', () => {
 		expect(localChanges(next, local)).toEqual([]);
 	});
 
+	it('shows a renamed or moved file as deleted at one path and added at the other', () => {
+		const local = texts(base);
+		delete local['model/B.sysml'];
+		local['structure/B.sysml'] = base['model/B.sysml']!.text;
+		const changes = localChanges(base, local);
+		expect(changes.map((c) => [c.path, c.status])).toEqual([
+			['model/B.sysml', 'deleted'],
+			['structure/B.sysml', 'added']
+		]);
+		expect(fileChanges(changes)).toEqual([
+			{ path: 'model/B.sysml', text: null },
+			{ path: 'structure/B.sysml', text: 'part def B;\n' }
+		]);
+		const next = baseAfterCommit(base, fileChanges(changes), { 'structure/B.sysml': 'b2' });
+		expect(next['model/B.sysml']).toBeUndefined();
+		expect(localChanges(next, local)).toEqual([]);
+		expect(defaultMessage(changes)).toBe('Move B.sysml to structure/');
+
+		const renamed = texts(base);
+		delete renamed['model/B.sysml'];
+		renamed['model/Bee.sysml'] = base['model/B.sysml']!.text;
+		expect(defaultMessage(localChanges(base, renamed))).toBe('Rename B.sysml to Bee.sysml');
+	});
+
 	it('names commits and branches sensibly', () => {
 		expect(defaultMessage([{ path: 'm/A.sysml', status: 'modified', before: '', after: '' }])).toBe(
 			'Update A.sysml'

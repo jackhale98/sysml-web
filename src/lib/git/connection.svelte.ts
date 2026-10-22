@@ -351,6 +351,18 @@ export function defaultMessage(changes: LocalChange[]): string {
 		const verb = c.status === 'added' ? 'Add' : c.status === 'deleted' ? 'Delete' : 'Update';
 		return `${verb} ${name(c.path)}`;
 	}
+	// A renamed or moved file: the host sees it deleted at one path and added at another.
+	const gone = changes.find((c) => c.status === 'deleted');
+	const added = changes.find((c) => c.status === 'added');
+	if (changes.length === 2 && gone && added && gone.before === added.after) {
+		if (name(gone.path) === name(added.path)) {
+			const folder = added.path.includes('/')
+				? added.path.slice(0, added.path.lastIndexOf('/'))
+				: '';
+			return `Move ${name(added.path)} to ${folder ? `${folder}/` : 'the top level'}`;
+		}
+		return `Rename ${name(gone.path)} to ${name(added.path)}`;
+	}
 	const shown = changes.slice(0, 3).map((c) => name(c.path));
 	return `Update ${shown.join(', ')}${changes.length > 3 ? ` and ${changes.length - 3} more` : ''}`;
 }
