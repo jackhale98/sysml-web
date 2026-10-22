@@ -41,7 +41,7 @@ jobs:
           PUBLIC_GITHUB_APP_SLUG: ${{ vars.PUBLIC_GITHUB_APP_SLUG }}
           PUBLIC_SYNC_WORKER: ${{ vars.PUBLIC_SYNC_WORKER }}
 
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v6
 
       - uses: actions/upload-pages-artifact@v3
         with:
