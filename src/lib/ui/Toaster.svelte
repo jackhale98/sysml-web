@@ -7,7 +7,19 @@
 		typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 </script>
 
-<section class="toaster" aria-label="Notifications" aria-live="polite">
+<!-- Toasts wait while the pointer is on them or focus is in them. -->
+<section
+	class="toaster"
+	aria-label="Notifications"
+	aria-live="polite"
+	onpointerenter={() => toasts.pause()}
+	onpointerleave={() => toasts.resume()}
+	onfocusin={() => toasts.pause()}
+	onfocusout={(event) => {
+		const to = event.relatedTarget as Node | null;
+		if (!to || !event.currentTarget.contains(to)) toasts.resume();
+	}}
+>
 	{#each toasts.items as toast (toast.id)}
 		<div
 			class="toast {toast.tone}"
