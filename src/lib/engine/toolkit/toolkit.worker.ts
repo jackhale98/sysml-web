@@ -12,6 +12,7 @@
 import type { Method, SourceFile } from '../protocol';
 import type { DiagramView, EditRequest } from '../types';
 import type { Toolkit } from './api';
+import { AnalysisSender } from './delta';
 import { ToolkitHost } from './host';
 import { SyntaxServices } from './language';
 import type { ToolkitCall, ToolkitInbound, ToolkitInit, ToolkitOutbound } from './protocol';
@@ -134,11 +135,14 @@ async function prefetch(i: ToolkitInit) {
 	}
 }
 
+/** Analyses go to the page only when they changed (`delta.ts`). */
+const analyses = new AnalysisSender();
+
 type Handler = (host: ToolkitHost, ...params: never[]) => unknown;
 const handlers: { [M in Method]: Handler } = {
 	version: (host) => host.version(),
 	analyze: (host, path: string, source: string) => host.analyze(path, source),
-	analyzeProject: (host, files: SourceFile[]) => host.analyzeProject(files),
+	analyzeProject: (host, files: SourceFile[]) => analyses.send(files, host.analyzeProject(files)),
 	elementDetails: (host, files: SourceFile[], path: string, line: number, element: string | null) =>
 		host.elementDetails(files, path, line, element),
 	stateMachines: (host, files: SourceFile[]) => host.stateMachines(files),

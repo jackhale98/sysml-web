@@ -35,48 +35,66 @@ export interface TreeNode {
 	children: TreeNode[];
 }
 
+/**
+ * Each analysis's elements, kept while the analysis is: the engine sends
+ * unchanged analyses as the same objects (`engine/toolkit/delta.ts`), so an
+ * edit rebuilds only the edited file's elements.
+ */
+const built = new WeakMap<Analysis, ModelElement[]>();
+
 /** Every named definition and usage in the analysed files. */
 export function collectElements(analyses: Iterable<Analysis>): ModelElement[] {
 	const elements: ModelElement[] = [];
-	for (const { model } of analyses) {
-		for (const d of model.definitions) {
-			if (!d.name) continue;
-			elements.push({
-				key: `${model.file}@${d.span.start_byte}`,
-				name: d.name,
-				label: unescapeName(d.name),
-				kind: d.kind,
-				isDefinition: true,
-				parent: d.parent_def ?? null,
-				typeRef: d.super_type,
-				shortName: d.short_name ? unescapeName(d.short_name) : null,
-				doc: d.doc ?? null,
-				multiplicity: null,
-				value: null,
-				file: model.file,
-				span: d.span,
-				...(d.id ? { id: d.id } : {})
-			});
+	for (const analysis of analyses) {
+		let own = built.get(analysis);
+		if (!own) {
+			own = elementsOf(analysis);
+			built.set(analysis, own);
 		}
-		for (const u of model.usages) {
-			if (!u.name) continue;
-			elements.push({
-				key: `${model.file}@${u.span.start_byte}`,
-				name: u.name,
-				label: unescapeName(u.name),
-				kind: u.kind,
-				isDefinition: false,
-				parent: u.parent_def ?? null,
-				typeRef: u.type_ref,
-				shortName: u.short_name ? unescapeName(u.short_name) : null,
-				doc: u.doc ?? null,
-				multiplicity: u.multiplicity ?? null,
-				value: u.value_expr ?? null,
-				file: model.file,
-				span: u.span,
-				...(u.id ? { id: u.id } : {})
-			});
-		}
+		for (const element of own) elements.push(element);
+	}
+	return elements;
+}
+
+function elementsOf({ model }: Analysis): ModelElement[] {
+	const elements: ModelElement[] = [];
+	for (const d of model.definitions) {
+		if (!d.name) continue;
+		elements.push({
+			key: `${model.file}@${d.span.start_byte}`,
+			name: d.name,
+			label: unescapeName(d.name),
+			kind: d.kind,
+			isDefinition: true,
+			parent: d.parent_def ?? null,
+			typeRef: d.super_type,
+			shortName: d.short_name ? unescapeName(d.short_name) : null,
+			doc: d.doc ?? null,
+			multiplicity: null,
+			value: null,
+			file: model.file,
+			span: d.span,
+			...(d.id ? { id: d.id } : {})
+		});
+	}
+	for (const u of model.usages) {
+		if (!u.name) continue;
+		elements.push({
+			key: `${model.file}@${u.span.start_byte}`,
+			name: u.name,
+			label: unescapeName(u.name),
+			kind: u.kind,
+			isDefinition: false,
+			parent: u.parent_def ?? null,
+			typeRef: u.type_ref,
+			shortName: u.short_name ? unescapeName(u.short_name) : null,
+			doc: u.doc ?? null,
+			multiplicity: u.multiplicity ?? null,
+			value: u.value_expr ?? null,
+			file: model.file,
+			span: u.span,
+			...(u.id ? { id: u.id } : {})
+		});
 	}
 	return elements;
 }
