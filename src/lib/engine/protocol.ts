@@ -9,6 +9,7 @@ import type {
 	Highlights,
 	CodeAction,
 	ElementDetails,
+	FeatureValue,
 	Completion,
 	DefinitionTarget,
 	FileChange,
@@ -43,6 +44,8 @@ export interface EngineApi {
 		line: number,
 		element: string | null
 	): ElementDetails;
+	/** A usage's attribute values: its own, then those its definition (and its supertypes) declare. */
+	featureValues(files: SourceFile[], id: string): FeatureValue[];
 	complete(files: SourceFile[], path: string, offset: number): Completion;
 	hover(files: SourceFile[], path: string, offset: number): Hover | null;
 	definition(files: SourceFile[], path: string, offset: number): DefinitionTarget | null;

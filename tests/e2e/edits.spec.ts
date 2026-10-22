@@ -84,9 +84,12 @@ test('renaming updates references in every file; deleting says what no longer re
 		.getByRole('navigation', { name: 'Explorer' })
 		.getByRole('button', { name: /^DroneArchitecture\.sysml/ })
 		.click();
-	// The editor draws only the lines in view.
-	await page.locator('.cm-scroller').evaluate((el) => el.scrollTo(0, 400));
-	await expect(text).toContainText('part battery : PowerPack;');
+	await expect(text).toContainText('package DroneArchitecture');
+	// The editor draws only the lines in view: scroll them in (again, if it was still loading).
+	await expect(async () => {
+		await page.locator('.cm-scroller').evaluate((el) => el.scrollTo(0, 400));
+		await expect(text).toContainText('part battery : PowerPack;', { timeout: 1000 });
+	}).toPass({ timeout: 15_000 });
 
 	const motor = await select(page, 'Motor');
 	await motor.getByRole('button', { name: 'Delete' }).click();
@@ -149,13 +152,15 @@ test('diagram edits: add, specialize, rename and delete', async ({ page }) => {
 	await relation.getByRole('button', { name: 'Create' }).click();
 	await expect(text).toContainText('part def DeliveryDrone :> Battery {', { timeout: 10_000 });
 
-	// Rename: the usage typed by it follows.
-	await diagram.getByText('DeliveryDrone', { exact: true }).first().click();
-	await diagram.getByRole('button', { name: 'Rename' }).click();
-	const name = diagram.getByRole('textbox', { name: 'New name for DeliveryDrone' });
-	await name.fill('Quadcopter');
-	await name.press('Enter');
-	await expect(text).toContainText('part def Quadcopter :> Battery {', { timeout: 10_000 });
+	// Rename: the usage typed by it follows (again, if the redraw after the last edit took the field).
+	await expect(async () => {
+		await diagram.getByText('DeliveryDrone', { exact: true }).first().click();
+		await diagram.getByRole('button', { name: 'Rename' }).click({ timeout: 2_000 });
+		const name = diagram.getByRole('textbox', { name: 'New name for DeliveryDrone' });
+		await name.fill('Quadcopter', { timeout: 2_000 });
+		await name.press('Enter');
+		await expect(text).toContainText('part def Quadcopter :> Battery {', { timeout: 4_000 });
+	}).toPass({ timeout: 30_000 });
 	await expect(text).toContainText('part drone : Quadcopter {');
 
 	// Delete: the new definition (once the rename's re-analysis has settled the diagram).
@@ -168,4 +173,32 @@ test('diagram edits: add, specialize, rename and delete', async ({ page }) => {
 	await confirm.getByRole('button', { name: 'Delete' }).click();
 	await expect(text).not.toContainText('part def Payload', { timeout: 10_000 });
 	await expectAccessible(page);
+});
+
+test('the inspector shows and edits the values a usage sets, its doc apart', async ({ page }) => {
+	await openDemo(page);
+	await openFile(page, /DesignFmea/);
+	const text = page.locator('.cm-content');
+	const hazard = await select(page, 'batteryFire');
+	const values = hazard.getByRole('region', { name: 'Values' });
+	// `:>> description = "…"` is a value of the hazard; its documentation is the doc comment.
+	await expect(values).toContainText('description');
+	await expect(values).toContainText('Fire or explosion of the battery pack');
+	await expect(hazard.getByLabel(/^Documentation/)).toHaveValue('');
+	await expectAccessible(page);
+
+	await values.getByRole('button', { name: /^description:/ }).click();
+	const field = values.getByRole('textbox', { name: 'description of batteryFire' });
+	await field.fill('Battery fire.');
+	await field.press('Enter');
+	await expect(text).toContainText(':>> description = "Battery fire.";');
+
+	// An enum value offers its literals.
+	const harm = await select(page, 'burnInjury');
+	const harmValues = harm.getByRole('region', { name: 'Values' });
+	await harmValues.getByRole('button', { name: /^severity: critical/ }).click();
+	await harmValues
+		.getByRole('combobox', { name: 'severity of burnInjury' })
+		.selectOption('serious');
+	await expect(text).toContainText(':>> severity = SeverityScale::serious;');
 });
