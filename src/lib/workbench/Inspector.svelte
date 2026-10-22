@@ -42,6 +42,17 @@
 		return engine && !element.isDefinition ? all.filter((c) => c.kind !== 'attribute') : all;
 	});
 	let valueCount = $state(0);
+	/** The element a `satisfy … by` or verification names: by its resolved id, else by its name. */
+	function traceTarget(by: string): ModelElement | undefined {
+		const id = requirement?.linkIds[by];
+		if (id) {
+			const found = workspace.elements.find((e) => e.id === id);
+			if (found) return found;
+		}
+		const name = by.split('.').pop() ?? by;
+		return workspace.elements.find((e) => e.label === name && !e.isDefinition);
+	}
+
 	/** Requirements this element satisfies (matched by name in `satisfy … by`). */
 	const satisfies = $derived(
 		element && !element.isDefinition
@@ -110,6 +121,19 @@
 	/** `a` or `an` before a concept's name (`an attribute usage`, `a part`). */
 	const article = (word: string) => (/^[aeio]/i.test(word) ? 'an' : 'a');
 </script>
+
+<!-- What satisfies or verifies the requirement, as a link to it when the model resolved it. -->
+{#snippet traced(by: string)}
+	{@const target = traceTarget(by)}
+	{#if target}
+		<button type="button" class="link" onclick={() => ui.select(target.key, 'inspector')}>
+			<Link2 size={13} aria-hidden="true" />
+			{by}
+		</button>
+	{:else}
+		<Link2 size={13} aria-hidden="true" /> {by}
+	{/if}
+{/snippet}
 
 <aside class="inspector" class:phone={ui.phone} aria-label="Inspector">
 	{#if !element}
@@ -219,7 +243,7 @@
 				<h4>Satisfied by</h4>
 				{#if requirement.satisfiedBy.length}
 					<ul class="links">
-						{#each requirement.satisfiedBy as by (by)}<li><Link2 size={13} /> {by}</li>{/each}
+						{#each requirement.satisfiedBy as by (by)}<li>{@render traced(by)}</li>{/each}
 					</ul>
 				{:else}
 					<p class="gap">
@@ -229,7 +253,7 @@
 				<h4>Verified by</h4>
 				{#if requirement.verifiedBy.length}
 					<ul class="links">
-						{#each requirement.verifiedBy as by (by)}<li><Link2 size={13} /> {by}</li>{/each}
+						{#each requirement.verifiedBy as by (by)}<li>{@render traced(by)}</li>{/each}
 					</ul>
 				{:else}
 					<p class="gap">No verification case covers this yet.</p>
