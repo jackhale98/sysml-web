@@ -132,6 +132,7 @@
 	import {
 		chooseNeighbours,
 		neighbours,
+		wiredNeighbours,
 		planExpose,
 		planUnexpose,
 		planViewAs,
@@ -1405,10 +1406,13 @@
 		if (element) {
 			items.push({ label: 'Show in text', icon: FileCode, run: () => showInText(element) });
 		}
-		if (view === 'general' && element?.id) {
+		if ((view === 'general' || view === 'interconnection') && element?.id) {
 			items.push({
 				label: 'Add connected elements…',
-				detail: 'What it refers to, or what refers to it',
+				detail:
+					view === 'general'
+						? 'What it refers to, or what refers to it'
+						: 'The parts beside it that it connects to',
 				icon: Waypoints,
 				run: () => void askAddConnected(id, point)
 			});
@@ -1581,7 +1585,10 @@
 		const at = formAt(point ?? underNode(id));
 		const related = await engine.related(workspace.sourceFiles(), element.id);
 		const drawn = new Set(nodes.flatMap((n) => (n.data.elementKey ? [n.data.elementKey] : [])));
-		const list = neighbours(related, workspace.elements, drawn);
+		const list =
+			view === 'interconnection'
+				? wiredNeighbours(related, workspace.elements, drawn, hiddenHere)
+				: neighbours(related, workspace.elements, drawn);
 		if (!list.length) {
 			toasts.show(`Everything connected to ${element.label} is on this diagram already.`);
 			return;
@@ -2400,6 +2407,7 @@
 	{#if connected}
 		<ConnectedForm
 			name={connected.name}
+			wired={view === 'interconnection'}
 			neighbours={connected.list.map((n) => ({ label: n.element.label, direction: n.direction }))}
 			mode={formMode}
 			x={connected.x}

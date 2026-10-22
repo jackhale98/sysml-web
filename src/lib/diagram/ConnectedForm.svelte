@@ -9,7 +9,8 @@
 <script lang="ts">
 	/**
 	 * "Add connected elements": what an element refers to (outgoing), what
-	 * refers to it (incoming), or both, put on the diagram in one step.
+	 * refers to it (incoming), or both, put on the diagram in one step. On an
+	 * interconnection view (`wired`), the parts it is wired to, shown again.
 	 */
 	import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight } from '@lucide/svelte';
 	import FormPanel from './FormPanel.svelte';
@@ -18,6 +19,7 @@
 		name,
 		neighbours,
 		mode = 'popover',
+		wired = false,
 		x = 0,
 		y = 0,
 		onapply,
@@ -28,6 +30,8 @@
 		/** Those not on the diagram yet. */
 		neighbours: Neighbour[];
 		mode?: 'popover' | 'sheet';
+		/** The neighbours are parts it is wired to (connections, flows, bindings) that the diagram hides. */
+		wired?: boolean;
 		x?: number;
 		y?: number;
 		onapply: (direction: 'out' | 'in' | 'both') => Promise<string | null>;
@@ -68,8 +72,10 @@
 				<span class="label">Outgoing ({outgoing.length})</span>
 				<span class="detail"
 					>{outgoing.length
-						? `What ${name} refers to: ${some(outgoing)}`
-						: `${name} refers to nothing else that is not here`}</span
+						? `What ${name} ${wired ? 'connects to' : 'refers to'}: ${some(outgoing)}`
+						: wired
+							? `${name} connects to nothing hidden here`
+							: `${name} refers to nothing else that is not here`}</span
 				>
 			</span>
 		</button>
@@ -84,8 +90,10 @@
 				<span class="label">Incoming ({incoming.length})</span>
 				<span class="detail"
 					>{incoming.length
-						? `What refers to ${name}: ${some(incoming)}`
-						: `Nothing else refers to ${name}`}</span
+						? `What ${wired ? 'connects' : 'refers'} to ${name}: ${some(incoming)}`
+						: wired
+							? `Nothing hidden here connects to ${name}`
+							: `Nothing else refers to ${name}`}</span
 				>
 			</span>
 		</button>
@@ -98,10 +106,18 @@
 			<ArrowLeftRight size={16} aria-hidden="true" />
 			<span>
 				<span class="label">Both ({new Set(neighbours.map((n) => n.label)).size})</span>
-				<span class="detail">Everything connected to it, either way</span>
+				<span class="detail"
+					>{wired
+						? 'Everything wired to it, either way'
+						: 'Everything connected to it, either way'}</span
+				>
 			</span>
 		</button>
-		<p class="hint">They stay where they are in the model; only this diagram changes.</p>
+		<p class="hint">
+			{wired
+				? 'They show on this diagram again; the model doesn’t change.'
+				: 'They stay where they are in the model; only this diagram changes.'}
+		</p>
 		{#if error}<p class="error" role="alert">{error}</p>{/if}
 		<div class="actions">
 			<button type="button" class="quiet" onclick={onclose}>Cancel</button>

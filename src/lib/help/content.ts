@@ -120,6 +120,7 @@ export const HELP: HelpSection[] = [
 					'Hidden elements are listed at the foot of the diagram (“2 hidden · Show all”): open the list to show one again, or show them all. Other diagrams are not affected.',
 					'**Duplicate** (Ctrl D, ⌘ D on a Mac, or in a box’s actions, an element’s menu in the explorer, the details panel and search) copies the element right after it in the text, with everything inside it, under a free name (`battery2`), and selects the copy.',
 					'**Add connected elements** (in a box’s actions, on structure diagrams) puts on the diagram what the element refers to (**Outgoing**: its type, what it specializes, satisfies or is connected to), what refers to it (**Incoming**), or both, in one step. A saved view gets an `expose` line for each; its filter may still leave some out, and it says so.',
+					'On an **interconnection** diagram, which draws one element’s parts and how they are wired, **Add connected elements** shows again the parts beside it that a connection, flow or binding joins it to, if you removed them from the diagram. State, action and sequence diagrams draw one machine, process or interaction, so it isn’t offered there.',
 					'**View as** (in a saved view’s toolbar) shows the same view as another kind of diagram that fits what it shows: a part’s general view as its interconnection view, an action’s as its action flow, and back. Only the view’s type changes (`view v : GeneralView` becomes `view v : InterconnectionView`); its positions and hidden elements come along.'
 				]
 			},
