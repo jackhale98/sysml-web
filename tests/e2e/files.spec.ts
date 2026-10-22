@@ -287,6 +287,29 @@ test('a file deleted in a folder project shows as deleted in the review after a 
 	expect(await folderFiles(page)).toEqual(['.project.json', 'model/Rig.sysml']);
 });
 
+test('deleting a file of several packages counts only what uses them from elsewhere', async ({
+	page
+}) => {
+	await page.setViewportSize({ width: 1440, height: 900 });
+	// Power and Spares use each other; only Rig, in another file, stays.
+	await openFolderProject(page, {
+		'model/Rig.sysml':
+			'package Rig {\n    private import Power::*;\n    part battery : Battery;\n}\n',
+		'model/Power.sysml':
+			'package Power {\n    part def Battery { part fuse : Spares::Fuse; }\n}\n\n' +
+			'package Spares {\n    private import Power::*;\n    part def Fuse;\n    part spare : Battery;\n}\n'
+	});
+	await noErrors(page);
+	await page.getByRole('tab', { name: 'Files' }).click();
+	await more(page, 'Power.sysml').click();
+	await page.getByRole('menuitem', { name: 'Delete…' }).click();
+	await expect(dialog(page)).toContainText('These would stop resolving:');
+	const breaks = dialog(page).getByRole('listitem');
+	await expect(breaks).toHaveCount(1);
+	await expect(breaks).toContainText(/to Power no longer resolves? \(Rig\)/);
+	await expectAccessible(page, 'the delete warning of several packages');
+});
+
 test.describe('on a phone', () => {
 	test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 
