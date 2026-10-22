@@ -158,10 +158,9 @@ export class TradeStudies {
 
 		const alternatives = this.alternatives(record, subject, notes);
 		const goal = objective ? this.goalOf(objective) : null;
-		if (!objective) notes.push('The study has no objective, so nothing is selected.');
-		else if (!goal)
+		if (!goal)
 			notes.push(
-				'Its objective is neither a MaximizeObjective nor a MinimizeObjective, so nothing is selected.'
+				`${objective ? 'Its objective is neither' : 'The study doesn’t say how to select: give it'} a MaximizeObjective or a MinimizeObjective${objective ? ', so nothing is selected' : ''}.`
 			);
 
 		// The evaluation function: its parameter (the alternative), its attributes, its result.
@@ -211,7 +210,13 @@ export class TradeStudies {
 			better: null,
 			best: []
 		}));
-		if (result?.value) this.weigh(result, frames, criteria);
+		if (result?.value) this.weigh(result, frames, criteria, goal);
+
+		// Headings: `batteryOptions::lithiumPolymer` reads as `lithiumPolymer`, unless two would read alike.
+		const short = alternatives.map((a) => lastSegment(a.label));
+		const names = short.map((s, i) =>
+			short.filter((x) => x === s).length > 1 ? alternatives[i]!.label : s
+		);
 
 		// The ranking and the selection.
 		const numbers = scores.map((s) => (s.kind === 'number' ? s.value : null));
@@ -231,18 +236,12 @@ export class TradeStudies {
 			notes.push('Some alternatives have no score, so nothing is selected.');
 		else if (best.length > 1)
 			notes.push(
-				`${best.map((i) => alternatives[i]!.label).join(' and ')} have the same score: the objective doesn't decide between them.`
+				`${best.map((i) => names[i]!).join(' and ')} have the same score: the objective doesn’t decide between them.`
 			);
 		else if (best.length === 1) {
 			selected = best[0]!;
 			byApp.push('the selected alternative');
 		}
-
-		// Headings: `batteryOptions::lithiumPolymer` reads as `lithiumPolymer`, unless two would read alike.
-		const short = alternatives.map((a) => lastSegment(a.label));
-		const names = short.map((s, i) =>
-			short.filter((x) => x === s).length > 1 ? alternatives[i]!.label : s
-		);
 
 		return {
 			name: record.name ?? lastSegment(qualified),
@@ -408,9 +407,15 @@ export class TradeStudies {
 	 * When the score is a weighted sum (`0.5 * enduranceScore + …`, written
 	 * in the result or in the calculation it invokes), each criterion's
 	 * weight and its score before weighting; and for every criterion the
-	 * score reads, whether a higher or a lower value scores better.
+	 * score reads, whether a higher or a lower value is better (gives a
+	 * higher score, or a lower one for a MinimizeObjective).
 	 */
-	private weigh(result: ElementRecord, frames: Frame[], criteria: TradeCriterion[]) {
+	private weigh(
+		result: ElementRecord,
+		frames: Frame[],
+		criteria: TradeCriterion[],
+		goal: 'maximize' | 'minimize' | null
+	) {
 		let ast: Expr;
 		try {
 			ast = parseExpr(result.value!);
@@ -495,7 +500,9 @@ export class TradeStudies {
 				const value = base.unit ? new ExprQuantity(nudged, base.unit) : nudged;
 				const after = this.scoreWith(frame, result.value!, criterion.name, value);
 				if (before === null || after === null || same(before, after)) return;
-				if (after > before === nudged > base.value) up++;
+				// Up: a higher value gives a better score (a lower one, for a MinimizeObjective).
+				const better = goal === 'minimize' ? after < before : after > before;
+				if (better === nudged > base.value) up++;
 				else down++;
 			});
 			criterion.better = up && !down ? 'higher' : down && !up ? 'lower' : null;

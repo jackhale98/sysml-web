@@ -340,7 +340,7 @@ export interface TradeCriterion {
 	weight: number | null;
 	/** Each alternative's score on this criterion before weighting, when the score has one. */
 	scores: (number | null)[] | null;
-	/** Whether a higher or a lower value raises the score; null when the score doesn't read it directly. */
+	/** Whether a higher or a lower value is better, by the objective; null when the score doesn't read it directly. */
 	better: 'higher' | 'lower' | null;
 	/** The alternatives with the best value (empty when all are equal or `better` is unknown). */
 	best: number[];

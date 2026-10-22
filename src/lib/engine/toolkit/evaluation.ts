@@ -732,10 +732,15 @@ function toEvaluated(value: unknown, id: string, extracted?: ExtractedModel): Ev
 	const object = value as Record<string, unknown>;
 	if (object['@indeterminate'])
 		return { kind: 'undecided', reason: 'it depends on values that are not known' };
-	if (typeof object.value === 'number' && 'unit' in object)
+	// An exact fraction (`{"@rational": "1279/4500", "approx": 0.284}`), alone or with a unit.
+	const approx = (v: unknown) =>
+		v && typeof v === 'object' && '@rational' in v ? (v as { approx?: unknown }).approx : v;
+	if (typeof approx(object) === 'number')
+		return { kind: 'number', value: approx(object) as number, unit: null };
+	if (typeof approx(object.value) === 'number' && 'unit' in object)
 		return {
 			kind: 'number',
-			value: object.value,
+			value: approx(object.value) as number,
 			unit: typeof object.unit === 'string' && object.unit ? object.unit : null
 		};
 	if (typeof object['@element'] === 'string') {
