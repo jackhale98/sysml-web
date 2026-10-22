@@ -12,7 +12,9 @@ export type Tab =
 	/** Run a state machine interactively. `machine` is its (qualified) name. */
 	| { kind: 'emulator'; machine: string; title: string }
 	/** A read-only file of the OMG standard library, at a line. */
-	| { kind: 'library'; path: string; line?: number };
+	| { kind: 'library'; path: string; line?: number }
+	/** What changed in the model since another version (review mode). */
+	| { kind: 'review' };
 
 export type SelectionSource = 'text' | 'diagram' | 'explorer' | 'inspector' | 'table';
 
@@ -71,6 +73,8 @@ export function tabTitle(tab: Tab): string {
 			return tab.title;
 		case 'library':
 			return tab.path.split('/').pop() ?? tab.path;
+		case 'review':
+			return 'Review changes';
 	}
 }
 

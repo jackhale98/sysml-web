@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { MARK_WORDS, reviewMarks } from '#lib/review/marks.svelte.ts';
 	import { tick, untrack } from 'svelte';
 	import {
 		ArrowDown,
@@ -139,6 +140,14 @@
 			inFile.find((e) => e.span.start_row === source.line || e.span.start_row + 1 === source.line)
 		);
 	}
+
+	/** In review mode: whether the row's element is new or changed. */
+	function markOf(index: number) {
+		return reviewMarks.shown ? reviewMarks.markOf(elementFor(index)?.id) : null;
+	}
+	const marked = $derived(
+		reviewMarks.shown && !!table && table.sources.some((_, i) => !!markOf(i))
+	);
 
 	// While it is on screen, search can find this table's rows and take you to one.
 	$effect(() => {
@@ -571,6 +580,14 @@
 		{#if table?.warnings.length}
 			<p class="warnings"><TriangleAlert size={14} /> {table.warnings.join(' · ')}</p>
 		{/if}
+		{#if marked}
+			<p class="review-legend">
+				<span class="review-badge added">{MARK_WORDS.added.badge}</span>
+				<span class="review-badge changed">{MARK_WORDS.changed.badge}</span>
+				since {reviewMarks.against}.
+				<button type="button" onclick={() => (reviewMarks.visible = false)}>Hide marks</button>
+			</p>
+		{/if}
 	</header>
 
 	{#if error}
@@ -591,9 +608,12 @@
 				{#each rows as row (row.index)}
 					{@const selectable = !isPivot && !!table.sources[row.index]}
 					{@const kind0 = cellKind(table.columns[0] ?? '', row.cells[0] ?? '', 0)}
+					{@const mark = selectable ? markOf(row.index) : null}
 					<li
 						class="card"
 						data-row={row.index}
+						class:review-added={mark === 'added'}
+						class:review-changed={mark === 'changed'}
 						class:flash={flash === row.index}
 						class:selected={selectable &&
 							!!ui.selection &&
@@ -615,6 +635,11 @@
 								<strong>{row.cells[0] || '—'}</strong>
 							{/if}
 							{#if subtitled && row.cells[1]}<span class="subtitle">{row.cells[1]}</span>{/if}
+							{#if mark}<span class="review-badge {mark}"
+									>{MARK_WORDS[mark].badge}<span class="visually-hidden">
+										— {MARK_WORDS[mark].said}</span
+									></span
+								>{/if}
 						</div>
 						{#if isTree}
 							{@const columns = table.columns}
@@ -715,6 +740,7 @@
 					{#each rows as row (row.index)}
 						{@const selectable = !isPivot && !!table.sources[row.index]}
 						{@const info = infoOf(row.index)}
+						{@const mark = selectable ? markOf(row.index) : null}
 						<!-- The first cell's button is the keyboard way to open a row. -->
 						<tr
 							data-row={row.index}
@@ -724,6 +750,8 @@
 							class:first-own={info.role === 'attribute' &&
 								infoOf(rows[rows.indexOf(row) - 1]?.index ?? -1).role !== 'attribute'}
 							class:checks={table.opensText}
+							class:review-added={mark === 'added'}
+							class:review-changed={mark === 'changed'}
 							class:selected={selectable &&
 								elementFor(row.index)?.key === ui.selection?.key &&
 								!!ui.selection}
@@ -747,7 +775,11 @@
 												e.stopPropagation();
 												openRow(row.index);
 											}}>{@render first(kind, value)}</button
-										>
+										>{#if mark}<span class="review-badge {mark}"
+												>{MARK_WORDS[mark].badge}<span class="visually-hidden">
+													— {MARK_WORDS[mark].said}</span
+												></span
+											>{/if}
 									{:else if editing?.row === row.index && editing.column === c && edit}
 										<CellEditor
 											{edit}
@@ -1499,5 +1531,63 @@
 		.pair .cell .empty {
 			opacity: 1;
 		}
+	}
+	/* Review mode: new and changed rows, with a badge saying so. */
+	.review-added {
+		--review: var(--ok);
+	}
+	.review-changed {
+		--review: var(--warn);
+	}
+	tr.review-added > :global(td:first-child),
+	tr.review-changed > :global(td:first-child) {
+		box-shadow: inset 3px 0 0 var(--review);
+	}
+	.card.review-added,
+	.card.review-changed {
+		box-shadow: inset 3px 0 0 var(--review);
+	}
+	.review-badge {
+		display: inline-block;
+		margin-left: 6px;
+		padding: 0 6px;
+		border: 1.5px solid var(--review);
+		border-radius: var(--radius-pill);
+		color: var(--review);
+		font-size: 10px;
+		font-weight: 700;
+		letter-spacing: 0.02em;
+		line-height: 15px;
+		text-transform: uppercase;
+		vertical-align: 1px;
+		white-space: nowrap;
+	}
+	.review-badge.added {
+		--review: var(--ok);
+	}
+	.review-badge.changed {
+		--review: var(--warn);
+	}
+	.review-legend {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 4px;
+		color: var(--text-3);
+		font-size: var(--text-xs);
+	}
+	.review-legend .review-badge {
+		margin-left: 0;
+	}
+	.review-legend button {
+		padding: 0 4px;
+		border: 0;
+		background: transparent;
+		color: var(--text-2);
+		font: inherit;
+		font-weight: 600;
+		text-decoration: underline;
+		text-underline-offset: 2px;
+		cursor: pointer;
 	}
 </style>

@@ -21,6 +21,7 @@ import type {
 	TradeStudy,
 	ViewInfo
 } from './types';
+import type { ModelComparison } from '#lib/review/types.ts';
 
 export interface SourceFile {
 	path: string;
@@ -67,6 +68,8 @@ export interface EngineApi {
 	evaluate(files: SourceFile[], ids: string[]): Record<string, Evaluated>;
 	/** Every trade study of the project, evaluated (cached per analysis). */
 	tradeStudies(files: SourceFile[]): TradeStudy[];
+	/** What changed from `base` to `current`, element by element (`#lib/review/semantic.ts`). */
+	compareModels(base: SourceFile[], current: SourceFile[]): ModelComparison;
 }
 
 export type Method = keyof EngineApi;

@@ -4,6 +4,7 @@
 		Eye,
 		FileCode,
 		FileText,
+		GitCompareArrows,
 		LayoutDashboard,
 		ListChecks,
 		Network,
@@ -21,5 +22,6 @@
 {:else if tab.kind === 'view'}<Eye {size} aria-hidden="true" />
 {:else if tab.kind === 'emulator'}<Play {size} aria-hidden="true" />
 {:else if tab.kind === 'library'}<BookLock {size} aria-hidden="true" />
+{:else if tab.kind === 'review'}<GitCompareArrows {size} aria-hidden="true" />
 {:else if tab.path.endsWith('.md')}<FileText {size} aria-hidden="true" />
 {:else}<FileCode {size} aria-hidden="true" />{/if}
