@@ -12,6 +12,30 @@ import { collapseWhitespace, simpleName, splitPath, unescape, unquote, unquoteNa
 const isView = (r: ElementRecord) =>
 	r.metaclass === 'ViewUsage' || r.metaclass === 'ViewDefinition';
 
+/** The views the SysML standard library defines, which the app draws. */
+const STANDARD_VIEWS = new Set([
+	'GeneralView',
+	'InterconnectionView',
+	'StateTransitionView',
+	'ActionFlowView',
+	'SequenceView'
+]);
+
+/**
+ * The standard view a chain of view defs comes down to. The standard library's
+ * defs are not in the model the app reads, so a def's `:> GeneralView` is
+ * matched as written.
+ */
+function standardOf(chain: ElementRecord[]): string | undefined {
+	for (const [i, r] of chain.entries()) {
+		if (i > 0 && STANDARD_VIEWS.has(r.name ?? '')) return r.name ?? undefined;
+		const written = r.isDefinition ? r.specializes : r.type ? [r.type] : [];
+		const found = written.map((w) => unquoteName(simpleName(w))).find((w) => STANDARD_VIEWS.has(w));
+		if (found) return found;
+	}
+	return undefined;
+}
+
 /** Every view def and view usage, in file and declaration order. */
 export function listViews(ctx: ViewContext): ViewInfo[] {
 	return viewRecords(ctx).map((view) => {
@@ -26,8 +50,15 @@ export function listViews(ctx: ViewContext): ViewInfo[] {
 			builtin: !ctx.isContent(view)
 		};
 		if (!view.isDefinition && view.type) info.definition = unquoteName(simpleName(view.type));
+		const chain = viewChain(ctx, view);
+		const standard = standardOf(chain);
+		if (standard && standard !== info.definition) info.standard = standard;
 		if (doc) info.doc = doc;
-		if (clauses.render.length) info.renderAs = clauses.render[0];
+		// `render` as written on the view, else as its view defs say.
+		const render = [clauses, ...chain.slice(1).map((r) => viewClauses(ctx.textOf(r)))].find(
+			(c) => c.render.length
+		)?.render[0];
+		if (render) info.renderAs = render;
 		if (clauses.expose.length) info.exposes = clauses.expose;
 		return info;
 	});

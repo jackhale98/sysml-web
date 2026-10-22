@@ -992,3 +992,47 @@ describe('the demo’s tables', () => {
 		expect(performance.now() - started).toBeLessThan(200);
 	});
 });
+
+describe('views written by hand', () => {
+	it('are drawn or tabled however the SysML says so', async () => {
+		const { presentationOf } = await import('#lib/workbench/views.ts');
+		const model = `package M {
+    private import StandardViewDefinitions::*;
+    private import ModelViews::*;
+    part def Car { part engine : Engine; }
+    part def Engine;
+    part car : Car;
+    view a : StandardViewDefinitions::GeneralView { expose M::*; }
+    view def MyDiagram :> GeneralView;
+    view b : MyDiagram { expose M::*; }
+    view c { expose M::*; render asTreeDiagram; }
+    view d { expose car; render asInterconnectionDiagram; }
+    view def MyTable :> RequirementsTable;
+    view e : MyTable { expose M::*; }
+    view def PartList { @Reporting::TableRendering { rows = "kind:part"; columns = "element; type"; } }
+    view f : PartList { expose M::*; }
+}`;
+		const files: SourceFile[] = [
+			...host.viewLibraries().map((l) => ({ path: l.path, text: l.text })),
+			{ path: 'm.sysml', text: model }
+		];
+		const shown = Object.fromEntries(
+			host
+				.listViews(files)
+				.filter((v) => v.file === 'm.sysml' && v.isUsage)
+				.map((v) => {
+					const p = presentationOf(v);
+					return [v.name, p.kind === 'diagram' ? p.view : p.kind];
+				})
+		);
+		expect(shown).toEqual({
+			a: 'general',
+			b: 'general', // a view def of the project's that specializes a standard one
+			c: 'general', // no view def, only `render asTreeDiagram`
+			d: 'interconnection',
+			e: 'table',
+			f: 'table'
+		});
+		expect(host.diagram('general', files, 'M::b').nodes.map((n) => n.id)).toContain('car');
+	});
+});
