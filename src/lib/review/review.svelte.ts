@@ -212,16 +212,29 @@ class Review {
 		const base = toList(this.baseFiles);
 		const comparison = await ctx.engine.compareModels(base, current);
 		if (generation !== this.generation) return;
-		// Edited meanwhile: the watcher compares again.
-		if (!this.currentFiles && current.some((f) => ctx.workspace.files[f.path] !== f.text)) return;
+		// Edited meanwhile: compare again once the edit is analysed.
+		if (!this.currentFiles && current.some((f) => ctx.workspace.files[f.path] !== f.text)) {
+			clearTimeout(this.timer);
+			this.timer = setTimeout(() => void this.refresh(), REFRESH_MS);
+			return;
+		}
 		this.comparison = comparison;
 		this.status = 'ready';
 		performance.mark('sysml:review', { detail: comparison.ms });
 		reviewMarks.set(comparison.diff, this.against);
 	}
 
-	/** Compare again shortly after each analysis of the project. */
+	/**
+	 * Compare again shortly after each analysis of the project, and start
+	 * over when the version compared with moves (saved to or got from
+	 * GitHub, marked as reviewed).
+	 */
 	private watch(ctx: ReviewContext) {
+		const baseKey = () => {
+			const record = ctx.session?.record;
+			return `${record?.git?.base ?? ''}|${record?.checkpoint?.at ?? ''}`;
+		};
+		const startedWith = untrack(baseKey);
 		this.stopWatching = $effect.root(() => {
 			let first = true;
 			$effect(() => {
@@ -234,6 +247,10 @@ class Review {
 					clearTimeout(this.timer);
 					this.timer = setTimeout(() => void this.refresh(), REFRESH_MS);
 				});
+			});
+			$effect(() => {
+				if (baseKey() !== startedWith && this.source.kind === 'local')
+					untrack(() => void this.start(ctx, this.source));
 			});
 		});
 	}
