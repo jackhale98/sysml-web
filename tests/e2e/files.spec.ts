@@ -60,6 +60,9 @@ async function command(page: Page, query: string, option: RegExp) {
 const tabs = (page: Page) => page.getByRole('list', { name: 'Open editors' });
 
 const files = (page: Page) => page.getByRole('list', { name: 'Files' });
+/** A file's ⋯ button. */
+const more = (page: Page, file: string) =>
+	files(page).getByRole('button', { name: 'More actions', description: file, exact: true });
 const dialog = (page: Page) => page.getByTestId('file-dialog');
 
 test('make a file in a new folder, use it, rename it, delete it and undo', async ({ page }) => {
@@ -107,7 +110,7 @@ test('make a file in a new folder, use it, rename it, delete it and undo', async
 	await files(page)
 		.getByRole('button', { name: /^Power\.sysml/ })
 		.click();
-	await files(page).getByRole('button', { name: 'More for Power.sysml' }).click();
+	await more(page, 'Power.sysml').click();
 	const menu = page.getByRole('menu', { name: 'Power.sysml: file' });
 	await expect(menu.getByRole('menuitem')).toHaveText(['Rename…', 'Move to folder…', 'Delete…']);
 	await expectAccessible(page, 'the file menu');
@@ -128,7 +131,7 @@ test('make a file in a new folder, use it, rename it, delete it and undo', async
 	await noErrors(page);
 
 	// Move it to another folder.
-	await files(page).getByRole('button', { name: 'More for PowerSupply.sysml' }).click();
+	await more(page, 'PowerSupply.sysml').click();
 	await page.getByRole('menuitem', { name: 'Move to folder…' }).click();
 	await dialog(page).getByLabel('Folder', { exact: true }).selectOption('model');
 	await expect(dialog(page)).toContainText('Moves it to model/PowerSupply.sysml.');
@@ -137,7 +140,7 @@ test('make a file in a new folder, use it, rename it, delete it and undo', async
 	await noErrors(page);
 
 	// Delete: the dialog says what would stop resolving.
-	await files(page).getByRole('button', { name: 'More for PowerSupply.sysml' }).click();
+	await more(page, 'PowerSupply.sysml').click();
 	await page.getByRole('menuitem', { name: 'Delete…' }).click();
 	await expect(dialog(page)).toContainText('These would stop resolving:');
 	await expect(dialog(page)).toContainText(/references to Power no longer resolve \(Grid\)/);
@@ -225,7 +228,7 @@ test.describe('on a phone', () => {
 		for (const item of await sheet.getByRole('menuitem').all()) {
 			expect((await item.boundingBox())!.height).toBeGreaterThanOrEqual(44);
 		}
-		const more = files(page).getByRole('button', { name: 'More for Power.sysml' });
+		const dots = more(page, 'Power.sysml');
 		await expectAccessible(page, 'the file sheet');
 
 		await sheet.getByRole('menuitem', { name: 'Delete…' }).click();
@@ -237,7 +240,7 @@ test.describe('on a phone', () => {
 			.click();
 		await expect(file).toBeVisible();
 		// The ⋯ button is as big as a thumb too.
-		const box = (await more.boundingBox())!;
+		const box = (await dots.boundingBox())!;
 		expect(box.height).toBeGreaterThanOrEqual(44);
 		expect(box.width).toBeGreaterThanOrEqual(44);
 	});

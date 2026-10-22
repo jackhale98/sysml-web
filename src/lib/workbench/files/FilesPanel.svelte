@@ -63,6 +63,7 @@
 	}
 
 	const triggerId = (path: string) => `${uid}-more-${encodeURIComponent(path)}`;
+	const labelId = (path: string) => `${uid}-name-${encodeURIComponent(path)}`;
 
 	function menuKeys(event: KeyboardEvent) {
 		const items = [...(menu?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])];
@@ -153,14 +154,16 @@
 			onpointerleave={pressEnd}
 		>
 			<FileCode size={14} />
-			<span class="label">{path.slice(folder ? folder.length + 1 : 0)}</span>
+			<span class="label" id={labelId(path)}>{path.slice(folder ? folder.length + 1 : 0)}</span>
 			{#if workspace.dirty.has(path)}<span class="dot" title="Edited"></span>{/if}
 		</button>
+		<!-- "More actions", described by the file's name: the name alone finds the file. -->
 		<button
 			type="button"
 			class="more"
 			id={triggerId(path)}
-			aria-label="More for {nameOf(path)}"
+			aria-label="More actions"
+			aria-describedby={labelId(path)}
 			aria-haspopup="menu"
 			aria-expanded={menuFor === path}
 			onclick={() => (menuFor === path ? closeMenu() : void openMenu(path))}
