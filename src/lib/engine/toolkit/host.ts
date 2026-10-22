@@ -89,8 +89,11 @@ export class ToolkitHost {
 	private pending: Prepared | null = null;
 	private settled: TkSettledOutcomes | undefined;
 	private readonly texts = new TextIndexCache();
-	/** Timings of the latest build, for the status line and measurements. */
-	lastBuild = { ms: 0, lenient: false, findings: 0 };
+	/**
+	 * Timings of the latest build, for the status line and measurements: the
+	 * session (parse, resolve), the toolkit's `check`, the model adapter.
+	 */
+	lastBuild = { ms: 0, lenient: false, findings: 0, sessionMs: 0, checkMs: 0, adapterMs: 0 };
 	/** The editor's language services (the toolkit's language server), started on first use. */
 	private readonly language: LanguageServices;
 	readonly syntax: SyntaxServices;
@@ -361,7 +364,9 @@ export class ToolkitHost {
 		previous?.evaluation?.free();
 		previous?.session?.free();
 		const { session, units, parse, lenient } = this.prepare(files, withViewLibraries);
+		const prepared = performance.now();
 		const findings = session ? (JSON.parse(session.check()) as TkFinding[]) : [];
+		const checked = performance.now();
 
 		// The session numbers its units; map them to the app's files.
 		const byIndex = new Map<number, UnitInfo>();
@@ -372,6 +377,7 @@ export class ToolkitHost {
 			}
 		}
 		const extracted = session ? extractModel(this.tk, session, byIndex) : null;
+		const adapted = performance.now();
 		const problems = toProblems(parse, findings, units);
 
 		const analyses = files.map((file): Analysis => {
@@ -393,7 +399,10 @@ export class ToolkitHost {
 		this.lastBuild = {
 			ms: Math.round(performance.now() - started),
 			lenient: !!lenient,
-			findings: findings.length
+			findings: findings.length,
+			sessionMs: Math.round(prepared - started),
+			checkMs: Math.round(checked - prepared),
+			adapterMs: Math.round(adapted - checked)
 		};
 		this.built = { files, session, units, analyses, extracted };
 		return this.built;

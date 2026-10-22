@@ -183,6 +183,8 @@ export class Workspace {
 			// Drop the result if any file changed while the engine was working.
 			if (files.some((f) => this.files[f.path] !== f.text)) return;
 			this.analyses = Object.fromEntries(files.map((f, i) => [f.path, results[i]!]));
+			// For measurements (tests/perf): when each analysis reached the page.
+			performance.mark('sysml:analysed');
 			if (this.engineError) {
 				this.engineError = null;
 				if (this.state.phase === 'error') this.state = { phase: 'ready', millis: 0 };
@@ -195,7 +197,10 @@ export class Workspace {
 			}
 			// Checks are extra: the model is usable without them.
 			const checks = await engine.checks(files).catch(() => null);
-			if (files.every((f) => this.files[f.path] === f.text)) this.checks = checks;
+			if (files.every((f) => this.files[f.path] === f.text)) {
+				this.checks = checks;
+				performance.mark('sysml:checked');
+			}
 		} catch (error) {
 			if (throwing) throw error;
 			this.failed(error);

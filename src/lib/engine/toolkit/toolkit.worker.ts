@@ -87,6 +87,7 @@ async function boot(i: ToolkitInit): Promise<ToolkitHost> {
 	}
 	library ??= new tk.PreparedLibrary(bundle, null);
 	const host = new ToolkitHost(tk, library, early);
+	latest = host;
 	post({
 		type: 'ready',
 		stats: {
@@ -101,6 +102,13 @@ async function boot(i: ToolkitInit): Promise<ToolkitHost> {
 }
 
 const memoryMiB = () => (memory ? Math.round(memory.buffer.byteLength / 1048576) : 0);
+
+/** For measurements (tests/perf): the worker's memory and the latest analysis' timings. */
+let latest: ToolkitHost | undefined;
+(scope as unknown as { sysmlStats: () => unknown }).sysmlStats = () => ({
+	memoryMiB: memoryMiB(),
+	lastBuild: latest?.lastBuild ?? null
+});
 
 /** Download the prepared snapshot into Cache Storage, unless it is there already. */
 async function prefetch(i: ToolkitInit) {
