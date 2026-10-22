@@ -24,10 +24,13 @@ import type {
 	ViewInfo
 } from './types';
 import type { ModelComparison } from '#lib/review/types.ts';
+import type { ElementJson } from '#lib/exchange/elements.ts';
 import type {
 	InterchangeExport,
 	InterchangeExportOptions,
-	InterchangeImport
+	InterchangeImport,
+	MergeInputs,
+	WeaveResult
 } from '#lib/exchange/types.ts';
 
 export interface SourceFile {
@@ -91,6 +94,10 @@ export interface EngineApi {
 	exportInterchange(files: SourceFile[], options: InterchangeExportOptions): InterchangeExport;
 	/** SysML v2 JSON as project files, and what didn't carry over. */
 	importInterchange(json: string): InterchangeImport;
+	/** The project, and a server's base and head, in one form for a merge (`#lib/exchange/merge.ts`). */
+	mergeInputs(files: SourceFile[], base: ElementJson[], theirs: ElementJson[]): MergeInputs;
+	/** The project's files changed to hold a merged model. */
+	weaveInterchange(files: SourceFile[], merged: ElementJson[]): WeaveResult;
 }
 
 export type Method = keyof EngineApi;

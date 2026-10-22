@@ -504,8 +504,10 @@ const present = (v: string | null | undefined) => {
 
 // --- layout helpers ----------------------------------------------------------------------
 
-const lineStart = (text: string, at: number) => text.lastIndexOf('\n', at - 1) + 1;
-const lineEnd = (text: string, at: number) => {
+/** Where the line holding `at` starts. */
+export const lineStart = (text: string, at: number) => text.lastIndexOf('\n', at - 1) + 1;
+/** Where the line holding `at` ends (its `\n`, or the end of the text). */
+export const lineEnd = (text: string, at: number) => {
 	const n = text.indexOf('\n', at);
 	return n < 0 ? text.length : n;
 };

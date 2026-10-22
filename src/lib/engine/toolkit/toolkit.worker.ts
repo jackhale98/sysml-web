@@ -11,6 +11,7 @@
  */
 import type { Method, SourceFile } from '../protocol';
 import type { DiagramView, EditRequest } from '../types';
+import type { ElementJson } from '#lib/exchange/elements.ts';
 import type { InterchangeExportOptions } from '#lib/exchange/types.ts';
 import type { Toolkit } from './api';
 import { AnalysisSender } from './delta';
@@ -190,7 +191,11 @@ const handlers: { [M in Method]: Handler } = {
 		host.compareModels(base, current),
 	exportInterchange: (host, files: SourceFile[], options: InterchangeExportOptions) =>
 		host.exportInterchange(files, options),
-	importInterchange: (host, json: string) => host.importInterchange(json)
+	importInterchange: (host, json: string) => host.importInterchange(json),
+	mergeInputs: (host, files: SourceFile[], base: ElementJson[], theirs: ElementJson[]) =>
+		host.mergeInputs(files, base, theirs),
+	weaveInterchange: (host, files: SourceFile[], merged: ElementJson[]) =>
+		host.weaveInterchange(files, merged)
 };
 
 /** A trap or a failed memory grow leaves the instance unusable: the page restarts the worker. */
