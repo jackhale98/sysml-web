@@ -345,6 +345,68 @@ ask and cached with it):
   ~15–30 ms (once per analysis, on first ask); `evaluate` of all 171
   attributes 3 ms; a budget table 2 ms after that. All in the worker.
 
+## Comparing versions (semantic diff)
+
+`EngineApi.compareModels(base, current)` says what changed between two
+versions of the project at model level; review mode (`src/lib/review/`)
+words and shows it. The host takes a **snapshot** of each version
+(`toolkit/snapshot.ts`) and diffs the two in TypeScript
+(`#lib/review/semantic.ts`, pure, unit-tested with hand-made snapshots).
+
+- **Snapshots.** From the model adapter's records of the project's own
+  files: every named element with what it says about itself as people
+  read it (`type`, `multiplicity`, `value`, `specializes`, `redefines`,
+  `direction`, `doc`, `shortName`, `abstract`, a requirement's `require
+  constraint`, and metadata values by `metadata:<Type>.<field>`: a status,
+  an FMEA rating), its label (`Motor.mass`, `SYS-003`), its group
+  (Requirements, Design, Behaviour, Verification, Risk, Other: from its
+  kind or its owner's, and from the risk libraries' types) and its text
+  without its name; the unnamed relationships (`satisfy`, `verify`,
+  `allocate`, `connect`, interfaces, flows, bindings, derivations,
+  successions, transitions) with their text and the elements they
+  resolve to; the checks (`Evaluation.checks()`, with the value against
+  its limit: `4.05 kg > 4 kg`); each budget table's total; and every
+  attribute's evaluated value. An `about` that doesn't resolve is left
+  out (the adapter would give the annotation to its package).
+- **Two sessions.** The current version is usually the analysed one, and
+  its snapshot is cached with the build. The base is analysed in a
+  session of its own, opened from the analysed project's settled outcomes
+  (the prepared library is shared), without `check()` (the model reads
+  the same without it, in half the time); its snapshot is kept (the two
+  latest) and the session freed at once. The analysed session is left
+  alone.
+- **The toolkit's ids** are UUIDv5s of qualified names: a named element
+  keeps its id through any edit that leaves its name and owner alone
+  (text moved, reformatted, others added before it), and gets a new one
+  when it, or anything it is in, is renamed or moved; unnamed elements
+  are numbered by position, so a `satisfy` added before another takes
+  its id (`compare.test.ts` pins all three).
+- **Matching elements.** By id first. Then, outermost first (so a renamed
+  owner is matched before its members), each new element without a match
+  against the old ones of the same kind: in the same owner with the same
+  name, it only follows a renamed or moved owner; in the same owner with
+  another name and a similar body (Dice coefficient of tokens ≥ 0.6),
+  renamed; in another owner with the same name (≥ 0.5), moved; another
+  owner and name with (nearly) the same substantial body, both. What is
+  left was added or removed; members of an added or removed element fold
+  into it. A file move is reported once, for the outermost element whose
+  file changed.
+- **Properties** are compared with renamed names substituted (after
+  renaming `motor`, `esc.mass + engine.mass` is the same value), and so
+  are relationships (kind, owner and resolved ends through the element
+  matching, text with renames substituted) and checks (kind,
+  requirement, `by`).
+- **Impact.** Checks whose verdict changed (failures first), a new
+  requirement that fails, margins that moved; budget totals; computed
+  values that changed although their own expression didn't.
+- **Cost.** On the demo in Node: the base 180–300 ms (670 ms the first
+  time, with the evaluation session and `verify`), the current version's
+  snapshot 20–100 ms once per analysis, the diff 2–7 ms; WebAssembly
+  memory grows by 11–13 MiB once (160 → 173 MiB) and stays there over
+  repeated comparisons. In the browser (desktop, in the worker): base
+  0.54 s, current 20–100 ms, diff 4–11 ms. Nothing runs on the main
+  thread but the wording.
+
 ## Language services
 
 The editor's completion, hover, go to definition, references, rename,

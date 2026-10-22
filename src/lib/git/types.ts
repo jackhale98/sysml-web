@@ -107,6 +107,25 @@ export interface PullRequest {
 	title: string;
 }
 
+/** An open pull request, to review. */
+export interface PullRequestSummary extends PullRequest {
+	author: string | null;
+	/** The branch with the changes, and its latest commit. */
+	head: { ref: string; sha: string };
+	/** The branch they would be merged into, and its latest commit. */
+	base: { ref: string; sha: string };
+	updatedAt: string | null;
+}
+
+/** A commit in a branch's history. */
+export interface CommitSummary {
+	sha: string;
+	/** The first line of its message. */
+	title: string;
+	author: string | null;
+	date: string | null;
+}
+
 /** A repository branch chosen to open or connect. */
 export interface RepoChoice {
 	ref: RepoRef;
@@ -140,6 +159,12 @@ export interface GitProvider {
 	createBranch(ref: RepoRef, name: string, from: string): Promise<BranchSummary>;
 	openPullRequest(ref: RepoRef, input: PullRequestInput): Promise<PullRequest>;
 	compare(ref: RepoRef, base: string, head: string): Promise<Comparison>;
+	/** The latest commit both have (where `head` branched off `base`). */
+	mergeBase(ref: RepoRef, base: string, head: string): Promise<string>;
+	/** Open pull requests, most recently updated first. */
+	listPullRequests(ref: RepoRef): Promise<PullRequestSummary[]>;
+	/** A branch's latest commits, newest first. */
+	listCommits(ref: RepoRef, branch: string, count?: number): Promise<CommitSummary[]>;
 	/** The repository's page, or a branch's, on the host. */
 	webUrl(ref: RepoRef, branch?: string): string;
 }

@@ -31,6 +31,7 @@ export function toolkitEngine(toolkit: ToolkitClient): Engine {
 		edit: (...params) => toolkit.call('edit', ...params),
 		checks: (...params) => toolkit.call('checks', ...params),
 		evaluate: (...params) => toolkit.call('evaluate', ...params),
+		compareModels: (...params) => toolkit.call('compareModels', ...params),
 		terminate: () => toolkit.terminate()
 	};
 }

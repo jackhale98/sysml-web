@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Handle, Position } from '@xyflow/svelte';
 	import { iconOf } from '#lib/ui/kinds.ts';
+	import { MARK_WORDS } from '#lib/review/marks.svelte.ts';
 	import { useEditing } from './editing.svelte.ts';
 	import { MAX_ROWS, notationOf } from './notation.ts';
 	import type { SysmlNodeData } from './types.ts';
@@ -77,7 +78,14 @@
 	class:linked={!!editing?.linked.has(id)}
 	class:source={editing?.connectingFrom === id}
 	class:pickable={!!editing?.connectingFrom && editing.connectingFrom !== id}
+	class:review-added={data.review === 'added'}
+	class:review-changed={data.review === 'changed'}
 >
+	{#if data.review}
+		<span class="review-badge {data.review}" aria-hidden="true"
+			>{MARK_WORDS[data.review].badge}</span
+		>
+	{/if}
 	{#if n.shape === 'port'}
 		<div class="port-node" title="port {node.label}"></div>
 		<span class="port-label">{node.label}</span>
@@ -209,6 +217,41 @@
 		outline: 2px solid var(--accent);
 		outline-offset: 2px;
 		box-shadow: var(--shadow-md);
+	}
+	/* Review mode: a ring and a badge (the badge says it; the colour only repeats it). */
+	.review-added {
+		--review: var(--ok);
+	}
+	.review-changed {
+		--review: var(--warn);
+	}
+	.review-added .box,
+	.review-changed .box,
+	.review-added .port-node,
+	.review-changed .port-node {
+		box-shadow:
+			0 0 0 3px color-mix(in oklab, var(--review) 55%, transparent),
+			var(--shadow-sm);
+	}
+	.review-added .box,
+	.review-changed .box {
+		border-color: var(--review);
+	}
+	.review-badge {
+		position: absolute;
+		z-index: 2;
+		top: -9px;
+		right: 8px;
+		padding: 0 6px;
+		border-radius: var(--radius-pill);
+		background: var(--review);
+		color: var(--surface);
+		font-size: 9.5px;
+		font-weight: 800;
+		letter-spacing: 0.04em;
+		line-height: 16px;
+		text-transform: uppercase;
+		pointer-events: none;
 	}
 	.head {
 		display: grid;
