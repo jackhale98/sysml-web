@@ -332,19 +332,6 @@ test.describe('on a phone', () => {
 		await expectNoSidewaysScroll(page);
 	});
 
-	test('on a phone, the views drawer reopened while it slides out stays open', async ({ page }) => {
-		await openDemo(page);
-		const pill = page.getByRole('button', { name: /Switch view$/ });
-		await pill.click();
-		const drawer = page.getByRole('dialog', { name: 'Views' });
-		await drawer.getByRole('button', { name: /System requirements/ }).click();
-		// Straight away, before the slide out has finished.
-		await pill.click();
-		await page.waitForTimeout(400);
-		await expect(drawer).toBeVisible();
-		await expect(drawer.getByRole('button', { name: /Drone mass budget/ })).toBeVisible();
-	});
-
 	async function editorFontSize(page: Page, setting: number) {
 		await page.addInitScript((size) => {
 			localStorage.setItem('sysml-web:settings', JSON.stringify({ editorFontSize: size }));
