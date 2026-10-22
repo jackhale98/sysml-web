@@ -37,7 +37,8 @@
 			.filter((v) => v.presentation.kind !== 'none' || v.report)
 	);
 	const viewGroups = $derived(groupViews(savedViews, (v) => v.info));
-	const reports = $derived(reportEntries(workspace.views, isLibraryFile));
+	// Saved reports are under Documents; the standard ones the project hasn't saved here.
+	const reports = $derived(reportEntries(workspace.views, isLibraryFile).filter((r) => !r.saved));
 	const packages = $derived(
 		workspace.tree.filter((n) => n.element.kind === 'package' && !isLibraryFile(n.element.file))
 	);
@@ -135,7 +136,7 @@
 				{#each workspace.machines as m (m.qualifiedName ?? m.name)}
 					{@render row(
 						Play,
-						`Run ${m.name}`,
+						`Run ${viewTitle(m.name)}`,
 						{ kind: 'emulator', machine: m.qualifiedName ?? m.name, title: m.name },
 						undefined,
 						'var(--kind-behavior)'
@@ -162,20 +163,22 @@
 		</section>
 	{/if}
 
-	<section>
-		{@render heading('Reports')}
-		<ul>
-			{#each reports as r (r.name)}
-				{@render row(
-					FileText,
-					r.title,
-					{ kind: 'view', name: r.name, title: r.title },
-					r.saved ? 'Saved' : 'Standard',
-					'var(--kind-view)'
-				)}
-			{/each}
-		</ul>
-	</section>
+	{#if reports.length}
+		<section>
+			{@render heading('Reports')}
+			<ul>
+				{#each reports as r (r.name)}
+					{@render row(
+						FileText,
+						r.title,
+						{ kind: 'view', name: r.name, title: r.title },
+						r.saved ? 'Saved' : 'Standard',
+						'var(--kind-view)'
+					)}
+				{/each}
+			</ul>
+		</section>
+	{/if}
 
 	<section>
 		{@render heading('Files')}

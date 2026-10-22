@@ -38,7 +38,7 @@ test('a state machine typed into the model is listed and runs, its regions in pa
 }) => {
 	await openDemo(page);
 	const simulations = page.locator('section[aria-labelledby="views-heading"]');
-	await expect(simulations.getByRole('button', { name: 'Run FlightModes' })).toBeVisible();
+	await expect(simulations.getByRole('button', { name: 'Run Flight modes' })).toBeVisible();
 
 	await page.getByRole('tab', { name: 'Files' }).click();
 	await page

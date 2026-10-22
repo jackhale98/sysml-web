@@ -232,7 +232,7 @@ test('a state machine runs step by step in the emulator', async ({ page }) => {
 	await openDemo(page);
 	await page
 		.locator('section[aria-labelledby="views-heading"]')
-		.getByRole('button', { name: 'Run FlightModes' })
+		.getByRole('button', { name: 'Run Flight modes' })
 		.click();
 	await expect(page.getByText(/(Started|Now) in idle/)).toBeVisible({ timeout: 15_000 });
 	// The blocked event explains why and links to the variable to set.
@@ -292,6 +292,23 @@ test.describe('on a phone', () => {
 		await expect(page.getByRole('dialog', { name: 'Problems' })).toBeVisible();
 	});
 
+	test('on a phone, the logo goes to the project overview and a tap outside closes the project menu', async ({
+		page
+	}) => {
+		await openDemo(page);
+		const nav = page.getByRole('navigation', { name: 'Sections' });
+		await nav.getByRole('button', { name: 'Model' }).click();
+		await page.getByRole('button', { name: 'Project overview' }).click();
+		await expect(page).toHaveURL(/\/p\/demo/);
+		await expect(nav.getByRole('button', { name: 'Home' })).toHaveAttribute('aria-current', 'page');
+
+		const menu = page.getByRole('button', { name: 'Drone UAV' });
+		await menu.click();
+		await expect(menu).toHaveAttribute('aria-expanded', 'true');
+		await page.mouse.click(200, 600);
+		await expect(menu).toHaveAttribute('aria-expanded', 'false');
+	});
+
 	test('on a phone, the views drawer switches views and tables show as cards', async ({ page }) => {
 		await openDemo(page);
 		await page.getByRole('button', { name: /Switch view$/ }).click();
@@ -310,7 +327,7 @@ test.describe('on a phone', () => {
 		await expect(
 			drawer.getByRole('button', { name: 'System requirements', exact: true })
 		).toHaveAttribute('aria-current', 'true');
-		await drawer.getByRole('button', { name: 'Run FlightModes' }).click();
+		await drawer.getByRole('button', { name: 'Run Flight modes' }).click();
 		await expect(page.getByText(/(Started|Now) in idle/)).toBeVisible({ timeout: 15_000 });
 		await expectNoSidewaysScroll(page);
 	});

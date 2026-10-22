@@ -1,4 +1,4 @@
-# SysML Web
+# Fairtide
 
 A web workbench that makes **SysML v2** approachable. Build models in text or
 diagrams — both edit the same SysML, live — with plain-language explanations
@@ -24,6 +24,10 @@ npm run test:e2e          # Playwright end-to-end + axe accessibility checks
 npm run lighthouse        # Lighthouse CI, mobile and desktop (after npm run build)
 ```
 
+**Sign in with GitHub** needs a GitHub App and a small Cloudflare worker
+(`worker/`); see [docs/setup-github-sign-in.md](docs/setup-github-sign-in.md).
+Without them, people connect GitHub with a personal access token.
+
 The engine is the Open-MBEE [sysml-toolkit](https://github.com/Open-MBEE/sysml-toolkit)
 (`@sysml/wasm`), at the release pinned in `toolkit.json`; see
 [docs/engine.md](docs/engine.md).
@@ -35,6 +39,8 @@ The engine is the Open-MBEE [sysml-toolkit](https://github.com/Open-MBEE/sysml-t
 | `src/lib/workbench` | Workbench: explorer, text editor, inspector, views, edit actions |
 | `src/lib/diagram` | Diagram canvas (Svelte Flow), SysML notation, ELK layout |
 | `src/lib/editor` | CodeMirror support driven by the engine |
+| `src/lib/git` | GitHub: connecting, sign-in, opening and saving repositories |
+| `worker` | The sign-in worker (Cloudflare), for "Sign in with GitHub" |
 | `src/lib/learn` | Plain-language explanations of SysML concepts |
 | `src/lib/ui` | Design-system components |
 | `src/routes` | Landing page and the workbench (`/p/[project]`) |

@@ -53,6 +53,9 @@ describe('names', () => {
 		expect(exposedName("P::'my part'::**")).toBe('my part');
 		expect(viewTitle('requirementCoverage')).toBe('Requirement coverage');
 		expect(viewTitle('RequirementGaps')).toBe('Requirement gaps');
+		expect(viewTitle('fmeaWorksheet')).toBe('FMEA worksheet');
+		expect(viewTitle('ICDChapter')).toBe('ICD chapter');
+		expect(viewTitle('FlightModes')).toBe('Flight modes');
 	});
 });
 

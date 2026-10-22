@@ -5,9 +5,9 @@
  */
 
 export type GitErrorKind =
-	/** The token is missing, expired or revoked (401). */
+	/** The token or sign-in is missing, expired or revoked (401). */
 	| 'auth'
-	/** The token can't do this (403). */
+	/** The token or app can't do this (403). */
 	| 'permission'
 	/** Too many requests (403/429 with the limit used up). */
 	| 'rate-limit'
@@ -40,19 +40,28 @@ interface HostResponse {
 	headers: { get(name: string): string | null };
 }
 
+/**
+ * How the account connected: with an access token the person made, or by
+ * signing in (a GitHub App, which can use only the repositories chosen for it).
+ */
+export type Access = 'token' | 'app';
+
 /** A friendly error for a failed host response. `what` names the thing asked for. */
 export function errorFor(
 	response: HostResponse,
 	detail: string,
 	host: string,
-	what = 'that'
+	what = 'that',
+	access: Access = 'token'
 ): GitError {
 	const { status } = response;
 	const lower = detail.toLowerCase();
 	if (status === 401)
 		return new GitError(
 			'auth',
-			`${host} didn't accept your access token. It may have expired or been revoked; connect again with a new token.`,
+			access === 'app'
+				? `Your ${host} sign-in has expired or was revoked. Sign in again to carry on (your work here is kept).`
+				: `${host} didn't accept your access token. It may have expired or been revoked; connect again with a new token.`,
 			status,
 			detail
 		);
@@ -75,14 +84,18 @@ export function errorFor(
 	if (status === 403)
 		return new GitError(
 			'permission',
-			`Your token isn't allowed to do ${what}. Check that it covers this repository with “Contents: Read and write” (and “Pull requests: Read and write” to propose changes).`,
+			access === 'app'
+				? `${host} didn't allow ${what}. Check that Fairtide can use this repository (choose repositories on ${host}), and that your account can make changes to it.`
+				: `Your token isn't allowed to do ${what}. Check that it covers this repository with “Contents: Read and write” (and “Pull requests: Read and write” to propose changes).`,
 			status,
 			detail
 		);
 	if (status === 404)
 		return new GitError(
 			'not-found',
-			`${host} couldn't find ${what}. Check the name, or that your token includes this repository.`,
+			access === 'app'
+				? `${host} couldn't find ${what}. Check the name, or that Fairtide can use this repository (choose repositories on ${host}).`
+				: `${host} couldn't find ${what}. Check the name, or that your token includes this repository.`,
 			status,
 			detail
 		);

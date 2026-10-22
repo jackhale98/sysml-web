@@ -60,7 +60,11 @@ export interface ReportEntry {
 	saved: boolean;
 }
 
-/** The reports to offer: the ones saved in the project's model, then the standard ones. */
+/**
+ * The reports to offer: the ones saved in the project's model, then the
+ * standard ones the project hasn't saved a copy of (a saved specification
+ * replaces the standard one in lists; the standard one is still a New view away).
+ */
 export function reportEntries(
 	views: readonly ViewInfo[],
 	isLibraryFile: (path: string) => boolean
@@ -73,12 +77,14 @@ export function reportEntries(
 				? [{ name: v.name, title: viewTitle(v.name), kind, doc: v.doc, saved: true }]
 				: [];
 		});
-	const standard = STANDARD_REPORTS.map((r): ReportEntry => ({
-		name: r.definition,
-		title: r.label,
-		kind: r.kind,
-		doc: r.description,
-		saved: false
-	}));
+	const standard = STANDARD_REPORTS.filter((r) => !saved.some((s) => s.kind === r.kind)).map(
+		(r): ReportEntry => ({
+			name: r.definition,
+			title: r.label,
+			kind: r.kind,
+			doc: r.description,
+			saved: false
+		})
+	);
 	return [...saved, ...standard];
 }

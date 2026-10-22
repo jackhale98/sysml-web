@@ -84,8 +84,8 @@
 		newOpen = false;
 		ui.create = request;
 	}
-	/** Reports: the ones saved in the model, then the standard ones. */
-	const reports = $derived(reportEntries(workspace.views, isLibraryFile));
+	/** The standard reports the project hasn't saved (saved ones are under Documents). */
+	const reports = $derived(reportEntries(workspace.views, isLibraryFile).filter((r) => !r.saved));
 	let packagesOpen = $state(false);
 
 	const needle = $derived(query.trim().toLowerCase());
@@ -138,6 +138,21 @@
 		return Object.entries(byFolder);
 	});
 </script>
+
+{#snippet fileItem(folder: string, path: string)}
+	<li>
+		<button
+			type="button"
+			class="item"
+			style:padding-left={folder ? '1.5rem' : undefined}
+			onclick={() => ui.open({ kind: 'file', path })}
+		>
+			<FileCode size={14} />
+			<span class="label">{path.slice(folder ? folder.length + 1 : 0)}</span>
+			{#if workspace.dirty.has(path)}<span class="dot" title="Edited"></span>{/if}
+		</button>
+	</li>
+{/snippet}
 
 {#snippet tree(nodes: TreeNode[], depth: number)}
 	<ul role={depth === 0 ? 'tree' : 'group'} aria-label={depth === 0 ? 'Model' : undefined}>
@@ -334,27 +349,29 @@
 												title: m.name
 											})}
 									>
-										<Play size={14} /> <span class="label">Run {m.name}</span>
+										<Play size={14} /> <span class="label">Run {viewTitle(m.name)}</span>
 									</button>
 								</li>
 							{/each}
 						</ul>
 					{/if}
-					<h3>Reports</h3>
-					<ul class="flat">
-						{#each reports as r (r.name)}
-							<li>
-								<button
-									type="button"
-									class="item"
-									title={r.doc}
-									onclick={() => ui.open({ kind: 'view', name: r.name, title: r.title })}
-								>
-									<FileText size={14} /> <span class="label">{r.title}</span>
-								</button>
-							</li>
-						{/each}
-					</ul>
+					{#if reports.length}
+						<h3>Reports</h3>
+						<ul class="flat">
+							{#each reports as r (r.name)}
+								<li>
+									<button
+										type="button"
+										class="item"
+										title={r.doc}
+										onclick={() => ui.open({ kind: 'view', name: r.name, title: r.title })}
+									>
+										<FileText size={14} /> <span class="label">{r.title}</span>
+									</button>
+								</li>
+							{/each}
+						</ul>
+					{/if}
 					<details class="group" bind:open={packagesOpen}>
 						<summary>Package diagrams</summary>
 						{#if packagesOpen}
@@ -462,23 +479,28 @@
 	{:else}
 		<ul class="flat files">
 			{#each folders as [folder, paths] (folder)}
-				{#if folder}
-					<li class="folder"><Folder size={14} /> {folder}</li>
-				{/if}
-				{#each paths as path (path)}
+				{#if folder && isLibraryFile(`${folder}/`)}
+					<!-- Libraries the model builds on: out of the way until wanted. -->
 					<li>
-						<button
-							type="button"
-							class="item"
-							style:padding-left={folder ? '1.5rem' : undefined}
-							onclick={() => ui.open({ kind: 'file', path })}
-						>
-							<FileCode size={14} />
-							<span class="label">{path.slice(folder ? folder.length + 1 : 0)}</span>
-							{#if workspace.dirty.has(path)}<span class="dot" title="Edited"></span>{/if}
-						</button>
+						<details class="library-folder">
+							<summary class="folder"
+								><ChevronRight size={14} class="chevron" /><Folder size={14} /> {folder}</summary
+							>
+							<ul class="flat">
+								{#each paths as path (path)}
+									{@render fileItem(folder, path)}
+								{/each}
+							</ul>
+						</details>
 					</li>
-				{/each}
+				{:else}
+					{#if folder}
+						<li class="folder"><Folder size={14} /> {folder}</li>
+					{/if}
+					{#each paths as path (path)}
+						{@render fileItem(folder, path)}
+					{/each}
+				{/if}
 			{/each}
 		</ul>
 	{/if}
@@ -683,6 +705,20 @@
 		margin: var(--space-1) var(--space-2);
 		color: var(--text-3);
 		font-size: var(--text-xs);
+	}
+	.library-folder > summary {
+		cursor: pointer;
+		list-style: none;
+	}
+	.library-folder > summary::-webkit-details-marker {
+		display: none;
+	}
+	.library-folder > summary :global(.chevron) {
+		margin-left: -2px;
+		transition: transform 0.15s;
+	}
+	.library-folder[open] > summary :global(.chevron) {
+		transform: rotate(90deg);
 	}
 	.folder {
 		display: flex;
