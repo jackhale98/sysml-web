@@ -222,11 +222,17 @@ its resolver recorded, reparses, and refuses an edit that doesn't parse
   `behavior.ts`) — from the toolkit's own graphs (`toGraph`, `tkgraph.ts`),
   which resolve connector ends through feature chains, render ports a part
   inherits from its definition and its supertypes, and label transitions.
-  Two gaps are filled from the model: a connector the toolkit cannot place
+  Gaps are filled from the model: a connector the toolkit cannot place
   (a binding to the scope's own inherited port) is drawn from its ends as
-  written, and a decision's branches (`if c then a; else b;`, transitions
+  written; a decision's branches (`if c then a; else b;`, transitions
   the action graph leaves out) take the node declared before them as
-  source. A change trigger's label (`accept when …`) is read from the text.
+  source; so does a state's target transition (`state b; accept Go then
+  a;`), which the state graph leaves out. A transition's label is
+  `trigger [guard] / effect` read from its text in the emulator's
+  conventions (`machines.ts`), as the toolkit labels an assigning effect
+  "assignment action". Every transition and succession edge carries its
+  statement's extent (`DiagramEdge.element`, with `end_byte`), which the
+  canvas changes and removes it by.
 - **requirements**, **trace**, **packages** (`trace.ts`) — from the records
   and the satisfy/verify ends the adapter resolved (`ExtractedModel.traces`).
 - **sequence** (`sequence.ts`) — from the records. The toolkit's sequence
@@ -266,6 +272,36 @@ is `general:Views::name`.
 Cost on the demo in Node, after analysis: 0.4–16 ms per view. The one
 expensive read (a connector's resolved ends, a whole-model pass of ~300 ms
 the first time) is only made when an end's name matches nothing drawn.
+
+## Drawing behaviour
+
+State and action diagrams are edited by drawing (`src/lib/diagram/`). The
+SysML is written by pure planners in `behaviorEdits.ts`, each returning one
+text patch (checked for new syntax errors, applied as one undoable step):
+
+| Gesture | Writes |
+| --- | --- |
+| Add a state, "Starts here" | `state off;` and `entry; then off;` (an existing `entry; then x;` is retargeted) |
+| Add a state inside a state | the same, in that state's body (`state on { entry; then idle; state idle; }`) |
+| Add a value | `attribute presses : Integer = 0;` |
+| Draw a transition | `transition off_to_on first off accept SwitchOn if presses < 3 do action beep then on;`, in the source's region; a target in another region by its path (`on.busy`); a new signal also writes `item def SwitchOn;` in the machine's package |
+| "When…" | a signal (`accept SwitchOn`), `accept when presses > 2`, `accept after 5 [s]` (`[SI::s]` without `import SI::*`), or nothing |
+| "Then do…" | a name: `do action beep`; `x := e`: `do assign x := e`; several: `do action { assign a := 1; assign b := 2; }` |
+| What a state does | `entry action greet;`, `do assign n := 0;`, `exit action wave;` in its body, in that order |
+| Add an action / control node | `action boil;`, `decide decision1;`, `merge merge1;`, `fork fork1;`, `join join1;` with the other nodes; "Starts here" also `first start then boil;` |
+| Draw a next step | `first boil then pour;` with the other successions; "Ends here": `first pour then done;` |
+| Draw from a decision | `if hot then pour;` (or `else wait;` without a condition) right after the `decide`, before an `else` |
+| Delete a line | its statement; `entry;` with an initial `then x;`; only the `then` of `then action b;` |
+| Delete a state or step | its declaration and every line drawn to or from it (and its nested states) |
+
+Transitions and successions are written where nothing positional can be
+broken: new states go after the last state and the `accept … then` lines
+that follow it, new steps after the last node and its branches, never
+between a `decide` and its branches. A shorthand `accept T then b;` that is
+changed is written out in full (`transition first a accept T then b;`).
+Each generator is checked in `behaviorEdits.test.ts` through the toolkit
+host (no problems), the diagram builder (the edges drawn) and the emulator
+(the machine runs).
 
 ## Values and constraint checks
 
@@ -621,3 +657,23 @@ Found while making the Sequence view (sysml-toolkit 0.10.10):
   declares has no `memberExtent`, so the model adapter, which keeps the
   elements written in the text, has no record of it; `event
   m.sourceEvent;` without `then` has one.
+
+Found while making state machines and action flows drawable (sysml-toolkit
+0.10.10):
+
+- **Target transitions in the state graph.** `toGraph({view: 'state'})`
+  leaves out a transition written without `first` (`state b; accept Go
+  then a;`, whose source is the state before it), though the model has it
+  (`derived:source`). The diagram builder draws it from the text.
+- **A transition whose source is a feature chain.** `transition first
+  on.idle accept Stop then off;` written in the machine's body (not inside
+  `on`) is not in the state graph either; its `derived:source` is right.
+  The app writes a transition in its source state's region instead.
+- **Effect labels.** The state graph labels `do assign x := x + 1` as
+  "assignment action" rather than with its text; the builder labels
+  transitions from their text.
+- **Guarded successions in the action graph.** `first d if hot then pour;`
+  (a `GuardedSuccession`, valid and resolved) is not in the action graph.
+  The app writes branches in the target form after their `decide` (`if hot
+  then pour; else wait;`), which the builder draws from the text; that
+  form is order-sensitive, which the planners take care of.

@@ -88,14 +88,14 @@
 			<input
 				class="code"
 				bind:value={action}
-				placeholder={values[0] ? `e.g. beep, or ${values[0]} := 0` : 'e.g. beep'}
+				placeholder="e.g. beep, or count := 0"
 				autocomplete="off"
 				spellcheck="false"
 			/>
 		</label>
 		<p class="hint">
 			{current[kind] ? 'Empty it to remove it. ' : ''}An action's name, or a value to set (count :=
-			count + 1).
+			count + 1).{values.length ? ` Values you can use: ${values.join(', ')}` : ''}
 		</p>
 		<div class="preview">
 			<span>Writes</span>

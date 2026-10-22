@@ -158,7 +158,7 @@
 				<input
 					class="code"
 					bind:value={condition}
-					placeholder={values[0] ? `e.g. ${values[0]} > 3` : 'e.g. temperature > 30'}
+					placeholder="e.g. temperature > 30"
 					autocomplete="off"
 					spellcheck="false"
 				/>
@@ -177,7 +177,7 @@
 			<input
 				class="code"
 				bind:value={guard}
-				placeholder={values[0] ? `e.g. ${values[0]} < 3` : 'a condition'}
+				placeholder="a condition, e.g. speed < 3"
 				autocomplete="off"
 				spellcheck="false"
 			/>
@@ -187,7 +187,7 @@
 			<input
 				class="code"
 				bind:value={effect}
-				placeholder={values[0] ? `e.g. beep, or ${values[0]} := ${values[0]} + 1` : 'e.g. beep'}
+				placeholder="e.g. beep, or count := count + 1"
 				autocomplete="off"
 				spellcheck="false"
 			/>

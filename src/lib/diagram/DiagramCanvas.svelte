@@ -49,10 +49,12 @@
 	import { ownersOf, qualifiedName, resolveNode } from './model.ts';
 	import BehaviorAddForm, { type BehaviorAddChoice } from './BehaviorAddForm.svelte';
 	import BranchForm from './BranchForm.svelte';
+	import FormPanel from './FormPanel.svelte';
 	import StateActionsForm from './StateActionsForm.svelte';
 	import TransitionForm from './TransitionForm.svelte';
 	import {
 		branchGuard,
+		CONTROL_WORDS,
 		flowStarts,
 		isBehavior,
 		isFlowNode,
@@ -415,6 +417,9 @@
 		);
 	}
 
+	/** The nodes and lines last drawn, to tell a new state or line from a changed label. */
+	let lastShape = '';
+
 	async function refresh(relayout = false) {
 		const current = ++generation;
 		try {
@@ -426,9 +431,13 @@
 			const stored = relayout ? {} : { ...storedPositions() };
 			// A state machine or flow nobody has arranged by hand is laid out afresh as it
 			// grows, so each new state or line lands where the layout reads best.
-			const settle = behavior && !Object.keys(stored).length;
-			const grew =
-				graph.nodes.length !== previous.size || graph.nodes.some((n) => !previous.has(n.id));
+			// Only when what is drawn changed: a new label alone moves nothing.
+			const shape = JSON.stringify([
+				graph.nodes.map((n) => n.id),
+				graph.edges.map((e) => [e.source, e.target])
+			]);
+			const settle = behavior && !Object.keys(stored).length && shape !== lastShape;
+			lastShape = shape;
 			const sizes = new Map(graph.nodes.map((n) => [n.id, nodeSize(n, view)]));
 
 			// A renamed element keeps its place.
@@ -568,7 +577,7 @@
 				if (Object.keys(stored).length) savePositions({ [dropped]: p });
 				else pinAll();
 			}
-			if (!hadNodes || relayout || (settle && grew)) fit();
+			if (!hadNodes || relayout || settle) fit();
 		} catch (error) {
 			if (current !== generation) return;
 			status = 'error';
@@ -876,7 +885,9 @@
 		| { kind: 'state'; state: ModelElement; x: number; y: number; focus?: string }
 		| null
 	>(null);
-	const formMode = $derived(hostWidth < 560 ? 'sheet' : 'popover');
+	/** Phones: forms are bottom sheets. */
+	const narrow = $derived(hostWidth < 560);
+	const formMode = $derived(narrow ? 'sheet' : 'popover');
 
 	/** Where a form opens: beside the point, inside the canvas (a sheet ignores it). */
 	function formAt(point: XY) {
@@ -1139,19 +1150,20 @@
 				shortcut: 'C',
 				run: () => startConnect(id)
 			});
-			if (!(element.kind in { decision_node: 1, merge_node: 1, fork_node: 1, join_node: 1 }))
-				items.push(
-					{
-						label: 'Starts here',
-						icon: CircleDot,
-						run: () => void applyBehavior(planSuccession('start', element, null, ctx))
-					},
-					{
-						label: 'Ends here',
-						icon: CircleStop,
-						run: () => void applyBehavior(planSuccession(element, 'done', null, ctx))
-					}
-				);
+			// A flow can start at an action or a fork, and end after an action, a merge or a join.
+			const control = element.kind in CONTROL_WORDS;
+			if (!control || element.kind === 'fork_node')
+				items.push({
+					label: 'Starts here',
+					icon: CircleDot,
+					run: () => void applyBehavior(planSuccession('start', element, null, ctx))
+				});
+			if (!control || element.kind === 'merge_node' || element.kind === 'join_node')
+				items.push({
+					label: 'Ends here',
+					icon: CircleStop,
+					run: () => void applyBehavior(planSuccession(element, 'done', null, ctx))
+				});
 			items.push({
 				label: 'Rename',
 				icon: Pencil,
@@ -1391,6 +1403,11 @@
 		if (event.key === 'Escape' && editing.connectingFrom) {
 			event.preventDefault();
 			cancelConnect();
+		} else if (event.key === 'Enter' && plain && edgeIn(event.target)?.data?.editable) {
+			// A transition or a branch: Enter opens the form that changes it.
+			event.preventDefault();
+			const edge = edgeIn(event.target)!;
+			editEdge(edge.id, underNode(edge.source));
 		} else if ((event.key === 'Delete' || event.key === 'Backspace') && plain) {
 			const edge = edgeIn(event.target) ?? edges.find((e) => e.selected);
 			if (nodeIdIn(event.target) || (!edge && id)) {
@@ -1694,25 +1711,11 @@
 					disabled={status !== 'ready' || nodes.length === 0}
 				/>
 			</div>
-			{#if popover === 'add' && behavior && subject}
+			{#if popover === 'add' && behavior && subject && !narrow}
 				<div class="popover">
-					<BehaviorAddForm
-						view={view as 'states' | 'actions'}
-						owners={behaviorOwners}
-						initialOwner={addInside}
-						plan={planAdd}
-						suggest={(o, kind) =>
-							suggestName(
-								o,
-								kind === 'decide' ? 'decision' : kind === 'action' ? 'step' : kind,
-								ctx
-							)}
-						starts={(o) => (view === 'states' ? !!startOf(o, ctx) : flowStarts(o, ctx))}
-						onapply={addBehavior}
-						oncancel={() => (popover = null)}
-					/>
+					{@render behaviorAdd()}
 				</div>
-			{:else if popover === 'add' && owner}
+			{:else if popover === 'add' && owner && !behavior}
 				<div class="popover">
 					<AddForm
 						ownerLabel={owner.label}
@@ -1787,6 +1790,12 @@
 				focusNode(back);
 			}}
 		/>
+	{/if}
+
+	{#if popover === 'add' && behavior && subject && narrow}
+		<FormPanel label="Add to {subject.label}" mode="sheet" onclose={() => (popover = null)}>
+			{@render behaviorAdd()}
+		</FormPanel>
 	{/if}
 
 	{#if behaviorForm?.kind === 'transition'}
@@ -1884,6 +1893,21 @@
 		</div>
 	{/if}
 </div>
+
+{#snippet behaviorAdd()}
+	<BehaviorAddForm
+		view={view as 'states' | 'actions'}
+		owners={behaviorOwners}
+		flat={narrow}
+		initialOwner={addInside}
+		plan={planAdd}
+		suggest={(o, kind) =>
+			suggestName(o, kind === 'decide' ? 'decision' : kind === 'action' ? 'step' : kind, ctx)}
+		starts={(o) => (view === 'states' ? !!startOf(o, ctx) : flowStarts(o, ctx))}
+		onapply={addBehavior}
+		oncancel={() => (popover = null)}
+	/>
+{/snippet}
 
 {#snippet markers(suffix: string, ink: string)}
 	<marker
@@ -2002,7 +2026,8 @@
 		cursor: pointer;
 	}
 	.toolbar .run {
-		color: var(--kind-behavior);
+		/* The behaviour green, deep enough to read as text (WCAG AA). */
+		color: color-mix(in oklab, var(--kind-behavior) 78%, var(--text));
 		font-weight: 650;
 	}
 	.toolbar button:hover:not(:disabled) {

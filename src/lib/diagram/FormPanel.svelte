@@ -276,6 +276,15 @@
 	.panel :global(.actions .quiet:hover) {
 		background: var(--surface-hover);
 	}
+	/* On a phone the buttons stay in reach however long the form is. */
+	.sheet :global(.actions) {
+		position: sticky;
+		bottom: calc(-1 * max(var(--space-4), env(safe-area-inset-bottom)));
+		margin: 0 calc(-1 * var(--space-4)) calc(-1 * max(var(--space-4), env(safe-area-inset-bottom)));
+		padding: var(--space-2) var(--space-4) max(var(--space-3), env(safe-area-inset-bottom));
+		border-top: 1px solid var(--border);
+		background: var(--surface);
+	}
 	.sheet :global(.choice),
 	.sheet :global(.actions button),
 	.sheet :global(.field input:not([type='checkbox'])),

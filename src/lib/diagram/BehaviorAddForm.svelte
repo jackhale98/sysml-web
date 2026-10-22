@@ -26,6 +26,7 @@
 	let {
 		view,
 		owners,
+		flat = false,
 		initialOwner = null,
 		plan,
 		suggest,
@@ -36,6 +37,8 @@
 		view: 'states' | 'actions';
 		/** Where it can go: the machine or flow, and the selected state it can go inside. */
 		owners: ModelElement[];
+		/** Inside a sheet: no card of its own. */
+		flat?: boolean;
 		/** The owner to start with (`owners[0]` when not given). */
 		initialOwner?: string | null;
 		plan: (owner: ModelElement, choice: BehaviorAddChoice) => Plan | string;
@@ -126,7 +129,12 @@
 	}
 </script>
 
-<form class="add-form" onsubmit={submit} aria-label="Add to {owner?.label ?? 'the diagram'}">
+<form
+	class="add-form"
+	class:flat
+	onsubmit={submit}
+	aria-label="Add to {owner?.label ?? 'the diagram'}"
+>
 	<fieldset>
 		<legend>Add</legend>
 		<div class="choices">
@@ -188,7 +196,7 @@
 		<pre class="preview" aria-label="SysML that will be added">{result.statement}</pre>
 	{/if}
 	{#if error}<p class="error" role="alert">{error}</p>{/if}
-	<div class="buttons">
+	<div class="actions">
 		<button type="button" class="ghost" onclick={oncancel}>Cancel</button>
 		<button type="submit" class="primary" disabled={busy}>Add</button>
 	</div>
@@ -206,6 +214,14 @@
 		border: 1px solid var(--border);
 		border-radius: var(--radius-md);
 		box-shadow: var(--shadow-lg);
+	}
+	.add-form.flat {
+		width: auto;
+		max-height: none;
+		overflow: visible;
+		padding: 0;
+		border: 0;
+		box-shadow: none;
 	}
 	fieldset {
 		display: grid;
@@ -318,7 +334,7 @@
 		color: var(--danger);
 		font-size: var(--text-sm);
 	}
-	.buttons {
+	.actions {
 		display: flex;
 		justify-content: flex-end;
 		gap: var(--space-2);

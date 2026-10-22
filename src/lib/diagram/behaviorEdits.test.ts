@@ -342,6 +342,23 @@ describe('state machines, drawn', () => {
 		expect(machine.states.find((s) => s.name === 'b')).toMatchObject({ do: 'hum' });
 	});
 
+	it('writes seconds the short way where SI is imported', () => {
+		const p = new Project(
+			starter(
+				'    state def T {\n        entry; then a;\n        state a;\n        state b;\n    }\n'
+			).replace(
+				'private import ScalarValues::*;',
+				'private import ScalarValues::*;\n    private import SI::*;'
+			)
+		);
+		p.apply(planTransition(p.el('a'), p.el('b'), spec({ kind: 'after', seconds: '5' }), p.ctx));
+		expect(p.text).toContain('transition a_to_b first a accept after 5 [s] then b;');
+		expect(p.machine('T').transitions.at(-1)).toMatchObject({ trigger: 'after 5 [s]' });
+		const machine = p.machine('T');
+		const session = step(machine, start(machine), { event: null });
+		expect(session.current).toEqual(['b']);
+	});
+
 	it('refuses what it cannot write', () => {
 		const p = new Project(starter('    state def M {\n        state a;\n    }\n'));
 		expect(planAddState(p.el('M'), 'a', false, p.ctx)).toBe('M already has a.');

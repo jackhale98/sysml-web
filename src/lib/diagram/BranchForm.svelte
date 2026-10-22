@@ -63,7 +63,7 @@
 			<input
 				class="code"
 				bind:value={guard}
-				placeholder={values[0] ? `e.g. ${values[0]}` : 'a condition'}
+				placeholder="a condition, e.g. temperature > 90"
 				autocomplete="off"
 				spellcheck="false"
 			/>
