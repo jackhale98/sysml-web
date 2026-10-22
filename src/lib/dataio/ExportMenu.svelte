@@ -76,7 +76,7 @@
 			open = !open;
 		}}
 	>
-		<Download size={14} /> Export
+		<Download size={14} /> <span class="text">Export</span>
 	</button>
 	{#if open}
 		<div
@@ -155,6 +155,23 @@
 	.trigger:disabled {
 		opacity: 0.6;
 		cursor: progress;
+	}
+	@media (max-width: 760px) {
+		/* An icon button on phones (the table's tools row is one line there). */
+		.trigger {
+			justify-content: center;
+			width: 2.75rem;
+			height: 2.75rem;
+			padding: 0;
+		}
+		.text {
+			position: absolute;
+			width: 1px;
+			height: 1px;
+			overflow: hidden;
+			clip-path: inset(50%);
+			white-space: nowrap;
+		}
 	}
 	.menu {
 		position: absolute;

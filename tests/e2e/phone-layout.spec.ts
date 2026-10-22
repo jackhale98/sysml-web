@@ -82,7 +82,10 @@ test('on a phone, the budgets, the checks and the trade study are cards that fit
 			timeout: 15_000
 		});
 		await expectFitsWidth(page, view);
-		await page.locator('.cards-scroll').evaluate((el) => el.scrollTo(0, el.scrollHeight));
+		await page
+			.locator('.view-table')
+			.first()
+			.evaluate((el) => el.scrollTo(0, el.scrollHeight));
 		await expectFitsWidth(page, `the end of ${view}`);
 	}
 });
