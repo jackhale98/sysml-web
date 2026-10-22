@@ -1,5 +1,11 @@
 <script module lang="ts">
-	export type SettingsSection = 'appearance' | 'editor' | 'projects' | 'accounts' | 'about';
+	export type SettingsSection =
+		| 'appearance'
+		| 'editor'
+		| 'projects'
+		| 'accounts'
+		| 'help'
+		| 'about';
 </script>
 
 <script lang="ts">
@@ -9,6 +15,7 @@
 	 */
 	import {
 		Check,
+		CircleQuestionMark,
 		ExternalLink,
 		HardDrive,
 		Info,
@@ -60,8 +67,15 @@
 	let {
 		open = $bindable(false),
 		section = $bindable<SettingsSection>('appearance'),
-		engine
-	}: { open?: boolean; section?: SettingsSection; engine?: Engine } = $props();
+		engine,
+		onhelp
+	}: {
+		open?: boolean;
+		section?: SettingsSection;
+		engine?: Engine;
+		/** Opens the help over the page; without it, the help page opens. */
+		onhelp?: () => void;
+	} = $props();
 
 	const uid = $props.id();
 	/** The editor's text size as it shows on this device. */
@@ -74,6 +88,7 @@
 		{ id: 'editor', label: 'Editor', icon: Type },
 		{ id: 'projects', label: 'Projects & storage', icon: HardDrive },
 		{ id: 'accounts', label: 'Accounts', icon: KeyRound },
+		{ id: 'help', label: 'Help', icon: CircleQuestionMark },
 		{ id: 'about', label: 'About', icon: Info }
 	];
 
@@ -687,6 +702,28 @@
 					<p class="muted small">
 						{SIGN_IN ? 'GitLab is planned.' : 'GitLab and sign-in without a token are planned.'}
 					</p>
+				{:else if section === 'help'}
+					<section class="block">
+						<h3><CircleQuestionMark size={18} aria-hidden="true" /> Help</h3>
+						<p class="muted">
+							How Fairtide works, in plain words: projects and their files, what SysML's ideas
+							mean, how to do the common jobs, keyboard shortcuts and where your data is kept.
+							It works offline. Press <kbd>?</kbd> in a project, or type <kbd>?</kbd> in search, to
+							find a topic.
+						</p>
+						{#if onhelp}
+							<button
+								type="button"
+								class="button"
+								onclick={() => {
+									open = false;
+									onhelp();
+								}}>Open the help</button
+							>
+						{:else}
+							<a class="button" href={resolve('/help')}>Open the help</a>
+						{/if}
+					</section>
 				{:else if section === 'about'}
 					<section class="block">
 						<h3><Smartphone size={18} aria-hidden="true" /> Install the app</h3>

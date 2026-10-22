@@ -30,6 +30,8 @@
 	];
 	const MEMBER_KINDS: AddKind[] = ['part', 'port', 'attribute', 'action', 'requirement'];
 
+	/** A place a guide asked for (for a new requirement or part), kept while the sheet is open. */
+	let askedOwner = $state<string | null>(null);
 	const candidates = $derived.by(() => {
 		const own = workspace.elements.filter(
 			(e) => !isLibraryFile(e.file) && canOwnMembers(e.kind, e.isDefinition)
@@ -51,13 +53,25 @@
 				: undefined;
 		}
 		add(context);
+		// Asked for by a guide (a place for a new requirement or part).
+		add(workspace.elements.find((e) => e.key === askedOwner));
 		for (const e of own) if (e.kind === 'package') add(e);
 		return out;
 	});
 
 	let ownerKey = $state('');
+	/** The kind the form starts with: the one asked for, else a part. */
+	let initialKind = $state<AddKind | undefined>(undefined);
 	$effect.pre(() => {
-		if (ui.addSheet) ownerKey = untrack(() => candidates[0]?.key ?? '');
+		if (!ui.addSheet) return;
+		untrack(() => {
+			askedOwner = ui.addOwner;
+			const asked = askedOwner && candidates.find((c) => c.key === askedOwner);
+			ownerKey = asked ? asked.key : (candidates[0]?.key ?? '');
+			initialKind = ui.addKind ?? undefined;
+			ui.addOwner = null;
+			ui.addKind = null;
+		});
 	});
 	const owner = $derived(candidates.find((c) => c.key === ownerKey) ?? candidates[0]);
 
@@ -83,6 +97,7 @@
 			<AddForm
 				ownerLabel={owner.label}
 				kinds={owner.kind === 'package' ? PACKAGE_KINDS : MEMBER_KINDS}
+				{initialKind}
 				onadd={async (kind, name, type) => {
 					const error = await addElement(workspace, owner, kind, name, type);
 					if (!error) ui.addSheet = false;

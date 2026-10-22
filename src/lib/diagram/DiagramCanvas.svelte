@@ -38,6 +38,7 @@
 	import { toasts } from '#lib/ui/toasts.svelte.ts';
 	import { addElement, applySteps, deleteElement, renameElement } from '#lib/workbench/actions.ts';
 	import AddForm from '#lib/workbench/AddForm.svelte';
+	import EmptyState from '#lib/ui/EmptyState.svelte';
 	import { canOwnMembers, formatName, type AddKind } from '#lib/workbench/templates.ts';
 	import type { WorkbenchUi } from '#lib/workbench/ui.svelte.ts';
 	import ConnectPicker, { type ConnectTarget } from './ConnectPicker.svelte';
@@ -1601,7 +1602,33 @@
 	{:else if status === 'too-large'}
 		<p class="state" role="status">{message}</p>
 	{:else if status === 'ready' && nodes.length === 0}
-		<p class="state">Nothing to show in this view yet. Add an element to get started.</p>
+		<div class="empty-diagram">
+			<EmptyState
+				title="Nothing to show in this view yet."
+				actions={addOwner
+					? [
+							{
+								label: view === 'states' ? 'Add a state' : view === 'actions' ? 'Add a step' : 'Add',
+								primary: true,
+								run: () => {
+									actionError = null;
+									popover = 'add';
+								}
+							},
+							{ label: 'How diagrams work', run: () => ui.showHelp('text-diagrams-tables') }
+						]
+					: [{ label: 'How diagrams work', run: () => ui.showHelp('text-diagrams-tables') }]}
+			>
+				{#if view === 'states'}
+					Add the states it can be in, then draw a transition from one to the next.
+				{:else if view === 'actions'}
+					Add the steps, then draw what comes next from each one.
+				{:else}
+					Add a part, a requirement or a package here, or write it in the text: the diagram
+					follows.
+				{/if}
+			</EmptyState>
+		</div>
 	{/if}
 
 	<SvelteFlow
@@ -2109,6 +2136,17 @@
 		position: absolute;
 		width: 0;
 		height: 0;
+	}
+	.empty-diagram {
+		position: absolute;
+		inset: 28% var(--space-4) auto;
+		z-index: 4;
+		pointer-events: none;
+	}
+	.empty-diagram :global(.empty-state) {
+		pointer-events: auto;
+		border-radius: var(--radius-lg);
+		background: color-mix(in oklab, var(--surface) 85%, transparent);
 	}
 	.state {
 		position: absolute;

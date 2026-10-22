@@ -16,6 +16,7 @@
 	} from '@lucide/svelte';
 	import type { TreeNode } from '#lib/project/elements.ts';
 	import { isLibraryFile, type Workspace } from '#lib/project/workspace.svelte.ts';
+	import EmptyState from '#lib/ui/EmptyState.svelte';
 	import KindGlyph from '#lib/ui/KindGlyph.svelte';
 	import type { LibraryEntry, LibraryHit } from '#lib/engine/types.ts';
 	import { libraryIndex, librarySearch } from '#lib/library/library.ts';
@@ -356,10 +357,14 @@
 							{/each}
 						</ul>
 					{:else}
-						<p class="hint">
-							No saved views yet. <strong>New view</strong> makes a table, diagram or budget that is saved
-							in the model.
-						</p>
+						<EmptyState
+							compact
+							title="No saved views yet"
+							actions={[{ label: 'New view', primary: true, run: () => create({ kind: 'view' }) }]}
+						>
+							A view is a table, diagram, budget or report, saved in the model so it is always up to
+							date.
+						</EmptyState>
 					{/each}
 					{#if workspace.machines.length}
 						<h3>Simulations</h3>
@@ -468,7 +473,18 @@
 						{/if}
 					</div>
 				</div>
-				{@render tree(userRoots, 0, '')}
+				{#if userRoots.length}
+					{@render tree(userRoots, 0, '')}
+				{:else}
+					<EmptyState
+						compact
+						title="Nothing in the model yet"
+						actions={[{ label: 'How to start', run: () => ui.showHelp('text-diagrams-tables') }]}
+					>
+						Write <code>package Name {'{ }'}</code> in a <code>.sysml</code> file under Files, and add parts
+						and requirements inside it.
+					</EmptyState>
+				{/if}
 			</section>
 			{#if libraryRoots.length}
 				<details class="libraries" bind:open={librariesOpen}>
@@ -728,11 +744,6 @@
 		border-radius: var(--radius-md);
 		background: var(--surface);
 		box-shadow: var(--shadow-lg);
-	}
-	.hint {
-		margin: var(--space-1) var(--space-2);
-		color: var(--text-3);
-		font-size: var(--text-xs);
 	}
 	.library-folder > summary {
 		cursor: pointer;

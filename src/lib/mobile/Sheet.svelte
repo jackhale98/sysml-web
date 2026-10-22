@@ -232,6 +232,13 @@
 		overscroll-behavior: contain;
 		padding: 0 var(--space-3) var(--space-4);
 	}
+	/* On a wide screen (where the guides open it), a panel of reading width. */
+	@media (min-width: 761px) {
+		.panel {
+			width: min(34rem, calc(100% - 2rem));
+			margin: 0 auto;
+		}
+	}
 	@media (prefers-reduced-motion: reduce) {
 		.panel,
 		.sheet::backdrop {
