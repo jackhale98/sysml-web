@@ -1,4 +1,5 @@
 /** What the engine answers for model exchange (`#lib/engine/toolkit/interchange.ts`). */
+import type { ElementJson } from './elements';
 import type { SourceFile } from '#lib/engine/protocol.ts';
 
 export interface InterchangeExportOptions {
@@ -50,4 +51,38 @@ export interface InterchangeImport {
 	carried: number;
 	notes: ImportNote[];
 	problems: ImportProblem[];
+}
+
+/** A file as a merge from the server leaves it. */
+export interface WovenFile {
+	path: string;
+	/** The new text ('' for a removed file). */
+	text: string;
+	status: 'changed' | 'added' | 'removed';
+}
+
+/** The project's files with a merged model brought in (`#lib/engine/toolkit/weave.ts`). */
+export interface WeaveResult {
+	files: WovenFile[];
+	/**
+	 * Declarations written again from the merged model (`element` null: the
+	 * whole file), with how many notes (`//`) they had: those are not kept.
+	 */
+	rewritten: { path: string; element: string | null; notes: number }[];
+	/** What the files still say differently from the merged model, in words (empty: nothing). */
+	differences: string[];
+}
+
+/** What a merge with a server works from, in one form (`#lib/exchange/merge.ts`). */
+export interface MergeInputs {
+	/** The project, exported. */
+	ours: ElementJson[];
+	/** The server's version the project was opened from or last saved to. */
+	base: ElementJson[];
+	/** The branch's head. */
+	theirs: ElementJson[];
+	/** Qualified names of what they refer to outside themselves, by id (the standard library). */
+	names: Record<string, string>;
+	/** Files with syntax errors. */
+	broken: string[];
 }
