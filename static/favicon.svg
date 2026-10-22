@@ -1,6 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" aria-hidden="true">
-	<rect width="32" height="32" rx="8" fill="#2f55d4" />
-	<rect x="6.5" y="6.5" width="9" height="9" rx="2" fill="#ffffff" />
-	<rect x="16.5" y="16.5" width="9" height="9" rx="4.5" fill="#ffffff" />
-	<path d="M15.5 11h3a2.5 2.5 0 0 1 2.5 2.5v3" fill="none" stroke="#b9c8ff" stroke-width="2" />
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Fairtide"><title>Fairtide</title><rect width="32" height="32" rx="8" fill="#0F2231"/><defs><mask id="ftf-phase" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64"><circle cx="32" cy="26" r="13" fill="#fff"/><circle cx="25.5" cy="26" r="13.4" fill="#000"/></mask></defs><g transform="translate(3 3) scale(0.40625)"><path d="M9 46 A25 25 0 1 1 55 46" fill="none" stroke="#8FA9B4" stroke-width="4.5" stroke-linecap="round"/><circle cx="32" cy="26" r="13" fill="#EEF3F1" mask="url(#ftf-phase)"/><path d="M8 47 C13 43.5 15 43.5 20 47 C22.5 49.5 29.5 49.5 32 47 C37 43.5 39 43.5 44 47 C46.5 49.5 53.5 49.5 56 47" fill="none" stroke="#EEF3F1" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></g></svg>

@@ -1,17 +1,20 @@
 <script lang="ts">
+	import FairtideLoader from '#lib/ui/FairtideLoader.svelte';
 	/**
 	 * Choose a GitHub repository and branch: from the account's repositories
 	 * (searchable) or a pasted URL. Connects the account first if needed.
 	 * `run` does the work (open as a project, or connect the current one)
 	 * while the dialog shows progress and any error.
 	 */
-	import { GitBranch, LoaderCircle, Lock, Search, X } from '@lucide/svelte';
+	import { ExternalLink, GitBranch, Lock, Search, X } from '@lucide/svelte';
 	import { pwa } from '#lib/offline/pwa.svelte.ts';
 	import { accounts } from './account.svelte.ts';
 	import ConnectGitHub from './ConnectGitHub.svelte';
-	import { messageOf } from './errors.ts';
+	import { GitError, messageOf } from './errors.ts';
 	import GitHubMark from './GitHubMark.svelte';
 	import { parseRepoUrl } from './github.ts';
+	import type { Resume } from './oauth.ts';
+	import { chooseRepositories, chooseRepositoriesUrl } from './signin.ts';
 	import type { BranchSummary, Progress, RepoChoice, RepoSummary } from './types.ts';
 
 	let {
@@ -19,12 +22,15 @@
 		title = 'Open from GitHub',
 		action = 'Open',
 		intro = 'Pick a repository with SysML files. Its .sysml, .kerml and Markdown files are copied into this browser to work on; save them back with “Save to GitHub”.',
+		resume = 'open-repository',
 		run
 	}: {
 		open?: boolean;
 		title?: string;
 		action?: string;
 		intro?: string;
+		/** What to reopen after a round trip to GitHub (signing in, choosing repositories). */
+		resume?: Resume;
 		run: (choice: RepoChoice, progress: Progress) => Promise<void>;
 	} = $props();
 
@@ -40,6 +46,9 @@
 	let error = $state<string | null>(null);
 
 	const connected = $derived(accounts.connected);
+	/** Signed in with GitHub: the app sees only the repositories chosen for it on GitHub. */
+	const installLink = $derived(accounts.github?.via === 'app' ? chooseRepositoriesUrl() : null);
+	let errorKind = $state<string | null>(null);
 	const pasted = $derived(parseRepoUrl(query));
 	const results = $derived.by(() => {
 		const q = query.trim().toLowerCase();
@@ -75,8 +84,18 @@
 			repos = await accounts.provider().listRepos();
 		} catch (e) {
 			repos = [];
-			error = messageOf(e);
+			fail(e);
 		}
+	}
+
+	function fail(e: unknown) {
+		error = messageOf(e);
+		errorKind = e instanceof GitError ? e.kind : null;
+	}
+
+	function chooseOnGitHub(event: MouseEvent) {
+		event.preventDefault();
+		void chooseRepositories(resume);
 	}
 
 	async function choose(repo: RepoSummary, wanted?: string) {
@@ -88,7 +107,7 @@
 			branches = await accounts.provider().listBranches(repo);
 			if (!branches.some((b) => b.name === branch)) branch = branches[0]?.name ?? branch;
 		} catch (e) {
-			error = messageOf(e);
+			fail(e);
 		}
 	}
 
@@ -102,7 +121,7 @@
 			query = '';
 			await choose(repo, pasted.branch);
 		} catch (e) {
-			error = messageOf(e);
+			fail(e);
 		} finally {
 			busy = null;
 		}
@@ -125,7 +144,7 @@
 			);
 			open = false;
 		} catch (e) {
-			error = messageOf(e);
+			fail(e);
 		} finally {
 			busy = null;
 		}
@@ -144,6 +163,14 @@
 		if (event.target === dialog && !busy) open = false;
 	}
 </script>
+
+{#snippet chooseLink(label: string)}
+	<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- GitHub's page; returns to this one -->
+	<a class="choose" href={installLink} onclick={chooseOnGitHub}>
+		{label}
+		<ExternalLink size={13} aria-hidden="true" />
+	</a>
+{/snippet}
 
 <!-- A backdrop click closes it; so does Escape. -->
 <dialog
@@ -170,7 +197,7 @@
 				</p>
 			{/if}
 			{#if !connected}
-				<ConnectGitHub onconnected={() => void loadRepos()} />
+				<ConnectGitHub {resume} onconnected={() => void loadRepos()} />
 			{:else}
 				<p class="intro">{intro}</p>
 				<form id="{uid}-form" onsubmit={submit}>
@@ -195,9 +222,18 @@
 					<fieldset class="repos" id="{uid}-repos">
 						<legend class="visually-hidden">Repository</legend>
 						{#if repos === null}
-							<p class="muted pad" role="status">
-								<LoaderCircle size={14} class="spin" aria-hidden="true" /> Loading your repositories…
+							<p class="muted pad loading" role="status">
+								<FairtideLoader size={28} label="" /> Loading your repositories…
 							</p>
+						{:else if !results.length && !repos.length && installLink}
+							<div class="none">
+								<p>
+									<strong>Choose the repositories Fairtide can use.</strong>
+									GitHub asks you once which of your repositories (or your organisation’s) to open here.
+									You’ll come straight back.
+								</p>
+								{@render chooseLink('Choose repositories on GitHub')}
+							</div>
 						{:else if !results.length}
 							<p class="muted pad">
 								{repos.length
@@ -225,6 +261,11 @@
 							{/each}
 						{/if}
 					</fieldset>
+					{#if installLink && repos?.length}
+						<p class="more">
+							Don’t see a repository? {@render chooseLink('Choose repositories on GitHub')}
+						</p>
+					{/if}
 
 					{#if selected}
 						<div class="branch-row">
@@ -245,7 +286,14 @@
 				</form>
 			{/if}
 
-			{#if error}<p class="error" role="alert">{error}</p>{/if}
+			{#if error}
+				<div class="error" role="alert">
+					<p>{error}</p>
+					{#if installLink && (errorKind === 'not-found' || errorKind === 'permission')}
+						{@render chooseLink('Choose repositories on GitHub')}
+					{/if}
+				</div>
+			{/if}
 		</div>
 
 		{#if connected}
@@ -493,6 +541,45 @@
 		border-radius: var(--radius-sm);
 		background: var(--danger-weak);
 		font-size: var(--text-sm);
+	}
+	.error {
+		display: grid;
+		gap: var(--space-1);
+		justify-items: start;
+	}
+	.none {
+		display: grid;
+		gap: var(--space-3);
+		justify-items: start;
+		padding: var(--space-3);
+		color: var(--text-2);
+		font-size: var(--text-sm);
+	}
+	.none strong {
+		display: block;
+		margin-bottom: 2px;
+		color: var(--text);
+	}
+	.none .choose {
+		min-height: 2.5rem;
+		padding: 0 var(--space-4);
+		border-radius: var(--radius-sm);
+		background: var(--text);
+		color: var(--surface);
+		text-decoration: none;
+	}
+	.none .choose:hover {
+		opacity: 0.9;
+	}
+	.more {
+		color: var(--text-2);
+		font-size: var(--text-sm);
+	}
+	.choose {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		font-weight: 600;
 	}
 	.offline {
 		background: var(--warn-weak);

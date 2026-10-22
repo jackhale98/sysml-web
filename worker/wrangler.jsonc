@@ -1,0 +1,20 @@
+// The SysML Web sign-in worker. JSONC (not TOML) on purpose: it's the format
+// Wrangler prefers, and the Cloudflare dashboard edits it in place.
+{
+	"name": "sysml-web-sync",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-10-01",
+	// Keep variables set in the Cloudflare dashboard when deploying (secrets are always
+	// kept); otherwise every build would delete them.
+	"keep_vars": true,
+	// Stateless by design: no KV, D1, R2 or Durable Object bindings, and no logs.
+	"observability": { "enabled": false },
+	"vars": {
+		// Origins (no path) that may use this worker: the site on GitHub Pages, and
+		// localhost for development (vite dev on 5173, vite preview and the e2e tests on 4173).
+		"ALLOWED_ORIGINS": "https://jackhale98.github.io,http://localhost:5173,http://localhost:4173"
+	}
+	// The GitHub App's client credentials are secrets, never vars:
+	//   npx wrangler secret put GITHUB_CLIENT_ID
+	//   npx wrangler secret put GITHUB_CLIENT_SECRET
+}

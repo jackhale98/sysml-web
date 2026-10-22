@@ -1,14 +1,14 @@
 {
 	"id": "./",
-	"name": "SysML Web",
-	"short_name": "SysML Web",
+	"name": "Fairtide",
+	"short_name": "Fairtide",
 	"description": "Requirements, architecture, verification and risk in one place, stored as standard SysML v2 in your own git repository.",
 	"lang": "en",
 	"dir": "ltr",
 	"start_url": "./",
 	"scope": "./",
 	"display": "standalone",
-	"background_color": "#ffffff",
+	"background_color": "#0f2231",
 	"theme_color": "#ffffff",
 	"categories": ["productivity", "developer", "education"],
 	"icons": [

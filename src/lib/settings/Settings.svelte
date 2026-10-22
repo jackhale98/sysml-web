@@ -23,12 +23,15 @@
 		Type,
 		X
 	} from '@lucide/svelte';
+	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import type { Engine } from '#lib/engine/client.ts';
 	import type { LibraryLicense } from '#lib/engine/types.ts';
 	import { accounts } from '#lib/git/account.svelte.ts';
 	import ConnectGitHub from '#lib/git/ConnectGitHub.svelte';
 	import GitHubMark from '#lib/git/GitHubMark.svelte';
+	import { takeResume } from '#lib/git/oauth.ts';
+	import { chooseRepositories, chooseRepositoriesUrl, SIGN_IN } from '#lib/git/signin.ts';
 	import {
 		deleteAllData,
 		isStoragePersisted,
@@ -73,6 +76,19 @@
 		settings.init();
 		accounts.init();
 	});
+
+	// Back from signing in on GitHub, started here: show the account.
+	onMount(() => {
+		if (takeResume('settings')) {
+			section = 'accounts';
+			open = true;
+		}
+	});
+
+	function chooseOnGitHub(event: MouseEvent) {
+		event.preventDefault();
+		void chooseRepositories('settings');
+	}
 
 	$effect(() => {
 		if (!dialog) return;
@@ -383,7 +399,7 @@
 						<h3>Where your projects are kept</h3>
 						<p>
 							In <strong>this browser, on this device</strong>. Every change is saved here as you
-							work; nothing is uploaded to a SysML Web server (there isn't one).
+							work; nothing is uploaded to a Fairtide server (there isn't one).
 						</p>
 						<ul class="facts">
 							<li>
@@ -488,48 +504,85 @@
 						<h3><GitHubMark size={18} /> GitHub</h3>
 						{#if accounts.github}
 							{@const user = accounts.github.user}
+							{@const signedIn = accounts.github.via === 'app'}
 							<div class="account">
 								{#if user.avatarUrl}<img src={user.avatarUrl} alt="" width="40" height="40" />{/if}
 								<div>
 									<strong>{user.name || user.login}</strong>
 									<span class="muted"
-										>@{user.login} · connected {new Date(
-											accounts.github.connectedAt
-										).toLocaleDateString()}</span
+										>@{user.login} · {signedIn ? 'signed in' : 'connected'}
+										{new Date(accounts.github.connectedAt).toLocaleDateString()}</span
 									>
 								</div>
-								<span class="pill"><Check size={13} aria-hidden="true" /> Connected</span>
-							</div>
-							<p class="muted">
-								Your access token is kept only in this browser. Signing out forgets it here; to
-								disable it everywhere, delete it on GitHub too.
-							</p>
-							<div class="row">
-								<button type="button" class="button" onclick={() => accounts.signOut()}>
-									<LogOut size={15} aria-hidden="true" /> Sign out and forget token
-								</button>
-								<a
-									class="button"
-									href="https://github.com/settings/personal-access-tokens"
-									target="_blank"
-									rel="noopener noreferrer"
+								<span class="pill"
+									><Check size={13} aria-hidden="true" />
+									{signedIn ? 'Signed in' : 'Connected'}</span
 								>
-									Manage tokens on GitHub <ExternalLink size={13} aria-hidden="true" /><span
-										class="visually-hidden">(opens in a new tab)</span
-									>
-								</a>
 							</div>
+							{#if signedIn}
+								<p class="muted">
+									You signed in with GitHub. Your sign-in is kept only in this browser and renews
+									itself while you use Fairtide. Fairtide can use only the repositories you chose on
+									GitHub.
+								</p>
+								<div class="row">
+									<button type="button" class="button" onclick={() => accounts.signOut()}>
+										<LogOut size={15} aria-hidden="true" /> Sign out
+									</button>
+									{#if chooseRepositoriesUrl()}
+										<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- GitHub's page; returns here -->
+										<a class="button" href={chooseRepositoriesUrl()} onclick={chooseOnGitHub}>
+											Choose repositories on GitHub <ExternalLink size={13} aria-hidden="true" />
+										</a>
+									{/if}
+								</div>
+								<p class="muted small">
+									Signing out forgets your sign-in here. To remove Fairtide's access everywhere,
+									revoke it on GitHub under
+									<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external link -->
+									<a
+										href="https://github.com/settings/apps/authorizations"
+										target="_blank"
+										rel="noopener noreferrer"
+										>Settings → Applications<span class="visually-hidden">
+											(opens in a new tab)</span
+										></a
+									>.
+								</p>
+							{:else}
+								<p class="muted">
+									Your access token is kept only in this browser. Signing out forgets it here; to
+									disable it everywhere, delete it on GitHub too.
+								</p>
+								<div class="row">
+									<button type="button" class="button" onclick={() => accounts.signOut()}>
+										<LogOut size={15} aria-hidden="true" /> Sign out and forget token
+									</button>
+									<a
+										class="button"
+										href="https://github.com/settings/personal-access-tokens"
+										target="_blank"
+										rel="noopener noreferrer"
+									>
+										Manage tokens on GitHub <ExternalLink size={13} aria-hidden="true" /><span
+											class="visually-hidden">(opens in a new tab)</span
+										>
+									</a>
+								</div>
+							{/if}
 						{:else}
-							<ConnectGitHub />
+							<ConnectGitHub resume="settings" />
 						{/if}
 					</section>
-					<p class="muted small">GitLab and sign-in without a token are planned.</p>
+					<p class="muted small">
+						{SIGN_IN ? 'GitLab is planned.' : 'GitLab and sign-in without a token are planned.'}
+					</p>
 				{:else if section === 'about'}
 					<section class="block about">
 						<div class="brand">
-							<Logo size={40} />
+							<Logo size={48} variant="tile" />
 							<div>
-								<strong>SysML Web</strong>
+								<strong>Fairtide</strong>
 								<span class="muted">Version {version}</span>
 							</div>
 						</div>
@@ -552,7 +605,7 @@
 					<section class="block">
 						<h3>Licences</h3>
 						<p>
-							SysML Web is free software, available under either the
+							Fairtide is free software, available under either the
 							<a
 								href="https://spdx.org/licenses/Apache-2.0.html"
 								target="_blank"
@@ -616,7 +669,7 @@
 					<section class="block">
 						<h3>Trademarks</h3>
 						<p class="muted">
-							SysML is a registered trademark of the Object Management Group (OMG). SysML Web is an
+							SysML is a registered trademark of the Object Management Group (OMG). Fairtide is an
 							independent project, not affiliated with or endorsed by OMG.
 						</p>
 					</section>

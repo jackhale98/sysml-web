@@ -16,6 +16,9 @@ interface InstallPromptEvent extends Event {
 /** Look for a new version this often while the app stays open. */
 const UPDATE_CHECK_MS = 60 * 60 * 1000;
 
+/** Why the page is about to go away. */
+export type Leaving = 'reload' | 'sign-in';
+
 class Pwa {
 	/** Whether the browser has a network connection. */
 	online = $state(true);
@@ -28,7 +31,7 @@ class Pwa {
 	private installPrompt: InstallPromptEvent | null = null;
 	private registration: ServiceWorkerRegistration | null = null;
 	private reloading = false;
-	private guards = new Set<() => Promise<boolean> | boolean>();
+	private guards = new Set<(leaving: Leaving) => Promise<boolean> | boolean>();
 
 	init() {
 		if (this.started || typeof window === 'undefined') return;
@@ -99,17 +102,24 @@ class Pwa {
 	}
 
 	/**
-	 * Run `guard` before reloading for a new version: it saves pending work and
-	 * returns false to stay on the page. Returns a function that removes it.
+	 * Run `guard` before this page goes away: reloading for a new version, or
+	 * leaving for GitHub to sign in. It saves pending work and returns false to
+	 * stay on the page. Returns a function that removes it.
 	 */
-	guardReload(guard: () => Promise<boolean> | boolean): () => void {
+	guardReload(guard: (leaving: Leaving) => Promise<boolean> | boolean): () => void {
 		this.guards.add(guard);
 		return () => this.guards.delete(guard);
 	}
 
+	/** Save pending work before the page goes away; false to stay here. */
+	async beforeLeaving(leaving: Leaving): Promise<boolean> {
+		for (const guard of this.guards) if (!(await guard(leaving))) return false;
+		return true;
+	}
+
 	/** Switch to the new version: save first, then reload this tab. */
 	async reload() {
-		for (const guard of this.guards) if (!(await guard())) return;
+		if (!(await this.beforeLeaving('reload'))) return;
 		const waiting = this.registration?.waiting;
 		if (waiting) {
 			this.reloading = true;

@@ -96,7 +96,7 @@ export function standaloneHtml(doc: ReportDocument, body: string, reportCss: str
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="generator" content="SysML Web">
+<meta name="generator" content="Fairtide">
 <title>${escapeHtml(doc.title)}</title>
 <style>
 ${reportCss}
