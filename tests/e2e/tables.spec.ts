@@ -68,8 +68,12 @@ test('a trace matrix made with New view renders from the view library', async ({
 	const form = page.getByRole('dialog', { name: 'New view' });
 	await form.getByText('Trace matrix', { exact: true }).click();
 	await form.getByRole('button', { name: 'Next' }).click();
+	// The demo saves a trace matrix already: this one gets a name of its own.
+	const name = form.getByLabel('Name', { exact: true });
+	if (!(await name.isVisible())) await form.getByRole('button', { name: 'Next' }).click();
+	await name.fill('Design trace');
 	await form.getByRole('button', { name: 'Create' }).click();
-	const table = page.getByRole('region', { name: 'Trace matrix view' });
+	const table = page.getByRole('region', { name: 'Design trace view' });
 	// Every requirement is a row, linked or not; the columns are named in words.
 	await expect(table.getByText('20 rows')).toBeVisible({ timeout: 15_000 });
 	await expect(table.getByRole('columnheader', { name: 'Payload release (drone)' })).toBeVisible();
