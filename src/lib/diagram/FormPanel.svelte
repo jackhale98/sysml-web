@@ -57,6 +57,7 @@
 	role={mode === 'inline' ? 'group' : 'dialog'}
 	tabindex="-1"
 	aria-label={label}
+	data-form-sheet={mode === 'sheet' ? '' : undefined}
 	onkeydown={(e) => {
 		e.stopPropagation();
 		if (e.key === 'Escape') {

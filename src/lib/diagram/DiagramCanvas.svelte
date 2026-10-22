@@ -217,7 +217,7 @@
 					: Promise.resolve('This node is not an element of the model.');
 			},
 			menu: (id, point) => openNodeMenu(id, point),
-			editEdge: (id, point) => editEdge(id, point)
+			editEdge: (id, point) => void editEdge(id, point)
 		})
 	);
 
@@ -317,7 +317,11 @@
 		const node = nodes.find((n) => n.id === id);
 		if (node?.data.elementKey) {
 			const known = workspace.elements.find((e) => e.key === node.data.elementKey);
-			if (known) return known;
+			// Until the diagram is drawn again after an edit, a key may name what is now
+			// at that place in the text: only trust it while the names agree.
+			const named = (e: ModelElement) =>
+				id === e.name || id.endsWith(`.${e.name}`) || id.endsWith(`::${e.name}`);
+			if (known && named(known)) return known;
 		}
 		return resolveNode(id, node?.data.node.is_definition, scope, workspace.elements, owners);
 	}
@@ -420,10 +424,14 @@
 	/** The nodes and lines last drawn, to tell a new state or line from a changed label. */
 	let lastShape = '';
 
+	/** The texts the diagram was last drawn from. */
+	let drawnTexts: string[] = [];
+
 	async function refresh(relayout = false) {
 		const current = ++generation;
 		try {
-			const graph = await engine.diagram(view, workspace.sourceFiles(), scope);
+			const files = workspace.sourceFiles();
+			const graph = await engine.diagram(view, files, scope);
 			if (current !== generation) return;
 			const direction = directionFor(graph);
 			const hadNodes = nodes.length > 0;
@@ -570,6 +578,7 @@
 				});
 			frameTitle = graph.title;
 			status = 'ready';
+			drawnTexts = files.map((f) => f.text);
 
 			if (dropped) {
 				pendingPlace = null;
@@ -848,7 +857,7 @@
 		if (!from) return;
 		editing.connectingFrom = null;
 		if (behavior && target.id) {
-			linkNodes(from, target.id, underNode(target.id));
+			void linkNodes(from, target.id, underNode(target.id));
 			return;
 		}
 		openRelation(from, target.element, target.id ? underNode(target.id) : underNode(from));
@@ -902,6 +911,52 @@
 		focusNode(back);
 	}
 
+	/**
+	 * Wait until the model describes the text as it is now, and the diagram
+	 * draws it: right after an edit, the analysis (where each element is in
+	 * the text) takes a moment, and a gesture planned on the old one would
+	 * write in the wrong place.
+	 */
+	async function settle(): Promise<void> {
+		for (let i = 0; i < 200 && !workspace.settled; i++) {
+			await new Promise((done) => setTimeout(done, 40));
+		}
+		const now = workspace.sourceFiles().map((f) => f.text);
+		if (drawnTexts.length !== now.length || drawnTexts.some((t, i) => t !== now[i])) {
+			clearTimeout(timer);
+			await refresh();
+		}
+	}
+
+	/** The element as the model has it now (ids survive edits that move it in the text). */
+	function fresh(e: ModelElement): ModelElement {
+		return (
+			(e.id ? workspace.elements.find((x) => x.id === e.id) : undefined) ??
+			workspace.elements.find((x) => x.key === e.key) ??
+			e
+		);
+	}
+
+	/** A drawn line by what it joins, as the diagram has it now. */
+	interface EdgeRef {
+		kind: string;
+		source: string;
+		target: string;
+		label: string | null;
+	}
+	const refOf = (e: Edge<SysmlEdgeData>): EdgeRef => ({
+		kind: e.data?.kind ?? '',
+		source: e.source,
+		target: e.target,
+		label: e.data?.label ?? null
+	});
+	function edgeNow(ref: EdgeRef): Edge<SysmlEdgeData> | undefined {
+		const same = edges.filter(
+			(e) => e.data?.kind === ref.kind && e.source === ref.source && e.target === ref.target
+		);
+		return same.find((e) => (e.data?.label ?? null) === ref.label) ?? same[0];
+	}
+
 	/** Apply a form's edit as one undoable step; the form closes when it is made, else says why. */
 	async function applyFromForm(plan: Plan): Promise<string | null> {
 		const error = await applySteps(workspace, plan.label, plan.steps, checkSyntax);
@@ -919,8 +974,18 @@
 		return error;
 	}
 
+	/** A menu item that plans its edit once the model has settled, on the node's element as it is then. */
+	function onSettled(id: string, plan: (element: ModelElement) => Plan | string) {
+		return () =>
+			void settle().then(() => {
+				const element = elementOf(id);
+				if (element) void applyBehavior(plan(element));
+			});
+	}
+
 	/** The Add form's plan for a state, a value, an action or a control node. */
-	function planAdd(o: ModelElement, choice: BehaviorAddChoice): Plan | string {
+	function planAdd(owner: ModelElement, choice: BehaviorAddChoice): Plan | string {
+		const o = fresh(owner);
 		switch (choice.kind) {
 			case 'state':
 				return planAddState(o, choice.name, choice.start, ctx);
@@ -978,9 +1043,11 @@
 		const e = elementOf(id);
 		return e && !isLibrary(e) && isFlowNode(e) ? e : undefined;
 	}
+	const freshEnd = (end: FlowEnd): FlowEnd => (typeof end === 'string' ? end : fresh(end));
 
 	/** A line drawn from one node to another on a state or action diagram. */
-	function linkNodes(fromId: string, toId: string, point: XY) {
+	async function linkNodes(fromId: string, toId: string, point: XY) {
+		await settle();
 		const label = (id: string) => nodes.find((n) => n.id === id)?.data.node.label || id;
 		const fromKind = nodes.find((n) => n.id === fromId)?.data.node.kind;
 		const toKind = nodes.find((n) => n.id === toId)?.data.node.kind;
@@ -1002,7 +1069,8 @@
 				to: target === 'done' ? 'the end' : target.label,
 				initial: { trigger: { kind: 'signal', signal: '' }, guard: '', effect: '' },
 				values: valuesAround(source, ctx),
-				plan: (spec) => planTransition(source, target, spec, ctx),
+				plan: (spec) =>
+					planTransition(fresh(source), target === 'done' ? 'done' : fresh(target), spec, ctx),
 				submit: 'Add transition',
 				...formAt(point),
 				focus: fromId
@@ -1023,16 +1091,14 @@
 				to: label(toId),
 				initial: '',
 				values: valuesAround(source, ctx),
-				plan: (guard) => planSuccession(source, to, guard, ctx),
+				plan: (guard) => planSuccession(fresh(source), freshEnd(to), guard, ctx),
 				submit: 'Add branch',
 				...formAt(point),
 				focus: fromId
 			};
 			return;
 		}
-		void applyBehavior(planSuccession(from, to, null, ctx)).then((error) => {
-			if (!error) focusNode(fromId);
-		});
+		if (!(await applyBehavior(planSuccession(from, to, null, ctx)))) focusNode(fromId);
 	}
 
 	/** The named element a drawn line is (a named transition), if any. */
@@ -1043,32 +1109,37 @@
 	}
 
 	/** Change a transition or a decision branch, from its label or its menu. */
-	function editEdge(id: string, point?: XY) {
-		const edge = edges.find((e) => e.id === id);
-		const element = edge?.data?.element;
-		if (!edge || !element || !edge.data?.editable) return;
+	async function editEdge(id: string, point?: XY) {
+		const before = edges.find((e) => e.id === id);
+		if (!before?.data?.editable) return;
 		menu = null;
-		const at = formAt(point ?? underNode(edge.source));
+		const ref = refOf(before);
+		const at = formAt(point ?? underNode(before.source));
+		await settle();
+		const edge = edgeNow(ref);
+		const element = edge?.data?.element;
+		if (!edge || !element) return;
 		const label = (nodeId: string) => nodes.find((n) => n.id === nodeId)?.data.node.label || nodeId;
+		/** The line's text as it is when the form is sent. */
+		const written = () => edgeNow(ref)?.data?.element;
+		const gone = 'This line is no longer in the model.';
+		const source = elementOf(edge.source);
+		if (!source) return;
 		if (view === 'states') {
-			const source = elementOf(edge.source);
 			const read = readTransition(element, ctx);
-			if (!source || !read) return;
+			if (!read) return;
 			const named = edgeElement(element);
+			const name = named?.kind === 'transition' ? named.name : null;
 			behaviorForm = {
 				kind: 'transition',
 				from: source.label,
 				to: label(edge.target),
 				initial: read.spec,
 				values: valuesAround(source, ctx),
-				plan: (spec) =>
-					planEditTransition(
-						element,
-						source,
-						spec,
-						named?.kind === 'transition' ? named.name : null,
-						ctx
-					),
+				plan: (spec) => {
+					const now = written();
+					return now ? planEditTransition(now, fresh(source), spec, name, ctx) : gone;
+				},
 				submit: 'Save',
 				...at,
 				focus: edge.source
@@ -1076,15 +1147,17 @@
 			return;
 		}
 		const guard = branchGuard(element, ctx);
-		const source = elementOf(edge.source);
-		if (guard === null || !source) return;
+		if (guard === null) return;
 		behaviorForm = {
 			kind: 'branch',
 			from: source.label,
 			to: label(edge.target),
 			initial: guard,
 			values: valuesAround(source, ctx),
-			plan: (g) => planEditBranch(element, g, ctx),
+			plan: (g) => {
+				const now = written();
+				return now ? planEditBranch(now, g, ctx) : gone;
+			},
 			submit: 'Save',
 			...at,
 			focus: edge.source
@@ -1092,11 +1165,13 @@
 	}
 
 	/** What a state does on entry, while in it and on exit. */
-	function openStateActions(id: string, point?: XY) {
+	async function openStateActions(id: string, point?: XY) {
+		menu = null;
+		const at = formAt(point ?? underNode(id));
+		await settle();
 		const state = elementOf(id);
 		if (!state || !isState(state)) return;
-		menu = null;
-		behaviorForm = { kind: 'state', state, ...formAt(point ?? underNode(id)), focus: id };
+		behaviorForm = { kind: 'state', state, ...at, focus: id };
 	}
 
 	/** The lines drawn to and from a node and the nodes inside it, as written. */
@@ -1127,10 +1202,10 @@
 				items.push({
 					label: 'Starts here',
 					icon: CircleDot,
-					run: () => void applyBehavior(planSetStart(element, ctx))
+					run: onSettled(id, (e) => planSetStart(e, ctx))
 				});
 			items.push(
-				{ label: 'What it does…', icon: ListTodo, run: () => openStateActions(id, point) },
+				{ label: 'What it does…', icon: ListTodo, run: () => void openStateActions(id, point) },
 				{
 					label: 'Add a state inside',
 					icon: Plus,
@@ -1156,13 +1231,13 @@
 				items.push({
 					label: 'Starts here',
 					icon: CircleDot,
-					run: () => void applyBehavior(planSuccession('start', element, null, ctx))
+					run: onSettled(id, (e) => planSuccession('start', e, null, ctx))
 				});
 			if (!control || element.kind === 'merge_node' || element.kind === 'join_node')
 				items.push({
 					label: 'Ends here',
 					icon: CircleStop,
-					run: () => void applyBehavior(planSuccession(element, 'done', null, ctx))
+					run: onSettled(id, (e) => planSuccession(e, 'done', null, ctx))
 				});
 			items.push({
 				label: 'Rename',
@@ -1219,7 +1294,7 @@
 			items.push({
 				label: view === 'states' ? 'Change when, only if, then do…' : 'Change the condition…',
 				icon: Pencil,
-				run: () => editEdge(edge.id, point)
+				run: () => void editEdge(edge.id, point)
 			});
 		items.push({
 			label: behavior ? 'Delete' : 'Delete relationship',
@@ -1262,7 +1337,14 @@
 				detail: `${plan.label}.`,
 				statement: plan.statement,
 				action: 'Delete',
-				run: () => applySteps(workspace, plan.label, plan.steps, checkSyntax),
+				run: async () => {
+					await settle();
+					const now = elementOf(id);
+					const again = now ? planRemoveNode(now, linesAt(id), ctx) : `${element.label} is gone.`;
+					return typeof again === 'string'
+						? again
+						: applySteps(workspace, again.label, again.steps, checkSyntax);
+				},
 				focus: id
 			};
 			return;
@@ -1305,7 +1387,17 @@
 				detail: plan.label + '.',
 				statement: plan.statement,
 				action: 'Delete',
-				run: () => applySteps(workspace, plan.label, plan.steps, checkSyntax)
+				run: async () => {
+					const ref = refOf(edge);
+					await settle();
+					const now = edgeNow(ref)?.data?.element;
+					const again = now
+						? planRemoveEdge(now, what, ctx)
+						: 'This line is no longer in the model.';
+					return typeof again === 'string'
+						? again
+						: applySteps(workspace, again.label, again.steps, checkSyntax);
+				}
 			};
 			return;
 		}
@@ -1407,7 +1499,7 @@
 			// A transition or a branch: Enter opens the form that changes it.
 			event.preventDefault();
 			const edge = edgeIn(event.target)!;
-			editEdge(edge.id, underNode(edge.source));
+			void editEdge(edge.id, underNode(edge.source));
 		} else if ((event.key === 'Delete' || event.key === 'Backspace') && plain) {
 			const edge = edgeIn(event.target) ?? edges.find((e) => e.selected);
 			if (nodeIdIn(event.target) || (!edge && id)) {
@@ -1529,7 +1621,7 @@
 			const to = state.toNode?.id ?? nodeIdAt(point);
 			if (!from || !to || (from === to && !behavior)) return;
 			if (behavior) {
-				linkNodes(from, to, point);
+				void linkNodes(from, to, point);
 				return;
 			}
 			const target = elementOf(to);
@@ -1810,6 +1902,7 @@
 			mode={formMode}
 			x={behaviorForm.x}
 			y={behaviorForm.y}
+			prepare={settle}
 			onapply={applyFromForm}
 			onclose={closeBehaviorForm}
 		/>
@@ -1824,11 +1917,12 @@
 			mode={formMode}
 			x={behaviorForm.x}
 			y={behaviorForm.y}
+			prepare={settle}
 			onapply={applyFromForm}
 			onclose={closeBehaviorForm}
 		/>
 	{:else if behaviorForm?.kind === 'state'}
-		{@const state = behaviorForm.state}
+		{@const state = fresh(behaviorForm.state)}
 		<StateActionsForm
 			stateName={state.label}
 			current={stateActions(state, ctx)}
@@ -1837,6 +1931,7 @@
 			mode={formMode}
 			x={behaviorForm.x}
 			y={behaviorForm.y}
+			prepare={settle}
 			onapply={applyFromForm}
 			onclose={closeBehaviorForm}
 		/>
@@ -1904,6 +1999,7 @@
 		suggest={(o, kind) =>
 			suggestName(o, kind === 'decide' ? 'decision' : kind === 'action' ? 'step' : kind, ctx)}
 		starts={(o) => (view === 'states' ? !!startOf(o, ctx) : flowStarts(o, ctx))}
+		prepare={settle}
 		onapply={addBehavior}
 		oncancel={() => (popover = null)}
 	/>

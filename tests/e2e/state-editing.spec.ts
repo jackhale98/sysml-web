@@ -35,7 +35,10 @@ async function newBehavior(
 	const structure = page.getByRole('region', { name: /Structure diagram/ });
 	await expect(structure.locator('.svelte-flow__node').first()).toBeVisible({ timeout: 15_000 });
 	// Add puts it in the selected package.
-	const pkg = project.replace(/\s+/g, '');
+	const pkg = project
+		.split(/\s+/)
+		.map((w) => w[0]!.toUpperCase() + w.slice(1))
+		.join('');
 	await page
 		.getByRole('navigation', { name: 'Explorer' })
 		.getByRole('button', { name: pkg, exact: true })
@@ -56,6 +59,9 @@ async function newBehavior(
 	await expect(diagram.getByText('Nothing to show in this view yet.')).toBeVisible();
 	return diagram;
 }
+
+// Each test draws a whole machine or flow, a step at a time.
+test.describe.configure({ timeout: 120_000 });
 
 const nodeOf = (diagram: Locator, id: string) =>
 	diagram.locator(`.svelte-flow__node[data-id="${id}"]`);
@@ -79,11 +85,23 @@ async function add(
 	if (name !== null && what !== 'Value') await expect(nodeOf(diagram, name)).toBeVisible();
 }
 
-/** Draw from one node to another with the keyboard's Connect (C), then pick the target. */
-async function connect(page: Page, diagram: Locator, from: string, to: string) {
+/**
+ * Draw from one node to another with Connect (C), then pick the target: by
+ * clicking it, or from the list (what keyboards and screen readers use).
+ */
+async function connect(
+	page: Page,
+	diagram: Locator,
+	from: string,
+	to: string,
+	pick: 'node' | 'list' = 'list'
+) {
 	await nodeOf(diagram, from).click();
 	await page.keyboard.press('c');
-	await nodeOf(diagram, to).click();
+	const picker = page.getByRole('dialog', { name: `Connect from ${from}` });
+	await expect(picker).toBeVisible();
+	if (pick === 'node') await nodeOf(diagram, to).click();
+	else await picker.getByRole('button', { name: new RegExp(`^${to} `) }).click();
 }
 
 test('a state machine drawn in a new project runs, and its transitions can be changed', async ({
@@ -97,10 +115,20 @@ test('a state machine drawn in a new project runs, and its transitions can be ch
 	await add(diagram, 'Value', 'presses', { type: 'Integer' });
 	await expect(diagram.locator('.svelte-flow__node[data-id="__initial__"]')).toBeVisible();
 
-	// off → on by dragging from one of the state's handles onto the other state.
+	// off → on by dragging from one of the state's handles onto the other state, once the
+	// layout has settled (it is laid out again as the machine grows).
+	await expect
+		.poll(async () => {
+			const a = await nodeOf(diagram, 'on').boundingBox();
+			await page.waitForTimeout(150);
+			const b = await nodeOf(diagram, 'on').boundingBox();
+			return !!a && !!b && a.x === b.x && a.y === b.y;
+		})
+		.toBe(true);
 	await nodeOf(diagram, 'off').click();
-	const handle = nodeOf(diagram, 'off').locator('.svelte-flow__handle.connect').first();
-	await handle.hover();
+	const handle = nodeOf(diagram, 'off').locator('.svelte-flow__handle.connect.right');
+	const grip = (await handle.boundingBox())!;
+	await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
 	await page.mouse.down();
 	const target = (await nodeOf(diagram, 'on').boundingBox())!;
 	await page.mouse.move(target.x + target.width / 2, target.y + target.height / 2, { steps: 8 });
@@ -117,7 +145,7 @@ test('a state machine drawn in a new project runs, and its transitions can be ch
 	await expect(form).toBeHidden();
 
 	// on → off and on → broken with Connect (C) and a pick.
-	await connect(page, diagram, 'on', 'off');
+	await connect(page, diagram, 'on', 'off', 'node');
 	form = page.getByRole('dialog', { name: 'Transition from on to off' });
 	await form.getByLabel('Signal', { exact: true }).fill('switch off');
 	await form.getByRole('button', { name: 'Add transition' }).click();
@@ -149,7 +177,11 @@ test('a state machine drawn in a new project runs, and its transitions can be ch
 	await expectAccessible(page);
 
 	// Change a guard from the transition's label; Undo puts it back.
-	await page.getByRole('tab', { name: 'Lamp', exact: true }).first().click();
+	await page
+		.getByRole('list', { name: 'Open editors' })
+		.getByRole('button', { name: 'Lamp', exact: true })
+		.first()
+		.click();
 	await diagram.getByRole('button', { name: 'Change transition: SwitchOn' }).click();
 	form = page.getByRole('dialog', { name: 'Transition from off to on' });
 	await form.getByLabel(/Only if/).fill('presses < 3');
@@ -186,7 +218,11 @@ test('a state machine drawn in a new project runs, and its transitions can be ch
 	await expect(inspector.getByText('presses := presses + 1')).toBeVisible();
 
 	// A transition is deleted from its line.
-	await page.getByRole('tab', { name: 'Lamp', exact: true }).first().click();
+	await page
+		.getByRole('list', { name: 'Open editors' })
+		.getByRole('button', { name: 'Lamp', exact: true })
+		.first()
+		.click();
 	await diagram.getByRole('group', { name: /transition from on to broken/ }).focus();
 	await page.keyboard.press('Delete');
 	const confirm = page.getByRole('alertdialog', { name: 'Delete this transition?' });
@@ -285,7 +321,10 @@ test.describe('on a phone', () => {
 
 		await longPress(nodeOf(diagram, 'idle').locator('.box'));
 		await page.getByRole('menuitem', { name: 'Add transition from here' }).click();
-		await nodeOf(diagram, 'landing').tap();
+		await page
+			.getByRole('dialog', { name: 'Connect from idle' })
+			.getByRole('button', { name: 'landing transition' })
+			.tap();
 		const sheet = page.getByRole('dialog', { name: 'Transition from idle to landing' });
 		await expect(sheet).toHaveClass(/sheet/);
 		const box = (await sheet.boundingBox())!;

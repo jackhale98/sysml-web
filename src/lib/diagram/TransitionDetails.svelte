@@ -58,6 +58,13 @@
 		return 'Right away';
 	};
 
+	/** Until the model describes the text as it is (a moment after an edit). */
+	async function settled() {
+		for (let i = 0; i < 200 && !workspace.settled; i++) {
+			await new Promise((done) => setTimeout(done, 40));
+		}
+	}
+
 	async function apply(plan: Plan) {
 		const error = await applySteps(workspace, plan.label, plan.steps, syntaxCheck(engine));
 		if (!error) editing = false;
@@ -83,6 +90,7 @@
 				plan={(spec) => planEditTransition(source, from, spec, element.name, ctx)}
 				submitLabel="Save"
 				mode="inline"
+				prepare={settled}
 				onapply={apply}
 				onclose={() => (editing = false)}
 			/>

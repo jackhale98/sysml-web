@@ -31,6 +31,7 @@
 		plan,
 		suggest,
 		starts,
+		prepare,
 		onapply,
 		oncancel
 	}: {
@@ -46,6 +47,8 @@
 		suggest: (owner: ModelElement, kind: BehaviorAddKind) => string;
 		/** Whether `owner` already says where it starts. */
 		starts: (owner: ModelElement) => boolean;
+		/** Waits until the model is up to date with the text, before the plan is made. */
+		prepare?: () => Promise<void>;
 		onapply: (plan: Plan, choice: BehaviorAddChoice, owner: ModelElement) => Promise<string | null>;
 		oncancel: () => void;
 	} = $props();
@@ -117,13 +120,10 @@
 	async function submit(event: SubmitEvent) {
 		event.preventDefault();
 		if (!owner) return;
-		const p = plan(owner, choice);
-		if (typeof p === 'string') {
-			error = p;
-			return;
-		}
 		busy = true;
-		error = await onapply(p, choice, owner);
+		await prepare?.();
+		const p = plan(owner, choice);
+		error = typeof p === 'string' ? p : await onapply(p, choice, owner);
 		busy = false;
 		if (!error) name = '';
 	}

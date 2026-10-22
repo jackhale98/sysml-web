@@ -16,6 +16,7 @@
 		mode = 'popover',
 		x = 0,
 		y = 0,
+		prepare,
 		onapply,
 		onclose
 	}: {
@@ -26,6 +27,8 @@
 		mode?: 'popover' | 'sheet' | 'inline';
 		x?: number;
 		y?: number;
+		/** Waits until the model is up to date with the text, before the plan is made. */
+		prepare?: () => Promise<void>;
 		onapply: (plan: Plan) => Promise<string | null>;
 		onclose: () => void;
 	} = $props();
@@ -53,12 +56,11 @@
 
 	async function submit(event: SubmitEvent) {
 		event.preventDefault();
-		if (typeof result === 'string') {
-			error = result;
-			return;
-		}
 		busy = true;
-		error = await onapply(result);
+		await prepare?.();
+		// Made again now: the model may have moved on since the preview.
+		const made = !action.trim() && !current[kind] ? 'Write what it does.' : plan(kind, action);
+		error = typeof made === 'string' ? made : await onapply(made);
 		busy = false;
 	}
 </script>
