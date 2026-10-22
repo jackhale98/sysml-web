@@ -9,9 +9,12 @@
 		Columns3,
 		FileCode,
 		FilePlus,
+		Gauge,
 		Info,
+		ListChecks,
 		Minus,
 		Search,
+		Table2,
 		TriangleAlert,
 		Upload
 	} from '@lucide/svelte';
@@ -21,18 +24,26 @@
 	import type { CheckStatus, RenderedTable, RowInfo, ViewInfo } from '#lib/engine/types.ts';
 	import { byteToUtf16, elementAt, type ModelElement } from '#lib/project/elements.ts';
 	import CheckChip from '#lib/ui/CheckChip.svelte';
+	import EmptyState from '#lib/ui/EmptyState.svelte';
+	import { runGuideAction, type GuideAction } from './guide.ts';
 	import type { Workspace } from '#lib/project/workspace.svelte.ts';
 	import KindGlyph from '#lib/ui/KindGlyph.svelte';
 	import { toasts } from '#lib/ui/toasts.svelte.ts';
 	import type { WorkbenchUi } from './ui.svelte.ts';
 	import { renameElement, setField, setTableColumns } from './actions.ts';
 	import ColumnChooser from './ColumnChooser.svelte';
+	import SheetDialog from '#lib/ui/SheetDialog.svelte';
 	import CellEditor from './CellEditor.svelte';
 	import TradeMatrix from './TradeMatrix.svelte';
 	import TraceGrid from './TraceGrid.svelte';
 	import TraceRefs from './TraceRefs.svelte';
 	import { matrixExport } from './traceGrid.ts';
 	import { viewTitle } from './views.ts';
+
+	/** Do what an empty table suggests (add a requirement, set a limit). */
+	function guide(action: GuideAction) {
+		void runGuideAction(action, { ui, workspace, engine });
+	}
 
 	/**
 	 * A SysML view rendered as a table by the engine: the view's
@@ -46,6 +57,7 @@
 		engine
 	}: { name: string; workspace: Workspace; ui: WorkbenchUi; engine: Engine } = $props();
 
+	const COLUMNS_HINT = "Saved in the view's @TableRendering, so the table stays part of the model.";
 	let table = $state.raw<RenderedTable | null>(null);
 	let error = $state<string | null>(null);
 	let query = $state('');
@@ -216,14 +228,18 @@
 		);
 		const scroller = target && scrollParent(target);
 		if (target && scroller) {
-			// Scroll only the rows' own container: moving the page around it would
-			// leave the table short of the screen's bottom.
+			// Scroll only the view's own container (the rows' on a desktop, the whole
+			// view on a phone): moving the page around it would leave it short of the bottom.
 			const offset =
 				target.getBoundingClientRect().top -
 				scroller.getBoundingClientRect().top +
 				scroller.scrollTop;
+			// On a phone the search and buttons stay pinned at the top: keep the row below them.
+			const pinned = ui.phone
+				? (scroller.querySelector('.tools')?.getBoundingClientRect().height ?? 0)
+				: 0;
 			const top = ui.phone
-				? offset - 12
+				? offset - pinned - 12
 				: offset - Math.max(0, (scroller.clientHeight - target.offsetHeight) / 2);
 			const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 			scroller.scrollTo({ top: Math.max(0, top), behavior: reduce ? 'auto' : 'smooth' });
@@ -508,7 +524,7 @@
 			</div>
 			{#if info && !info.builtin}
 				<button type="button" class="source" onclick={showSource}>
-					<FileCode size={14} /> Show SysML
+					<FileCode size={14} /> <span class="button-label">Show SysML</span>
 				</button>
 			{:else if info?.builtin}
 				<button
@@ -517,7 +533,7 @@
 					title="Copy the standard views into this project as SysML you can change"
 					onclick={addToModel}
 				>
-					<FilePlus size={14} /> Add to my model
+					<FilePlus size={14} /> <span class="button-label">Add to my model</span>
 				</button>
 			{/if}
 		</div>
@@ -545,14 +561,11 @@
 						aria-expanded={columnsOpen}
 						onclick={() => (columnsOpen ? (columnsOpen = false) : openColumns())}
 					>
-						<Columns3 size={14} /> Columns
+						<Columns3 size={14} /> <span class="button-label">Columns</span>
 					</button>
-					{#if columnsOpen}
+					{#if columnsOpen && !ui.phone}
 						<div class="columns-panel" role="dialog" aria-label="Choose columns">
-							<p class="panel-hint">
-								Saved in the view's <code>@TableRendering</code>, so the table stays part of the
-								model.
-							</p>
+							<p class="panel-hint">{COLUMNS_HINT}</p>
 							<ColumnChooser bind:choice={columnChoice} {heading} />
 							<div class="panel-buttons">
 								<button type="button" class="source" onclick={() => (columnsOpen = false)}
@@ -579,7 +592,7 @@
 							title="Add requirements from an Excel or CSV file, or cells pasted from a spreadsheet"
 							onclick={() => (ui.importOpen = true)}
 						>
-							<Upload size={14} /> Import
+							<Upload size={14} /> <span class="button-label">Import</span>
 						</button>
 					{/if}
 				</div>
@@ -616,7 +629,48 @@
 			{flash}
 		/>
 	{:else if table.rows.length === 0}
-		<p class="state">No rows. Nothing in the model matches this view yet.</p>
+		{@const definition = (info?.definition ?? name).split('::').pop()}
+		{#if listsRequirements}
+			<EmptyState
+				icon={ListChecks}
+				title="No requirements yet"
+				actions={[
+					{ label: 'Add a requirement', primary: true, run: () => guide('add-requirement') },
+					{ label: 'Import from a spreadsheet', run: () => guide('import-requirements') }
+				]}
+			>
+				A requirement is a “shall” statement with an ID. Add one, or bring in the ones you have from
+				Excel or a CSV file.
+			</EmptyState>
+		{:else if definition === 'ConstraintChecks'}
+			<EmptyState
+				icon={Gauge}
+				title="No limits to check yet"
+				actions={[{ label: 'Set a limit', primary: true, run: () => guide('limit') }]}
+			>
+				A limit, such as “mass at most 150 g”, turns a requirement into a check. Each one shows here
+				with whether the design meets it.
+			</EmptyState>
+		{:else}
+			<EmptyState
+				icon={Table2}
+				title="Nothing to show yet"
+				actions={[
+					...(info && !info.builtin
+						? [
+								{
+									label: 'Show what it covers',
+									run: () => ui.open({ kind: 'file', path: info.file })
+								}
+							]
+						: []),
+					{ label: 'About views', run: () => ui.showHelp('concept-view') }
+				]}
+			>
+				Nothing in the model matches this view yet. Add elements to the model, or change what the
+				view covers (its <code>expose</code> lines) in its text.
+			</EmptyState>
+		{/if}
 	{:else if ui.phone}
 		<!-- Phones: one card per row, full width, scrolling down rather than sideways. -->
 		{@const subtitled = !isPivot && table.columns.length > 2 && !table.editable?.[1]}
@@ -833,6 +887,19 @@
 	{/if}
 </section>
 
+{#if ui.phone}
+	<!-- On a phone the column choice is a sheet over everything, within thumb reach. -->
+	<SheetDialog bind:open={columnsOpen} title="Choose columns" description={COLUMNS_HINT}>
+		<ColumnChooser bind:choice={columnChoice} {heading} />
+		{#snippet footer()}
+			<button type="button" class="source sheet-button" onclick={() => (columnsOpen = false)}
+				>Cancel</button
+			>
+			<button type="button" class="apply" onclick={applyColumns}>Apply</button>
+		{/snippet}
+	</SheetDialog>
+{/if}
+
 {#snippet more()}
 	{#if rows.length > shown.length}
 		<p class="more">
@@ -990,6 +1057,9 @@
 		border-radius: var(--radius-md);
 		background: var(--surface);
 		box-shadow: var(--shadow-lg);
+	}
+	.sheet-button {
+		justify-content: center;
 	}
 	.panel-hint {
 		color: var(--text-2);
@@ -1371,10 +1441,53 @@
 	}
 
 	@media (max-width: 760px) {
-		.head {
-			gap: var(--space-2);
-			padding: var(--space-3) var(--space-3) var(--space-2);
+		/*
+		 * The whole view scrolls, so the title and description move out of the
+		 * way and the rows get the screen; the search and buttons stay at the top.
+		 */
+		.view-table {
+			display: block;
+			overflow-y: auto;
+			overscroll-behavior: contain;
 		}
+		.head {
+			display: contents;
+		}
+		.title,
+		.doc,
+		.warnings {
+			margin-inline: var(--space-3);
+		}
+		.title {
+			margin-top: var(--space-3);
+		}
+		.doc {
+			margin-top: var(--space-1);
+		}
+		.tools {
+			position: sticky;
+			top: 0;
+			z-index: 4;
+			padding: var(--space-2) var(--space-3);
+			background: var(--bg);
+		}
+		/* Icon buttons, with their words for screen readers. */
+		.button-label {
+			position: absolute;
+			width: 1px;
+			height: 1px;
+			overflow: hidden;
+			clip-path: inset(50%);
+			white-space: nowrap;
+		}
+		.title .source,
+		.columns-menu > .source,
+		.io > .source {
+			justify-content: center;
+			width: 2.75rem;
+			padding: 0;
+		}
+
 		h2 {
 			font-size: var(--text-lg);
 		}
@@ -1393,11 +1506,11 @@
 			line-clamp: 3;
 		}
 		.tools {
-			flex-wrap: wrap;
 			gap: var(--space-2);
 		}
 		.search {
-			flex: 1 1 12rem;
+			flex: 1 1 auto;
+			min-width: 0;
 			width: auto;
 			height: 2.75rem;
 		}
@@ -1414,9 +1527,7 @@
 		.cards-scroll {
 			margin: 0;
 			padding: var(--space-1) var(--space-3) calc(6rem + var(--sheet-cover, 0px));
-			overflow-x: hidden;
-			overflow-y: auto;
-			overscroll-behavior: contain;
+			overflow: visible;
 			border: 0;
 			border-radius: 0;
 			background: transparent;

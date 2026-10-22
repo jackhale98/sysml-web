@@ -6,6 +6,7 @@
 		ArrowDownToLine,
 		Check,
 		ChevronDown,
+		CircleQuestionMark,
 		CloudOff,
 		CloudUpload,
 		Download,
@@ -55,7 +56,8 @@
 		onopensettings,
 		onopensourcecontrol,
 		onimportrequirements,
-		onreview
+		onreview,
+		onhelp
 	}: {
 		workspace: Workspace;
 		session: ProjectSession;
@@ -66,6 +68,8 @@
 		onimportrequirements?: () => void;
 		/** Shows "Review changes" when the host can open the review. */
 		onreview?: () => void;
+		/** Opens the help; without it, "Help" goes to the help page. */
+		onhelp?: () => void;
 	} = $props();
 
 	let open = $state(false);
@@ -451,6 +455,22 @@
 								: 'works offline'}</small
 						>
 					</button>
+				{/if}
+				{#if onhelp}
+					<button
+						type="button"
+						role="menuitem"
+						onclick={() => {
+							open = false;
+							onhelp();
+						}}
+					>
+						<CircleQuestionMark size={15} /> Help <kbd>?</kbd>
+					</button>
+				{:else}
+					<a role="menuitem" href={resolve('/help')} onclick={() => (open = false)}>
+						<CircleQuestionMark size={15} /> Help
+					</a>
 				{/if}
 				<button type="button" role="menuitem" onclick={showSettings}>
 					<SettingsIcon size={15} /> Settings… <kbd>Ctrl ,</kbd>

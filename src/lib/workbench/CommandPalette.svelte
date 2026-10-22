@@ -1,5 +1,12 @@
 <script lang="ts">
-	import { Command, FileCode, Network, Search, Table as TableIcon } from '@lucide/svelte';
+	import {
+		CircleQuestionMark,
+		Command,
+		FileCode,
+		Network,
+		Search,
+		Table as TableIcon
+	} from '@lucide/svelte';
 	import { tick } from 'svelte';
 	import { isLibraryFile, type Workspace } from '#lib/project/workspace.svelte.ts';
 	import KindGlyph from '#lib/ui/KindGlyph.svelte';
@@ -8,6 +15,7 @@
 		GROUP_HEADINGS,
 		commandItems,
 		elementItems,
+		helpItems,
 		fileItems,
 		machineItems,
 		modelViewItems,
@@ -23,6 +31,10 @@
 	} from './palette.ts';
 	import type { WorkbenchUi } from './ui.svelte.ts';
 	import { VIEW_KINDS } from '#lib/create/view.ts';
+	import { ALL_TOPICS } from '#lib/help/content.ts';
+
+	// The help's topics, found by title and keywords (the help itself is loaded when opened).
+	const help = helpItems(ALL_TOPICS);
 
 	let { workspace, ui }: { workspace: Workspace; ui: WorkbenchUi } = $props();
 
@@ -52,6 +64,7 @@
 			...openFileItems(ui.activeTab?.kind === 'file' ? ui.activeTab.path : null),
 			...newViewItems(VIEW_KINDS)
 		],
+		help,
 		...(ui.table
 			? {
 					rows: tableRowItems(ui.table.view, ui.table.title, ui.table.columns, ui.table.rows),
@@ -149,6 +162,9 @@
 			case 'file':
 				ui.fileRequest = action.request;
 				break;
+			case 'help':
+				ui.showHelp(action.topic);
+				break;
 		}
 	}
 
@@ -207,7 +223,7 @@
 				aria-expanded={results.length > 0}
 				aria-controls={results.length > 0 ? listId : undefined}
 				aria-activedescendant={results.length > 0 ? optionId(current) : undefined}
-				placeholder="Search elements, views and commands…"
+				placeholder="Search the model and commands, or ? for help"
 				autocomplete="off"
 				autocapitalize="off"
 				spellcheck="false"
@@ -249,6 +265,8 @@
 									<TableIcon size={16} aria-hidden="true" />
 								{:else if item.group === 'views'}
 									<Network size={16} aria-hidden="true" />
+								{:else if item.group === 'help' || item.action.type === 'help'}
+									<CircleQuestionMark size={16} aria-hidden="true" />
 								{:else}
 									<Command size={16} aria-hidden="true" />
 								{/if}
@@ -283,6 +301,7 @@
 		<div class="footer" aria-hidden="true">
 			<span><kbd>↑</kbd><kbd>↓</kbd> to move</span>
 			<span><kbd>↵</kbd> to open</span>
+			<span><kbd>?</kbd> for help</span>
 		</div>
 	{/if}
 </dialog>

@@ -75,9 +75,13 @@
 	let importPrimed = $state(false);
 	let createPrimed = $state(false);
 	let filesPrimed = $state(false);
+	let helpPrimed = $state(false);
+	let addPrimed = $state(false);
 	$effect(() => {
 		if (ui.create) createPrimed = true;
 		if (ui.fileRequest) filesPrimed = true;
+		if (ui.helpOpen) helpPrimed = true;
+		if (ui.addSheet) addPrimed = true;
 		if (ui.paletteOpen) palettePrimed = true;
 		if (ui.sourceControlOpen) sourceControlPrimed = true;
 		if (ui.settingsOpen) settingsPrimed = true;
@@ -269,10 +273,27 @@
 	);
 	const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
+	/** Whether a key press is typing (in a field, the text editor or a dialog's input). */
+	function typing(event: KeyboardEvent): boolean {
+		const target = event.target as HTMLElement | null;
+		return !!target?.closest?.('input, textarea, select, [contenteditable="true"], .cm-editor');
+	}
+
 	function onkeydown(event: KeyboardEvent) {
 		if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
 			event.preventDefault();
 			ui.paletteOpen = !ui.paletteOpen;
+		} else if (
+			event.key === '?' &&
+			!event.metaKey &&
+			!event.ctrlKey &&
+			!event.altKey &&
+			!event.defaultPrevented &&
+			!typing(event) &&
+			!document.querySelector('dialog[open]')
+		) {
+			event.preventDefault();
+			ui.showHelp();
 		}
 	}
 </script>
@@ -305,6 +326,7 @@
 				onopensourcecontrol={() => (ui.sourceControlOpen = true)}
 				onimportrequirements={() => (ui.importOpen = true)}
 				onreview={() => ui.open({ kind: 'review' })}
+				onhelp={() => ui.showHelp()}
 			/>
 		{:else}
 			<div class="project"><strong>{workspace.info?.name ?? 'Project'}</strong></div>
@@ -476,7 +498,7 @@
 							<ViewsCatalog {workspace} {ui} />
 						</div>
 					{:else}
-						<HomeView {workspace} {ui} {engine} />
+						<HomeView {workspace} {ui} {engine} {session} />
 					{/if}
 				{:else if tab.kind === 'requirements'}
 					<ViewTable name="RequirementsTable" {workspace} {ui} {engine} />
@@ -611,7 +633,10 @@
 						</button>
 					</li>
 				{:else}
-					<li class="none">No problems. The model is consistent.</li>
+					<li class="none">
+						No problems. The model is consistent. Mistakes in the text, such as a name that refers
+						to nothing, show here as you type.
+					</li>
 				{/each}
 				{#if listedProblems.length > PROBLEMS_LISTED}
 					<li class="none">{listedProblems.length - PROBLEMS_LISTED} more not listed.</li>
@@ -696,7 +721,7 @@
 	{/if}
 	{#if settingsPrimed}
 		{#await import('#lib/settings/Settings.svelte') then { default: SettingsDialog }}
-			<SettingsDialog {engine} bind:open={ui.settingsOpen} />
+			<SettingsDialog {engine} bind:open={ui.settingsOpen} onhelp={() => ui.showHelp()} />
 		{/await}
 	{/if}
 	{#if importPrimed}
@@ -730,6 +755,14 @@
 		<MoreMenu bind:open={moreOpen} {ui} {errors} {warnings} />
 		<ProblemsSheet {workspace} {ui} />
 		<AddSheet {workspace} {ui} context={viewPackage} />
+	{:else if addPrimed}
+		<!-- On a wide screen, the guides open it to add a requirement or a part. -->
+		<AddSheet {workspace} {ui} context={viewPackage} />
+	{/if}
+	{#if helpPrimed}
+		{#await import('#lib/help/HelpDialog.svelte') then { default: HelpDialog }}
+			<HelpDialog {workspace} {ui} {engine} {session} />
+		{/await}
 	{/if}
 </div>
 

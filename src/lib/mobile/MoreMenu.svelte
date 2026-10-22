@@ -1,6 +1,7 @@
 <script lang="ts">
 	import {
 		ChevronRight,
+		CircleQuestionMark,
 		GitBranch,
 		Monitor,
 		Moon,
@@ -74,6 +75,13 @@
 			<button type="button" onclick={() => then(() => (ui.sourceControlOpen = true))}>
 				<span class="tile"><GitBranch size={18} /></span>
 				<span class="label">Source control</span>
+				<ChevronRight size={16} class="chev" />
+			</button>
+		</li>
+		<li>
+			<button type="button" onclick={() => then(() => ui.showHelp())}>
+				<span class="tile"><CircleQuestionMark size={18} /></span>
+				<span class="label">Help</span>
 				<ChevronRight size={16} class="chev" />
 			</button>
 		</li>

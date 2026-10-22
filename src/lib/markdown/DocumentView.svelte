@@ -17,6 +17,7 @@
 	import type { WorkbenchUi } from '#lib/workbench/ui.svelte.ts';
 	import { viewTitle } from '#lib/workbench/views.ts';
 	import { parseBlocks, type Inline } from './markdown.ts';
+	import { isGuideAction, runGuideAction, type GuideAction } from '#lib/workbench/guide.ts';
 
 	/**
 	 * A project document (README, TOUR) as a page to read. Model references
@@ -73,6 +74,12 @@
 	}
 
 	const external = (href: string) => /^https?:\/\//.test(href);
+
+	/** `[Import a spreadsheet](#do:import-requirements)`: a link that does it here. */
+	function actionOf(href: string): GuideAction | null {
+		const id = /^#do:([\w-]+)$/.exec(href)?.[1];
+		return id && isGuideAction(id) ? id : null;
+	}
 </script>
 
 {#snippet inline(nodes: Inline[])}
@@ -85,6 +92,11 @@
 					href={node.href}
 					target="_blank"
 					rel="noopener noreferrer">{@render inline(node.children)}</a
+				>{:else if actionOf(node.href)}{@const action = actionOf(node.href)!}<button
+					type="button"
+					class="do"
+					onclick={() => void runGuideAction(action, { ui, workspace })}
+					>{@render inline(node.children)}</button
 				>{:else}{@render inline(node.children)}{/if}{:else}
 			{@const reference = resolve(node.text)}
 			{#if reference}
@@ -272,6 +284,22 @@
 		transition:
 			border-color var(--duration) var(--ease),
 			box-shadow var(--duration) var(--ease);
+	}
+	/* A tour's "do it" link: looks like a link, does the thing here. */
+	.do {
+		display: inline;
+		padding: 0;
+		border: 0;
+		background: none;
+		color: var(--accent);
+		font: inherit;
+		font-weight: 600;
+		text-decoration: underline;
+		text-underline-offset: 2px;
+		cursor: pointer;
+	}
+	.do:hover {
+		text-decoration-thickness: 2px;
 	}
 	.ref:hover {
 		border-color: var(--accent);

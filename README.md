@@ -10,6 +10,13 @@ conformant tool, and the app works on desktop and mobile.
 you can edit, inspector, requirements view and a guided demo model. See
 [docs/PLAN.md](docs/PLAN.md) for the plan and roadmap.
 
+## Using it
+
+New to Fairtide, or to SysML? The [user guide](docs/user-guide.md) covers
+starting a project (blank, requirements first, or a small example system),
+the ideas in plain words, how to do the common jobs, keyboard shortcuts and
+where your data is kept. It is the same guide as **Help** in the app.
+
 ## Development
 
 Requires Node 22.17+.

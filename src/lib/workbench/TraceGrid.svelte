@@ -8,8 +8,11 @@
 		ChevronRight,
 		ChevronsUpDown,
 		FileCode,
+		ListChecks,
 		TriangleAlert
 	} from '@lucide/svelte';
+	import EmptyState from '#lib/ui/EmptyState.svelte';
+	import { runGuideAction } from './guide.ts';
 	import type { TraceMatrix } from '#lib/engine/types.ts';
 	import { byteToUtf16, type ModelElement } from '#lib/project/elements.ts';
 	import type { Workspace } from '#lib/project/workspace.svelte.ts';
@@ -288,7 +291,25 @@
 	{/if}
 
 	{#if total === 0}
-		<p class="state">There are no requirements in scope.</p>
+		<EmptyState
+			icon={ListChecks}
+			title="No requirements here yet"
+			actions={[
+				{
+					label: 'Add a requirement',
+					primary: true,
+					run: () => void runGuideAction('add-requirement', { ui, workspace })
+				},
+				{
+					label: 'Import from a spreadsheet',
+					run: () => void runGuideAction('import-requirements', { ui, workspace })
+				}
+			]}
+		>
+			Each requirement gets a row here, with a mark for each {matrix.relation === 'verify'
+				? 'test that checks it'
+				: 'part that meets it'}.
+		</EmptyState>
 	{:else if rows.length === 0}
 		<p class="state">
 			{gapsOnly

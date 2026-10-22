@@ -1,6 +1,7 @@
 /** Workbench UI state: open tabs, the selected element and the phone layout. */
 import type { DiagramView } from '#lib/engine/types.ts';
 import { isPhone } from '#lib/mobile/media.svelte.ts';
+import type { AddKind } from './templates.ts';
 
 export type Tab =
 	| { kind: 'home' }
@@ -116,6 +117,15 @@ export class WorkbenchUi {
 	create = $state.raw<CreateRequest | null>(null);
 	/** The file form on show, if any (mounted by the host). */
 	fileRequest = $state.raw<FileRequest | null>(null);
+	/** The help guide (mounted by the host when first opened), at a topic. */
+	helpOpen = $state(false);
+	helpTopic = $state<string | null>(null);
+
+	/** Open the help, at a topic (`add-part`) or at the start. */
+	showHelp(topic: string | null = null) {
+		this.helpTopic = topic;
+		this.helpOpen = true;
+	}
 
 	// ── Phone layout ──────────────────────────────────────────────────────────
 	#pane = $state<MobilePane>('home');
@@ -127,6 +137,9 @@ export class WorkbenchUi {
 	problemsSheet = $state(false);
 	/** The "add an element" sheet. */
 	addSheet = $state(false);
+	/** What the add sheet starts with, when something asked for a kind or a place. */
+	addKind = $state<AddKind | null>(null);
+	addOwner = $state<string | null>(null);
 	/** True while SysML text is being typed, with the keyboard up. */
 	editingText = $state(false);
 	/** On phones, each file shows as a diagram or as text; diagram unless chosen. */

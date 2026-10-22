@@ -4,6 +4,7 @@
  * exporting it as a `.kpar`.
  */
 import { GitConnection } from '#lib/git/connection.svelte.ts';
+import { noteDownloaded } from '#lib/workbench/home/nextSteps.ts';
 import { demoProject } from './demo.ts';
 import { leaveRisk, type LeaveRisk } from './pending.ts';
 import { download, writeToFolder } from './sources.ts';
@@ -225,5 +226,6 @@ export class ProjectSession {
 		const bytes = await writeKpar(info, this.files(), timestamp());
 		const name = (info.name || 'project').replace(/[^\w.-]+/g, '-');
 		download(`${name}.kpar`, bytes, 'application/zip');
+		if (this.record) noteDownloaded(this.record.id);
 	}
 }
