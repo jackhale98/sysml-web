@@ -120,6 +120,17 @@ session is resolution context.
   (`typeIds`, `generalIds`, `rootId`). A port's connections come from the
   interconnection graph (`toGraph({view:'interconnection'})`), whose ends are
   resolved through the parts' types; the far end is shown as written.
+- **Traceability matrices.** A pivot of `relation:satisfy` or
+  `relation:verify` rows as `"requirement; by"` (`TraceMatrix`,
+  `VerificationMatrix`) has a row for every requirement in scope — the
+  `requirements` rows the view's `expose` and `filter` keep, plus any a link
+  in scope names — so a requirement nothing satisfies is a row of empty
+  cells, not missing. Its `sources` are the requirements, and
+  `RenderedTable.matrix` carries the requirements, the elements (declared
+  name, the path written before it, kind, element id) and the links (where
+  each `satisfy` or `verify` is written), which `TraceGrid.svelte` shows:
+  readable column names, counts, gaps flagged, a card per requirement on a
+  phone. Export keeps the grid. Other pivots count as before.
 - **`expose`.** `X` is X, `X::*` X's members, `X::**` X and everything
   nested in it, `X::*::**` everything nested but X. Members are what a
   namespace owns and what it inherits from its types and specializations
