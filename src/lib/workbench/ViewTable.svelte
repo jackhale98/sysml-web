@@ -42,6 +42,7 @@
 	import TraceGrid from './TraceGrid.svelte';
 	import TraceRefs from './TraceRefs.svelte';
 	import { matrixExport } from './traceGrid.ts';
+	import { flatten } from '#lib/create/model.ts';
 	import RiskGrid from './RiskGrid.svelte';
 	import {
 		ELEMENT_LIST_COLUMNS,
@@ -194,12 +195,21 @@
 		return byFile;
 	});
 
-	/** The model element behind a row, matched by file and name or line. */
+	/** The model's elements by qualified name, as the tree writes it. */
+	const elementsByName = $derived(
+		new Map(flatten(workspace.tree).map((n) => [n.qualifiedName, n.node.element]))
+	);
+
+	/**
+	 * The model element behind a row, matched by file and name or line; for a
+	 * row written elsewhere (an FMEA line about a part), the element it is about.
+	 */
 	function elementFor(index: number): ModelElement | undefined {
 		const source = table?.sources[index];
 		if (!source) return undefined;
 		const simple = source.element.split('::').pop()?.replace(/^'|'$/g, '') ?? '';
 		const inFile = elementsByFile.get(source.file) ?? [];
+		if (source.annotation) return elementsByName.get(source.element);
 		return (
 			inFile.find((e) => e.label === simple) ??
 			inFile.find((e) => e.span.start_row === source.line || e.span.start_row + 1 === source.line)
@@ -607,13 +617,13 @@
 	<button
 		type="button"
 		class="gap-link"
+		aria-label="Not yet: say what {column === 'satisfiedBy'
+			? 'implements'
+			: 'tests'} {cells[0]}’s control"
 		onclick={(e) => {
 			e.stopPropagation();
 			linkControl(cells, column);
-		}}
-		>Not yet<span class="visually-hidden"
-			>: say what {column === 'satisfiedBy' ? 'implements' : 'tests'} {cells[0]}’s control</span
-		></button
+		}}>Not yet</button
 	>
 {/snippet}
 
@@ -1484,7 +1494,7 @@
 	}
 	td.trace,
 	td.elements {
-		min-width: 8rem;
+		min-width: 5.5rem;
 	}
 	td.number {
 		font-variant-numeric: tabular-nums;

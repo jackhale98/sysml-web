@@ -146,6 +146,23 @@ session is resolution context.
   `@SysML::<Metaclass>` (by metaclass conformance: a part is an item),
   `@<Metadata>` and `kind = x` terms are read, and anything else is reported
   and ignored.
+- **Calcs, scales and checks of the model.** A column can invoke a calc
+  def of the model (`rpn = Rpn(severity, likelihood, detection)`,
+  `views/calcs.ts`): its result expression is evaluated with the
+  emulator's evaluator, its `in` parameters bound in order, and an
+  argument its parameter type's `assert constraint` rejects leaves the cell
+  empty. What a field's type allows (`views/domains.ts`: an enum's
+  literals, or the whole numbers an attribute def's asserted constraints
+  allow, found by trying them) gives a pivot every value of the scale (the
+  risk matrix). A metadata value its declared type rejects, and an FMEA
+  line whose severity is not the worst harm of its hazard
+  (`views/hazards.ts`, by the `HazardAnalysis` conventions:
+  `Causation` connections from cause to effect, a `Harm`'s `SeverityScale`
+  severity), are a cell's `problems` and, through
+  `views/annotationChecks.ts`, violated `assert` checks that the
+  evaluation adds to the toolkit's (the toolkit doesn't evaluate
+  metadata). The `hazards` row provider (the `HazardLog` view) reads the
+  same model. See [risk-analysis.md](risk-analysis.md).
 - **Editing.** Each column says what it edits (`name`, `shortName`, `doc`,
   `feature:<f>`, `metadata:<Meta>.<f>`) and its kind and enum options, found
   through the rows' resolved types and the library's metadata defs
@@ -485,8 +502,9 @@ toolkit's `conforms`).
 
 ## Guided forms
 
-The forms that make views, roll-ups, limits and trade studies
-(`src/lib/create/`) write standard SysML through the edit actions; the
+The forms that make views, roll-ups, limits, trade studies, FMEA
+worksheets and their lines, and hazards (`src/lib/create/`) write standard
+SysML through the edit actions; the
 engine tells them about the model with `EngineApi.elementFeatures(files,
 ids)` (`toolkit/views/features.ts`):
 
