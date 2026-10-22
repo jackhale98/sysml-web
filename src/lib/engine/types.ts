@@ -630,8 +630,12 @@ export interface DiagramEdge {
 	target: string;
 	label: string | null;
 	kind: EdgeKind;
-	/** Where the element the edge draws is declared (a sequence view's messages). */
-	element?: { file: string; start_byte: number };
+	/**
+	 * Where the element the edge draws is declared: a sequence view's messages,
+	 * and the transitions and successions of state and action views (with the
+	 * end of their statement, so a diagram can change or remove it).
+	 */
+	element?: { file: string; start_byte: number; end_byte?: number };
 	/** Sequence views: the message an edge draws (edges come in time order). */
 	message?: SequenceMessage;
 }
