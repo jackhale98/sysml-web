@@ -64,6 +64,18 @@ export function viewTitle(name: string): string {
 		.join(' ');
 }
 
+/**
+ * A name in pieces a narrow column may break between: at a change from a
+ * lower-case letter or digit to a capital (`burn|Injury`), after `::`, `.`
+ * and `_`, and at a hyphen between words — never inside a word
+ * (`burnIn|jury`) or an ID (`RC-001`). Spaces break as usual.
+ */
+export function breakable(text: string): string[] {
+	return text
+		.split(/(?<=[a-z0-9])(?=[A-Z])|(?<=::|[._])(?=[^\s:._-])|(?<=[a-z]-)(?=[a-z])/)
+		.filter(Boolean);
+}
+
 /** Abbreviations engineers write in capitals, even when a name is camel case (`fmeaWorksheet`). */
 const ACRONYMS = new Set(['fmea', 'icd', 'bom', 'rpn', 'uav', 'gps', 'id', 'si', 'ui', 'api']);
 

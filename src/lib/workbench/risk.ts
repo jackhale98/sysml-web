@@ -18,26 +18,70 @@ export function isHazardLog(info: ViewInfo | undefined): boolean {
 	return definition.split('::').pop() === 'HazardLog';
 }
 
-/** How a level reads: an action priority, a harm's severity class. */
+/**
+ * How a level reads: an action priority, an RPN band, an acceptability, a
+ * harm's severity class, how far a line's controls and mitigations are.
+ */
 const LEVEL_TONE: Record<string, 'bad' | 'warn' | 'ok'> = {
 	high: 'bad',
 	medium: 'warn',
 	low: 'ok',
-	catastrophic: 'bad',
 	critical: 'bad',
+	unacceptable: 'bad',
+	reduce: 'warn',
+	acceptable: 'ok',
+	catastrophic: 'bad',
 	serious: 'warn',
 	minor: 'ok',
-	negligible: 'ok'
+	negligible: 'ok',
+	open: 'bad',
+	implemented: 'warn',
+	verified: 'ok',
+	proposed: 'warn',
+	inprogress: 'warn',
+	completed: 'ok'
 };
 
-/** The risk tables' level columns: the action priority (now and before), a hazard's severity. */
-const LEVEL_COLUMNS = new Set(['actionPriority', 'priorityBefore', 'severity']);
+/** The risk tables' level columns: priorities, bands, acceptability (now and before), a hazard's severity, status. */
+const LEVEL_COLUMNS = new Set([
+	'actionPriority',
+	'priorityBefore',
+	'rpnBand',
+	'acceptability',
+	'acceptabilityBefore',
+	'severity',
+	'controlStatus',
+	'mitigationStatus'
+]);
 
-/** The tone of a level cell (`actionPriority`, a hazard's `severity`), or null when it isn't one. */
-export function levelTone(column: string, value: string): 'bad' | 'warn' | 'ok' | null {
-	if (!LEVEL_COLUMNS.has(column)) return null;
-	return LEVEL_TONE[value.toLowerCase()] ?? null;
+/**
+ * The tone of a level cell (`actionPriority`, a hazard's `severity`), `plain`
+ * for a level that says nothing good or bad (no controls), or null when it
+ * isn't one (an FMEA line's severity is a number).
+ */
+export function levelTone(column: string, value: string): 'bad' | 'warn' | 'ok' | 'plain' | null {
+	if (!LEVEL_COLUMNS.has(column) || !value || /^[\d.]+$/.test(value)) return null;
+	return LEVEL_TONE[value.toLowerCase()] ?? (column === 'severity' ? null : 'plain');
 }
+
+/** The tone of a risk policy's zone (`acceptable`, `reduce`, `unacceptable`), by its place among the zones. */
+export function zoneTone(zone: string, zones: readonly string[]): 'bad' | 'warn' | 'ok' | 'plain' {
+	const known = LEVEL_TONE[zone.toLowerCase()];
+	if (known) return known;
+	const at = zones.indexOf(zone);
+	if (at < 0) return 'plain';
+	return at === zones.length - 1 ? 'bad' : at === 0 ? 'ok' : 'warn';
+}
+
+/** How each zone reads, in plain words. */
+export const ZONE_WORDS: Record<string, { label: string; meaning: string }> = {
+	acceptable: { label: 'Acceptable', meaning: 'No further reduction needed' },
+	reduce: {
+		label: 'Reduce as far as possible',
+		meaning: 'Lower it as far as you can, then weigh what remains against the benefit'
+	},
+	unacceptable: { label: 'Unacceptable', meaning: 'Must be reduced before release' }
+};
 
 /** Columns whose cells name elements of the model, each a link that selects it. */
 export const ELEMENT_LIST_COLUMNS = new Set(['controls', 'harms', 'situations']);

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { RenderedTable, ViewInfo } from '#lib/engine/types.ts';
 import type { Workspace } from '#lib/project/workspace.svelte.ts';
-import { isFmeaTable, isHazardLog, levelTone, matrixOf } from './risk.ts';
+import { isFmeaTable, isHazardLog, levelTone, matrixOf, zoneTone } from './risk.ts';
 
 const view = (over: Partial<ViewInfo>): ViewInfo => ({
 	name: 'v',
@@ -23,13 +23,24 @@ describe('risk tables', () => {
 		expect(isHazardLog(view({ definition: 'RequirementsTable' }))).toBe(false);
 	});
 
-	it('show the action priority and a harm’s severity as levels, nothing else', () => {
+	it('show priorities, bands, acceptability, status and a harm’s severity as levels, nothing else', () => {
 		expect(levelTone('actionPriority', 'high')).toBe('bad');
 		expect(levelTone('priorityBefore', 'medium')).toBe('warn');
 		expect(levelTone('severity', 'negligible')).toBe('ok');
+		expect(levelTone('rpnBand', 'critical')).toBe('bad');
+		expect(levelTone('acceptability', 'reduce')).toBe('warn');
+		expect(levelTone('mitigationStatus', 'inProgress')).toBe('warn');
+		expect(levelTone('controlStatus', 'none')).toBe('plain');
 		// A requirement's priority, a rating as a number: not levels.
 		expect(levelTone('priority', 'high')).toBeNull();
 		expect(levelTone('severity', '8')).toBeNull();
+	});
+
+	it('tone a policy’s zones by name, else by their place', () => {
+		expect(zoneTone('unacceptable', [])).toBe('bad');
+		expect(zoneTone('tolerable', ['broadlyAcceptable', 'tolerable', 'intolerable'])).toBe('warn');
+		expect(zoneTone('intolerable', ['broadlyAcceptable', 'tolerable', 'intolerable'])).toBe('bad');
+		expect(zoneTone('', [])).toBe('plain');
 	});
 
 	it('find the saved risk matrix of a sheet', () => {

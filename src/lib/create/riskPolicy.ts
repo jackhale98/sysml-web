@@ -23,22 +23,13 @@
  * with the toolkit.
  */
 import { docComment, name as sysmlName, skipTrivia } from './sysml';
+export { ZONE_WORDS } from '#lib/workbench/risk.ts';
 
 /** `zones[severity - 1][likelihood - 1]`: a level of the policy (`acceptable`, `reduce`, `unacceptable`). */
 export type Zones = string[][];
 
 /** The zones, lowest first, as the library declares them. */
 export const ZONE_LEVELS = ['acceptable', 'reduce', 'unacceptable'] as const;
-
-/** How each zone reads, in plain words. */
-export const ZONE_WORDS: Record<string, { label: string; meaning: string }> = {
-	acceptable: { label: 'Acceptable', meaning: 'No further reduction needed' },
-	reduce: {
-		label: 'Reduce as far as possible',
-		meaning: 'Lower it as far as you can, then weigh what remains against the benefit'
-	},
-	unacceptable: { label: 'Unacceptable', meaning: 'Must be reduced before release' }
-};
 
 /** The library's default: per severity band, the likelihood from which a risk is in each zone. */
 const DEFAULT_RULES: { from: number; reduce: number; unacceptable: number }[] = [

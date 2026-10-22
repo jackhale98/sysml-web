@@ -499,6 +499,15 @@ export function commandItems(themeChoice: string): PaletteItem[] {
 			}
 		),
 		command(
+			'risk-policy',
+			'Risk policy…',
+			{ type: 'create', request: { kind: 'riskPolicy' } },
+			{
+				aliases:
+					'risk acceptability acceptable unacceptable alarp reduce matrix zones rpn bands thresholds action priority iso 14971'
+			}
+		),
+		command(
 			'new-hazard',
 			'New hazard…',
 			{ type: 'create', request: { kind: 'hazard' } },

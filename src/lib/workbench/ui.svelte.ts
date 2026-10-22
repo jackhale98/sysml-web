@@ -21,7 +21,8 @@ export type Tab =
  * A guided form to open (`#lib/create`): a new view (optionally of a kind,
  * over an element), "add up this value" and "set a limit" on an element's
  * attribute (or a requirement), a new trade study, a new FMEA (of a kind),
- * a line of an FMEA worksheet (the view's name), or a new hazard.
+ * a line of an FMEA worksheet (the view's name), a new hazard, the risk
+ * policy, or a filtered table saved as a view.
  */
 export type CreateRequest =
 	| { kind: 'view'; viewKind?: string; target?: string }
@@ -30,7 +31,22 @@ export type CreateRequest =
 	| { kind: 'trade'; alternatives?: string[] }
 	| { kind: 'fmea'; fmeaKind?: string }
 	| { kind: 'fmeaLine'; view: string }
-	| { kind: 'hazard' };
+	| { kind: 'hazard' }
+	| { kind: 'riskPolicy' }
+	| {
+			kind: 'savedReview';
+			/** A name to start from. */
+			title: string;
+			/** The view def the saved view is typed by (qualified). */
+			definition: string;
+			exposes: string[];
+			where: string;
+			/** The filters kept and those left out, in words. */
+			kept: string[];
+			left: string[];
+			/** The view it comes from, as people read its name. */
+			about: string;
+	  };
 
 /**
  * A file form to open (`files/FileHost.svelte`): a new file (optionally in a
