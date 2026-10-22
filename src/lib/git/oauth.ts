@@ -87,7 +87,8 @@ export function authorizeUrl(
 	clientId: string,
 	redirectUri: string,
 	state: string,
-	challenge: string
+	challenge: string,
+	options: { selectAccount?: boolean } = {}
 ): string {
 	const url = new URL(AUTHORIZE);
 	url.searchParams.set('client_id', clientId);
@@ -95,6 +96,9 @@ export function authorizeUrl(
 	url.searchParams.set('state', state);
 	url.searchParams.set('code_challenge', challenge);
 	url.searchParams.set('code_challenge_method', 'S256');
+	// Adding another account: GitHub shows its account picker where it can
+	// (when several accounts are signed in on github.com).
+	if (options.selectAccount) url.searchParams.set('prompt', 'select_account');
 	return url.toString();
 }
 
@@ -184,7 +188,7 @@ export function pendingSignIn(
  */
 export async function startSignIn(
 	config: SignInConfig,
-	options: { redirectUri: string; returnTo: string; resume?: Resume },
+	options: { redirectUri: string; returnTo: string; resume?: Resume; selectAccount?: boolean },
 	stores = browserStores(),
 	now = Date.now()
 ): Promise<string> {
@@ -206,7 +210,8 @@ export async function startSignIn(
 		config.clientId,
 		options.redirectUri,
 		pending.state,
-		await challengeFor(pending.verifier)
+		await challengeFor(pending.verifier),
+		{ selectAccount: options.selectAccount }
 	);
 }
 

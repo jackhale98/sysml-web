@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ACCOUNT_KEY, Accounts, readAccount } from './account.svelte.ts';
+import {
+	ACCOUNT_KEY,
+	ACCOUNTS_KEY,
+	Accounts,
+	readAccount,
+	readAccounts
+} from './account.svelte.ts';
 import { GitError } from './errors.ts';
 
 const NOW = Date.UTC(2026, 9, 22, 12);
@@ -27,8 +33,9 @@ interface Call {
 /**
  * GitHub's API and the sign-in worker. The API accepts only the tokens in
  * `valid`; the worker hands out `ghu_<n>`/`ghr_<n>` for each refresh.
+ * `users` says whose each token is (octo's, unless listed).
  */
-function github(valid: Set<string>) {
+function github(valid: Set<string>, users: Record<string, string> = {}) {
 	const calls: Call[] = [];
 	let issued = 1;
 	const fetch = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
@@ -52,8 +59,14 @@ function github(valid: Set<string>) {
 		}
 		if (!auth || !valid.has(auth.replace('Bearer ', '')))
 			return new Response('{"message":"Bad credentials"}', { status: 401 });
-		if (url.endsWith('/user'))
-			return Response.json({ login: 'octo', name: 'Octo Cat', avatar_url: octo.avatarUrl });
+		if (url.endsWith('/user')) {
+			const who = users[auth.replace('Bearer ', '')] ?? 'octo';
+			return Response.json({
+				login: who,
+				name: who === 'octo' ? 'Octo Cat' : null,
+				avatar_url: `https://avatars.example/${who}`
+			});
+		}
 		return Response.json({ name: 'main', commit: { sha: 'c1', commit: { tree: { sha: 't1' } } } });
 	}) as unknown as typeof globalThis.fetch;
 	return {
@@ -127,14 +140,12 @@ describe('stored accounts', () => {
 		});
 		expect(user.login).toBe('octo');
 		expect(accounts.github?.via).toBe('app');
-		expect(JSON.parse(stored.get(ACCOUNT_KEY)!)).toMatchObject({
-			token: 'ghu_9',
-			via: 'app',
-			refreshToken: 'ghr_9',
-			expiresAt: NOW + 8 * HOUR
+		expect(JSON.parse(stored.get(ACCOUNTS_KEY)!)).toMatchObject({
+			active: 'octo',
+			accounts: [{ token: 'ghu_9', via: 'app', refreshToken: 'ghr_9', expiresAt: NOW + 8 * HOUR }]
 		});
 		accounts.signOut();
-		expect(stored.has(ACCOUNT_KEY)).toBe(false);
+		expect(stored.has(ACCOUNTS_KEY)).toBe(false);
 		expect(accounts.connected).toBe(false);
 	});
 });
@@ -159,12 +170,12 @@ describe('a signed-in account', () => {
 			'https://api.github.com/repos/acme/drone/branches/main'
 		]);
 		expect(gh.api()[0]!.auth).toBe('Bearer ghu_2');
-		expect(JSON.parse(stored.get(ACCOUNT_KEY)!)).toMatchObject({
-			token: 'ghu_2',
-			refreshToken: 'ghr_2',
-			expiresAt: NOW + 28800_000,
-			via: 'app'
+		// Kept in today's shape from then on; the older key is gone.
+		expect(JSON.parse(stored.get(ACCOUNTS_KEY)!)).toMatchObject({
+			active: 'octo',
+			accounts: [{ token: 'ghu_2', refreshToken: 'ghr_2', expiresAt: NOW + 28800_000, via: 'app' }]
 		});
+		expect(stored.has(ACCOUNT_KEY)).toBe(false);
 	});
 
 	it('refreshes once when GitHub refuses the token, and tries again', async () => {
@@ -224,5 +235,146 @@ describe('a signed-in account', () => {
 		);
 		await accounts.provider().head(ref, 'main');
 		expect(gh.calls.map((c) => c.auth ?? c.url)).toEqual(['Bearer ghu_7']);
+	});
+});
+
+describe('several accounts', () => {
+	const ref = { owner: 'acme', repo: 'drone' };
+	const team = { login: 'team-bot', name: null, avatarUrl: 'https://avatars.example/team-bot' };
+
+	it('reads the single account stored before as the default, without rewriting it', () => {
+		const legacy = JSON.stringify({ token: 'github_pat_1', user: octo, connectedAt: '2026-09-01' });
+		expect(readAccounts(null, legacy)).toEqual({
+			active: 'octo',
+			accounts: [{ token: 'github_pat_1', user: octo, connectedAt: '2026-09-01', via: 'token' }]
+		});
+		expect(readAccounts(null, null)).toEqual({ active: null, accounts: [] });
+		expect(readAccounts('not json', appAccount())).toMatchObject({
+			active: 'octo',
+			accounts: [{ via: 'app' }]
+		});
+		// Today's key wins; duplicates and unreadable entries are dropped; a missing default becomes the first.
+		expect(
+			readAccounts(
+				JSON.stringify({
+					active: 'nobody',
+					accounts: [
+						{ token: 'a', user: octo, connectedAt: 'x' },
+						{ token: 'b', user: { login: 'OCTO' }, connectedAt: 'y' },
+						{ token: '', user: team }
+					]
+				}),
+				JSON.stringify({ token: 'old', user: team, connectedAt: 'z' })
+			)
+		).toEqual({
+			active: 'octo',
+			accounts: [{ token: 'a', user: octo, connectedAt: 'x', via: 'token' }]
+		});
+	});
+
+	it('adds a second account, which becomes the default, and keeps both', async () => {
+		stored.set(ACCOUNT_KEY, JSON.stringify({ token: 'pat_octo', user: octo, connectedAt: 'x' }));
+		const gh = github(new Set(['pat_octo', 'pat_team']), { pat_team: 'team-bot' });
+		const accounts = accountsWith(gh.fetch);
+		const claimed: string[] = [];
+		accounts.beforeAdding = async (previous) => void claimed.push(previous);
+
+		await accounts.connect('pat_team');
+		expect(accounts.list.map((a) => a.user.login)).toEqual(['octo', 'team-bot']);
+		expect(accounts.active).toBe('team-bot');
+		expect(accounts.lastAdded).toEqual({ login: 'team-bot', existed: false });
+		// Projects that didn't say which account they use were given the one they had used.
+		expect(claimed).toEqual(['octo']);
+		expect(JSON.parse(stored.get(ACCOUNTS_KEY)!).accounts).toHaveLength(2);
+		expect(stored.has(ACCOUNT_KEY)).toBe(false);
+
+		// Each project uses its own account's token; projects that don't say use the default.
+		await accounts.provider('octo').head(ref, 'main');
+		await accounts.provider('team-bot').head(ref, 'main');
+		await accounts.provider().head(ref, 'main');
+		const heads = gh.api().filter((c) => c.url.includes('/branches/'));
+		expect(heads.map((c) => c.auth)).toEqual([
+			'Bearer pat_octo',
+			'Bearer pat_team',
+			'Bearer pat_team'
+		]);
+		expect(accounts.accountFor('OCTO')?.user.login).toBe('octo');
+		expect(accounts.accountFor(undefined)?.user.login).toBe('team-bot');
+
+		accounts.use('octo');
+		expect(accounts.github?.user.login).toBe('octo');
+		expect(JSON.parse(stored.get(ACCOUNTS_KEY)!).active).toBe('octo');
+	});
+
+	it('signing in as an account already here replaces its tokens instead of adding it', async () => {
+		stored.set(ACCOUNT_KEY, JSON.stringify({ token: 'pat_octo', user: octo, connectedAt: 'x' }));
+		const gh = github(new Set(['ghu_9']));
+		const accounts = accountsWith(gh.fetch);
+		let claimed = 0;
+		accounts.beforeAdding = async () => void claimed++;
+		await accounts.signInWith({
+			accessToken: 'ghu_9',
+			refreshToken: 'ghr_9',
+			expiresAt: NOW + 8 * HOUR,
+			refreshExpiresAt: null
+		});
+		expect(accounts.list).toHaveLength(1);
+		expect(accounts.list[0]!.via).toBe('app');
+		expect(accounts.lastAdded).toEqual({ login: 'octo', existed: true });
+		expect(claimed).toBe(0);
+	});
+
+	it('signs out one account; another becomes the default', async () => {
+		stored.set(
+			ACCOUNTS_KEY,
+			JSON.stringify({
+				active: 'team-bot',
+				accounts: [
+					{ token: 'pat_octo', user: octo, connectedAt: 'x' },
+					{ token: 'pat_team', user: team, connectedAt: 'y' }
+				]
+			})
+		);
+		const accounts = accountsWith(github(new Set()).fetch);
+		accounts.signOut('octo');
+		expect(accounts.list.map((a) => a.user.login)).toEqual(['team-bot']);
+		expect(accounts.active).toBe('team-bot');
+		accounts.signOut('team-bot');
+		expect(accounts.connected).toBe(false);
+		expect(accounts.active).toBeNull();
+		expect(stored.has(ACCOUNTS_KEY)).toBe(false);
+	});
+
+	it("says plainly when a project's account isn't signed in here", async () => {
+		stored.set(ACCOUNT_KEY, JSON.stringify({ token: 'pat_octo', user: octo, connectedAt: 'x' }));
+		const accounts = accountsWith(github(new Set(['pat_octo'])).fetch);
+		expect(accounts.accountFor('someone')).toBeNull();
+		expect(() => accounts.provider('someone')).toThrow(
+			/uses the GitHub account @someone, which isn't signed in here/
+		);
+	});
+
+	it('refreshes each signed-in account with its own refresh token, keeping the others', async () => {
+		stored.set(
+			ACCOUNTS_KEY,
+			JSON.stringify({
+				active: 'octo',
+				accounts: [
+					{ token: 'pat_team', user: team, connectedAt: 'y', via: 'token' },
+					JSON.parse(appAccount({ expiresAt: NOW - 1 }))
+				]
+			})
+		);
+		const gh = github(new Set(['pat_team']));
+		const accounts = accountsWith(gh.fetch);
+		await accounts.provider('octo').head(ref, 'main');
+		await accounts.provider('team-bot').head(ref, 'main');
+		expect(gh.calls.map((c) => c.auth ?? c.url)).toEqual([
+			'https://sync.example/oauth/github/refresh',
+			'Bearer ghu_2',
+			'Bearer pat_team'
+		]);
+		const kept = JSON.parse(stored.get(ACCOUNTS_KEY)!);
+		expect(kept.accounts.map((a: { token: string }) => a.token)).toEqual(['pat_team', 'ghu_2']);
 	});
 });

@@ -46,7 +46,7 @@
 	const uid = $props.id();
 	const git = $derived(session?.record?.git ?? null);
 	const summary = $derived(review.summary);
-	const reachable = $derived(accounts.connected && pwa.online);
+	const reachable = $derived(!!accounts.accountFor(git?.account) && pwa.online);
 
 	let open = $state<string | null>(null);
 	let pulls = $state.raw<PullRequestSummary[] | null>(null);
@@ -74,7 +74,7 @@
 		if (!git || !reachable || (pulls && commits)) return;
 		choicesError = null;
 		try {
-			const provider = accounts.provider();
+			const provider = accounts.provider(git.account);
 			const ref = { owner: git.owner, repo: git.repo };
 			[pulls, commits] = await Promise.all([
 				provider.listPullRequests(ref),

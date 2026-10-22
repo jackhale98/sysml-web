@@ -5,7 +5,7 @@
 	"description": "Requirements, architecture, verification and risk in one place, stored as standard SysML v2 in your own git repository.",
 	"lang": "en",
 	"dir": "ltr",
-	"start_url": "./",
+	"start_url": "./projects?launch",
 	"scope": "./",
 	"display": "standalone",
 	"background_color": "#0f2231",
@@ -30,6 +30,7 @@
 	],
 	"shortcuts": [
 		{ "name": "Your projects", "url": "./projects" },
+		{ "name": "New project", "url": "./projects?new" },
 		{ "name": "Open the demo", "url": "./p/demo" }
 	]
 }

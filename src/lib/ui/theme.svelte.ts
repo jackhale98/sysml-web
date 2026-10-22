@@ -41,6 +41,12 @@ class Theme {
 		const root = document.documentElement;
 		if (this.choice === 'system') delete root.dataset.theme;
 		else root.dataset.theme = this.choice;
+		// The browser bar (and, in the installed app on iPhone, the status bar) follows the theme.
+		for (const meta of document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')) {
+			const media = (meta.dataset.media ??= meta.media);
+			const scheme = /dark/.test(media) ? 'dark' : 'light';
+			meta.media = this.choice === 'system' ? media : this.choice === scheme ? 'all' : 'not all';
+		}
 	}
 }
 

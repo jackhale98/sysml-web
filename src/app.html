@@ -12,6 +12,13 @@
 		<link rel="icon" href="%sveltekit.assets%/favicon.svg" type="image/svg+xml" />
 		<link rel="apple-touch-icon" href="%sveltekit.assets%/apple-touch-icon.png" />
 		<link rel="manifest" href="%sveltekit.assets%/manifest.webmanifest" />
+		<!-- Added to the Home Screen on iPhone and iPad: its own window, named Fairtide.
+		     The "default" status bar takes the theme colour above, so it suits light and dark. -->
+		<meta name="mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-title" content="Fairtide" />
+		<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+		<meta name="application-name" content="Fairtide" />
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">
