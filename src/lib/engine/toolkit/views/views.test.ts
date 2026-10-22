@@ -497,13 +497,88 @@ describe('requirements, trace and ports', () => {
 		]);
 	});
 
-	it('pivot satisfy links by requirement', () => {
+	it('pivot satisfy links by requirement: a matrix of every requirement in scope', () => {
 		const t = render(files, 'Tm');
-		expect(t.columns).toEqual(['requirement\\by', 'drone', 'drone.controller']);
+		expect(t.columns).toEqual(['requirement', 'drone', 'drone.controller']);
+		// R-3 has no link: it is a row all the same, so the gap shows.
 		expect(t.rows).toEqual([
 			['R-1 Flight endurance', '1', ''],
-			['R-2 Geofencing', '', '1']
+			['R-2 Geofencing', '', '1'],
+			['R-3 Noise', '', '']
 		]);
+		expect(t.sources.map((s) => s.element)).toEqual([
+			"Reqs::'Flight endurance'",
+			'Reqs::Geofencing',
+			'Reqs::Noise'
+		]);
+		const m = t.matrix!;
+		expect(m.relation).toBe('satisfy');
+		expect(m.requirements.map(({ id, title }) => [id, title])).toEqual([
+			['R-1', 'Flight endurance'],
+			['R-2', 'Geofencing'],
+			['R-3', 'Noise']
+		]);
+		expect(m.requirements.every((r) => r.elementId)).toBe(true);
+		expect(
+			m.elements.map(({ written, name, path, qualifiedName, kind }) => ({
+				written,
+				name,
+				path,
+				qualifiedName,
+				kind
+			}))
+		).toEqual([
+			{ written: 'drone', name: 'drone', path: [], qualifiedName: 'Design::drone', kind: 'part' },
+			{
+				written: 'drone.controller',
+				name: 'controller',
+				path: ['drone'],
+				qualifiedName: 'Design::drone::controller',
+				kind: 'part'
+			}
+		]);
+		expect(m.links.map(({ row, column, file, line }) => [row, column, file, line])).toEqual([
+			[0, 0, 'design.sysml', 4],
+			[1, 1, 'design.sysml', 5]
+		]);
+		const text = files[1]!.text;
+		const { start, end } = m.links[1]!;
+		expect(text.slice(start, end)).toMatch(/^satisfy 'R-2' by drone\.controller/);
+	});
+
+	it('a verification matrix: verify links by requirement, the rest as gaps', () => {
+		const verification = [
+			...files,
+			{
+				path: 'views.sysml',
+				text: `package V { metadata def TableRendering; view def Vm { @TableRendering { rows = "relation:verify"; pivot = "requirement; by"; sortBy = "requirement"; } } }`
+			}
+		];
+		const t = render(verification, 'Vm');
+		expect(t.columns).toEqual(['requirement', 'flightTest']);
+		expect(t.rows).toEqual([
+			['R-1 Flight endurance', '1'],
+			['R-2 Geofencing', ''],
+			['R-3 Noise', '']
+		]);
+		expect(t.matrix?.relation).toBe('verify');
+		expect(t.matrix?.elements[0]).toMatchObject({ name: 'flightTest', kind: 'verification' });
+	});
+
+	it('a matrix shows the requirements its view exposes', () => {
+		const scoped = [
+			...files,
+			{
+				path: 'views.sysml',
+				text: `package V { private import Reqs::*; view tm : Reqs::Tm { expose Reqs::Geofencing; expose Reqs::Noise; } }`
+			}
+		];
+		const t = render(scoped, 'V::tm');
+		expect(t.rows).toEqual([
+			['R-2 Geofencing', '1'],
+			['R-3 Noise', '']
+		]);
+		expect(t.columns).toEqual(['requirement', 'drone.controller']);
 	});
 
 	it('don’t count a link whose requirement doesn’t resolve', () => {
@@ -710,10 +785,18 @@ describe('the demo’s tables', () => {
 		]);
 		const coverage = table('requirementCoverage');
 		expect(shape(coverage)).toEqual([20, 4]);
-		expect(coverage.rows[0]).toEqual(['Acoustic noise', 'SYS-006', 'no', 'no']);
-		expect(coverage.rows[11]).toEqual(['Navigation integrity monitoring', 'RC-003', 'yes', 'no']);
+		// Who satisfies and verifies each requirement; an empty cell is a gap.
+		expect(coverage.columns).toEqual(['requirement', 'id', 'satisfiedBy', 'verifiedBy']);
+		expect(coverage.rows[0]).toEqual(['Acoustic noise', 'SYS-006', '', '']);
+		expect(coverage.rows[11]).toEqual([
+			'Navigation integrity monitoring',
+			'RC-003',
+			'navigationIntegrityMonitor',
+			''
+		]);
+		// Every requirement is a row of the matrices, linked or not.
 		const trace = table('TraceMatrix');
-		expect(shape(trace)).toEqual([12, 9]);
+		expect(shape(trace)).toEqual([20, 9]);
 		expect(trace.columns.slice(1)).toEqual([
 			'batteryManagementSystem',
 			'drone',
@@ -724,10 +807,27 @@ describe('the demo’s tables', () => {
 			'navigationIntegrityMonitor',
 			'rotorHealthMonitor'
 		]);
-		expect(trace.rows[4]).toEqual(['SYS-002 Payload capacity', '', '1', '', '', '', '', '', '']);
+		expect(trace.rows[10]).toEqual(['SYS-002 Payload capacity', '', '1', '', '', '', '', '', '']);
+		expect(trace.rows[13]).toEqual(['SYS-005 Ingress protection', '', '', '', '', '', '', '', '']);
+		expect(trace.rows.filter((r) => r.slice(1).every((c) => !c)).map((r) => r[0])).toEqual([
+			'STK-001 Parcel delivery',
+			'STK-002 Safe operation',
+			'STK-003 Flying in typical weather',
+			'STK-004 Approved for operation',
+			'STK-005 Quiet neighbour',
+			'STK-006 Safe hand-over',
+			'SYS-005 Ingress protection',
+			'SYS-006 Acoustic noise'
+		]);
+		expect(trace.matrix?.elements[3]).toMatchObject({
+			written: 'drone.flightController',
+			name: 'flightController',
+			path: ['drone']
+		});
+		expect(trace.matrix?.links).toHaveLength(12);
 		const verification = table('VerificationMatrix');
-		expect(shape(verification)).toEqual([9, 7]);
-		expect(verification.rows[8]).toEqual([
+		expect(shape(verification)).toEqual([20, 7]);
+		expect(verification.rows[18]).toEqual([
 			'SYS-010 Command and telemetry link',
 			'',
 			'',
@@ -736,6 +836,7 @@ describe('the demo’s tables', () => {
 			'',
 			''
 		]);
+		expect(verification.matrix?.relation).toBe('verify');
 	});
 
 	it('ports, resolved through the toolkit’s connection ends', () => {

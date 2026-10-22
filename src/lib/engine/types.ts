@@ -181,6 +181,53 @@ export interface RenderedTable {
 	opensText?: boolean;
 	/** For a trade study table (`rows = "trade"`): the study, evaluated. */
 	trade?: TradeStudy;
+	/**
+	 * For a traceability matrix (`rows = "relation:satisfy"` or `"relation:verify"`,
+	 * `pivot = "requirement; by"`): the requirements, the elements and the links
+	 * behind the grid. `rows` and `columns` stay the grid (a requirement per row,
+	 * `1` where a link is), for export and search.
+	 */
+	matrix?: TraceMatrix;
+}
+
+/**
+ * Requirements down the side (every requirement in scope, linked or not, so
+ * gaps show), what satisfies or verifies them across the top.
+ */
+export interface TraceMatrix {
+	relation: 'satisfy' | 'verify';
+	/** Parallel to `rows`. */
+	requirements: {
+		/** The short name (`SYS-001`), or ''. */
+		id: string;
+		title: string;
+		/** The toolkit's element id, when the requirement resolves. */
+		elementId: string | null;
+	}[];
+	/** Parallel to `columns.slice(1)`: what satisfies or verifies, as written there. */
+	elements: {
+		/** As written in the `satisfy … by` or verification (`drone.flightController`). */
+		written: string;
+		/** Its declared name (`flightController`). */
+		name: string;
+		/** What comes before the name as written (`['drone']`). */
+		path: string[];
+		qualifiedName: string;
+		/** The toolkit's element id, when it resolves. */
+		elementId: string | null;
+		/** Its kind (`part`, `verification`, …), when it resolves. */
+		kind: string | null;
+	}[];
+	/** One per relationship, by index into `requirements` and `elements`. */
+	links: {
+		row: number;
+		column: number;
+		/** Where the `satisfy` or `verify` is written (bytes). */
+		file: string;
+		line: number;
+		start: number;
+		end: number;
+	}[];
 }
 
 /**

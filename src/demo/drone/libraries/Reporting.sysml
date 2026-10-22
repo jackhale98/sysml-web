@@ -92,7 +92,9 @@ package Reporting {
      * expression language (so derived values like RPN are never stored).
      * `where` filters rows with a boolean expression; `sortBy` orders by
      * a column (`-` prefix for descending); `pivot = "rowField; colField"`
-     * renders a count grid instead of columns.
+     * renders a count grid instead of columns. Satisfy or verify links
+     * pivoted as `"requirement; by"` make a traceability matrix: every
+     * requirement in scope is a row, linked or not, so gaps show.
      */
 
     private import ScalarValues::*;
@@ -128,12 +130,12 @@ package Reporting {
     view def RequirementsTraceMatrix {
         doc
         /*
-         * One row per requirement definition with satisfy/verify status —
-         * the requirements traceability matrix.
+         * One row per requirement with what satisfies it and what verifies
+         * it — the requirements traceability matrix. An empty cell is a gap.
          */
         @TableRendering {
             rows = "trace";
-            columns = "requirement; id; satisfied; verified";
+            columns = "requirement; id; satisfiedBy; verifiedBy";
             sortBy = "requirement";
         }
     }
