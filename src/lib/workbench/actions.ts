@@ -10,6 +10,7 @@ import { toasts } from '#lib/ui/toasts.svelte.ts';
 import { planDuplicate } from '#lib/diagram/duplicate.ts';
 import { modelContext } from '#lib/diagram/modelContext.ts';
 import { elementText, formatName, type AddKind } from './templates';
+import type { SelectionSource, WorkbenchUi } from './ui.svelte.ts';
 
 /**
  * Run an edit as one undoable step and confirm it with a toast that offers
@@ -144,6 +145,21 @@ export async function duplicateElement(
 			e.label === plan.name && e.file === element.file && now.owners.get(e.key)?.key === owner?.key
 	);
 	return { error: null, ...(copy ? { copy } : {}) };
+}
+
+/**
+ * Duplicate an element and select the copy, or say why it can't be: the
+ * shortcut, the search box and the explorer's menu do it so.
+ */
+export async function duplicateAndSelect(
+	workspace: Workspace,
+	ui: WorkbenchUi,
+	element: ModelElement,
+	source: SelectionSource
+): Promise<void> {
+	const { error, copy } = await duplicateElement(workspace, element);
+	if (error) toasts.show(error, { tone: 'error' });
+	else if (copy) ui.select(copy.key, source);
 }
 
 /** What else a delete affects, in a line for its confirmation. */

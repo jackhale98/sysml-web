@@ -164,6 +164,42 @@ test('add connected elements puts what refers to an element on the diagram, in o
 	await expect(node(diagram, 'battery')).toHaveCount(0);
 });
 
+test('on an interconnection view, add connected elements shows again the parts it is wired to', async ({
+	page
+}) => {
+	await openDemo(page);
+	const diagram = await openView(page, 'Drone interconnection');
+	// Take the board and the radio off; the battery's power goes to the board.
+	for (const id of ['powerDistribution', 'radio']) {
+		await node(diagram, id).focus();
+		await page.keyboard.press('h');
+		await expect(node(diagram, id)).toHaveCount(0);
+	}
+	await node(diagram, 'battery').click({ button: 'right' });
+	await page.getByRole('menuitem', { name: /Add connected elements/ }).click();
+	const form = page.getByRole('dialog', { name: 'Add connected elements of battery' });
+	await expect(form.getByRole('button', { name: /Outgoing \(1\)/ })).toContainText(
+		'What battery connects to: powerDistribution'
+	);
+	await expect(form.getByRole('button', { name: /Incoming/ })).toBeDisabled();
+	await expectAccessible(page);
+	await form.getByRole('button', { name: /Outgoing/ }).click();
+	await expect(form).toHaveCount(0);
+	await expect(node(diagram, 'powerDistribution')).toBeVisible();
+	await expect(diagram.getByText('batteryPower')).toBeVisible();
+	// The radio isn't wired to the battery: it stays hidden.
+	await expect(node(diagram, 'radio')).toHaveCount(0);
+	await expect(toasts(page)).toContainText('Added powerDistribution to this diagram');
+	await toasts(page).getByRole('button', { name: 'Undo' }).last().click();
+	await expect(node(diagram, 'powerDistribution')).toHaveCount(0);
+	// With nothing wired to it hidden, it says so.
+	await node(diagram, 'gnss').click({ button: 'right' });
+	await page.getByRole('menuitem', { name: /Add connected elements/ }).click();
+	await expect(toasts(page)).toContainText(
+		'Everything connected to gnss is on this diagram already.'
+	);
+});
+
 test('in a saved view, add connected elements writes expose lines, and says what the filter leaves out', async ({
 	page
 }) => {
@@ -420,5 +456,28 @@ test.describe('on a phone', () => {
 		await expectAccessible(page);
 		await incoming.tap();
 		await expect(toasts(page)).toContainText(/Added \d+ connected elements to this diagram/);
+	});
+
+	test('on an interconnection view, add connected elements is a sheet too', async ({ page }) => {
+		await openDemo(page);
+		const diagram = await openPhoneView(page, 'Drone interconnection');
+		await longPress(page, node(diagram, 'powerDistribution'));
+		await page
+			.getByRole('dialog', { name: /^powerDistribution/ })
+			.getByRole('menuitem', { name: /Remove from diagram/ })
+			.click();
+		await expect(node(diagram, 'powerDistribution')).toHaveCount(0);
+		await longPress(page, node(diagram, 'battery'));
+		await page
+			.getByRole('dialog', { name: /^battery/ })
+			.getByRole('menuitem', { name: /Add connected elements/ })
+			.click();
+		const form = page.getByRole('dialog', { name: 'Add connected elements of battery' });
+		await expect(form).toHaveClass(/sheet/);
+		const outgoing = form.getByRole('button', { name: /Outgoing/ });
+		expect((await outgoing.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+		await expectAccessible(page);
+		await outgoing.tap();
+		await expect(node(diagram, 'powerDistribution')).toBeVisible();
 	});
 });

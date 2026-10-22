@@ -27,7 +27,8 @@
 		kind,
 		linked,
 		workspace,
-		engine
+		engine,
+		open = $bindable(false)
 	}: {
 		requirement: ModelElement;
 		kind: 'satisfy' | 'verify';
@@ -35,11 +36,12 @@
 		linked: (ModelElement | undefined)[];
 		workspace: Workspace;
 		engine: Engine;
+		/** Whether the picker is open (the button shows when not). */
+		open?: boolean;
 	} = $props();
 
 	const uid = $props.id();
 	const LIMIT = 50;
-	let open = $state(false);
 	let query = $state('');
 	let busy = $state(false);
 

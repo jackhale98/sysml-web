@@ -54,4 +54,35 @@ describe('what stops resolving without a file', () => {
 		expect(workspace.text('structure/Power.sysml')).toBe(POWER);
 		expect(await workspace.whatBreaksWithout('Main.sysml')).toEqual([]);
 	});
+
+	it('counts only references from what stays: not those between packages of the same file', async () => {
+		// Spares uses Power and Power uses Spares; only Main, in another file, stays.
+		const both = `package Power {
+    part def Battery { part fuse : Spares::Fuse; }
+}
+
+package Spares {
+    private import Power::*;
+    part def Fuse;
+    part spare : Battery;
+}
+`;
+		const workspace = new Workspace();
+		await workspace.open(
+			{
+				id: 'p',
+				info: { name: 'P' },
+				files: [
+					{ path: 'Main.sysml', text: MAIN },
+					{ path: 'structure/Power.sysml', text: both }
+				]
+			},
+			engine()
+		);
+		expect(workspace.problems.filter((p) => p.severity === 'error')).toEqual([]);
+		const warnings = await workspace.whatBreaksWithout('structure/Power.sysml');
+		expect(warnings).toHaveLength(1);
+		expect(warnings[0]).toMatch(/references? to Power no longer resolves? \(Main\)/);
+		expect(workspace.text('structure/Power.sysml')).toBe(both);
+	});
 });

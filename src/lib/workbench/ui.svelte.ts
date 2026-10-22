@@ -35,6 +35,13 @@ export type CreateRequest =
 export type FileRequest =
 	{ kind: 'new'; folder?: string } | { kind: 'rename' | 'move' | 'delete'; path: string };
 
+/** An element form to open (`ElementHost.svelte`): renaming it, or deleting it from the model. */
+export interface ElementRequest {
+	kind: 'rename' | 'delete';
+	/** `ModelElement.key`. */
+	key: string;
+}
+
 export type SelectionSource = 'text' | 'diagram' | 'explorer' | 'inspector' | 'table';
 
 export interface Selection {
@@ -121,9 +128,13 @@ export class WorkbenchUi {
 	create = $state.raw<CreateRequest | null>(null);
 	/** The file form on show, if any (mounted by the host). */
 	fileRequest = $state.raw<FileRequest | null>(null);
+	/** The element form on show, if any (mounted by the host). */
+	elementRequest = $state.raw<ElementRequest | null>(null);
 	/** The help guide (mounted by the host when first opened), at a topic. */
 	helpOpen = $state(false);
 	helpTopic = $state<string | null>(null);
+	/** A requirement (`ModelElement.key`) whose "Add what satisfies it" picker should open. */
+	satisfyRequest = $state<string | null>(null);
 
 	/** Open the help, at a topic (`add-part`) or at the start. */
 	showHelp(topic: string | null = null) {
@@ -279,6 +290,18 @@ export class WorkbenchUi {
 		this.textRequest = { path, from, to, nonce: (this.textRequest?.nonce ?? 0) + 1 };
 		if (this.phone) this.showText(path);
 		else this.open({ kind: 'file', path });
+	}
+
+	/** Select an element and show it in its file's text. */
+	showInText(element: { key: string; file: string }, source: SelectionSource) {
+		if (this.phone) {
+			// Select first: opening the text then lowers the details sheet to show it.
+			this.select(element.key, source);
+			this.showText(element.file);
+			return;
+		}
+		this.open({ kind: 'file', path: element.file });
+		this.select(element.key, source);
 	}
 
 	revealRow(view: string, index: number) {

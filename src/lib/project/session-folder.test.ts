@@ -186,4 +186,51 @@ describe('saving to the folder', () => {
 		expect(await reopened.saveToFolder()).toBeNull();
 		expect(Object.keys(root.list()).sort()).toEqual(['.project.json', 'model/Drone.sysml']);
 	});
+
+	it('reviews, after a reload, against what the folder holds: deleted and changed files as they were', async () => {
+		const { workspace, session } = await folderProject({
+			'model/Drone.sysml': 'package Drone {\n}\n',
+			'model/Old.sysml': 'package Old {\n}\n'
+		});
+		await workspace.deleteFile('model/Old.sysml');
+		workspace.setText('model/Drone.sysml', 'package Drone {\n    part frame;\n}\n');
+		await workspace.createFile('model/New.sysml', 'package New {\n}\n');
+		session.changed();
+		await session.save();
+
+		const again = new Workspace();
+		const reopened = new ProjectSession(again);
+		again.preview((await reopened.load('f'))!);
+		reopened.changed();
+		expect([...reopened.unsavedToFolder].sort()).toEqual([
+			'model/Drone.sysml',
+			'model/New.sysml',
+			'model/Old.sysml'
+		]);
+		const base = Object.fromEntries(reopened.reviewBase().files.map((f) => [f.path, f.text]));
+		expect(base).toEqual({
+			'model/Drone.sysml': 'package Drone {\n}\n',
+			'model/Old.sysml': 'package Old {\n}\n'
+		});
+		expect(reopened.reviewBase().label).toBe('the files in the folder');
+	});
+
+	it('still removes a deleted file kept before the folder texts were', async () => {
+		const { root } = await folderProject({
+			'model/Drone.sysml': 'package Drone {\n}\n',
+			'model/Old.sysml': 'package Old {\n}\n'
+		});
+		stored.set('f', {
+			...stored.get('f')!,
+			files: [{ path: 'model/Drone.sysml', text: 'package Drone {\n}\n' }],
+			unsavedToFolder: ['model/Old.sysml']
+		});
+		const again = new Workspace();
+		const reopened = new ProjectSession(again);
+		again.preview((await reopened.load('f'))!);
+		reopened.changed();
+		expect(reopened.unsavedToFolder).toEqual(['model/Old.sysml']);
+		expect(await reopened.saveToFolder()).toBeNull();
+		expect(Object.keys(root.list()).sort()).toEqual(['.project.json', 'model/Drone.sysml']);
+	});
 });
