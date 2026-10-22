@@ -35,7 +35,11 @@ Row providers (the `rows` value):
                           annotation's values (an enum literal by
                           its name: `design`), and the defaults its
                           metadata def gives the fields it leaves
-                          out
+                          out. An FMEA line (RiskAnalysis::Fmea)
+                          also has riskControls (its controls as
+                          "ID title"), controlStatus (none, open,
+                          implemented or verified), mitigations
+                          and mitigationStatus (the least done)
   "type:Hazard"           rows are usages typed by a definition or
                           any of its specializations; fields =
                           element, type, kind, parent, file, line +
@@ -124,21 +128,40 @@ local values, and its result expression is evaluated; an argument its
 parameter's type rejects (by the type's `assert constraint`, with
 `that` the value) leaves the cell empty. A result that is an enum
 literal shows its name (`high`).
-`where` filters rows with a boolean expression; `sortBy` orders by
+`where` filters rows with a boolean expression; a view's own `where`
+narrows the rows of the def it is typed by (the conditions
+accumulate, joined with `and`, as `filter`s do). `sortBy` orders by
 a column, or by a field of the rows the table doesn't show (`-`
-prefix for descending); `pivot = "rowField; colField"` renders a
+prefix for descending); further keys follow after `;` (`-actionPriority;
+-rpn`), and a column whose values are an enum's literals (a field
+declared with an enum, a calc that returns one) sorts in the order
+the literals are declared. `pivot = "rowField; colField"` renders a
 count grid instead of columns. A pivot field whose type bounds its
 values has every value as a row or column, in order, so empty cells
 show: an enum's literals, or the whole numbers an attribute def's
 asserted constraints allow (FmeaRating's `that >= 1 and that <= 10`
 gives 1 to 10; numbers run down from the highest and across from the
-lowest). Satisfy or verify links pivoted as `"requirement; by"` make
+lowest). A pivot's `cellLevel` is an expression of the row and column
+values evaluated for every cell (`Acceptability(severity,
+likelihood)` gives the risk matrix its zones), which tools show as
+the cell's colour. Satisfy or verify links pivoted as `"requirement; by"` make
 a traceability matrix: every requirement in scope is a row, linked or
 not, so gaps show.
 
 Values the model rejects are flagged, not hidden: a metadata value its
 declared type's asserted constraints reject (`severity = 14` for an
 FmeaRating), and a risk rule the libraries state (an FMEA line whose
-severity is not the worst harm of its hazard) mark their cell and are
-listed as problems.
+severity is not the worst harm of its hazard, whose risk the policy
+calls unacceptable, or whose high priority has no verified control)
+mark their cell and are listed as problems.
 ```
+
+## Filtering in the app
+
+The app's tables filter by column as a way of looking: numbers by range,
+levels (an enum's literals, in order) by value, text that contains words.
+Phones' cards and exports show the same rows. **Save as a view** writes the
+number and level filters as the new view's `where`, over the columns' own
+expressions (`Rpn(severity, likelihood, detection) >= 100`); text filters
+are left out, since the expression language has no "contains". Why `where`
+rather than a view's `filter`: see [risk-analysis.md](risk-analysis.md#reviews-saved-as-views).

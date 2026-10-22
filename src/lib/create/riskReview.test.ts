@@ -16,13 +16,7 @@ import { whereOf } from '#lib/workbench/tableFilters.ts';
 import { write } from './apply';
 import { flatten } from './model';
 import { fmeaKind } from './fmea';
-import {
-	planFmeaLine,
-	planLineLinks,
-	planSavedReview,
-	type Linked,
-	type PatchPlan
-} from './plans';
+import { planFmeaLine, planLineLinks, planSavedReview, type Linked, type PatchPlan } from './plans';
 import { annotationAt, mitigationText, withLineField } from './riskControls';
 import { analysed, hostEngine, openWorkspace, problemsOf } from './testing';
 

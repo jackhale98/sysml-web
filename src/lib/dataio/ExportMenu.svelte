@@ -87,7 +87,7 @@
 			aria-label="Export this table"
 		>
 			{#if filtered}
-				<p class="hint">Only the rows your search shows.</p>
+				<p class="hint">Only the rows shown, as searched and filtered.</p>
 			{/if}
 			<button
 				type="button"

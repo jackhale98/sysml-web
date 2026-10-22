@@ -109,9 +109,9 @@
 									'no'} line{count === '1' ? '' : 's'}{zone
 									? ` (${zoneLabel(zone).toLowerCase()})`
 									: ''}"
-								>{count}{#if zone}<span class="visually-hidden">
-										{count ? '' : 'none'}, {zoneLabel(zone).toLowerCase()}</span
-									>{/if}</td
+								aria-label={zone
+									? `${count || 'none'}, ${zoneLabel(zone).toLowerCase()}`
+									: undefined}>{count}</td
 							>
 						{/each}
 					</tr>
@@ -194,6 +194,7 @@
 	.grid-scroll {
 		max-width: 100%;
 		overflow-x: auto;
+		overflow-y: hidden;
 	}
 	.grid {
 		border-collapse: separate;

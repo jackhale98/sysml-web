@@ -108,6 +108,10 @@ test('a design FMEA on a new Small system project: the libraries come with it, l
 	await expect(line.getByText('7 of 10: The main function works less well')).toBeVisible();
 	await expect(line.getByText('Risk priority number: 224')).toBeVisible();
 	await expectAccessible(page);
+	// The controls step is optional.
+	await line.getByRole('button', { name: 'Next' }).click();
+	await expect(line.getByRole('heading', { name: /What controls this risk/ })).toBeVisible();
+	await expectAccessible(page);
 	await line.getByRole('button', { name: 'Add line' }).click();
 	const row = sheet.locator('tbody tr').filter({ hasText: 'Cells leak' });
 	await expect(row).toContainText('224', { timeout: 15_000 });
@@ -265,6 +269,9 @@ test.describe('on a phone', () => {
 		const line = await addLine(page, /prepareFlight/, 'Uploads the wrong plan', ['5', '4', '4']);
 		await fits(page, 'the add a line form');
 		await tall(page, line.getByLabel(/^Severity/), 'a rating');
+		await line.getByRole('button', { name: 'Next' }).click();
+		await fits(page, 'the controls step');
+		await tall(page, line.getByRole('button', { name: 'Add line' }), 'Add line');
 		await line.getByRole('button', { name: 'Add line' }).click();
 		const card = sheet.locator('.cards .card').filter({ hasText: 'Uploads the wrong plan' });
 		await expect(card).toContainText('80', { timeout: 15_000 });

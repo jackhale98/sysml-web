@@ -129,10 +129,14 @@ verified yet.
 A design FMEA. Hazards lead to harms (`Causation`). Risk controls are requirements
 on the design. Mitigations are the work that implements them (`satisfy`). Each
 `@Fmea` line rates one failure mode of one component. The risk priority number is
-calculated from the ratings, never typed in, and so is the action priority (high,
-medium or low). Two risk controls are not verified yet. Tables:
-**`DroneViews::fmeaWorksheet`**, **`DroneViews::riskMatrix`** (the lines by severity and
-likelihood) and **`DroneViews::hazardLog`** (each hazard with its harms and controls).
+calculated from the ratings, never typed in, and so are its band, the action priority
+(high, medium or low) and the acceptability under the risk policy in
+`libraries/RiskAnalysis.sysml`. Each line names the risk controls that address it;
+two of them are not verified yet. Tables: **`DroneViews::fmeaWorksheet`**,
+**`DroneViews::fmeaReview`** (the lines the policy says to reduce, saved as a view),
+**`DroneViews::riskReduction`** (the risk before and after the controls),
+**`DroneViews::riskMatrix`** (the lines by severity and likelihood, coloured by the policy)
+and **`DroneViews::hazardLog`** (each hazard with its harms and controls).
 
 ## 14. Documents for review: `DroneViews::droneSpecification`
 

@@ -59,9 +59,7 @@
 	const levels = $derived(policy?.zoneLevels.length ? policy.zoneLevels : [...ZONE_LEVELS]);
 	/** The project's risk library, if it has one. */
 	const library = $derived(
-		workspace.elements.find(
-			(e) => e.kind === 'package' && e.name === 'RiskAnalysis' && !e.isDefinition
-		)?.file
+		workspace.elements.find((e) => e.kind === 'package' && e.name === 'RiskAnalysis')?.file
 	);
 	const zoneLabel = (z: string) => ZONE_WORDS[z]?.label ?? viewTitle(z);
 	const meaning = (field: 'severity' | 'likelihood', value: number) =>
@@ -250,7 +248,7 @@
 			</table>
 		</div>
 		<div class="row-buttons">
-			<button type="button" class="plain" onclick={() => (zones = DEFAULT_ZONES.map((r) => [...r]))}
+			<button type="button" class="reset" onclick={() => (zones = DEFAULT_ZONES.map((r) => [...r]))}
 				>Start from the library’s default</button
 			>
 		</div>
@@ -329,8 +327,8 @@
 		border-radius: 3px;
 	}
 	.paint {
+		flex: none;
 		max-width: 100%;
-		overflow-x: auto;
 		touch-action: none;
 		user-select: none;
 	}
@@ -404,6 +402,20 @@
 		display: flex;
 		justify-content: flex-end;
 	}
+	.reset {
+		min-height: 2.25rem;
+		padding: 0 var(--space-3);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-sm);
+		background: var(--surface);
+		color: var(--text);
+		font: inherit;
+		font-size: var(--text-sm);
+		cursor: pointer;
+	}
+	.reset:hover {
+		border-color: var(--border-strong);
+	}
 	.words summary {
 		min-height: 2.75rem;
 		display: flex;
@@ -442,8 +454,21 @@
 		font-weight: 600;
 	}
 	@media (max-width: 760px) {
+		/* Ten cells across the screen's width, each a finger's height. */
+		table {
+			width: 100%;
+			table-layout: fixed;
+		}
+		.corner {
+			width: 1.75rem;
+			white-space: normal;
+			font-size: 10px;
+		}
 		.cell {
-			width: 1.95rem;
+			width: 100%;
+		}
+		.reset {
+			min-height: 2.75rem;
 		}
 	}
 </style>

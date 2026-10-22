@@ -67,7 +67,7 @@ test('a searched table exports only its rows, as an Excel workbook', async ({ pa
 	const table = await openRequirements(page);
 	await table.getByRole('searchbox').fill('battery');
 	await table.getByRole('button', { name: 'Export' }).click();
-	await expect(page.getByText('Only the rows your search shows.')).toBeVisible();
+	await expect(page.getByText('Only the rows shown, as searched and filtered.')).toBeVisible();
 	const download = page.waitForEvent('download');
 	await page.getByRole('menuitem', { name: 'Excel workbook' }).click();
 	const file = await download;

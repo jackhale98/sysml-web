@@ -85,7 +85,6 @@
 			.filter(
 				(e) =>
 					e.kind === 'package' &&
-					!e.isDefinition &&
 					e.file === line.file &&
 					e.span.start_row <= line.line &&
 					e.span.end_row >= line.line
@@ -230,8 +229,7 @@
 							>{ZONE_WORDS[line.acceptability]?.label ?? word(line.acceptability)}</span
 						>{/if}
 					{#if line.rpn}<span class="rpn"
-							>RPN {line.rpn}{#if line.rpnBand}
-								({word(line.rpnBand)}){/if}</span
+							>{`RPN ${line.rpn}${line.rpnBand ? ` (${word(line.rpnBand)} band)` : ''}`}</span
 						>{/if}
 				</p>
 				<dl class="scores">
@@ -425,9 +423,12 @@
 	}
 	.name {
 		display: flex;
-		flex-wrap: wrap;
 		align-items: center;
 		gap: var(--space-2);
+	}
+	.name .link {
+		min-width: 0;
+		overflow-wrap: break-word;
 	}
 	.link {
 		padding: 0;

@@ -182,7 +182,7 @@
 		const preset = presets.find((p) => isPreset(active, p));
 		ui.create = {
 			kind: 'savedReview',
-			title: `${preset ? preset.label : 'Filtered'} ${title.toLowerCase()}`,
+			title: `${preset ? preset.label : 'Filtered'} ${/^[A-Z][a-z]/.test(title) ? title[0]!.toLowerCase() + title.slice(1) : title}`,
 			definition,
 			exposes: info.isUsage ? (info.exposes ?? []) : [],
 			where: own && where ? `(${own}) and (${where})` : (own ?? where),
@@ -1880,7 +1880,7 @@
 	/* Names break between their words only, so these columns are wide enough for most. */
 	td.trace,
 	td.elements {
-		min-width: 8rem;
+		min-width: 10rem;
 	}
 	td.controls {
 		min-width: 11rem;
@@ -1910,7 +1910,7 @@
 	.control-link:hover {
 		text-decoration: underline;
 	}
-	.control-state {
+	.chip.control-state {
 		display: inline-flex;
 		align-items: center;
 		gap: 3px;
@@ -1918,7 +1918,7 @@
 		text-transform: none;
 	}
 	.no-controls {
-		color: var(--text-3);
+		color: var(--text-2);
 	}
 	td.number {
 		font-variant-numeric: tabular-nums;
@@ -2035,7 +2035,7 @@
 		}
 		td.trace,
 		td.elements {
-			min-width: 6.5rem;
+			min-width: 8.5rem;
 		}
 		td.controls {
 			min-width: 9rem;
