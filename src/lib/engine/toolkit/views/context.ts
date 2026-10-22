@@ -10,7 +10,8 @@ import type { TkSession } from '../api';
 import type { Evaluation } from '../evaluation';
 import type { ElementRecord, ExtractedModel } from '../model';
 import { TradeStudies } from '../trade';
-import { unquoteName } from './text';
+import { ModelCalcs } from './calcs';
+import { splitPath, unquoteName } from './text';
 
 export interface Annotation extends MetadataAnnotation {
 	/** The metadata usage's own record (absent if the adapter skipped it). */
@@ -91,6 +92,12 @@ export class ViewContext {
 	}
 
 	private trades: TradeStudy[] | undefined;
+	private modelCalcs: ModelCalcs | undefined;
+
+	/** The model's calculations, which table columns can invoke (`Rpn(…)`). */
+	get calcs(): ModelCalcs {
+		return (this.modelCalcs ??= new ModelCalcs(this));
+	}
 
 	/** The project's trade studies, evaluated (`trade.ts`), once. */
 	tradeStudies(): TradeStudy[] {
@@ -251,6 +258,49 @@ export class ViewContext {
 			}
 		}
 		return null;
+	}
+
+	/**
+	 * What a name as written in an element names: resolved from the
+	 * namespaces around it (innermost first), then from the root, else the
+	 * model element whose qualified name ends with it (a name an import makes
+	 * visible).
+	 */
+	resolveIn(scopeId: string | null, written: string): string | null {
+		const segments = splitPath(written);
+		if (!segments.length) return null;
+		const session = this.session;
+		const tryResolve = (qualified: string): string | null => {
+			const handle = session?.resolve(qualified);
+			if (!session || !handle) return null;
+			try {
+				return session.elementId(handle);
+			} finally {
+				handle.free();
+			}
+		};
+		const scope = scopeId ? this.byId.get(scopeId) : undefined;
+		const scopes = scope
+			? [...this.ownerChain(scope), scope.id]
+					.reverse()
+					.map((id) => this.byId.get(id)?.qualifiedName)
+					.filter((q): q is string => !!q)
+			: [];
+		const plain = segments.join('::');
+		for (const prefix of [...scopes, '']) {
+			for (const name of new Set([written.trim(), plain])) {
+				const found = tryResolve(prefix ? `${prefix}::${name}` : name);
+				if (found) return found;
+			}
+		}
+		const matches = this.records.filter((r) => {
+			const path = splitPath(r.qualifiedName ?? '');
+			return (
+				path.length >= segments.length &&
+				segments.every((s, i) => path[path.length - segments.length + i] === s)
+			);
+		});
+		return (matches.find((r) => this.isContent(r)) ?? matches[0])?.id ?? null;
 	}
 
 	/** Whether `name` is a SysML metaclass (`PartUsage`, `Usage`, `Package`). */

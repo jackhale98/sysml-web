@@ -188,7 +188,7 @@ describe('general view', () => {
 
 	it('draws the view usages of a package with what they expose', () => {
 		const tk = toolkit('general', 'DroneViews');
-		expect(tk.nodes).toHaveLength(21);
+		expect(tk.nodes).toHaveLength(23);
 		expect(node(tk, 'componentCatalogue')).toMatchObject({
 			label: 'componentCatalogue : GeneralView',
 			stereotype: '<<view>>',
@@ -207,13 +207,14 @@ describe('general view', () => {
 			.filter((d) => d.kind !== 'package')
 			.map((d) => d.name)
 			.sort();
-		expect(definitions).toHaveLength(98);
+		expect(definitions).toHaveLength(104);
 		expect(ids(tk)).toEqual(definitions);
 		expect(edges(tk, 'specialization')).toEqual([
 			'Airframe -specialization-> Component',
 			'ArmCommand -specialization-> FlightCommand',
 			'Battery -specialization-> Component',
 			'Camera -specialization-> Component',
+			'DesignFmeaWorksheet -specialization-> FmeaWorksheet',
 			'DisarmCommand -specialization-> FlightCommand',
 			'DroneRequirement -specialization-> EngineeringRequirement',
 			'FailureMode -specialization-> RiskEvent',
@@ -226,12 +227,14 @@ describe('general view', () => {
 			'Motor -specialization-> Component',
 			'PayloadRelease -specialization-> Component',
 			'PowerDistributionBoard -specialization-> Component',
+			'ProcessFmeaWorksheet -specialization-> FmeaWorksheet',
 			'Propeller -specialization-> Component',
 			'ReturnHomeCommand -specialization-> FlightCommand',
 			'Rotor -specialization-> Component',
 			'SpeedController -specialization-> Component',
 			'TakeOffCommand -specialization-> FlightCommand',
-			'TelemetryRadio -specialization-> Component'
+			'TelemetryRadio -specialization-> Component',
+			'UseFmeaWorksheet -specialization-> FmeaWorksheet'
 		]);
 	});
 

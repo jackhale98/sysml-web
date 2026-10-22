@@ -9,7 +9,10 @@
 import type { ElementRecord } from '../model';
 import { connectionEnds, isReference, multiplicityOf } from '../model';
 import type { TradeStudy } from '../../types';
+import { valueProblems } from './assertions';
 import { budgetRows, checkRows } from './budget';
+import { declaredFeature, metadataDefinition } from './domains';
+import { hazardRows, severityProblem } from './hazards';
 import type { Annotation, Link, ViewContext } from './context';
 import { tradeRows } from './trade';
 import {
@@ -36,7 +39,11 @@ export interface Row {
 		depth?: number;
 		role?: 'rollup' | 'total' | 'attribute';
 		notes?: Record<string, string>;
+		/** What is wrong with a value, by field (a rating outside its scale). */
+		problems?: Record<string, string>;
 	};
+	/** For an `@Metadata` row: the annotation. */
+	annotation?: Annotation;
 	/** Where the row's subject is written, when it is a statement (a `satisfy`, a constraint). */
 	byte?: number;
 	/** Fields a column stands for several of (`alternatives`: one per alternative), by column name. */
@@ -81,6 +88,8 @@ export function provideRows(ctx: ViewContext, spec: string, warnings: string[]):
 			return checkRows(ctx);
 		case 'trade':
 			return tradeRows(ctx);
+		case 'hazards':
+			return hazardRows(ctx);
 		case 'uncertainty':
 			warnings.push(
 				'uncertainty analyses are not evaluated by this engine yet; the table is empty'
@@ -88,7 +97,7 @@ export function provideRows(ctx: ViewContext, spec: string, warnings: string[]):
 			return [];
 		default:
 			throw new Error(
-				`unknown row provider \`${spec}\` (expected @Metadata, type:, kind:, relation:, composition, budget:, requirements, trace, checks, trade, kindcounts, or uncertainty)`
+				`unknown row provider \`${spec}\` (expected @Metadata, type:, kind:, relation:, composition, budget:, requirements, trace, checks, trade, hazards, kindcounts, or uncertainty)`
 			);
 	}
 }
@@ -100,10 +109,17 @@ function contentRecords(ctx: ViewContext): ElementRecord[] {
 
 // --- @Metadata -------------------------------------------------------------------
 
-/** One row per annotation of a metadata type, belonging to the annotated element. */
+/**
+ * One row per annotation of a metadata type, belonging to the annotated
+ * element. Values read as people read them (an enum literal by its name);
+ * a field the annotation leaves out has its default from the metadata def.
+ * A value its type's constraints reject, or a severity that disagrees with
+ * its hazard's harms, is a problem of its cell.
+ */
 function metadataRows(ctx: ViewContext, meta: string): Row[] {
 	const wanted = unquoteName(simpleName(meta));
 	const rows: Row[] = [];
+	const defaults = metadataDefaults(ctx, meta);
 	for (const a of ctx.annotations) {
 		if (!ctx.content.has(a.path) || unquoteName(simpleName(a.metadata_type)) !== wanted) continue;
 		const target = a.target_id ? ctx.byId.get(a.target_id) : undefined;
@@ -116,10 +132,28 @@ function metadataRows(ctx: ViewContext, meta: string): Row[] {
 			[a.target_id, a.record?.id, a.record?.ownerId].filter((x): x is string => !!x),
 			target?.qualifiedName ?? ''
 		);
-		for (const [k, v] of a.values) r.fields.set(k, unquote(v));
+		for (const [k, v] of a.values) r.fields.set(k, displayValue(v));
+		for (const [k, v] of defaults) if (!r.fields.has(k)) r.fields.set(k, v);
+		r.annotation = a;
+		const problems: Record<string, string> = {};
+		for (const p of [...valueProblems(ctx, a), severityProblem(ctx, a)])
+			if (p && !problems[p.field]) problems[p.field] = p.message;
+		if (Object.keys(problems).length) r.info = { problems };
 		rows.push(r);
 	}
 	return rows;
+}
+
+/** The default values a metadata def gives its fields (`category … default RiskCategory::design`). */
+function metadataDefaults(ctx: ViewContext, meta: string): [string, string][] {
+	const def = metadataDefinition(ctx, meta);
+	if (!def) return [];
+	const out: [string, string][] = [];
+	for (const t of [def, ...ctx.supers(def)])
+		for (const f of ctx.ownedBy(t))
+			if (f.name && f.value !== null && f.valueIsDefault && !out.some(([k]) => k === f.name))
+				out.push([f.name, displayValue(f.value)]);
+	return out.filter(([k]) => declaredFeature(ctx, def, k));
 }
 
 /** `@Fmea about drone::battery { … }` → `drone::battery`, as written. */
@@ -138,7 +172,8 @@ function typedRows(ctx: ViewContext, type: string): Row[] {
 	const rows: Row[] = [];
 	for (const u of contentRecords(ctx)) {
 		const typeId = typeOf(u);
-		if (u.isDefinition || !u.name || !typeId) continue;
+		// A reference (`ref :>> hazard = batteryFire`) points at one; it isn't one.
+		if (u.isDefinition || !u.name || !typeId || isReference(u)) continue;
 		const typed = target
 			? ctx.conforms(typeId, target)
 			: unquoteName(simpleName(u.type ?? '')) === simple;
@@ -157,7 +192,8 @@ function typedRows(ctx: ViewContext, type: string): Row[] {
 		);
 		r.typeId = typeId;
 		for (const c of ctx.ownedBy(u.id))
-			if (c.name && c.value !== null && !c.isDefinition) r.fields.set(c.name, unquote(c.value));
+			if (c.name && c.value !== null && !c.isDefinition)
+				r.fields.set(c.name, displayValue(c.value));
 		rows.push(r);
 	}
 	return rows;

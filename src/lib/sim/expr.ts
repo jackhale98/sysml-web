@@ -23,8 +23,10 @@ export class Quantity {
 /** An enumeration literal (`Mode::cruise`): equal to another with the same name, or to its name as text. */
 export class EnumLiteral {
 	constructor(readonly qualified: string) {}
+	/** The literal's name, unquoted (`Kind::'use'` is `use`). */
 	get name(): string {
-		return this.qualified.split('::').pop()!;
+		const last = this.qualified.split('::').pop()!;
+		return /^'.*'$/.test(last) ? last.slice(1, -1).replace(/\\(.)/g, '$1') : last;
 	}
 }
 
@@ -540,6 +542,12 @@ export interface Scope {
 	get(name: string): Value | undefined;
 	/** Whether the name is a variable (bound or not), so `X::name` reads it. */
 	isVariable?(name: string): boolean;
+	/**
+	 * A function the evaluator doesn't have (a calculation of the model,
+	 * `Rpn(s, o, d)`), by its name as written: its value, or `undefined`
+	 * when the scope doesn't know it either.
+	 */
+	call?(name: string, args: Value[]): Value | undefined;
 }
 
 /** The value of a name: a variable, `self.x`, else an enum literal (`Mode::cruise`). */
@@ -610,11 +618,11 @@ export function evaluate(expr: Expr, scope: Scope): Value {
 			if (expr.op === '??' && left !== null) return left;
 			return binary(expr.op, left, evaluate(expr.right, scope));
 		}
-		case 'call':
-			return call(
-				expr.name.split('::').pop()!,
-				expr.args.map((a) => evaluate(a, scope))
-			);
+		case 'call': {
+			const args = expr.args.map((a) => evaluate(a, scope));
+			const own = scope.call?.(expr.name, args);
+			return own !== undefined ? own : call(expr.name.split('::').pop()!, args);
+		}
 		case 'unit': {
 			const v = evaluate(expr.operand, scope);
 			if (v instanceof Quantity) {

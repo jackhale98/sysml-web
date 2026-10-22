@@ -25,6 +25,14 @@ export function checkProblems(checks: readonly Check[]): Diagnostic[] {
 	return checks
 		.filter((c) => c.status === 'violated')
 		.map((c) => {
+			if (c.problem)
+				return {
+					file: c.file,
+					span: c.span,
+					severity: 'warning',
+					code: 'check',
+					message: c.problem
+				} satisfies Diagnostic;
 			const by = c.kind === 'satisfy' && c.by ? ` by ${c.by}` : '';
 			const values = c.values
 				.filter((v) => v.value.kind === 'number' || v.value.kind === 'text')

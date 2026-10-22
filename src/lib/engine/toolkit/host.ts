@@ -381,7 +381,8 @@ export class ToolkitHost {
 			library: this.library,
 			session: built.session,
 			units: built.units,
-			extracted: built.extracted
+			extracted: built.extracted,
+			more: () => views.annotationChecks(this.viewContextOf(built, built.files))
 		});
 		return built.evaluation;
 	}

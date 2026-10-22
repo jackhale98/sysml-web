@@ -14,6 +14,7 @@
  * `expose` shows the whole model (the library's convention).
  */
 import {
+	EnumLiteral,
 	EvalError,
 	ParseError,
 	evaluate,
@@ -21,9 +22,10 @@ import {
 	mapScope,
 	parseExpr
 } from '#lib/sim/expr.ts';
-import type { Value } from '#lib/sim/expr.ts';
+import type { Scope, Value } from '#lib/sim/expr.ts';
 import type { ColumnEdit, RenderedTable, RowInfo, TraceMatrix } from '../../types';
 import { fieldKinds } from './budget';
+import { fieldDomain, type Domain } from './domains';
 import type { ElementRecord } from '../model';
 import { findView, listViews, tableSpec, viewChain, viewClauses } from './catalog';
 import type { ViewContext } from './context';
@@ -32,6 +34,7 @@ import { provideRows, requirementRows, type Row } from './rows';
 import {
 	compareCells,
 	formatNumber,
+	isPlainIdentifier,
 	parseNumber,
 	simpleName,
 	splitPath,
@@ -105,8 +108,11 @@ export function renderView(ctx: ViewContext, name: string): RenderedTable {
 	const where = spec.get('where');
 	if (where !== undefined) {
 		const condition = parse(where);
-		rows = condition ? rows.filter((r) => holds(condition, r)) : [];
+		rows = condition ? rows.filter((r) => holds(ctx, condition, r)) : [];
 	}
+	const annotations = rowsSpec.trim().startsWith('@')
+		? annotationsOf(ctx, view, rowsSpec.trim().slice(1), rows)
+		: undefined;
 
 	const pivot = spec.get('pivot');
 	if (pivot !== undefined) {
@@ -132,12 +138,17 @@ export function renderView(ctx: ViewContext, name: string): RenderedTable {
 				availableFields: probe.fields
 			};
 		}
-		const table = pivotTable(shown, rows, parts[0]!, parts[1]!, spec.get('sortBy'));
+		const [rowField, colField] = [parts[0]!, parts[1]!];
+		const domains = [rowField, colField].map((f) => fieldDomain(ctx, rowsSpec.trim(), f));
+		const table = pivotTable(shown, rows, rowField, colField, spec.get('sortBy'), domains);
+		const scales = domains.every((d) => d?.numeric);
 		return {
 			...table,
 			warnings,
 			editable: table.columns.map(() => null),
-			availableFields: probe.fields
+			availableFields: probe.fields,
+			...(scales ? { counts: { rows: rowField, columns: colField } } : {}),
+			...(annotations ? { annotations } : {})
 		};
 	}
 
@@ -163,26 +174,33 @@ export function renderView(ctx: ViewContext, name: string): RenderedTable {
 	let table = rows.map((r) => ({
 		cells: columns.map(([column, expr], i) => {
 			if (expr === null) return r.fields.get(column) ?? '';
-			const value = compiled[i] ? number(compiled[i]!, r) : null;
-			return value !== null ? formatNumber(value) : (r.fields.get(expr) ?? '');
+			// `part = element`: the field under another name.
+			if (isPlainIdentifier(expr) && r.fields.has(expr)) return r.fields.get(expr)!;
+			return compiled[i] ? cellValue(ctx, compiled[i]!, r) : '';
 		}),
 		source: {
 			element: r.element,
 			file: r.fields.get('file') ?? '',
 			line: parseNumber(r.fields.get('line') ?? '') ?? 0,
-			...(r.byte !== undefined ? { byte: r.byte } : {})
+			...(r.byte !== undefined ? { byte: r.byte } : {}),
+			...(r.annotation?.record ? { annotation: r.annotation.record.id } : {})
 		},
+		row: r,
 		info: rowInfoOf(r, columns)
 	}));
 
+	// By a column, else by a field of the rows the table doesn't show.
 	const sortBy = spec.get('sortBy');
 	if (sortBy !== undefined) {
 		const descending = sortBy.startsWith('-');
 		const key = descending ? sortBy.slice(1).trim() : sortBy;
 		const index = columns.findIndex(([c]) => c === key);
-		if (index >= 0) {
+		const field = index < 0 && rows.some((r) => r.fields.has(key));
+		if (index >= 0 || field) {
+			const at = (t: (typeof table)[number]) =>
+				index >= 0 ? t.cells[index]! : (t.row.fields.get(key) ?? '');
 			table = table.toSorted((a, b) => {
-				const order = compareCells(a.cells[index]!, b.cells[index]!);
+				const order = compareCells(at(a), at(b));
 				return descending ? -order : order;
 			});
 		} else warnings.push(`sortBy column \`${key}\` is not in the column list`);
@@ -201,6 +219,7 @@ export function renderView(ctx: ViewContext, name: string): RenderedTable {
 	return {
 		view: shown,
 		columns: columns.map(([c]) => c),
+		columnSpecs: columns.map(([c, expr]) => (expr === null ? c : `${c} = ${expr}`)),
 		rows: table.map((t) => t.cells),
 		warnings,
 		sources: table.map((t) => t.source),
@@ -209,24 +228,68 @@ export function renderView(ctx: ViewContext, name: string): RenderedTable {
 		...(columnKinds.some((k) => k) ? { columnKinds } : {}),
 		...(described ? { rowInfo: table.map((t) => t.info ?? {}) } : {}),
 		...(rowsSpec.trim() === 'checks' ? { opensText: true } : {}),
-		...(study ? { trade: study } : {})
+		...(study ? { trade: study } : {}),
+		...(annotations ? { annotations } : {})
 	};
 }
 
-/** What the provider said about a row, with its notes by column. */
+/** What the provider said about a row, with its notes and problems by column. */
 function rowInfoOf(r: Row, columns: [string, string | null][]): RowInfo | undefined {
 	if (!r.info) return undefined;
-	const { notes, ...rest } = r.info;
+	const { notes, problems, ...rest } = r.info;
 	const info: RowInfo = { ...rest };
-	if (notes) {
-		const byColumn: Record<number, string> = {};
+	const byColumn = (by: Record<string, string>) => {
+		const out: Record<number, string> = {};
 		columns.forEach(([column, expr], i) => {
-			const note = notes[expr ?? column] ?? notes[column];
-			if (note) byColumn[i] = note;
+			const said = by[expr ?? column] ?? by[column];
+			if (said) out[i] = said;
 		});
-		if (Object.keys(byColumn).length) info.notes = byColumn;
+		return Object.keys(out).length ? out : undefined;
+	};
+	const n = notes && byColumn(notes);
+	if (n) info.notes = n;
+	const p = problems && byColumn(problems);
+	if (p) info.problems = p;
+	return Object.keys(info).length ? info : undefined;
+}
+
+/**
+ * For rows of metadata annotations: the metadata def, and the package new
+ * lines go in — the first package the view exposes, else the one most of
+ * its rows are written in.
+ */
+function annotationsOf(
+	ctx: ViewContext,
+	view: ElementRecord,
+	meta: string,
+	rows: Row[]
+): RenderedTable['annotations'] {
+	const metadata =
+		ctx.annotations.find(
+			(a) => unquoteName(simpleName(a.metadata_type)) === unquoteName(simpleName(meta))
+		)?.metadata_qualified_type ?? meta;
+	const packageOf = (id: string | null | undefined): ElementRecord | undefined => {
+		for (let at = id ? ctx.byId.get(id) : undefined; at;) {
+			if (/Package$/.test(at.metaclass)) return at;
+			at = at.ownerId ? ctx.byId.get(at.ownerId) : undefined;
+		}
+		return undefined;
+	};
+	const clauses = viewChain(ctx, view).map((v) => ({ v, ...viewClauses(ctx.textOf(v)) }));
+	const exposing = clauses.find((c) => c.expose.length);
+	for (const text of exposing?.expose ?? []) {
+		const id = ctx.resolveIn(exposing!.v.id, parseExpose(text).base);
+		const record = id ? ctx.byId.get(id) : undefined;
+		if (record && /Package$/.test(record.metaclass) && ctx.isContent(record))
+			return { metadata, package: record.qualifiedName };
 	}
-	return info;
+	const counts = new Map<string, number>();
+	for (const r of rows) {
+		const pkg = packageOf(r.annotation?.record?.ownerId);
+		if (pkg?.qualifiedName) counts.set(pkg.qualifiedName, (counts.get(pkg.qualifiedName) ?? 0) + 1);
+	}
+	const best = [...counts].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+	return { metadata, package: best };
 }
 
 /** The provider's fields and row types, before `expose` and `where` narrow the rows. */
@@ -331,44 +394,9 @@ function isExposed(r: Row, exposures: Exposure[], exposed: Set<string>): boolean
 	});
 }
 
-/**
- * What an expose target names: a name relative to the namespaces around the
- * view (innermost first) or from the root, else the model element whose
- * qualified name ends with it (a name an import makes visible).
- */
+/** What an expose target names, from where the view is written. */
 function resolveTarget(ctx: ViewContext, base: string, view: ElementRecord): string | null {
-	const session = ctx.session;
-	const segments = splitPath(base);
-	if (!segments.length) return null;
-	const tryResolve = (qualified: string): string | null => {
-		const handle = session?.resolve(qualified);
-		if (!session || !handle) return null;
-		try {
-			return session.elementId(handle);
-		} finally {
-			handle.free();
-		}
-	};
-	const plain = segments.join('::');
-	const scopes = [...ctx.ownerChain(view), view.id]
-		.reverse()
-		.map((id) => ctx.byId.get(id)?.qualifiedName)
-		.filter((q): q is string => !!q);
-	// Innermost first, as names resolve.
-	for (const prefix of [...scopes, '']) {
-		for (const name of new Set([base.trim(), plain])) {
-			const found = tryResolve(prefix ? `${prefix}::${name}` : name);
-			if (found) return found;
-		}
-	}
-	const matches = ctx.records.filter((r) => {
-		const path = splitPath(r.qualifiedName ?? '');
-		return (
-			path.length >= segments.length &&
-			segments.every((s, i) => path[path.length - segments.length + i] === s)
-		);
-	});
-	return (matches.find((r) => ctx.isContent(r)) ?? matches[0])?.id ?? null;
+	return ctx.resolveIn(view.id, base);
 }
 
 /** The elements the exposures cover. */
@@ -504,30 +532,36 @@ function parse(source: string): Compiled | null {
 
 /**
  * A row's fields as variables: numbers as numbers, everything else by its
- * simple name (`RiskCategory::software` compares as `software`).
+ * simple name (`RiskCategory::software` compares as `software`); a call
+ * the language doesn't have is a calc of the model (`Rpn(…)`).
  */
-function scopeOf(r: Row) {
+function scopeOf(ctx: ViewContext, r: Row): Scope {
 	const values = new Map<string, Value>();
 	for (const [k, v] of r.fields) {
 		const n = parseNumber(v);
-		values.set(k, n !== null ? n : simpleName(v));
+		values.set(k, n !== null ? n : unquoteName(simpleName(v)));
 	}
-	return mapScope(values);
+	return { ...mapScope(values), call: ctx.calcs.hook };
 }
 
-function number(expr: Compiled, r: Row): number | null {
+/** A computed cell: a number as tables write numbers, an enum literal by its name, text as it is. */
+function cellValue(ctx: ViewContext, expr: Compiled, r: Row): string {
 	try {
-		const value = evaluate(expr, scopeOf(r));
-		return typeof value === 'number' ? value : null;
+		const value = evaluate(expr, scopeOf(ctx, r));
+		if (typeof value === 'number') return formatNumber(value);
+		if (value instanceof EnumLiteral) return value.name;
+		if (typeof value === 'string') return value;
+		if (typeof value === 'boolean') return String(value);
+		return '';
 	} catch (error) {
-		if (error instanceof EvalError) return null;
+		if (error instanceof EvalError) return '';
 		throw error;
 	}
 }
 
-function holds(expr: Compiled, r: Row): boolean {
+function holds(ctx: ViewContext, expr: Compiled, r: Row): boolean {
 	try {
-		return evaluateCondition(expr, scopeOf(r));
+		return evaluateCondition(expr, scopeOf(ctx, r));
 	} catch (error) {
 		if (error instanceof EvalError) return false;
 		throw error;
@@ -536,16 +570,23 @@ function holds(expr: Compiled, r: Row): boolean {
 
 // --- pivot -----------------------------------------------------------------------
 
-/** Counts of rows per (row field, column field) value; rows descending unless `sortBy` names the row field. */
+/**
+ * Counts of rows per (row field, column field) value; rows descending unless
+ * `sortBy` names the row field. A field whose type bounds its values (a
+ * rating of 1 to 10, an enum) has every value as a row or column, in
+ * order, so the empty cells show too.
+ */
 function pivotTable(
 	view: string,
 	rows: Row[],
 	rowField: string,
 	colField: string,
-	sort: string | undefined
+	sort: string | undefined,
+	domains: (Domain | null)[] = []
 ): Pick<RenderedTable, 'view' | 'columns' | 'rows' | 'sources'> {
-	const rowKeys: string[] = [];
-	const colKeys: string[] = [];
+	const [rowDomain, colDomain] = domains;
+	const rowKeys: string[] = [...(rowDomain?.values ?? [])];
+	const colKeys: string[] = [...(colDomain?.values ?? [])];
 	const counts = new Map<string, number>();
 	for (const r of rows) {
 		const rv = r.fields.get(rowField) ?? '';
@@ -556,9 +597,12 @@ function pivotTable(
 		counts.set(key, (counts.get(key) ?? 0) + 1);
 	}
 	const s = sort?.trim();
-	if (s === rowField) rowKeys.sort(compareCells);
-	else rowKeys.sort((a, b) => compareCells(b, a));
-	colKeys.sort(compareCells);
+	// An enum's literals keep their order; numbers and text sort.
+	if (!rowDomain || rowDomain.numeric) {
+		if (s === rowField) rowKeys.sort(compareCells);
+		else rowKeys.sort((a, b) => compareCells(b, a));
+	}
+	if (!colDomain || colDomain.numeric) colKeys.sort(compareCells);
 	return {
 		view,
 		columns: [`${rowField}\\${colField}`, ...colKeys],

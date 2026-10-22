@@ -163,6 +163,11 @@ export class ColumnEdits {
 			if (['type', 'kind', 'parent', 'file', 'line'].includes(f)) return null;
 			return this.feature(probe, f, false);
 		}
+		if (spec === 'hazards') {
+			if (f === 'element') return plain('name', 'text');
+			if (f === 'description') return this.feature(probe, f, true);
+			return null;
+		}
 		if (spec.startsWith('kind:')) {
 			if (f === 'element') return plain('name', 'text');
 			if (f === 'doc') return plain('doc', 'longText');
