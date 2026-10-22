@@ -151,7 +151,7 @@
 			),
 			radial-gradient(
 				28rem 22rem at 100% 10%,
-				color-mix(in oklab, var(--kind-requirement) 11%, transparent),
+				color-mix(in oklab, var(--accent) 11%, transparent),
 				transparent 70%
 			),
 			radial-gradient(
@@ -194,7 +194,7 @@
 		width: 0.5rem;
 		height: 0.5rem;
 		border-radius: 2px;
-		background: linear-gradient(135deg, var(--kind-structure), var(--kind-requirement));
+		background: linear-gradient(135deg, var(--kind-interface), var(--accent));
 		transform: rotate(45deg);
 	}
 	.version {

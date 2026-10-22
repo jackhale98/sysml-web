@@ -463,12 +463,12 @@
 			),
 			radial-gradient(
 				36rem 26rem at 84% 18%,
-				color-mix(in srgb, var(--kind-requirement) 12%, transparent),
+				color-mix(in srgb, var(--accent) 12%, transparent),
 				transparent 70%
 			),
 			radial-gradient(
 				56rem 26rem at 50% 78%,
-				color-mix(in srgb, var(--kind-view) 13%, transparent),
+				color-mix(in srgb, var(--kind-interface) 12%, transparent),
 				transparent 70%
 			);
 	}
@@ -534,8 +534,8 @@
 		background: linear-gradient(
 			100deg,
 			var(--kind-structure) 5%,
-			var(--kind-view) 50%,
-			var(--kind-requirement) 95%
+			var(--kind-interface) 50%,
+			var(--accent) 95%
 		);
 		-webkit-background-clip: text;
 		background-clip: text;
@@ -807,7 +807,7 @@
 			),
 			radial-gradient(
 				30rem 20rem at 80% 40%,
-				color-mix(in srgb, var(--kind-requirement) 10%, transparent),
+				color-mix(in srgb, var(--kind-interface) 10%, transparent),
 				transparent 70%
 			);
 	}
@@ -830,13 +830,7 @@
 		border-radius: calc(var(--radius-lg) + 4px);
 		background:
 			linear-gradient(var(--surface), var(--surface)) padding-box,
-			linear-gradient(
-					135deg,
-					var(--kind-structure),
-					var(--kind-view) 45%,
-					var(--kind-requirement) 75%,
-					var(--kind-analysis)
-				)
+			linear-gradient(135deg, var(--kind-structure), var(--kind-interface) 50%, var(--accent))
 				border-box;
 		border: 2px solid transparent;
 		box-shadow: var(--shadow-lg);
