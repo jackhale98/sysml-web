@@ -8,6 +8,7 @@ import type {
 	BranchSummary,
 	CommitRequest,
 	CommitResult,
+	CommitSummary,
 	Comparison,
 	FileChange,
 	GitProvider,
@@ -16,6 +17,7 @@ import type {
 	Progress,
 	PullRequest,
 	PullRequestInput,
+	PullRequestSummary,
 	RemoteTree,
 	RepoRef,
 	RepoSummary,
@@ -351,6 +353,65 @@ export class GitHubProvider implements GitProvider {
 			'the latest changes'
 		);
 		return { ahead: c.ahead_by, behind: c.behind_by, status: c.status };
+	}
+
+	async mergeBase(ref: RepoRef, base: string, head: string): Promise<string> {
+		const c = await this.request<{ merge_base_commit: { sha: string } }>(
+			'GET',
+			`${path(ref)}/compare/${branchPath(base)}...${branchPath(head)}?per_page=1`,
+			undefined,
+			'where the branches part'
+		);
+		return c.merge_base_commit.sha;
+	}
+
+	async listPullRequests(ref: RepoRef): Promise<PullRequestSummary[]> {
+		const prs = await this.request<
+			{
+				number: number;
+				html_url: string;
+				title: string;
+				user: { login: string } | null;
+				head: { ref: string; sha: string };
+				base: { ref: string; sha: string };
+				updated_at: string | null;
+			}[]
+		>(
+			'GET',
+			`${path(ref)}/pulls?state=open&sort=updated&direction=desc&per_page=30`,
+			undefined,
+			'the proposals'
+		);
+		return prs.map((p) => ({
+			number: p.number,
+			url: p.html_url,
+			title: p.title,
+			author: p.user?.login ?? null,
+			head: { ref: p.head.ref, sha: p.head.sha },
+			base: { ref: p.base.ref, sha: p.base.sha },
+			updatedAt: p.updated_at
+		}));
+	}
+
+	async listCommits(ref: RepoRef, branch: string, count = 20): Promise<CommitSummary[]> {
+		const commits = await this.request<
+			{
+				sha: string;
+				commit: { message: string; author: { name?: string; date?: string } | null };
+				author: { login: string } | null;
+			}[]
+		>(
+			'GET',
+			`${path(ref)}/commits?sha=${encodeURIComponent(branch)}&per_page=${count}`,
+			undefined,
+			'the versions'
+		);
+		return commits.map((c) => ({
+			sha: c.sha,
+			title: c.commit.message.split('\n')[0] ?? '',
+			author: c.author?.login ?? c.commit.author?.name ?? null,
+			date: c.commit.author?.date ?? null
+		}));
 	}
 
 	webUrl(ref: RepoRef, branch?: string): string {

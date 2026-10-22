@@ -442,6 +442,12 @@ export function commandItems(themeChoice: string): PaletteItem[] {
 		),
 		command('requirements', 'Open requirements', { type: 'open', tab: { kind: 'requirements' } }),
 		command(
+			'review',
+			'Review changes',
+			{ type: 'open', tab: { kind: 'review' } },
+			{ aliases: 'diff compare semantic what changed version pull request' }
+		),
+		command(
 			'import-requirements',
 			'Import requirements…',
 			{ type: 'import-requirements' },

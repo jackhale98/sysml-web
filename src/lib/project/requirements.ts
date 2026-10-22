@@ -23,6 +23,8 @@ export interface RequirementRow {
 	issues: string[];
 	satisfiedBy: string[];
 	verifiedBy: string[];
+	/** The element ids of what satisfies or verifies it, by the name shown (when resolved). */
+	linkIds: Record<string, string>;
 	file: string;
 	span: Span;
 }
@@ -60,8 +62,9 @@ export function collectRequirements(analyses: Iterable<Analysis>): RequirementRo
 				issues: annotations
 					.filter((a) => typeName(a) === 'Issue')
 					.map((a) => field(a, 'text', stringValue) ?? ''),
-				satisfiedBy: satisfactions.to(usage),
-				verifiedBy: verifications.to(usage),
+				satisfiedBy: linksTo(satisfactions.of(usage)),
+				verifiedBy: linksTo(verifications.of(usage)),
+				linkIds: linkIds([...satisfactions.of(usage), ...verifications.of(usage)]),
 				file: model.file,
 				span: usage.span
 			});
@@ -112,6 +115,10 @@ function referencesTo(usage: Usage): Set<string> {
 	return names;
 }
 
+function linksTo(links: TraceLink[]): string[] {
+	return [...new Set(links.map((link) => displayReference(link.by)))];
+}
+
 /**
  * Trace links by the requirement they name, so each requirement finds its
  * own without a pass over every link of the project (that was quadratic).
@@ -135,17 +142,19 @@ class LinkIndex {
 		});
 	}
 
-	/** What the links to this requirement name as satisfying or verifying it, in link order. */
-	to(usage: Usage): string[] {
+	/** The links to a requirement, in link order: by its resolved id, else (unresolved) by name. */
+	of(usage: Usage): TraceLink[] {
 		const found = new Set<number>();
-		// A resolved link names its requirement by id; an unresolved one only by name.
 		if (usage.id) for (const index of this.byId.get(usage.id) ?? []) found.add(index);
 		for (const name of referencesTo(usage))
 			for (const index of this.byName.get(name) ?? [])
 				if (!(this.links[index]!.requirement_id && usage.id)) found.add(index);
-		const targets = [...found]
-			.sort((a, b) => a - b)
-			.map((index) => displayReference(this.links[index]!.by));
-		return [...new Set(targets)];
+		return [...found].sort((a, b) => a - b).map((index) => this.links[index]!);
 	}
+}
+
+function linkIds(links: TraceLink[]): Record<string, string> {
+	const ids: Record<string, string> = {};
+	for (const link of links) if (link.by_id) ids[displayReference(link.by)] ??= link.by_id;
+	return ids;
 }

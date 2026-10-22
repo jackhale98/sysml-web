@@ -182,6 +182,55 @@ describe('GitHubProvider', () => {
 		expect(progress).toEqual(['0/1', '1/1']);
 	});
 
+	it('lists open proposals and recent versions, and finds where branches part', async () => {
+		const { fetch } = mockFetch({
+			'GET /repos/acme/drone/pulls\\?state=open.*': () => ({
+				body: [
+					{
+						number: 9,
+						html_url: 'https://github.com/acme/drone/pull/9',
+						title: 'Heavier motors',
+						user: { login: 'jo' },
+						head: { ref: 'motors', sha: 'h9' },
+						base: { ref: 'main', sha: 'b9' },
+						updated_at: '2026-10-20T10:00:00Z'
+					}
+				]
+			}),
+			'GET /repos/acme/drone/commits\\?sha=main&per_page=5': () => ({
+				body: [
+					{
+						sha: 'c2',
+						commit: {
+							message: 'Add SYS-011\n\nNoise at night',
+							author: { name: 'Jo', date: '2026-10-20' }
+						},
+						author: null
+					}
+				]
+			}),
+			'GET /repos/acme/drone/compare/main...motors\\?per_page=1': () => ({
+				body: { merge_base_commit: { sha: 'm1' } }
+			})
+		});
+		const github = new GitHubProvider('tok', { fetch });
+		expect(await github.listPullRequests(ref)).toEqual([
+			{
+				number: 9,
+				url: 'https://github.com/acme/drone/pull/9',
+				title: 'Heavier motors',
+				author: 'jo',
+				head: { ref: 'motors', sha: 'h9' },
+				base: { ref: 'main', sha: 'b9' },
+				updatedAt: '2026-10-20T10:00:00Z'
+			}
+		]);
+		expect(await github.listCommits(ref, 'main', 5)).toEqual([
+			{ sha: 'c2', title: 'Add SYS-011', author: 'Jo', date: '2026-10-20' }
+		]);
+		expect(await github.mergeBase(ref, 'main', 'motors')).toBe('m1');
+	});
+
 	it('creates branches, opens pull requests and compares', async () => {
 		const { fetch, calls } = mockFetch({
 			'POST /repos/acme/drone/git/refs': () => ({ status: 201, body: {} }),

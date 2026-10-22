@@ -152,6 +152,7 @@ const handlers: { [M in Method]: Handler } = {
 	analyzeProject: (host, files: SourceFile[]) => analyses.send(files, host.analyzeProject(files)),
 	elementDetails: (host, files: SourceFile[], path: string, line: number, element: string | null) =>
 		host.elementDetails(files, path, line, element),
+	featureValues: (host, files: SourceFile[], id: string) => host.featureValues(files, id),
 	stateMachines: (host, files: SourceFile[]) => host.stateMachines(files),
 	highlight: (host, source: string) => host.highlight(source),
 	format: (host, source: string) => host.format(source),
@@ -175,7 +176,9 @@ const handlers: { [M in Method]: Handler } = {
 	renderView: (host, files: SourceFile[], name: string) => host.renderView(files, name),
 	viewLibraries: (host) => host.viewLibraries(),
 	checks: (host, files: SourceFile[]) => host.checks(files),
-	evaluate: (host, files: SourceFile[], ids: string[]) => host.evaluate(files, ids)
+	evaluate: (host, files: SourceFile[], ids: string[]) => host.evaluate(files, ids),
+	compareModels: (host, base: SourceFile[], current: SourceFile[]) =>
+		host.compareModels(base, current)
 };
 
 /** A trap or a failed memory grow leaves the instance unusable: the page restarts the worker. */

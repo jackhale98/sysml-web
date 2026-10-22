@@ -12,7 +12,7 @@
  * string, a number or a boolean. When nothing declares the feature, the
  * values the model already gives it say.
  */
-import type { ColumnEdit } from '../../types';
+import type { ColumnEdit, FeatureValue } from '../../types';
 import { multiplicityOf } from '../model';
 import type { ViewContext } from './context';
 import { isPlainIdentifier, simpleName, unquoteName } from './text';
@@ -51,6 +51,53 @@ const NUMERIC = new Set([
 ]);
 
 const LIBRARY_METADATA = ['ModelingMetadata', 'RiskMetadata'];
+
+/**
+ * A usage's attribute values, for the inspector: the attributes it sets
+ * itself (`:>> description = "…"`, or new ones), then those its definition
+ * and the definition's supertypes declare and it doesn't set, with what they
+ * give. Each with how `setField` edits it (`feature:<name>`).
+ */
+export function featureValues(ctx: ViewContext, id: string): FeatureValue[] {
+	const record = ctx.byId.get(id);
+	if (!record || record.isDefinition) return [];
+	const type = ctx.effectiveType(record);
+	const edits = new ColumnEdits(ctx);
+	const probe: Probe = { fields: [], typeIds: type ? [type] : [] };
+	const out: FeatureValue[] = [];
+	const seen = new Set<string>();
+	const declaring = new Map<string, { by: string | null; value: string | null }>();
+	for (const t of type ? [type, ...ctx.supers(type)] : []) {
+		for (const f of ctx.ownedBy(t)) {
+			if (f.isDefinition || f.kind !== 'attribute' || !f.name || declaring.has(f.name)) continue;
+			declaring.set(f.name, { by: ctx.nameOf(t) ?? null, value: f.value });
+		}
+	}
+	// A value field edits plain values; an expression (`capacity * usableFraction`) is edited on
+	// the attribute itself, where it can be written whole.
+	const editFor = (name: string, value: string | null) => {
+		const e = edits.forFeature(probe, name);
+		const literal = value === null || /^\s*(?:"|-?\d|true\b|false\b|\(?\s*[\w']+::)/.test(value);
+		return e && (literal || e.kind !== 'text') && (literal || e.kind !== 'number') ? e : null;
+	};
+	for (const f of ctx.ownedBy(id)) {
+		if (f.isDefinition || f.kind !== 'attribute' || !f.name || seen.has(f.name)) continue;
+		seen.add(f.name);
+		out.push({
+			name: f.name,
+			value: f.value,
+			own: true,
+			declaredBy: declaring.get(f.name)?.by ?? null,
+			edit: editFor(f.name, f.value),
+			elementId: f.id
+		});
+	}
+	for (const [name, { by, value }] of declaring) {
+		if (seen.has(name)) continue;
+		out.push({ name, value, own: false, declaredBy: by, edit: editFor(name, value) });
+	}
+	return out;
+}
 
 export class ColumnEdits {
 	private readonly ctx: ViewContext;
@@ -120,6 +167,11 @@ export class ColumnEdits {
 			return null;
 		}
 		return null;
+	}
+
+	/** How `setField` edits feature `f` of an element of the probe's types. */
+	forFeature(probe: Probe, f: string): ColumnEdit | null {
+		return this.feature(probe, f, true);
 	}
 
 	/** A body value `feature:<f>`: declared as an attribute by a row's type, or already set somewhere (or `always`). */

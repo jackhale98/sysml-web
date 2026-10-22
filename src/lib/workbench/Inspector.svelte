@@ -2,6 +2,7 @@
 	import type { Engine } from '#lib/engine/client.ts';
 	import type { Evaluated } from '#lib/engine/types.ts';
 	import { valueText } from '#lib/project/checks.ts';
+	import FeatureValues from './FeatureValues.svelte';
 	import PropertyForm from './PropertyForm.svelte';
 	import { BookOpen, CircleAlert, Code, FileCode, Link2, Plus, Trash2 } from '@lucide/svelte';
 	import { conceptFor } from '#lib/learn/concepts.ts';
@@ -36,8 +37,22 @@
 				if (inner) return inner;
 			}
 		};
-		return find(workspace.tree)?.children.map((c) => c.element) ?? [];
+		const all = find(workspace.tree)?.children.map((c) => c.element) ?? [];
+		// A usage's attributes are under Values, with their values.
+		return engine && !element.isDefinition ? all.filter((c) => c.kind !== 'attribute') : all;
 	});
+	let valueCount = $state(0);
+	/** The element a `satisfy … by` or verification names: by its resolved id, else by its name. */
+	function traceTarget(by: string): ModelElement | undefined {
+		const id = requirement?.linkIds[by];
+		if (id) {
+			const found = workspace.elements.find((e) => e.id === id);
+			if (found) return found;
+		}
+		const name = by.split('.').pop() ?? by;
+		return workspace.elements.find((e) => e.label === name && !e.isDefinition);
+	}
+
 	/** Requirements this element satisfies (matched by name in `satisfy … by`). */
 	const satisfies = $derived(
 		element && !element.isDefinition
@@ -107,6 +122,19 @@
 	const article = (word: string) => (/^[aeio]/i.test(word) ? 'an' : 'a');
 </script>
 
+<!-- What satisfies or verifies the requirement, as a link to it when the model resolved it. -->
+{#snippet traced(by: string)}
+	{@const target = traceTarget(by)}
+	{#if target}
+		<button type="button" class="link" onclick={() => ui.select(target.key, 'inspector')}>
+			<Link2 size={13} aria-hidden="true" />
+			{by}
+		</button>
+	{:else}
+		<Link2 size={13} aria-hidden="true" /> {by}
+	{/if}
+{/snippet}
+
 <aside class="inspector" class:phone={ui.phone} aria-label="Inspector">
 	{#if !element}
 		<div class="empty">
@@ -168,7 +196,7 @@
 			</form>
 			{#if engine}
 				{#key element.key}
-					<PropertyForm {element} {workspace} {engine} computed={valueOf(element)} />
+					<PropertyForm {element} {workspace} {engine} {ui} computed={valueOf(element)} />
 				{/key}
 			{/if}
 			<dl>
@@ -186,6 +214,15 @@
 			</dl>
 			{#if !engine && element.doc}<p class="doc">{element.doc}</p>{/if}
 		</section>
+
+		{#if engine && !element.isDefinition}
+			<section aria-labelledby="values-heading" hidden={!valueCount}>
+				<h3 id="values-heading">Values</h3>
+				{#key element.key}
+					<FeatureValues {element} {workspace} {engine} {ui} oncount={(n) => (valueCount = n)} />
+				{/key}
+			</section>
+		{/if}
 
 		{#if requirement}
 			<section>
@@ -206,7 +243,7 @@
 				<h4>Satisfied by</h4>
 				{#if requirement.satisfiedBy.length}
 					<ul class="links">
-						{#each requirement.satisfiedBy as by (by)}<li><Link2 size={13} /> {by}</li>{/each}
+						{#each requirement.satisfiedBy as by (by)}<li>{@render traced(by)}</li>{/each}
 					</ul>
 				{:else}
 					<p class="gap">
@@ -216,7 +253,7 @@
 				<h4>Verified by</h4>
 				{#if requirement.verifiedBy.length}
 					<ul class="links">
-						{#each requirement.verifiedBy as by (by)}<li><Link2 size={13} /> {by}</li>{/each}
+						{#each requirement.verifiedBy as by (by)}<li>{@render traced(by)}</li>{/each}
 					</ul>
 				{:else}
 					<p class="gap">No verification case covers this yet.</p>
@@ -488,8 +525,6 @@
 	}
 	.issue,
 	.gap {
-		display: flex;
-		gap: var(--space-1);
 		color: var(--warn);
 	}
 	ul {

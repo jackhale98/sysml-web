@@ -19,6 +19,8 @@ export interface StoredProject {
 	folder?: FileSystemDirectoryHandle;
 	/** The repository it is connected to (`git` projects, or any project connected later). */
 	git?: GitRecord;
+	/** The version "Review changes" compares with when there is no repository: set by "Mark as reviewed". */
+	checkpoint?: { files: ProjectFile[]; at: string };
 }
 
 export type ProjectSummary = Omit<StoredProject, 'files'> & { fileCount: number };

@@ -18,6 +18,7 @@ export function toolkitEngine(toolkit: ToolkitClient): Engine {
 		analyzeProject: async (files) =>
 			analyses.receive(files, (await toolkit.call('analyzeProject', files)) as (Analysis | null)[]),
 		elementDetails: (...params) => toolkit.call('elementDetails', ...params),
+		featureValues: (...params) => toolkit.call('featureValues', ...params),
 		highlight: (...params) => toolkit.call('highlight', ...params),
 		format: (...params) => toolkit.call('format', ...params),
 		complete: (...params) => toolkit.call('complete', ...params),
@@ -35,6 +36,7 @@ export function toolkitEngine(toolkit: ToolkitClient): Engine {
 		edit: (...params) => toolkit.call('edit', ...params),
 		checks: (...params) => toolkit.call('checks', ...params),
 		evaluate: (...params) => toolkit.call('evaluate', ...params),
+		compareModels: (...params) => toolkit.call('compareModels', ...params),
 		terminate: () => toolkit.terminate()
 	};
 }

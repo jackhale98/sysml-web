@@ -428,11 +428,13 @@ export function extractModel(
 			byId: ref(row?.['derived:satisfyingFeature'])
 		});
 		if (!requirement || !by) continue;
+		const byId = ref(row?.['derived:satisfyingFeature']);
 		const link: TraceLink = {
 			requirement,
 			by,
 			span: record.span,
-			...(requirementId ? { requirement_id: requirementId } : {})
+			...(requirementId ? { requirement_id: requirementId } : {}),
+			...(byId ? { by_id: byId } : {})
 		};
 		modelOf(record.path).satisfactions.push(link);
 	}
@@ -453,7 +455,8 @@ export function extractModel(
 			requirement,
 			by: owner.written,
 			span: record.span,
-			...(requirementId ? { requirement_id: requirementId } : {})
+			...(requirementId ? { requirement_id: requirementId } : {}),
+			by_id: owner.id
 		});
 	}
 

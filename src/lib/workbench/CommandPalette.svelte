@@ -372,8 +372,10 @@
 		border-color: var(--text-3);
 	}
 
+	/* Sized by its rows and shrinking to fit (`flex: 1` would start it at zero
+	   height, which Safari keeps when the dialog is as tall as its content). */
 	.results {
-		flex: 1;
+		flex: 1 1 auto;
 		min-height: 0;
 		overflow-y: auto;
 		overscroll-behavior: contain;

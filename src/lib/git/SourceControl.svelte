@@ -34,16 +34,28 @@
 	import GitHubMark from './GitHubMark.svelte';
 	import OpenRepository from './OpenRepository.svelte';
 	import { branchName, type Resolution } from './sync.ts';
+	import ChangeSummary from '#lib/review/ChangeSummary.svelte';
+	import { knowBlobs, modelFilesAt } from '#lib/review/remote.ts';
+	import {
+		commitMessage,
+		markdownSummary,
+		summarize,
+		type ReviewSummary
+	} from '#lib/review/summary.ts';
+	import { isModelFile } from '#lib/project/workspace.svelte.ts';
 	import type { BranchSummary, Progress, RepoChoice } from './types.ts';
 
 	let {
 		session,
 		engine,
-		open = $bindable(false)
+		open = $bindable(false),
+		onreview
 	}: {
 		session: ProjectSession;
 		engine: Engine;
 		open?: boolean;
+		/** Opens the full review of the changes (shown when the host can). */
+		onreview?: () => void;
 	} = $props();
 
 	const uid = $props.id();
@@ -85,6 +97,52 @@
 		record?.pullRequest && record.pullRequest.branch === record.branch ? record.pullRequest : null
 	);
 
+	// The model files at the base version, and as they are now: what the summary compares.
+	const baseTexts = $derived(
+		Object.fromEntries(
+			Object.entries(record?.files ?? {})
+				.filter(([path]) => isModelFile(path))
+				.map(([path, f]) => [path, f.text])
+		)
+	);
+	const currentTexts = $derived.by(() => {
+		const now: Record<string, string> = { ...baseTexts };
+		for (const c of changes) {
+			if (!isModelFile(c.path)) continue;
+			if (c.after === null) delete now[c.path];
+			else now[c.path] = c.after;
+		}
+		return now;
+	});
+	/** The changes in plain language, for the commit message. */
+	let semantic = $state.raw<ReviewSummary | null>(null);
+	const suggested = $derived(semantic && !semantic.empty ? commitMessage(semantic) : '');
+	let summarising = $state(false);
+
+	/** Describe the proposal with what changed in the model on this branch. */
+	async function describeProposal() {
+		if (!record || !ref) return;
+		summarising = true;
+		try {
+			const provider = accounts.provider();
+			const start = await provider.mergeBase(ref, prInto || record.defaultBranch, record.base);
+			knowBlobs(record.files);
+			const before = await modelFilesAt(provider, ref, start);
+			const list = (files: Record<string, string>) =>
+				Object.keys(files)
+					.sort()
+					.map((path) => ({ path, text: files[path]! }));
+			const comparison = await engine.compareModels(list(before), list(baseTexts));
+			const summary = summarize(comparison.diff);
+			prBody = summary.empty ? 'No change to the model itself.' : markdownSummary(summary);
+			if (!prTitle.trim() && !summary.empty) prTitle = commitMessage(summary).split('\n')[0]!;
+		} catch (e) {
+			error = e instanceof GitError ? e : new GitError('other', messageOf(e));
+		} finally {
+			summarising = false;
+		}
+	}
+
 	$effect(() => {
 		if (!dialog) return;
 		if (open && !dialog.open) {
@@ -112,7 +170,7 @@
 
 	const save = () =>
 		act(async () => {
-			const result = await git.save(message);
+			const result = await git.save(message.trim() ? message : suggested);
 			message = '';
 			expanded = null;
 			notice = {
@@ -503,7 +561,19 @@
 							<Check size={16} aria-hidden="true" /> Nothing new since the version on GitHub.
 						</p>
 					{:else}
-						<ul class="changes">
+						<ChangeSummary
+							{engine}
+							base={baseTexts}
+							current={currentTexts}
+							onreview={onreview
+								? () => {
+										open = false;
+										onreview();
+									}
+								: undefined}
+							bind:summary={semantic}
+						/>
+						<ul class="changes" aria-label="Changed files">
 							{#each changes as change (change.path)}
 								{@const p = parts(change.path)}
 								{@const stats = statsOf(change.before, change.after)}
@@ -583,9 +653,16 @@
 						id="{uid}-message"
 						bind:value={message}
 						rows="2"
-						placeholder={changes.length
-							? defaultMessage(changes)
-							: 'e.g. Add the payload interface'}></textarea>
+						placeholder={suggested
+							? suggested.split('\n')[0]
+							: changes.length
+								? defaultMessage(changes)
+								: 'e.g. Add the payload interface'}></textarea>
+					{#if suggested && !message.trim()}
+						<button type="button" class="link-button" onclick={() => (message = suggested)}>
+							Use the change summary as the description
+						</button>
+					{/if}
 					<div class="save-row">
 						<button
 							type="submit"
@@ -703,6 +780,15 @@
 								<span>What and why <small>(optional)</small></span>
 								<textarea bind:value={prBody} rows="3"></textarea>
 							</label>
+							<button
+								type="button"
+								class="link-button"
+								disabled={summarising || !reachable}
+								onclick={describeProposal}
+							>
+								{#if summarising}<LoaderCircle size={14} class="spin" aria-hidden="true" />{/if}
+								Describe it with what changed in the model
+							</button>
 							<label>
 								<span>Merge into</span>
 								<select bind:value={prInto}>

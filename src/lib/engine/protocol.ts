@@ -9,6 +9,7 @@ import type {
 	Highlights,
 	CodeAction,
 	ElementDetails,
+	FeatureValue,
 	Completion,
 	DefinitionTarget,
 	FileChange,
@@ -19,6 +20,7 @@ import type {
 	StateMachine,
 	ViewInfo
 } from './types';
+import type { ModelComparison } from '#lib/review/types.ts';
 
 export interface SourceFile {
 	path: string;
@@ -43,6 +45,8 @@ export interface EngineApi {
 		line: number,
 		element: string | null
 	): ElementDetails;
+	/** A usage's attribute values: its own, then those its definition (and its supertypes) declare. */
+	featureValues(files: SourceFile[], id: string): FeatureValue[];
 	complete(files: SourceFile[], path: string, offset: number): Completion;
 	hover(files: SourceFile[], path: string, offset: number): Hover | null;
 	definition(files: SourceFile[], path: string, offset: number): DefinitionTarget | null;
@@ -61,6 +65,8 @@ export interface EngineApi {
 	checks(files: SourceFile[]): CheckReport;
 	/** Elements' bound values, evaluated, by element id (cached per analysis). */
 	evaluate(files: SourceFile[], ids: string[]): Record<string, Evaluated>;
+	/** What changed from `base` to `current`, element by element (`#lib/review/semantic.ts`). */
+	compareModels(base: SourceFile[], current: SourceFile[]): ModelComparison;
 }
 
 export type Method = keyof EngineApi;

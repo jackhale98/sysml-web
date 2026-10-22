@@ -8,12 +8,15 @@
  * rebuild starts from the previous build's settled outcomes (the toolkit's
  * incremental path).
  */
+import { compareSnapshots } from '#lib/review/semantic.ts';
+import type { ModelComparison, ModelSnapshot } from '#lib/review/types.ts';
 import type { SourceFile } from '../protocol';
 import type {
 	Analysis,
 	CheckReport,
 	CodeAction,
 	Completion,
+	FeatureValue,
 	DefinitionTarget,
 	Diagnostic,
 	DiagramGraph,
@@ -49,6 +52,7 @@ import { extractMachines } from './machines';
 import { detailsOf, extractModel, findElement, type ExtractedModel, type UnitInfo } from './model';
 import { TextIndexCache } from './offsets';
 import { RepairMap } from './repair';
+import { buildSnapshot } from './snapshot';
 import * as views from './views';
 
 /** A session over `files`, with how its units map to them; not analysed yet. */
@@ -75,6 +79,10 @@ interface Built {
 	machines?: StateMachine[];
 	/** Values and verdicts (`evaluation.ts`), on first ask. */
 	evaluation?: Evaluation;
+	/** The model as the semantic diff reads it (`snapshot.ts`), on first ask. */
+	snapshot?: ModelSnapshot;
+	/** Files with syntax errors. */
+	broken?: string[];
 }
 
 export class ToolkitHost {
@@ -89,6 +97,10 @@ export class ToolkitHost {
 	private pending: Prepared | null = null;
 	private settled: TkSettledOutcomes | undefined;
 	private readonly texts = new TextIndexCache();
+	/** Snapshots of versions other than the analysed one (a base to compare with), newest first. */
+	private apart: { files: SourceFile[]; snapshot: ModelSnapshot }[] = [];
+	/** Timings of the latest version analysed apart, for measurements. */
+	lastApart = { ms: 0 };
 	/**
 	 * Timings of the latest build, for the status line and measurements: the
 	 * session (parse, resolve), the toolkit's `check`, the model adapter.
@@ -291,13 +303,21 @@ export class ToolkitHost {
 		return views.renderView(this.viewContext(files), name);
 	}
 
+	/** A usage's attribute values, for the inspector. */
+	featureValues(files: SourceFile[], id: string): FeatureValue[] {
+		return views.featureValues(this.viewContext(files), id);
+	}
+
 	/** The view libraries every project has (`Reporting`, `ModelViews`). */
 	viewLibraries(): SourceFile[] {
 		return views.viewLibraries();
 	}
 
 	private viewContext(files: SourceFile[]): views.ViewContext {
-		const built = this.build(files);
+		return this.viewContextOf(this.build(files), files);
+	}
+
+	private viewContextOf(built: Built, files: SourceFile[]): views.ViewContext {
 		built.views ??= new views.ViewContext({
 			session: built.session,
 			extracted: built.extracted,
@@ -337,6 +357,106 @@ export class ToolkitHost {
 			extracted: built.extracted
 		});
 		return built.evaluation;
+	}
+
+	/**
+	 * What changed from one version of the project to another, at model
+	 * level (`#lib/review/semantic.ts`). The current version is usually the
+	 * analysed one; another version (the base) is analysed in a session of
+	 * its own, which is freed once its snapshot is taken (the snapshot is
+	 * kept for the next comparison with the same base).
+	 */
+	compareModels(base: SourceFile[], current: SourceFile[]): ModelComparison {
+		const started = performance.now();
+		const before = this.snapshotApart(base);
+		const baseMs = performance.now() - started;
+		const now =
+			this.built && sameFiles(this.built.files, current)
+				? this.snapshotOf(this.built)
+				: this.snapshotApart(current);
+		const currentMs = performance.now() - started - baseMs;
+		const diff = compareSnapshots(before.snapshot, now.snapshot);
+		return {
+			diff,
+			ms: {
+				base: before.cached ? 0 : Math.round(baseMs),
+				current: now.cached ? 0 : Math.round(currentMs),
+				diff: Math.round(performance.now() - started - baseMs - currentMs)
+			}
+		};
+	}
+
+	/** The snapshot of an analysed build, made on first ask. */
+	private snapshotOf(built: Built): { snapshot: ModelSnapshot; cached: boolean } {
+		if (built.snapshot) return { snapshot: built.snapshot, cached: true };
+		built.snapshot = this.takeSnapshot(built);
+		return { snapshot: built.snapshot, cached: false };
+	}
+
+	private takeSnapshot(built: Built): ModelSnapshot {
+		const empty: ModelSnapshot = {
+			elements: [],
+			relations: [],
+			checks: [],
+			budgets: [],
+			values: {},
+			brokenFiles: built.broken ?? []
+		};
+		if (!built.extracted) return empty;
+		return buildSnapshot({
+			extracted: built.extracted,
+			units: built.units,
+			content: new Set(built.files.map((f) => f.path)),
+			evaluation: this.evaluationOf(built),
+			views: this.viewContextOf(built, built.files),
+			broken:
+				built.broken ??
+				built.analyses.filter((a) => a.model.syntax_errors.length).map((a) => a.model.file)
+		});
+	}
+
+	/**
+	 * A snapshot of a version that is not the analysed one, from a session
+	 * of its own (the prepared library is shared); cached for the two latest.
+	 */
+	private snapshotApart(files: SourceFile[]): { snapshot: ModelSnapshot; cached: boolean } {
+		const known = this.apart.find((a) => sameFiles(a.files, files));
+		if (known) return { snapshot: known.snapshot, cached: true };
+		if (this.built && sameFiles(this.built.files, files)) return this.snapshotOf(this.built);
+		const started = performance.now();
+		const all = [...files, ...views.missingViewLibraries(files)];
+		// Its own text indexes: the analysed project's stay cached.
+		const { repaired, units, parse } = this.repair(all, new TextIndexCache());
+		const json = JSON.stringify(repaired);
+		// Settled outcomes of the analysed project are a head start (most of the text is the same).
+		let session: TkSession | null = null;
+		if (this.settled)
+			try {
+				session = this.tk.Session.fromSourcesSettled(json, this.library, this.settled);
+			} catch {
+				session = null;
+			}
+		session ??= this.tk.Session.fromSourcesWithPreparedLibrary(json, this.library);
+		const built: Built = { files, session, units, analyses: [], extracted: null };
+		try {
+			// No `check()`: the model reads the same without it, in half the time.
+			const byIndex = new Map<number, UnitInfo>();
+			for (const u of JSON.parse(session.units()) as { unit: number; name: string }[]) {
+				const unit = units.get(u.name);
+				if (unit) byIndex.set(u.unit, unit);
+			}
+			built.extracted = extractModel(this.tk, session, byIndex);
+			built.broken = [...new Set(parse.map((f) => f.unit ?? ''))].filter((p) =>
+				files.some((f) => f.path === p)
+			);
+			const snapshot = this.takeSnapshot(built);
+			this.apart = [{ files, snapshot }, ...this.apart].slice(0, 2);
+			this.lastApart = { ms: Math.round(performance.now() - started) };
+			return { snapshot, cached: false };
+		} finally {
+			built.evaluation?.free();
+			session.free();
+		}
 	}
 
 	/** A standard view of the project as a diagram graph (`diagrams/`). */
@@ -435,10 +555,23 @@ export class ToolkitHost {
 			return { ...pending, files };
 		}
 		this.keepPending(null);
+		const { repaired, units, parse, lenient } = this.repair(all);
+		const session = this.openSession(JSON.stringify(repaired));
+		return { files, all, session, units, parse, lenient };
+	}
+
+	/** Units that don't parse are repaired first: a session can't be built over them. */
+	private repair(
+		all: SourceFile[],
+		texts = this.texts
+	): {
+		repaired: TkSource[];
+		units: Map<string, UnitInfo>;
+		parse: TkFinding[];
+		lenient: boolean;
+	} {
 		const sources: TkSource[] = all.map((f) => ({ name: f.path, text: f.text }));
 		const json = JSON.stringify(sources);
-
-		// Units that don't parse are repaired first: a session can't be built over them.
 		const parse = (JSON.parse(this.tk.checkSyntax(json)) as TkFinding[]).filter(
 			(f) => f.stage === 'parse'
 		);
@@ -452,25 +585,26 @@ export class ToolkitHost {
 		const units = this.unitsOf(
 			all,
 			repaired.map((r) => ({ path: r.name, text: r.text })),
-			lenient
+			lenient,
+			texts
 		);
-		const session = this.openSession(JSON.stringify(repaired));
-		return { files, all, session, units, parse, lenient: !!lenient };
+		return { repaired, units, parse, lenient: !!lenient };
 	}
 
 	/** How each file maps to the text its session parsed (`repaired`, the same when it parses). */
 	private unitsOf(
 		files: SourceFile[],
 		repaired: SourceFile[],
-		lenient: TkLenient | null = null
+		lenient: TkLenient | null = null,
+		texts = this.texts
 	): Map<string, UnitInfo> {
 		const units = new Map<string, UnitInfo>();
 		for (const file of files) {
-			const original = this.texts.get(file.path, file.text);
+			const original = texts.get(file.path, file.text);
 			const fixed = repaired.find((s) => s.path === file.path);
 			const unit: UnitInfo = { path: file.path, original, repaired: original };
 			if (fixed && fixed.text !== file.text) {
-				unit.repaired = this.texts.get(`repaired:${file.path}`, fixed.text);
+				unit.repaired = texts.get(`repaired:${file.path}`, fixed.text);
 				unit.repair = RepairMap.build(
 					file.text,
 					fixed.text,
@@ -479,7 +613,7 @@ export class ToolkitHost {
 			}
 			units.set(file.path, unit);
 		}
-		this.texts.retain([...files.map((f) => f.path), ...files.map((f) => `repaired:${f.path}`)]);
+		texts.retain([...files.map((f) => f.path), ...files.map((f) => `repaired:${f.path}`)]);
 		return units;
 	}
 
