@@ -50,7 +50,13 @@ import {
 import { convert, formatQuantity, parseLiteral, readable, type Quantity } from '../quantity';
 import type { Check, CheckReport, CheckStatus, CheckValue, Evaluated, Span } from '../types';
 import type { TkElement, TkLibrary, TkSession, TkSite, Toolkit } from './api';
-import { multiplicityOf, type ElementRecord, type ExtractedModel, type UnitInfo } from './model';
+import {
+	multiplicityOf,
+	type ElementRecord,
+	type ExtractedModel,
+	type TraceRecord,
+	type UnitInfo
+} from './model';
 
 /** The JSON `verify` answers (only the fields the app reads). */
 interface TkVerifyReport {
@@ -111,6 +117,8 @@ export class Evaluation {
 	private readonly values = new Map<string, Evaluated>();
 	/** Records by qualified name (first wins), for requirement and owner lookups. */
 	private readonly byQualified = new Map<string, ElementRecord>();
+	private byPath: Map<string, ElementRecord[]> | undefined;
+	private satisfies: Map<string, TraceRecord[]> | undefined;
 	/** Timings, for measurements. */
 	readonly timings = { sessionMs: 0, verifyMs: 0 };
 
@@ -124,6 +132,16 @@ export class Evaluation {
 	free() {
 		this.own?.free();
 		this.own = null;
+	}
+
+	/**
+	 * Free the evaluation session until it is needed again (values already
+	 * evaluated and the checks stay cached): on a large model it is as big as
+	 * the analysed session, and the language server needs memory next.
+	 */
+	release() {
+		this.free();
+		this.opened = false;
 	}
 
 	/** The session to evaluate in, opened on first use. */
@@ -435,9 +453,7 @@ export class Evaluation {
 	private satisfaction(s: TkSatisfaction, requirement: ElementRecord | undefined): Check | null {
 		const at = this.locate(s);
 		if (!at) return null;
-		const trace = this.source.extracted.traces.find(
-			(t) => t.kind === 'satisfy' && t.at.path === at.unit.path && overlaps(t.at.span, at.span)
-		);
+		const trace = this.satisfiesIn(at.unit.path).find((t) => overlaps(t.at.span, at.span));
 		const byRecord = trace?.byId ? this.source.extracted.byId.get(trace.byId) : undefined;
 		const constraintTexts: string[] = [];
 		let constraintAt: Check['constraintAt'];
@@ -596,8 +612,8 @@ export class Evaluation {
 	/** The innermost named element whose declaration contains a byte of the person's text. */
 	private ownerAt(unit: UnitInfo, byte: number): ElementRecord | undefined {
 		let best: ElementRecord | undefined;
-		for (const r of this.source.extracted.elements) {
-			if (r.path !== unit.path || !r.name) continue;
+		for (const r of this.elementsIn(unit.path)) {
+			if (!r.name) continue;
 			if (byte < r.span.start_byte || byte >= r.span.end_byte) continue;
 			if (!best || r.span.end_byte - r.span.start_byte < best.span.end_byte - best.span.start_byte)
 				best = r;
@@ -605,10 +621,37 @@ export class Evaluation {
 		return best;
 	}
 
+	/** The records of one file, in order (made on first use: per-file lookups, not scans of all). */
+	private elementsIn(path: string): ElementRecord[] {
+		if (!this.byPath) {
+			this.byPath = new Map();
+			for (const r of this.source.extracted.elements) {
+				const list = this.byPath.get(r.path);
+				if (list) list.push(r);
+				else this.byPath.set(r.path, [r]);
+			}
+		}
+		return this.byPath.get(path) ?? [];
+	}
+
+	/** The satisfy links of one file (made on first use). */
+	private satisfiesIn(path: string): TraceRecord[] {
+		if (!this.satisfies) {
+			this.satisfies = new Map();
+			for (const t of this.source.extracted.traces) {
+				if (t.kind !== 'satisfy') continue;
+				const list = this.satisfies.get(t.at.path);
+				if (list) list.push(t);
+				else this.satisfies.set(t.at.path, [t]);
+			}
+		}
+		return this.satisfies.get(path) ?? [];
+	}
+
 	private requirementAround(unit: UnitInfo, byte: number): ElementRecord | undefined {
 		let best: ElementRecord | undefined;
-		for (const r of this.source.extracted.elements) {
-			if (r.path !== unit.path || !/^Requirement(Usage|Definition)$/.test(r.metaclass)) continue;
+		for (const r of this.elementsIn(unit.path)) {
+			if (!/^Requirement(Usage|Definition)$/.test(r.metaclass)) continue;
 			if (byte < r.span.start_byte || byte >= r.span.end_byte) continue;
 			if (!best || r.span.end_byte - r.span.start_byte < best.span.end_byte - best.span.start_byte)
 				best = r;

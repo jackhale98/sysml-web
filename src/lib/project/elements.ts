@@ -35,48 +35,66 @@ export interface TreeNode {
 	children: TreeNode[];
 }
 
+/**
+ * Each analysis's elements, kept while the analysis is: the engine sends
+ * unchanged analyses as the same objects (`engine/toolkit/delta.ts`), so an
+ * edit rebuilds only the edited file's elements.
+ */
+const built = new WeakMap<Analysis, ModelElement[]>();
+
 /** Every named definition and usage in the analysed files. */
 export function collectElements(analyses: Iterable<Analysis>): ModelElement[] {
 	const elements: ModelElement[] = [];
-	for (const { model } of analyses) {
-		for (const d of model.definitions) {
-			if (!d.name) continue;
-			elements.push({
-				key: `${model.file}@${d.span.start_byte}`,
-				name: d.name,
-				label: unescapeName(d.name),
-				kind: d.kind,
-				isDefinition: true,
-				parent: d.parent_def ?? null,
-				typeRef: d.super_type,
-				shortName: d.short_name ? unescapeName(d.short_name) : null,
-				doc: d.doc ?? null,
-				multiplicity: null,
-				value: null,
-				file: model.file,
-				span: d.span,
-				...(d.id ? { id: d.id } : {})
-			});
+	for (const analysis of analyses) {
+		let own = built.get(analysis);
+		if (!own) {
+			own = elementsOf(analysis);
+			built.set(analysis, own);
 		}
-		for (const u of model.usages) {
-			if (!u.name) continue;
-			elements.push({
-				key: `${model.file}@${u.span.start_byte}`,
-				name: u.name,
-				label: unescapeName(u.name),
-				kind: u.kind,
-				isDefinition: false,
-				parent: u.parent_def ?? null,
-				typeRef: u.type_ref,
-				shortName: u.short_name ? unescapeName(u.short_name) : null,
-				doc: u.doc ?? null,
-				multiplicity: u.multiplicity ?? null,
-				value: u.value_expr ?? null,
-				file: model.file,
-				span: u.span,
-				...(u.id ? { id: u.id } : {})
-			});
-		}
+		for (const element of own) elements.push(element);
+	}
+	return elements;
+}
+
+function elementsOf({ model }: Analysis): ModelElement[] {
+	const elements: ModelElement[] = [];
+	for (const d of model.definitions) {
+		if (!d.name) continue;
+		elements.push({
+			key: `${model.file}@${d.span.start_byte}`,
+			name: d.name,
+			label: unescapeName(d.name),
+			kind: d.kind,
+			isDefinition: true,
+			parent: d.parent_def ?? null,
+			typeRef: d.super_type,
+			shortName: d.short_name ? unescapeName(d.short_name) : null,
+			doc: d.doc ?? null,
+			multiplicity: null,
+			value: null,
+			file: model.file,
+			span: d.span,
+			...(d.id ? { id: d.id } : {})
+		});
+	}
+	for (const u of model.usages) {
+		if (!u.name) continue;
+		elements.push({
+			key: `${model.file}@${u.span.start_byte}`,
+			name: u.name,
+			label: unescapeName(u.name),
+			kind: u.kind,
+			isDefinition: false,
+			parent: u.parent_def ?? null,
+			typeRef: u.type_ref,
+			shortName: u.short_name ? unescapeName(u.short_name) : null,
+			doc: u.doc ?? null,
+			multiplicity: u.multiplicity ?? null,
+			value: u.value_expr ?? null,
+			file: model.file,
+			span: u.span,
+			...(u.id ? { id: u.id } : {})
+		});
 	}
 	return elements;
 }
@@ -88,9 +106,20 @@ export function collectElements(analyses: Iterable<Analysis>): ModelElement[] {
  */
 export function buildTree(elements: ModelElement[]): TreeNode[] {
 	const nodes = new Map(elements.map((e) => [e.key, { element: e, children: [] as TreeNode[] }]));
+	// Candidates for an owner, by file and name (a linear scan per element was quadratic).
+	const named = new Map<string, ModelElement[]>();
+	for (const e of elements) {
+		const key = `${e.file}\u0000${e.name}`;
+		const list = named.get(key);
+		if (list) list.push(e);
+		else named.set(key, [e]);
+	}
 	const roots: TreeNode[] = [];
 	for (const node of nodes.values()) {
-		const owner = node.element.parent ? findOwner(elements, node.element) : undefined;
+		const child = node.element;
+		const owner = child.parent
+			? findOwner(named.get(`${child.file}\u0000${child.parent}`) ?? [], child)
+			: undefined;
 		const parentNode = owner ? nodes.get(owner.key) : undefined;
 		if (parentNode) parentNode.children.push(node);
 		else roots.push(node);
@@ -98,7 +127,7 @@ export function buildTree(elements: ModelElement[]): TreeNode[] {
 	const sort = (list: TreeNode[]) => {
 		list.sort(
 			(a, b) =>
-				a.element.file.localeCompare(b.element.file) ||
+				(a.element.file === b.element.file ? 0 : a.element.file.localeCompare(b.element.file)) ||
 				a.element.span.start_byte - b.element.span.start_byte
 		);
 		for (const n of list) sort(n.children);
@@ -107,10 +136,11 @@ export function buildTree(elements: ModelElement[]): TreeNode[] {
 	return roots;
 }
 
-function findOwner(elements: ModelElement[], child: ModelElement): ModelElement | undefined {
+/** The innermost of `candidates` (same file, named as `child`'s parent) that encloses it. */
+function findOwner(candidates: ModelElement[], child: ModelElement): ModelElement | undefined {
 	let best: ModelElement | undefined;
-	for (const e of elements) {
-		if (e === child || e.file !== child.file || e.name !== child.parent) continue;
+	for (const e of candidates) {
+		if (e === child) continue;
 		if (e.span.start_byte > child.span.start_byte || e.span.end_byte < child.span.end_byte)
 			continue;
 		// The innermost enclosing element with that name.

@@ -103,17 +103,29 @@ export class ToolkitHost {
 	private apart: { files: SourceFile[]; snapshot: ModelSnapshot }[] = [];
 	/** Timings of the latest version analysed apart, for measurements. */
 	lastApart = { ms: 0 };
-	/** Timings of the latest build, for the status line and measurements. */
-	lastBuild = { ms: 0, lenient: false, findings: 0 };
+	/**
+	 * Timings of the latest build, for the status line and measurements: the
+	 * session (parse, resolve), the toolkit's `check`, the model adapter.
+	 */
+	lastBuild = { ms: 0, lenient: false, findings: 0, sessionMs: 0, checkMs: 0, adapterMs: 0 };
 	/** The editor's language services (the toolkit's language server), started on first use. */
 	private readonly language: LanguageServices;
 	readonly syntax: SyntaxServices;
 
-	constructor(tk: Toolkit, library: TkLibrary, syntax = new SyntaxServices(tk)) {
+	/** The instance's WebAssembly memory in MiB (0 when unknown). */
+	private readonly memoryMiB: () => number;
+
+	constructor(
+		tk: Toolkit,
+		library: TkLibrary,
+		syntax = new SyntaxServices(tk),
+		memoryMiB: () => number = () => 0
+	) {
 		this.tk = tk;
 		this.library = library;
 		this.language = new LanguageServices(tk, library);
 		this.syntax = syntax;
+		this.memoryMiB = memoryMiB;
 	}
 
 	highlight(source: string): Highlights {
@@ -329,9 +341,12 @@ export class ToolkitHost {
 	 */
 	checks(files: SourceFile[]): CheckReport {
 		const evaluation = this.evaluationOf(this.build(files));
-		return evaluation
-			? evaluation.checks()
-			: { checks: [], summary: { satisfied: 0, violated: 0, undecided: 0 }, ms: 0 };
+		if (!evaluation)
+			return { checks: [], summary: { satisfied: 0, violated: 0, undecided: 0 }, ms: 0 };
+		const report = evaluation.checks();
+		// A large model's second session costs hundreds of MB: free it until values are asked for.
+		if (this.memoryMiB() > RELEASE_EVALUATION_AT_MIB) evaluation.release();
+		return report;
 	}
 
 	/** Elements' bound values, evaluated, by element id; cached per analysis. */
@@ -492,8 +507,11 @@ export class ToolkitHost {
 		this.built = null;
 		previous?.evaluation?.free();
 		previous?.session?.free();
+		if (withViewLibraries) this.language.textsChanged(files);
 		const { session, units, parse, lenient } = this.prepare(files, withViewLibraries);
+		const prepared = performance.now();
 		const findings = session ? (JSON.parse(session.check()) as TkFinding[]) : [];
+		const checked = performance.now();
 
 		// The session numbers its units; map them to the app's files.
 		const byIndex = new Map<number, UnitInfo>();
@@ -504,6 +522,7 @@ export class ToolkitHost {
 			}
 		}
 		const extracted = session ? extractModel(this.tk, session, byIndex) : null;
+		const adapted = performance.now();
 		const problems = toProblems(parse, findings, units);
 
 		const analyses = files.map((file): Analysis => {
@@ -525,7 +544,10 @@ export class ToolkitHost {
 		this.lastBuild = {
 			ms: Math.round(performance.now() - started),
 			lenient: !!lenient,
-			findings: findings.length
+			findings: findings.length,
+			sessionMs: Math.round(prepared - started),
+			checkMs: Math.round(checked - prepared),
+			adapterMs: Math.round(adapted - checked)
 		};
 		this.built = { files, session, units, analyses, extracted };
 		return this.built;
@@ -632,6 +654,13 @@ export class ToolkitHost {
 		return session;
 	}
 }
+
+/**
+ * WebAssembly memory (MiB) from which the evaluation session is freed after
+ * the checks. The toolkit's instance can't grow past 2 GiB; a model of 50k
+ * lines passes 1 GiB (the demo takes about 300 MiB).
+ */
+const RELEASE_EVALUATION_AT_MIB = 1024;
 
 const isModel = (path: string) => path.endsWith('.sysml') || path.endsWith('.kerml');
 

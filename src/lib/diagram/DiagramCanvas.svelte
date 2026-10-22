@@ -45,7 +45,15 @@
 	import { DiagramEditing, provideEditing } from './editing.svelte.ts';
 	import FlowBridge, { type FlowApi } from './FlowBridge.svelte';
 	import { LABEL_HEIGHT, labelWidth, provideLabels } from './labels.svelte.ts';
-	import { edgeText, layout, nodeSize, UPWARD, type Direction, type Layout } from './layout.ts';
+	import {
+		edgeText,
+		layout,
+		MAX_NODES,
+		nodeSize,
+		UPWARD,
+		type Direction,
+		type Layout
+	} from './layout.ts';
 	import { ownersOf, qualifiedName, resolveNode } from './model.ts';
 	import BehaviorAddForm, { type BehaviorAddChoice } from './BehaviorAddForm.svelte';
 	import BranchForm from './BranchForm.svelte';
@@ -130,7 +138,7 @@
 
 	let nodes = $state.raw<Node<SysmlNodeData>[]>([]);
 	let edges = $state.raw<Edge<SysmlEdgeData>[]>([]);
-	let status = $state<'loading' | 'ready' | 'error'>('loading');
+	let status = $state<'loading' | 'ready' | 'error' | 'too-large'>('loading');
 	let message = $state('');
 	let popover = $state<'add' | 'rename' | null>(null);
 	let renameTo = $state('');
@@ -433,6 +441,15 @@
 			const files = workspace.sourceFiles();
 			const graph = await engine.diagram(view, files, scope);
 			if (current !== generation) return;
+			// Laying out thousands of boxes takes the page minutes and draws nothing readable.
+			if (graph.nodes.length > MAX_NODES) {
+				nodes = [];
+				edges = [];
+				frameTitle = graph.title;
+				message = `This view has ${graph.nodes.length} elements, too many to draw at once (at most ${MAX_NODES}). Narrow it: expose less in the view, or open the diagram of a package or a part inside it.`;
+				status = 'too-large';
+				return;
+			}
 			const direction = directionFor(graph);
 			const hadNodes = nodes.length > 0;
 			const previous = new Map(nodes.map((n) => [n.id, n]));
@@ -1581,6 +1598,8 @@
 
 	{#if status === 'error'}
 		<p class="state" role="alert">This view could not be drawn: {message}</p>
+	{:else if status === 'too-large'}
+		<p class="state" role="status">{message}</p>
 	{:else if status === 'ready' && nodes.length === 0}
 		<p class="state">Nothing to show in this view yet. Add an element to get started.</p>
 	{/if}

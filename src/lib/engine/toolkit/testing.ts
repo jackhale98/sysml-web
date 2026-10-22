@@ -14,6 +14,7 @@ const ROOT = resolve(import.meta.dirname, '../../../..');
 const TOOLKIT = join(ROOT, 'static/toolkit');
 
 let host: Promise<ToolkitHost> | undefined;
+let memory: WebAssembly.Memory | undefined;
 
 /** One host for the whole test file (the library takes about a second to load). */
 export function loadHost(): Promise<ToolkitHost> {
@@ -23,13 +24,20 @@ export function loadHost(): Promise<ToolkitHost> {
 		const tk = (await import(
 			/* @vite-ignore */ pathToFileURL(join(TOOLKIT, 'sysmlv2.js')).href
 		)) as Toolkit;
-		await tk.default({ module_or_path: readFileSync(join(TOOLKIT, 'sysmlv2_bg.wasm')) });
+		({ memory } = await tk.default({
+			module_or_path: readFileSync(join(TOOLKIT, 'sysmlv2_bg.wasm'))
+		}));
 		const bundle = gunzipSync(
 			readFileSync(join(TOOLKIT, 'stdlib/sysml-library.json.gz'))
 		).toString();
-		return new ToolkitHost(tk, new tk.PreparedLibrary(bundle, null));
+		return new ToolkitHost(tk, new tk.PreparedLibrary(bundle, null), undefined, toolkitMemoryMiB);
 	})();
 	return host;
+}
+
+/** The toolkit's WebAssembly memory, in MiB (it only grows). */
+export function toolkitMemoryMiB(): number {
+	return memory ? Math.round(memory.buffer.byteLength / 1048576) : 0;
 }
 
 /** The demo project's model files, sorted by path as the workspace sorts them. */

@@ -16,6 +16,13 @@ export interface Placed {
 
 export type Direction = 'DOWN' | 'RIGHT';
 
+/**
+ * The most nodes a diagram lays out. ELK runs on the page's main thread and
+ * its time grows faster than the node count; a bigger view says how to
+ * narrow it instead (docs/performance.md).
+ */
+export const MAX_NODES = 500;
+
 export interface XY {
 	x: number;
 	y: number;

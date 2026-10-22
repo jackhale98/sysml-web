@@ -32,8 +32,8 @@ export interface RequirementRow {
 /** Collect every requirement usage across the analysed files. */
 export function collectRequirements(analyses: Iterable<Analysis>): RequirementRow[] {
 	const all = [...analyses];
-	const satisfactions = all.flatMap((a) => a.model.satisfactions);
-	const verifications = all.flatMap((a) => a.model.verifications);
+	const satisfactions = new LinkIndex(all.flatMap((a) => a.model.satisfactions));
+	const verifications = new LinkIndex(all.flatMap((a) => a.model.verifications));
 	const rows: RequirementRow[] = [];
 
 	for (const { model } of all) {
@@ -62,9 +62,9 @@ export function collectRequirements(analyses: Iterable<Analysis>): RequirementRo
 				issues: annotations
 					.filter((a) => typeName(a) === 'Issue')
 					.map((a) => field(a, 'text', stringValue) ?? ''),
-				satisfiedBy: linksTo(usage, satisfactions),
-				verifiedBy: linksTo(usage, verifications),
-				linkIds: linkIds(usage, [...satisfactions, ...verifications]),
+				satisfiedBy: linksTo(satisfactions.of(usage)),
+				verifiedBy: linksTo(verifications.of(usage)),
+				linkIds: linkIds([...satisfactions.of(usage), ...verifications.of(usage)]),
 				file: model.file,
 				span: usage.span
 			});
@@ -115,23 +115,46 @@ function referencesTo(usage: Usage): Set<string> {
 	return names;
 }
 
-function linksTo(usage: Usage, links: TraceLink[]): string[] {
-	return [...new Set(linksOf(usage, links).map((link) => displayReference(link.by)))];
+function linksTo(links: TraceLink[]): string[] {
+	return [...new Set(links.map((link) => displayReference(link.by)))];
 }
 
-/** The links to a requirement: by its resolved id, else (unresolved) by name. */
-function linksOf(usage: Usage, links: TraceLink[]): TraceLink[] {
-	const names = referencesTo(usage);
-	return links.filter((link) => {
-		if (link.requirement_id && usage.id) return link.requirement_id === usage.id;
-		const segments = link.requirement.split('::');
-		return names.has(link.requirement) || names.has(segments[segments.length - 1] ?? '');
-	});
+/**
+ * Trace links by the requirement they name, so each requirement finds its
+ * own without a pass over every link of the project (that was quadratic).
+ */
+class LinkIndex {
+	private readonly byId = new Map<string, number[]>();
+	private readonly byName = new Map<string, number[]>();
+
+	constructor(private readonly links: TraceLink[]) {
+		const add = (map: Map<string, number[]>, key: string, index: number) => {
+			const list = map.get(key);
+			if (list) list.push(index);
+			else map.set(key, [index]);
+		};
+		links.forEach((link, index) => {
+			if (link.requirement_id) add(this.byId, link.requirement_id, index);
+			const segments = link.requirement.split('::');
+			const last = segments[segments.length - 1] ?? '';
+			add(this.byName, link.requirement, index);
+			if (last !== link.requirement) add(this.byName, last, index);
+		});
+	}
+
+	/** The links to a requirement, in link order: by its resolved id, else (unresolved) by name. */
+	of(usage: Usage): TraceLink[] {
+		const found = new Set<number>();
+		if (usage.id) for (const index of this.byId.get(usage.id) ?? []) found.add(index);
+		for (const name of referencesTo(usage))
+			for (const index of this.byName.get(name) ?? [])
+				if (!(this.links[index]!.requirement_id && usage.id)) found.add(index);
+		return [...found].sort((a, b) => a - b).map((index) => this.links[index]!);
+	}
 }
 
-function linkIds(usage: Usage, links: TraceLink[]): Record<string, string> {
+function linkIds(links: TraceLink[]): Record<string, string> {
 	const ids: Record<string, string> = {};
-	for (const link of linksOf(usage, links))
-		if (link.by_id) ids[displayReference(link.by)] ??= link.by_id;
+	for (const link of links) if (link.by_id) ids[displayReference(link.by)] ??= link.by_id;
 	return ids;
 }

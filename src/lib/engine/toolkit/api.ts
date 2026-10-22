@@ -75,6 +75,8 @@ export interface TkLspServer {
 	free(): void;
 	handle(message: string): string[];
 	setWorkspace(sourcesJson: string): string[];
+	/** Drop cached navigation sessions; returns refresh requests (unused). */
+	invalidateSessions(): string[];
 }
 
 /** The module's exports (after `default()` has instantiated it). */

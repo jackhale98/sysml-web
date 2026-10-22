@@ -1,5 +1,7 @@
 import type { EngineApi, Method } from './protocol';
 import type { ToolkitClient } from './toolkit/client';
+import { AnalysisReceiver } from './toolkit/delta';
+import type { Analysis } from './types';
 
 /** The engine, as seen from the UI: every call is asynchronous. */
 export type Engine = {
@@ -8,10 +10,13 @@ export type Engine = {
 
 /** The app's engine: every call goes to the sysml-toolkit worker. */
 export function toolkitEngine(toolkit: ToolkitClient): Engine {
+	// The worker sends only the analyses that changed (`toolkit/delta.ts`).
+	const analyses = new AnalysisReceiver();
 	return {
 		version: (...params) => toolkit.call('version', ...params),
 		analyze: (...params) => toolkit.call('analyze', ...params),
-		analyzeProject: (...params) => toolkit.call('analyzeProject', ...params),
+		analyzeProject: async (files) =>
+			analyses.receive(files, (await toolkit.call('analyzeProject', files)) as (Analysis | null)[]),
 		elementDetails: (...params) => toolkit.call('elementDetails', ...params),
 		featureValues: (...params) => toolkit.call('featureValues', ...params),
 		elementFeatures: (...params) => toolkit.call('elementFeatures', ...params),
