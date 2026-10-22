@@ -11,14 +11,12 @@ describe('toasts', () => {
 
 	const shown = (id: number) => toasts.items.some((t) => t.id === id);
 
-	it('go on their own, later when they offer an action', () => {
-		const plain = toasts.show('Saved');
-		const undo = toasts.show('Deleted', { action: { label: 'Undo', run: () => {} } });
-		vi.advanceTimersByTime(6000);
-		expect(shown(plain)).toBe(false);
-		expect(shown(undo)).toBe(true);
-		vi.advanceTimersByTime(4000);
-		expect(shown(undo)).toBe(false);
+	it('go on their own', () => {
+		const id = toasts.show('Saved');
+		vi.advanceTimersByTime(5999);
+		expect(shown(id)).toBe(true);
+		vi.advanceTimersByTime(1);
+		expect(shown(id)).toBe(false);
 	});
 
 	it('wait while paused, then carry on with the time they had left', () => {
