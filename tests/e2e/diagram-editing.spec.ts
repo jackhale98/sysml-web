@@ -72,6 +72,37 @@ test('remove from diagram hides an element and keeps it in the model; undo bring
 	await expect(node(catalogue, 'Motor')).toHaveCount(0);
 });
 
+test('hidden elements are listed on the diagram, to show again one by one or all at once', async ({
+	page
+}) => {
+	await openDemo(page);
+	const catalogue = await openView(page, 'Component catalogue');
+	for (const id of ['Camera', 'TelemetryRadio']) {
+		await node(catalogue, id).focus();
+		await page.keyboard.press('h');
+		await expect(node(catalogue, id)).toHaveCount(0);
+	}
+	const hidden = catalogue.getByRole('group', { name: 'Hidden on this diagram' });
+	await expect(hidden).toContainText('2 hidden');
+	await hidden.getByRole('button', { name: '2 hidden' }).click();
+	await expect(hidden.getByRole('listitem')).toHaveCount(2);
+	await expect(hidden.getByRole('list')).toContainText('TelemetryRadio');
+	await expectAccessible(page);
+	await hidden.getByRole('button', { name: 'Show TelemetryRadio again' }).click();
+	await expect(node(catalogue, 'TelemetryRadio')).toBeVisible();
+	await expect(hidden).toContainText('1 hidden');
+	// Another diagram hides nothing of it.
+	const breakdown = await openView(page, 'Drone breakdown');
+	await expect(breakdown.getByRole('group', { name: 'Hidden on this diagram' })).toHaveCount(0);
+	await openView(page, 'Component catalogue');
+	await hidden.getByRole('button', { name: 'Show all' }).click();
+	await expect(node(catalogue, 'Camera')).toBeVisible();
+	await expect(hidden).toHaveCount(0);
+	// Showing is undone like any change.
+	await toasts(page).getByRole('button', { name: 'Undo' }).last().click();
+	await expect(node(catalogue, 'Camera')).toHaveCount(0);
+});
+
 test('delete from model says what uses the element before it goes', async ({ page }) => {
 	await openDemo(page);
 	const catalogue = await openView(page, 'Component catalogue');
@@ -131,5 +162,11 @@ test.describe('on a phone', () => {
 		await sheet.getByRole('menuitem', { name: /Remove from diagram/ }).click();
 		await expect(sheet).toHaveCount(0);
 		await expect(node(catalogue, 'Camera')).toHaveCount(0);
+		// The hidden list is in thumb reach too.
+		const hidden = catalogue.getByRole('group', { name: 'Hidden on this diagram' });
+		const all = hidden.getByRole('button', { name: 'Show all' });
+		expect((await all.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+		await all.tap();
+		await expect(node(catalogue, 'Camera')).toBeVisible();
 	});
 });

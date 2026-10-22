@@ -51,6 +51,10 @@ describe('layout file', () => {
 		const added = withShown(shown, 'general:', { added: ['P::Q'] });
 		expect(parseShown(serializeLayout({}, added))).toEqual(added);
 		expect(withShown(shown, key, { hidden: [] })).toEqual({});
+		// Tidying the layout up forgets the positions, not what is hidden.
+		const tidied = serializeLayout(withPositions(file, key, null), shown);
+		expect(parseLayout(tidied)).toEqual({});
+		expect(parseShown(tidied)).toEqual(shown);
 		expect(parseShown('{"k": {"#hidden": [1, "a", ""]}}')).toEqual({
 			k: { hidden: ['a'], added: [] }
 		});

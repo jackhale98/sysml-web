@@ -60,6 +60,8 @@ Right-click a box (long-press on a phone) to see its actions. Two of them look a
 
 In a saved view, removing an element its `expose` line names removes that line (the view’s own record of what it shows). Anything else is hidden on that diagram, and the layout remembers it beside the positions.
 
+Hidden elements are listed at the foot of the diagram (“2 hidden · Show all”): open the list to show one again, or show them all. Other diagrams are not affected.
+
 ### The overview and the details panel
 
 The **Overview** shows the project at a glance: what the model has, how many requirements are met and tested, and any problems.

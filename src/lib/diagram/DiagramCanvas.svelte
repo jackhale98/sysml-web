@@ -67,6 +67,7 @@
 	import BehaviorAddForm, { type BehaviorAddChoice } from './BehaviorAddForm.svelte';
 	import BranchForm from './BranchForm.svelte';
 	import FormPanel from './FormPanel.svelte';
+	import HiddenPanel from './HiddenPanel.svelte';
 	import StateActionsForm from './StateActionsForm.svelte';
 	import TransitionForm from './TransitionForm.svelte';
 	import {
@@ -157,6 +158,8 @@
 	let popover = $state<'add' | 'rename' | null>(null);
 	let renameTo = $state('');
 	let actionError = $state<string | null>(null);
+	/** The nodes this diagram hides (that its scope would draw), with their names. */
+	let hiddenHere = $state.raw<{ id: string; label: string }[]>([]);
 	/** The diagram frame's name, as SysML writes it: "gv [Scope]". */
 	let frameTitle = $state('');
 	let timer: ReturnType<typeof setTimeout> | undefined;
@@ -491,8 +494,12 @@
 		try {
 			const files = workspace.sourceFiles();
 			const hidden = untrack(() => shown.hidden);
-			const graph = withoutHidden(await engine.diagram(view, files, scope), hidden);
+			const full = await engine.diagram(view, files, scope);
 			if (current !== generation) return;
+			const graph = withoutHidden(full, hidden);
+			hiddenHere = full.nodes
+				.filter((n) => hidden.includes(n.id))
+				.map((n) => ({ id: n.id, label: n.label || n.id }));
 			// Laying out thousands of boxes takes the page minutes and draws nothing readable.
 			if (graph.nodes.length > MAX_NODES) {
 				nodes = [];
@@ -1487,6 +1494,19 @@
 		else host.focus({ preventScroll: true });
 	}
 
+	/** Put hidden nodes back on this diagram (one undoable step). */
+	async function showAgain(ids: string[] | 'all') {
+		const names = hiddenHere.filter((h) => ids === 'all' || ids.includes(h.id)).map((h) => h.label);
+		const label =
+			names.length === 1
+				? `Showed ${names[0]} again on this diagram`
+				: `Showed ${names.length} hidden elements again on this diagram`;
+		await undoable(workspace, label, async () => {
+			saveShown({ hidden: ids === 'all' ? [] : shown.hidden.filter((h) => !ids.includes(h)) });
+			return null;
+		});
+	}
+
 	function askDeleteEdge(edge: Edge<SysmlEdgeData>) {
 		menu = null;
 		const written = edge.data?.element;
@@ -1709,6 +1729,15 @@
 		<p class="state" role="alert">This view could not be drawn: {message}</p>
 	{:else if status === 'too-large'}
 		<p class="state" role="status">{message}</p>
+	{:else if status === 'ready' && nodes.length === 0 && hiddenHere.length}
+		<div class="empty-diagram">
+			<EmptyState
+				title="Everything on this diagram is hidden."
+				actions={[{ label: 'Show all', primary: true, run: () => void showAgain('all') }]}
+			>
+				The elements are still in the model; this diagram only leaves them out.
+			</EmptyState>
+		</div>
 	{:else if status === 'ready' && nodes.length === 0}
 		<div class="empty-diagram">
 			<EmptyState
@@ -1844,6 +1873,11 @@
 					{/if}
 					<button type="button" onclick={() => (reviewMarks.visible = false)}>Hide marks</button>
 				</div>
+			</Panel>
+		{/if}
+		{#if hiddenHere.length}
+			<Panel position="bottom-center">
+				<HiddenPanel hidden={hiddenHere} onshow={(ids) => void showAgain(ids)} />
 			</Panel>
 		{/if}
 		{#if lastClick && popover === 'add'}
