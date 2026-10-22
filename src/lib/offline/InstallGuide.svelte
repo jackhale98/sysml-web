@@ -283,11 +283,12 @@
 		font-size: var(--text-md);
 	}
 	.steps li > span:last-child {
-		display: grid;
-		gap: 2px;
-		padding-top: 0.55rem;
+		display: block;
+		padding-top: 0.6rem;
 	}
 	.steps small {
+		display: block;
+		margin-top: 2px;
 		color: var(--text-2);
 		font-size: var(--text-sm);
 	}
@@ -314,10 +315,11 @@
 	.key {
 		font-weight: 650;
 	}
-	.copy {
-		justify-items: start;
+	.copy .button {
+		margin: var(--space-1) 0;
 	}
 	.copy code {
+		display: block;
 		max-width: 100%;
 		overflow-wrap: anywhere;
 		color: var(--text-2);

@@ -619,19 +619,17 @@
 													type="button"
 													class="button"
 													onclick={() => void askSignOut(user.login)}
-													aria-label="Sign out @{user.login}"
 												>
 													<LogOut size={15} aria-hidden="true" />
-													{signedIn ? 'Sign out' : 'Sign out and forget token'}
+													Sign out<span class="visually-hidden"> @{user.login}</span>
 												</button>
 												{#if accounts.list.length > 1 && !isDefault}
 													<button
 														type="button"
 														class="button"
 														onclick={() => accounts.use(user.login)}
-														aria-label="Make @{user.login} the default"
 													>
-														Make default
+														Make default<span class="visually-hidden">: @{user.login}</span>
 													</button>
 												{/if}
 												{#if signedIn && chooseRepositoriesUrl()}

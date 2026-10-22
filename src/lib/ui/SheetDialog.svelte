@@ -72,7 +72,7 @@
 >
 	{#if open}
 		<div class="panel">
-			<header>
+			<div class="head">
 				{#if icon}<span class="icon">{@render icon()}</span>{/if}
 				<div class="titles">
 					<h2 id="{uid}-title">{title}</h2>
@@ -83,12 +83,12 @@
 						<X size={18} />
 					</button>
 				{/if}
-			</header>
+			</div>
 			<div class="body">
 				{@render children()}
 			</div>
 			{#if footer}
-				<footer>{@render footer()}</footer>
+				<div class="foot">{@render footer()}</div>
 			{/if}
 		</div>
 	{/if}
@@ -130,7 +130,7 @@
 		flex-direction: column;
 		min-height: 0;
 	}
-	header {
+	.head {
 		display: flex;
 		align-items: flex-start;
 		gap: var(--space-3);
@@ -184,7 +184,7 @@
 		overflow: auto;
 		overscroll-behavior: contain;
 	}
-	footer {
+	.foot {
 		display: flex;
 		flex-wrap: wrap;
 		justify-content: flex-end;
@@ -212,13 +212,13 @@
 				transform: translateY(100%);
 			}
 		}
-		header {
+		.head {
 			padding: var(--space-4) var(--space-2) var(--space-3) var(--space-4);
 		}
 		.body {
 			padding: 0 var(--space-4) var(--space-4);
 		}
-		footer {
+		.foot {
 			flex-direction: column-reverse;
 			align-items: stretch;
 			padding: var(--space-3) var(--space-4) max(var(--space-4), env(safe-area-inset-bottom));
