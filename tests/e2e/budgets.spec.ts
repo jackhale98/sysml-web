@@ -150,9 +150,12 @@ test('a value that breaks a requirement is a violation and a problem, until undo
 	await expect(page.locator('section.problems-pane')).toContainText(
 		'SYS-001 Flight endurance is not met by drone: drone.endurance = 24.48 min (needs ≥ 25 min)'
 	);
+	// Reached by keyboard, the toast waits while the page is checked.
+	const undo = toasts(page).getByRole('button', { name: 'Undo' }).last();
+	await undo.focus();
 	await expectAccessible(page);
 
-	await toasts(page).getByRole('button', { name: 'Undo' }).last().click();
+	await undo.click();
 	await expect(endurance).toContainText('Satisfied', { timeout: 15_000 });
 	await expect(problems(page)).toHaveAccessibleName('Problems: 0 errors, 0 warnings');
 });

@@ -10,10 +10,21 @@ export interface Toast {
 }
 
 const DURATION_MS = 6000;
+/** A toast that offers an action (such as Undo) stays longer, to give time to use it. */
+const ACTION_DURATION_MS = 10_000;
+
+interface Timer {
+	handle?: ReturnType<typeof setTimeout>;
+	/** When it was last started, and what was left of its time then. */
+	started: number;
+	left: number;
+}
 
 class Toasts {
 	items = $state<Toast[]>([]);
 	private next = 1;
+	private timers = new Map<number, Timer>();
+	private paused = false;
 
 	show(message: string, options: Omit<Partial<Toast>, 'id' | 'message'> = {}) {
 		const toast: Toast = { id: this.next++, message, tone: options.tone ?? 'info', ...options };
@@ -22,13 +33,48 @@ class Toasts {
 		const others = this.items.filter((t) => t.duration !== 0);
 		const room = Math.max(0, 2 - stays.length);
 		this.items = [...stays, ...others.slice(others.length - room), toast];
-		const duration = options.duration ?? DURATION_MS;
-		if (duration > 0) setTimeout(() => this.dismiss(toast.id), duration);
+		const duration = options.duration ?? (options.action ? ACTION_DURATION_MS : DURATION_MS);
+		if (duration > 0) {
+			const timer: Timer = { started: Date.now(), left: duration };
+			this.timers.set(toast.id, timer);
+			if (!this.paused) this.run(toast.id, timer);
+		}
 		return toast.id;
 	}
 
 	dismiss(id: number) {
+		clearTimeout(this.timers.get(id)?.handle);
+		this.timers.delete(id);
 		this.items = this.items.filter((t) => t.id !== id);
+	}
+
+	/**
+	 * Hold every toast while the pointer is on them or focus is in them, so one
+	 * being read or reached by keyboard doesn't go (WCAG 2.2.1, timing adjustable).
+	 */
+	pause() {
+		if (this.paused) return;
+		this.paused = true;
+		const now = Date.now();
+		for (const timer of this.timers.values()) {
+			clearTimeout(timer.handle);
+			timer.left = Math.max(0, timer.left - (now - timer.started));
+		}
+	}
+
+	/** Carry on, each with the time it had left (and at least a moment to move away). */
+	resume() {
+		if (!this.paused) return;
+		this.paused = false;
+		for (const [id, timer] of this.timers) {
+			timer.left = Math.max(timer.left, 1500);
+			this.run(id, timer);
+		}
+	}
+
+	private run(id: number, timer: Timer) {
+		timer.started = Date.now();
+		timer.handle = setTimeout(() => this.dismiss(id), timer.left);
 	}
 }
 

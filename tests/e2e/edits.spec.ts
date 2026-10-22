@@ -255,9 +255,12 @@ test('a requirement gets what satisfies it and a new test from the inspector', a
 		timeout: 15_000
 	});
 	await expect(page.getByRole('button', { name: /^Problems/ })).not.toContainText(/[1-9] error/);
+	// Reached by keyboard, the toast waits while the page is checked.
+	const undo = toasts(page).getByRole('button', { name: 'Undo' }).last();
+	await undo.focus();
 	await expectAccessible(page);
 
-	await toasts(page).getByRole('button', { name: 'Undo' }).last().click();
+	await undo.click();
 	await expect(requirement.getByRole('button', { name: 'deliveryDemo', exact: true })).toBeHidden({
 		timeout: 15_000
 	});
