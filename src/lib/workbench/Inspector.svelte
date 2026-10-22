@@ -172,7 +172,7 @@
 			</form>
 			{#if engine}
 				{#key element.key}
-					<PropertyForm {element} {workspace} {engine} computed={valueOf(element)} />
+					<PropertyForm {element} {workspace} {engine} {ui} computed={valueOf(element)} />
 				{/key}
 			{/if}
 			<dl>
@@ -501,8 +501,6 @@
 	}
 	.issue,
 	.gap {
-		display: flex;
-		gap: var(--space-1);
 		color: var(--warn);
 	}
 	ul {

@@ -192,6 +192,8 @@ test('the inspector shows and edits the values a usage sets, its doc apart', asy
 	await field.fill('Battery fire.');
 	await field.press('Enter');
 	await expect(text).toContainText(':>> description = "Battery fire.";');
+	// Once the model has caught up with the edit (positions after it moved).
+	await expect(values).toContainText('Battery fire.', { timeout: 15_000 });
 
 	// An enum value offers its literals.
 	const harm = await select(page, 'burnInjury');
@@ -201,4 +203,15 @@ test('the inspector shows and edits the values a usage sets, its doc apart', asy
 		.getByRole('combobox', { name: 'severity of burnInjury' })
 		.selectOption('serious');
 	await expect(text).toContainText(':>> severity = SeverityScale::serious;');
+});
+
+test('the inspector goes to the definition of a type', async ({ page }) => {
+	await openDemo(page);
+	const operator = await select(page, 'operator');
+	await operator.getByRole('button', { name: 'Go to Operator' }).click();
+	await expect(operator.getByRole('heading', { level: 2 })).toHaveText(/\bOperator$/);
+	// A supertype, from a definition's chips.
+	const camera = await select(page, 'Camera');
+	await camera.getByRole('button', { name: 'Component', exact: true }).click();
+	await expect(camera.getByRole('heading', { level: 2 })).toHaveText(/\bComponent$/);
 });
