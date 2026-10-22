@@ -212,7 +212,8 @@ test('the inspector goes to the definition of a type', async ({ page }) => {
 	await expect(operator.getByRole('heading', { level: 2 })).toHaveText(/\bOperator$/);
 	// A supertype, from a definition's chips.
 	const camera = await select(page, 'Camera');
-	await camera.getByRole('button', { name: 'Component', exact: true }).click();
+	// The chip comes first; the related elements below list Component too.
+	await camera.getByRole('button', { name: 'Component', exact: true }).first().click();
 	await expect(camera.getByRole('heading', { level: 2 })).toHaveText(/\bComponent$/);
 });
 
