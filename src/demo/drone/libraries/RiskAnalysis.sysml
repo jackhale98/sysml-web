@@ -210,12 +210,14 @@ package RiskAnalysis {
     }
 
     // --- Worksheets: views of the @Fmea lines -------------------------------
+    // The figures come right after the failure, so they stay in view on a
+    // narrow screen; the effect and the cause follow.
 
     view def FmeaWorksheet {
         doc /* Every FMEA line, of every kind, highest risk priority number first. */
         @TableRendering {
             rows = "@Fmea";
-            columns = "element; failureMode; effect; severity; cause; likelihood; detection; rpn = Rpn(severity, likelihood, detection); actionPriority = ActionPriority(severity, likelihood, detection); category";
+            columns = "element; failureMode; severity; likelihood; detection; rpn = Rpn(severity, likelihood, detection); actionPriority = ActionPriority(severity, likelihood, detection); effect; cause; category";
             sortBy = "-rpn";
         }
     }
@@ -224,7 +226,7 @@ package RiskAnalysis {
         doc /* A design FMEA: how the parts can fail. */
         @TableRendering {
             rows = "@Fmea";
-            columns = "part = element; failureMode; effect; severity; cause; likelihood; detection; rpn = Rpn(severity, likelihood, detection); actionPriority = ActionPriority(severity, likelihood, detection)";
+            columns = "part = element; failureMode; severity; likelihood; detection; rpn = Rpn(severity, likelihood, detection); actionPriority = ActionPriority(severity, likelihood, detection); effect; cause";
             where = "category == RiskCategory::design or category == RiskCategory::software";
             sortBy = "-rpn";
         }
@@ -234,7 +236,7 @@ package RiskAnalysis {
         doc /* A process FMEA: how the steps of a process can go wrong. */
         @TableRendering {
             rows = "@Fmea";
-            columns = "processStep = element; failureMode; effect; severity; cause; likelihood; detection; rpn = Rpn(severity, likelihood, detection); actionPriority = ActionPriority(severity, likelihood, detection)";
+            columns = "processStep = element; failureMode; severity; likelihood; detection; rpn = Rpn(severity, likelihood, detection); actionPriority = ActionPriority(severity, likelihood, detection); effect; cause";
             where = "category == RiskCategory::process";
             sortBy = "-rpn";
         }
@@ -244,7 +246,7 @@ package RiskAnalysis {
         doc /* A use FMEA: the use errors a user can make in each task, and what follows. */
         @TableRendering {
             rows = "@Fmea";
-            columns = "task = element; useError = failureMode; effect; severity; cause; likelihood; detection; rpn = Rpn(severity, likelihood, detection); actionPriority = ActionPriority(severity, likelihood, detection)";
+            columns = "task = element; useError = failureMode; severity; likelihood; detection; rpn = Rpn(severity, likelihood, detection); actionPriority = ActionPriority(severity, likelihood, detection); effect; cause";
             where = "category == RiskCategory::'use'";
             sortBy = "-rpn";
         }

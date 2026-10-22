@@ -361,6 +361,45 @@ export const HELP: HelpSection[] = [
 				action: { action: 'trade', label: 'New trade study' }
 			},
 			{
+				id: 'fmea',
+				title: 'Analyse what can fail (FMEA)',
+				keywords:
+					'fmea dfmea pfmea ufmea failure mode effects analysis risk rpn action priority severity likelihood occurrence detection worksheet use error',
+				blocks: [
+					'An FMEA lists what can go wrong, what follows and why, and rates each line from 1 to 10 for **severity** (how bad the effect is), **likelihood** (how likely the cause is) and **detection** (how likely it is to go unnoticed). **New FMEA** asks which kind you want:',
+					{
+						list: [
+							'**Design FMEA**: how the parts of a design can fail.',
+							'**Process FMEA**: how the steps of a process (making, assembling, servicing) can go wrong.',
+							'**Use FMEA**: the mistakes a user can make in each task, or foreseeable misuse.'
+						]
+					},
+					'It opens as a worksheet. **Add a line** to choose the part, step or task, say how it fails, what follows and why, and choose the three ratings, each with what it means. Lines can link to the hazard they can lead to. Edit any cell in place; the bin at the end of a row removes the line.',
+					'The **risk priority number** (severity × likelihood × detection) and the **action priority** (high, medium or low, from the AIAG-VDA table) are calculated, never typed in. **Risk matrix** counts the lines by severity and likelihood.',
+					'A rating outside 1 to 10, or a severity that is not the worst harm of the line’s hazard, is flagged in its cell and under **Problems**. The rules come from the risk library in `libraries/RiskAnalysis.sysml`, which the first FMEA adds to the project.'
+				],
+				action: { action: 'fmea', label: 'New FMEA' }
+			},
+			{
+				id: 'hazards',
+				title: 'Log hazards and their controls',
+				keywords:
+					'hazard harm severity hazardous situation risk control mitigation hazard log iso 14971 safety',
+				blocks: [
+					'**New hazard** records a source of harm, when people are exposed to it (optional), the harms it can cause with how severe each is, and the **risk controls** that lower the risk. Each control is a requirement, so what implements it and the test that proves it are linked as for any requirement.',
+					{
+						steps: [
+							'Name the hazard and describe it.',
+							'Add the harms it can cause, and choose how severe each is.',
+							'Add the risk controls, each a “shall” statement.',
+							'In the **hazard log** that opens, choose a control, then **Add what satisfies it** and **Add a test that verifies it** in its details.'
+						]
+					},
+					'The hazard log lists each hazard with its harms, the worst severity and its controls, with gaps left empty. The words come from `libraries/HazardAnalysis.sysml`.'
+				],
+				action: { action: 'hazard', label: 'New hazard' }
+			},
+			{
 				id: 'draw-state-machine',
 				title: 'Draw a state machine',
 				keywords: 'state diagram modes transitions',

@@ -490,6 +490,21 @@ export function commandItems(themeChoice: string): PaletteItem[] {
 			{ aliases: 'create compare alternatives options choose decision matrix weighted score' }
 		),
 		command(
+			'new-fmea',
+			'New FMEA…',
+			{ type: 'create', request: { kind: 'fmea' } },
+			{
+				aliases:
+					'create risk failure mode effects analysis dfmea pfmea ufmea design process use error worksheet rpn'
+			}
+		),
+		command(
+			'new-hazard',
+			'New hazard…',
+			{ type: 'create', request: { kind: 'hazard' } },
+			{ aliases: 'create risk harm severity hazard log risk control iso 14971 safety' }
+		),
+		command(
 			'new-file',
 			'New file…',
 			{ type: 'file', request: { kind: 'new' } },

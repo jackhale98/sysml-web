@@ -302,6 +302,14 @@ function probeOf(ctx: ViewContext, spec: string, rows: Row[]): Probe {
 		const id = ctx.definitionNamed(spec.slice(5).trim());
 		if (id) typeIds.push(id);
 	}
+	// A metadata def's fields, even before an annotation gives them (a new FMEA's columns).
+	const meta = spec.startsWith('@') ? metadataDefinition(ctx, spec.slice(1).trim()) : null;
+	if (meta) {
+		fields.push('element');
+		for (const t of [meta, ...ctx.supers(meta)])
+			for (const f of ctx.ownedBy(t))
+				if (f.name && f.kind === 'attribute' && !fields.includes(f.name)) fields.push(f.name);
+	}
 	for (const r of rows) {
 		for (const k of r.fields.keys()) if (!fields.includes(k)) fields.push(k);
 		if (r.typeId && !typeIds.includes(r.typeId)) typeIds.push(r.typeId);

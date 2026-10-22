@@ -895,28 +895,29 @@ describe('the demo’s tables', () => {
 		expect(shape(allocations)).toEqual([8, 2]);
 		expect(allocations.rows[0]).toEqual(['drone.deliveryFlight.checkDropZone', 'drone.camera']);
 		const fmea = table('fmeaWorksheet');
+		// The figures come right after the failure, so they stay in view in a narrow pane.
 		expect(fmea.columns).toEqual([
 			'part',
 			'failureMode',
-			'effect',
 			'severity',
-			'cause',
 			'likelihood',
 			'detection',
 			'rpn',
-			'actionPriority'
+			'actionPriority',
+			'effect',
+			'cause'
 		]);
 		expect(shape(fmea)).toEqual([6, 9]);
 		expect(fmea.rows[0]).toEqual([
 			'drone::battery',
 			'Thermal runaway',
-			'Fire in the airframe; loss of the drone; burns to bystanders',
 			'8',
-			'Internal cell short, overcharge or crash damage',
 			'3',
 			'6',
 			'144',
-			'medium'
+			'medium',
+			'Fire in the airframe; loss of the drone; burns to bystanders',
+			'Internal cell short, overcharge or crash damage'
 		]);
 		// RPN and action priority are the library's calcs, `Rpn(…)` and `ActionPriority(…)`.
 		expect(col(fmea, 'rpn')).toEqual(['144', '96', '96', '80', '72', '60']);
@@ -937,7 +938,7 @@ describe('the demo’s tables', () => {
 		// New lines go in the package the worksheet exposes.
 		expect(fmea.annotations).toEqual({ metadata: 'RiskAnalysis::Fmea', package: 'DroneFmea' });
 		expect(fmea.columnSpecs?.[0]).toBe('part = element');
-		expect(fmea.editable?.[3]).toEqual({ field: 'metadata:Fmea.severity', kind: 'number' });
+		expect(fmea.editable?.[2]).toEqual({ field: 'metadata:Fmea.severity', kind: 'number' });
 		const all = table('FmeaWorksheet');
 		// The category reads as its literal and is edited with the enum's literals.
 		expect(col(all, 'category')).toEqual([

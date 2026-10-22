@@ -20,13 +20,17 @@ export type Tab =
 /**
  * A guided form to open (`#lib/create`): a new view (optionally of a kind,
  * over an element), "add up this value" and "set a limit" on an element's
- * attribute (or a requirement), or a new trade study.
+ * attribute (or a requirement), a new trade study, a new FMEA (of a kind),
+ * a line of an FMEA worksheet (the view's name), or a new hazard.
  */
 export type CreateRequest =
 	| { kind: 'view'; viewKind?: string; target?: string }
 	| { kind: 'rollup'; element: string; attribute: string }
 	| { kind: 'limit'; element: string; attribute?: string }
-	| { kind: 'trade'; alternatives?: string[] };
+	| { kind: 'trade'; alternatives?: string[] }
+	| { kind: 'fmea'; fmeaKind?: string }
+	| { kind: 'fmeaLine'; view: string }
+	| { kind: 'hazard' };
 
 /**
  * A file form to open (`files/FileHost.svelte`): a new file (optionally in a

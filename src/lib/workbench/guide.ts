@@ -25,6 +25,8 @@ export const GUIDE_ACTIONS = [
 	'rollup',
 	'limit',
 	'trade',
+	'fmea',
+	'hazard',
 	'state-machine',
 	'action-flow',
 	'report',
@@ -209,6 +211,12 @@ export async function runGuideAction(action: GuideAction, context: GuideContext)
 		}
 		case 'trade':
 			ui.create = { kind: 'trade' };
+			return;
+		case 'fmea':
+			ui.create = { kind: 'fmea' };
+			return;
+		case 'hazard':
+			ui.create = { kind: 'hazard' };
 			return;
 		case 'import-requirements':
 			ui.importOpen = true;

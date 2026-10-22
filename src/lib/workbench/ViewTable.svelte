@@ -10,11 +10,15 @@
 		FileCode,
 		FilePlus,
 		Gauge,
+		Grid3x3,
 		Info,
 		ListChecks,
 		Minus,
+		Plus,
 		Search,
+		ShieldAlert,
 		Table2,
+		Trash2,
 		TriangleAlert,
 		Upload
 	} from '@lucide/svelte';
@@ -30,7 +34,7 @@
 	import KindGlyph from '#lib/ui/KindGlyph.svelte';
 	import { toasts } from '#lib/ui/toasts.svelte.ts';
 	import type { WorkbenchUi } from './ui.svelte.ts';
-	import { renameElement, setField, setTableColumns } from './actions.ts';
+	import { removeAnnotation, renameElement, setField, setTableColumns } from './actions.ts';
 	import ColumnChooser from './ColumnChooser.svelte';
 	import SheetDialog from '#lib/ui/SheetDialog.svelte';
 	import CellEditor from './CellEditor.svelte';
@@ -38,6 +42,15 @@
 	import TraceGrid from './TraceGrid.svelte';
 	import TraceRefs from './TraceRefs.svelte';
 	import { matrixExport } from './traceGrid.ts';
+	import RiskGrid from './RiskGrid.svelte';
+	import {
+		ELEMENT_LIST_COLUMNS,
+		elementNamed,
+		isFmeaTable,
+		isHazardLog,
+		levelTone,
+		matrixOf
+	} from './risk.ts';
 	import { viewTitle } from './views.ts';
 
 	/** Do what an empty table suggests (add a requirement, set a limit). */
@@ -81,6 +94,14 @@
 			!isPivot &&
 			['text', 'satisfiedBy', 'verifiedBy'].every((f) => table?.availableFields?.includes(f))
 	);
+
+	/** An FMEA worksheet of the project: lines can be added, removed and shown as a risk matrix. */
+	const fmea = $derived(
+		table && info && !info.builtin && !isPivot && isFmeaTable(table)
+			? (table.annotations ?? null)
+			: null
+	);
+	const hazardLog = $derived(isHazardLog(info));
 
 	/** The table as shown (searched and sorted), for exporting. */
 	function exportData(): ExportTable {
@@ -349,7 +370,12 @@
 
 	async function applyColumns() {
 		if (!info) return;
-		const columns = columnChoice.filter((c) => c.shown).map((c) => c.field);
+		// A column written `rpn = Rpn(…)` keeps its expression.
+		const specOf = (field: string) => {
+			const at = table?.columns.indexOf(field) ?? -1;
+			return (at >= 0 ? table?.columnSpecs?.[at] : undefined) ?? field;
+		};
+		const columns = columnChoice.filter((c) => c.shown).map((c) => specOf(c.field));
 		columnsOpen = false;
 		const error = await setTableColumns(workspace, info.file, info.name, columns);
 		if (error) toasts.show(error, { tone: 'error' });
@@ -384,6 +410,64 @@
 		if (error) toasts.show(error, { tone: 'error' });
 	}
 
+	function addLine() {
+		ui.create = { kind: 'fmeaLine', view: info?.name ?? name };
+	}
+
+	/** Open the worksheet's risk matrix, making it first when the project has none. */
+	async function openMatrix() {
+		const pkg = fmea?.package;
+		if (!pkg) return;
+		const saved = matrixOf(workspace, pkg);
+		if (saved) {
+			ui.open({ kind: 'view', name: saved.name, title: viewTitle(saved.name) });
+			return;
+		}
+		const [{ planRiskMatrix }, { openView, write }] = await Promise.all([
+			import('#lib/create/plans.ts'),
+			import('#lib/create/apply.ts')
+		]);
+		const plan = planRiskMatrix(workspace, { packageName: pkg, title });
+		const error = await write(workspace, plan.label, plan.write);
+		if (error) toasts.show(error, { tone: 'error' });
+		else void openView(workspace, ui, plan.open!);
+	}
+
+	/** Remove an FMEA line: its `@Fmea` annotation, as one undoable step. */
+	async function removeLine(index: number, cells: string[]) {
+		const source = table?.sources[index];
+		if (!source?.annotation) return;
+		const error = await removeAnnotation(
+			workspace,
+			{ file: source.file, line: source.line, annotation: source.annotation },
+			`Removed the line ${lineLabel(cells)}`
+		);
+		if (error) toasts.show(error, { tone: 'error' });
+	}
+
+	/**
+	 * A hazard's control that nothing satisfies or verifies yet: its details,
+	 * with "Add what satisfies it" open (verifying is under it).
+	 */
+	function linkControl(cells: string[], column: string) {
+		const controls = cells[table?.columns.indexOf('controls') ?? -1] ?? '';
+		const first = controls.split(/,\s*/)[0];
+		const control = first ? elementNamed(workspace, first) : undefined;
+		if (!control) {
+			toasts.show('Add a risk control to the hazard first, then say what implements it.');
+			return;
+		}
+		ui.select(control.key, 'table');
+		if (column === 'satisfiedBy') ui.satisfyRequest = control.key;
+		if (ui.phone) ui.showDetails('full');
+		else ui.inspectorOpen = true;
+	}
+
+	/** “Thermal runaway” of drone::battery. */
+	function lineLabel(cells: string[]): string {
+		return cells[1] ? `“${cells[1]}” of ${cells[0]}` : (cells[0] ?? '');
+	}
+
 	type CellKind =
 		| 'id'
 		| 'flag'
@@ -398,10 +482,14 @@
 		| 'verdict'
 		| 'verdictIcon'
 		| 'tree'
-		| 'trace';
+		| 'trace'
+		| 'level'
+		| 'elements';
 	function cellKind(column: string, value: string, index?: number): CellKind {
 		const c = column.toLowerCase();
 		if (isPivot) return 'mark';
+		if (levelTone(column, value)) return 'level';
+		if (hazardLog && ELEMENT_LIST_COLUMNS.has(column)) return 'elements';
 		// What the row provider says the column holds.
 		switch (index === undefined ? null : table?.columnKinds?.[index]) {
 			case 'quantity':
@@ -454,6 +542,10 @@
 			></span>{:else}{value}{/if}
 	{:else if kind === 'status' && value}
 		<span class="chip {STATUS_TONE[value.toLowerCase()] ?? 'plain'}">{value}</span>
+	{:else if kind === 'level'}
+		<span class="chip {levelTone('priority', value)}">{value}</span>
+	{:else if kind === 'elements'}
+		<TraceRefs {value} {workspace} {ui} gap="None yet" find={(n) => elementNamed(workspace, n)} />
 	{:else if (kind === 'verdict' || kind === 'verdictIcon') && isVerdict(value)}
 		<CheckChip status={value} compact={kind === 'verdictIcon'} />
 	{:else if kind === 'percent' && value}
@@ -502,8 +594,36 @@
 		{splitTreePath(value)[1] || '—'}
 	{:else if kind === 'verdict'}
 		{@render display(kind, value)}
+	{:else if value.includes('::')}
+		<!-- A path (`drone::rotors::motor`) may break after each `::` in a narrow column. -->
+		{#each value.split('::') as part, i (i)}{#if i}::<wbr />{/if}{part}{/each}
 	{:else}
 		{value || '—'}
+	{/if}
+{/snippet}
+
+<!-- In the hazard log, an empty "satisfied by" or "verified by" links its control from here. -->
+{#snippet controlGap(cells: string[], column: string)}
+	<button
+		type="button"
+		class="gap-link"
+		onclick={(e) => {
+			e.stopPropagation();
+			linkControl(cells, column);
+		}}
+		>Not yet<span class="visually-hidden"
+			>: say what {column === 'satisfiedBy' ? 'implements' : 'tests'} {cells[0]}’s control</span
+		></button
+	>
+{/snippet}
+
+<!-- What is wrong with a cell's value (a rating outside its scale), after the value. -->
+{#snippet flag(problem: string | undefined)}
+	{#if problem}
+		<span class="flag" title={problem}
+			><TriangleAlert size={13} aria-hidden="true" /><span class="visually-hidden">{problem}</span
+			></span
+		>
 	{/if}
 {/snippet}
 
@@ -539,19 +659,35 @@
 		</div>
 		{#if info?.doc}<p class="doc">{info.doc}</p>{/if}
 		<div class="tools">
-			{#if !table?.trade}
+			{#if !table?.trade && !table?.counts}
 				<label class="search">
 					<Search size={14} />
 					<span class="visually-hidden">Search {title}</span>
 					<input type="search" placeholder="Search" bind:value={query} />
 				</label>
 			{/if}
-			{#if table && !table.trade}
+			{#if table && !table.trade && !table.counts}
 				<span class="count" aria-live="polite">
 					{rows.length === table.rows.length
-						? `${table.rows.length} rows`
+						? `${table.rows.length} row${table.rows.length === 1 ? '' : 's'}`
 						: `${rows.length} of ${table.rows.length} rows`}
 				</span>
+			{/if}
+			{#if fmea && !ui.phone}
+				<button type="button" class="apply add-line" onclick={addLine}>
+					<Plus size={14} aria-hidden="true" /> Add a line
+				</button>
+				<button type="button" class="source" onclick={openMatrix}>
+					<Grid3x3 size={14} aria-hidden="true" /> <span class="button-label">Risk matrix</span>
+				</button>
+			{:else if hazardLog && table && !ui.phone}
+				<button
+					type="button"
+					class="apply add-line"
+					onclick={() => (ui.create = { kind: 'hazard' })}
+				>
+					<Plus size={14} aria-hidden="true" /> New hazard
+				</button>
 			{/if}
 			{#if table?.availableFields?.length && info && !info.builtin && !isPivot && !table.trade}
 				<div class="columns-menu">
@@ -619,6 +755,8 @@
 		</div>
 	{:else if table.trade}
 		<TradeMatrix trade={table.trade} {workspace} {ui} {name} />
+	{:else if table.counts}
+		<RiskGrid {table} {title} />
 	{:else if table.matrix}
 		<TraceGrid
 			matrix={table.matrix}
@@ -630,7 +768,27 @@
 		/>
 	{:else if table.rows.length === 0}
 		{@const definition = (info?.definition ?? name).split('::').pop()}
-		{#if listsRequirements}
+		{#if fmea}
+			<EmptyState
+				icon={ShieldAlert}
+				title="No lines yet"
+				actions={[{ label: 'Add a line', primary: true, run: addLine }]}
+			>
+				Each line is one way something can fail: what fails, how, what follows and why, rated for
+				severity, likelihood and detection.
+			</EmptyState>
+		{:else if hazardLog}
+			<EmptyState
+				icon={ShieldAlert}
+				title="No hazards yet"
+				actions={[
+					{ label: 'New hazard', primary: true, run: () => (ui.create = { kind: 'hazard' }) }
+				]}
+			>
+				A hazard is a source of harm. Add one with the harms it can cause and the risk controls on
+				it.
+			</EmptyState>
+		{:else if listsRequirements}
 			<EmptyState
 				icon={ListChecks}
 				title="No requirements yet"
@@ -675,6 +833,22 @@
 		<!-- Phones: one card per row, full width, scrolling down rather than sideways. -->
 		{@const subtitled = !isPivot && table.columns.length > 2 && !table.editable?.[1]}
 		<div class="scroll cards-scroll" data-table={name}>
+			{#if fmea}
+				<div class="card-actions">
+					<button type="button" class="apply" onclick={addLine}>
+						<Plus size={16} aria-hidden="true" /> Add a line
+					</button>
+					<button type="button" class="source" onclick={openMatrix}>
+						<Grid3x3 size={16} aria-hidden="true" /> Risk matrix
+					</button>
+				</div>
+			{:else if hazardLog}
+				<div class="card-actions">
+					<button type="button" class="apply" onclick={() => (ui.create = { kind: 'hazard' })}>
+						<Plus size={16} aria-hidden="true" /> New hazard
+					</button>
+				</div>
+			{/if}
 			<ul class="cards" aria-label="{title} rows">
 				{#each shown as row (row.index)}
 					{@const selectable = !isPivot && !!table.sources[row.index]}
@@ -758,21 +932,35 @@
 												<button
 													type="button"
 													class="cell"
+													class:problem={!!infoOf(row.index).problems?.[c]}
 													onclick={() => (editing = { row: row.index, column: c })}
 													><span class="visually-hidden">Edit {heading(column)}:</span
 													>{@render display(kind, value)}{#if !value}<span class="empty">Add</span
-														>{/if}</button
+														>{/if}{@render flag(infoOf(row.index).problems?.[c])}</button
 												>
 											{:else if note && (value === '' || infoOf(row.index).role === 'rollup')}
 												{value || '—'}<span class="card-note">{note}</span>
+											{:else if hazardLog && kind === 'trace' && !value}
+												{@render controlGap(row.cells, column)}
 											{:else}
-												{@render display(kind, value)}
+												{@render display(kind, value)}{@render flag(
+													infoOf(row.index).problems?.[c]
+												)}
 											{/if}
 										</dd>
 									</div>
 								{/if}
 							{/each}
 						</dl>
+						{#if fmea && table.sources[row.index]?.annotation}
+							<button
+								type="button"
+								class="source remove-line"
+								onclick={() => removeLine(row.index, row.cells)}
+							>
+								<Trash2 size={15} aria-hidden="true" /> Remove line
+							</button>
+						{/if}
 					</li>
 				{/each}
 			</ul>
@@ -806,6 +994,9 @@
 								{/if}
 							</th>
 						{/each}
+						{#if fmea}<th scope="col" class="row-actions"
+								><span class="visually-hidden">Remove</span></th
+							>{/if}
 					</tr>
 				</thead>
 				<tbody>
@@ -833,7 +1024,12 @@
 								{@const kind = cellKind(table.columns[c] ?? '', value, c)}
 								{@const edit = table.editable?.[c] ?? null}
 								{@const canEdit = selectable && !!edit}
-								<td class={kind} style:--depth={kind === 'tree' ? (info.depth ?? 0) : undefined}>
+								{@const problem = info.problems?.[c]}
+								<td
+									class={kind}
+									class:problem={!!problem}
+									style:--depth={kind === 'tree' ? (info.depth ?? 0) : undefined}
+								>
 									{#if c === 0 && selectable}
 										<button
 											type="button"
@@ -871,13 +1067,36 @@
 											}}
 											><span class="visually-hidden">Edit {heading(table.columns[c] ?? '')}:</span
 											>{@render display(kind, value)}{#if !value}<span class="empty">Add</span
-												>{/if}</button
+												>{/if}{@render flag(problem)}</button
 										>
+									{:else if hazardLog && kind === 'trace' && !value}
+										{@render controlGap(row.cells, table.columns[c] ?? '')}
 									{:else}
-										{@render cell(kind, value, info.notes?.[c], info.role === 'rollup')}
+										{@render cell(
+											kind,
+											value,
+											info.notes?.[c],
+											info.role === 'rollup'
+										)}{@render flag(problem)}
 									{/if}
 								</td>
 							{/each}
+							{#if fmea}
+								<td class="row-actions">
+									{#if table.sources[row.index]?.annotation}
+										<button
+											type="button"
+											class="icon-button"
+											aria-label="Remove the line {lineLabel(row.cells)}"
+											title="Remove this line"
+											onclick={(e) => {
+												e.stopPropagation();
+												void removeLine(row.index, row.cells);
+											}}><Trash2 size={14} aria-hidden="true" /></button
+										>
+									{/if}
+								</td>
+							{/if}
 						</tr>
 					{/each}
 				</tbody>
@@ -997,14 +1216,19 @@
 	}
 	.tools {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
-		gap: var(--space-3);
+		gap: var(--space-2) var(--space-3);
+	}
+	.tools button {
+		white-space: nowrap;
 	}
 	.search {
 		display: flex;
+		flex: 0 1 20rem;
 		align-items: center;
 		gap: var(--space-2);
-		width: min(20rem, 100%);
+		min-width: 9rem;
 		height: 2.125rem;
 		padding: 0 var(--space-3);
 		border: 1px solid var(--border);
@@ -1258,6 +1482,10 @@
 	td.list {
 		min-width: 6rem;
 	}
+	td.trace,
+	td.elements {
+		min-width: 8rem;
+	}
 	td.number {
 		font-variant-numeric: tabular-nums;
 		text-align: right;
@@ -1356,12 +1584,31 @@
 		overflow: hidden;
 	}
 	/* A narrow pane (the inspector open beside it): tighter cells, the share as a figure only,
-	   and a margin's percentage under it, so wide tables fit without scrolling sideways. */
+	   and a margin's percentage under it, so wide tables fit without scrolling sideways. Text
+	   wraps in narrower columns and headings may take two lines, so a worksheet's figures
+	   (severity to action priority) stay on screen. */
 	@container (max-width: 64rem) {
 		td,
 		th button,
 		.th {
 			padding-inline: var(--space-2);
+		}
+		td.text {
+			min-width: 6.5rem;
+		}
+		td.long {
+			min-width: 9rem;
+		}
+		th button {
+			height: auto;
+			min-height: 2.25rem;
+			padding-block: var(--space-1);
+			text-align: left;
+			white-space: normal;
+		}
+		/* The sort arrow takes no room until a column is sorted. */
+		th :global(.idle) {
+			display: none;
 		}
 		.share .bar {
 			display: none;
@@ -1409,6 +1656,82 @@
 	.chip.bad {
 		background: color-mix(in oklab, var(--danger) 16%, var(--surface));
 		color: var(--text);
+	}
+	td.level {
+		white-space: nowrap;
+	}
+	/* A value its type rejects, or that disagrees with the model: flagged where it is. */
+	td.problem,
+	.cell.problem {
+		background: color-mix(in oklab, var(--warn) 16%, var(--surface));
+	}
+	.flag {
+		display: inline-flex;
+		margin-left: 4px;
+		color: var(--warn);
+		vertical-align: -2px;
+		cursor: help;
+	}
+	.gap-link {
+		min-height: 1.75rem;
+		padding: 0 8px;
+		border: 1px dashed color-mix(in oklab, var(--warn) 60%, var(--border));
+		border-radius: var(--radius-pill);
+		background: color-mix(in oklab, var(--warn) 12%, var(--surface));
+		color: var(--text);
+		font: inherit;
+		font-size: var(--text-xs);
+		font-weight: 600;
+		cursor: pointer;
+	}
+	.gap-link:hover {
+		border-style: solid;
+	}
+	.add-line {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+	}
+	th.row-actions,
+	td.row-actions {
+		width: 2.5rem;
+		padding-inline: var(--space-1);
+		text-align: center;
+	}
+	.icon-button {
+		display: inline-grid;
+		place-items: center;
+		width: 2rem;
+		height: 2rem;
+		border: 0;
+		border-radius: var(--radius-sm);
+		background: transparent;
+		color: var(--text-3);
+		cursor: pointer;
+	}
+	.icon-button:hover,
+	.icon-button:focus-visible {
+		background: color-mix(in oklab, var(--danger) 12%, var(--surface));
+		color: var(--danger);
+	}
+	.card-actions {
+		display: flex;
+		gap: var(--space-2);
+		margin-bottom: var(--space-2);
+	}
+	.card-actions button,
+	.remove-line {
+		display: inline-flex;
+		flex: 1;
+		align-items: center;
+		justify-content: center;
+		gap: 6px;
+		min-height: 2.75rem;
+	}
+	.remove-line {
+		width: 100%;
+		margin-top: var(--space-2);
+		color: var(--text-2);
 	}
 	code.inline {
 		padding: 0 3px;
@@ -1506,6 +1829,7 @@
 			line-clamp: 3;
 		}
 		.tools {
+			flex-wrap: nowrap;
 			gap: var(--space-2);
 		}
 		.search {
@@ -1649,6 +1973,9 @@
 		}
 		.pair .cell .empty {
 			opacity: 1;
+		}
+		.gap-link {
+			min-height: 2.75rem;
 		}
 	}
 	/* Review mode: new and changed rows, with a badge saying so. */

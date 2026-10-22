@@ -8,6 +8,7 @@
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { ToolkitHost } from '#lib/engine/toolkit/host.ts';
+import type { RenderedTable } from '#lib/engine/types.ts';
 import { demoFiles, loadHost } from '#lib/engine/toolkit/testing.ts';
 import { flashlightProject } from '#lib/project/templates/flashlight.ts';
 import type { ProjectFile, Workspace } from '#lib/project/workspace.svelte.ts';
@@ -68,6 +69,7 @@ function packageOf(workspace: Workspace, name: string) {
 
 const render = (workspace: Workspace, view: string) =>
 	hostEngine(host).renderView(workspace.sourceFiles(), view);
+const col = (t: RenderedTable, name: string) => t.rows.map((r) => r[t.columns.indexOf(name)]!);
 
 function flashlight(): ProjectFile[] {
 	return flashlightProject('Flashlight', '', host.viewLibraries()).files;
@@ -221,13 +223,13 @@ describe('on a new Small system project', { timeout: 60_000 }, () => {
 			[
 				'flashlight::battery',
 				'Cells leak',
-				'Corroded contacts; the light fails',
 				'7',
-				'Left in for years',
 				'4',
 				'8',
 				'224',
-				'high'
+				'high',
+				'Corroded contacts; the light fails',
+				'Left in for years'
 			]
 		]);
 		// Removing the line takes it out of the text, as one undoable step.
@@ -323,7 +325,7 @@ describe('on a new Small system project', { timeout: 60_000 }, () => {
 			'Severity is 4, but its hazard Hot battery can lead to Burned hand, which is serious (6) (@Fmea about Battery).'
 		]);
 		const sheet = await render(workspace, fmea.open!.name);
-		expect(sheet.rowInfo?.[0]?.problems?.[3]).toMatch(/^Severity is 4, but/);
+		expect(sheet.rowInfo?.[0]?.problems?.[2]).toMatch(/^Severity is 4, but/);
 		// A risk matrix of the sheet.
 		const matrix = planRiskMatrix(workspace, { packageName: 'BatteryFMEA', title: 'Battery FMEA' });
 		expect(matrix.preview).toMatchSnapshot();
@@ -404,6 +406,37 @@ describe('on the demo', { timeout: 60_000 }, () => {
 		expect(workspace.text(`risk/ParcelDeliveryUseFMEA.sysml`)).toContain(
 			"category = RiskCategory::'use';"
 		);
+	});
+
+	it('a worksheet cell edits its line: a rating out of scale is flagged, a kind is a literal', async () => {
+		const workspace = await openWorkspace(host, demoFiles());
+		const { setField } = await import('#lib/workbench/actions.ts');
+		const all = await render(workspace, 'FmeaWorksheet');
+		const battery = all.sources[0]!;
+		await analysed(workspace, () =>
+			setField(workspace, battery, 'metadata:Fmea.severity', '14', 'Set severity')
+		);
+		expect(workspace.problems.filter((p) => p.code === 'check').map((p) => p.message)).toEqual([
+			'Severity is 14, outside the scale of 1 to 10 (@Fmea about drone::battery).',
+			'Severity is 14, but its hazard batteryFire can lead to burnInjury, which is critical (8) (@Fmea about drone::battery).'
+		]);
+		const flagged = await render(workspace, 'fmeaWorksheet');
+		const at = flagged.rows.findIndex((r) => r[0] === 'drone::battery');
+		expect(flagged.rowInfo?.[at]?.problems?.[2]).toBe(
+			'Severity is 14, outside the scale of 1 to 10.'
+		);
+		// The RPN and the action priority wait for a rating in scale (the line sorts last).
+		expect(at).toBe(5);
+		expect(flagged.rows[at]!.slice(5, 7)).toEqual(['', '']);
+		const category = all.columns.indexOf('category');
+		expect(all.editable?.[category]?.options).toContain('use');
+		await analysed(workspace, () =>
+			setField(workspace, battery, 'metadata:Fmea.category', 'use', 'Set category')
+		);
+		expect(workspace.text('risk/DesignFmea.sysml')).toContain("category = RiskCategory::'use';");
+		expect(problemsOf(workspace)).toEqual([]);
+		const after = await render(workspace, 'FmeaWorksheet');
+		expect(col(after, 'category')[col(after, 'element').indexOf('drone::battery')]).toBe('use');
 	});
 
 	it('a new hazard goes beside the demo’s, into its hazard log, leading to a harm it has', async () => {

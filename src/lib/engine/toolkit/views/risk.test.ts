@@ -182,7 +182,7 @@ ${Array.from({ length: 10 }, (_, o) => `    part p${o + 1} { @Fmea { failureMode
 		const process = host.renderView(files, 'process');
 		// The leak leads to a scald (serious, 6) through a hazardous situation, and a slip (minor, 4).
 		expect(process.rowInfo?.[0]?.problems).toEqual({
-			3: 'Severity is 4, but its hazard leak can lead to scald, which is serious (6).'
+			2: 'Severity is 4, but its hazard leak can lead to scald, which is serious (6).'
 		});
 		const design = host.renderView(files, 'design');
 		expect(design.rowInfo?.[0]?.problems).toBeUndefined();

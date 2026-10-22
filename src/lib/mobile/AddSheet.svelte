@@ -107,6 +107,19 @@
 			/>
 		{/key}
 	{/if}
+	<!-- Things made of several elements have guided forms of their own. -->
+	<div class="forms">
+		<span>Or make</span>
+		{#each [['fmea', 'An FMEA'], ['hazard', 'A hazard'], ['trade', 'A trade study']] as const as [kind, label] (kind)}
+			<button
+				type="button"
+				onclick={() => {
+					ui.addSheet = false;
+					ui.create = { kind };
+				}}>{label}</button
+			>
+		{/each}
+	</div>
 </Sheet>
 
 <style>
@@ -150,5 +163,27 @@
 	.none {
 		padding: var(--space-4) var(--space-2);
 		color: var(--text-2);
+	}
+	.forms {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: var(--space-2);
+		margin-top: var(--space-4);
+		padding: var(--space-3) var(--space-1) 0;
+		border-top: 1px solid var(--border);
+		color: var(--text-2);
+		font-size: var(--text-sm);
+	}
+	.forms button {
+		min-height: 2.75rem;
+		padding: 0 var(--space-3);
+		border: 1px solid var(--border-strong);
+		border-radius: var(--radius-pill);
+		background: var(--surface);
+		color: var(--text);
+		font: inherit;
+		font-weight: 560;
+		cursor: pointer;
 	}
 </style>

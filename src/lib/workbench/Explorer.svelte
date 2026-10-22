@@ -15,8 +15,10 @@
 		Scale,
 		PenLine,
 		Search,
+		ShieldAlert,
 		Table2,
-		Trash2
+		Trash2,
+		TriangleAlert
 	} from '@lucide/svelte';
 	import NodeMenu, { type MenuItem } from '#lib/diagram/NodeMenu.svelte';
 	import { longPress } from '#lib/mobile/press.ts';
@@ -575,6 +577,16 @@
 								<li>
 									<button type="button" class="item" onclick={() => create({ kind: 'trade' })}>
 										<Scale size={14} /> <span class="label">Trade study…</span>
+									</button>
+								</li>
+								<li>
+									<button type="button" class="item" onclick={() => create({ kind: 'fmea' })}>
+										<ShieldAlert size={14} /> <span class="label">FMEA…</span>
+									</button>
+								</li>
+								<li>
+									<button type="button" class="item" onclick={() => create({ kind: 'hazard' })}>
+										<TriangleAlert size={14} /> <span class="label">Hazard…</span>
 									</button>
 								</li>
 								<li>
