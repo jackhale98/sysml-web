@@ -39,12 +39,12 @@ package Reporting {
     view def RequirementsTraceMatrix {
         doc
         /*
-         * One row per requirement definition with satisfy/verify status —
-         * the requirements traceability matrix.
+         * One row per requirement with what satisfies it and what verifies
+         * it — the requirements traceability matrix. An empty cell is a gap.
          */
         @TableRendering {
             rows = "trace";
-            columns = "requirement; id; satisfied; verified";
+            columns = "requirement; id; satisfiedBy; verifiedBy";
             sortBy = "requirement";
         }
     }

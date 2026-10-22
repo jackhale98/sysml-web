@@ -43,7 +43,8 @@ Row providers (the `rows` value):
   "relation:verify"       verify relationships (requirement, by)
   "relation:connection"   connections (source, target)
   "trace"                 requirement coverage (requirement, id,
-                          satisfied, verified)
+                          satisfied, verified as yes/no, satisfiedBy,
+                          verifiedBy)
   "kindcounts"            model statistics (kind, definitions,
                           usages)
   "budget:mass"           a budget of one attribute (here `mass`)
@@ -97,5 +98,7 @@ computes a value from the row's numeric fields with the standard
 expression language (so derived values like RPN are never stored).
 `where` filters rows with a boolean expression; `sortBy` orders by
 a column (`-` prefix for descending); `pivot = "rowField; colField"`
-renders a count grid instead of columns.
+renders a count grid instead of columns. Satisfy or verify links
+pivoted as `"requirement; by"` make a traceability matrix: every
+requirement in scope is a row, linked or not, so gaps show.
 ```

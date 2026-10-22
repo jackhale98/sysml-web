@@ -120,7 +120,22 @@
 		.filter(Boolean)
 		.join(' ')}
 />
-{#if text}
+{#if text && data?.editable && editing?.actions.editEdge}
+	<EdgeLabel
+		x={at.x}
+		y={at.y}
+		class={lit ? 'sysml-edge-label editable lit' : 'sysml-edge-label editable'}
+	>
+		<button
+			type="button"
+			class="nodrag nopan"
+			aria-label="Change {data.kind === 'transition' ? 'transition' : 'branch'}: {text}"
+			title="Change it"
+			onclick={(event) => editing.actions.editEdge?.(id, { x: event.clientX, y: event.clientY })}
+			>{text}</button
+		>
+	</EdgeLabel>
+{:else if text}
 	<EdgeLabel x={at.x} y={at.y} class={lit ? 'sysml-edge-label lit' : 'sysml-edge-label'}
 		>{text}</EdgeLabel
 	>
@@ -152,6 +167,40 @@
 		border-color: var(--accent);
 		color: var(--accent);
 		font-weight: 600;
+	}
+	/* A label that opens the form to change its transition: the same pill, pressable. */
+	:global(.sysml-edge-label.editable) {
+		padding: 0;
+	}
+	:global(.sysml-edge-label.editable button) {
+		padding: 1px 7px;
+		border: 0;
+		border-radius: 999px;
+		background: transparent;
+		color: inherit;
+		font: inherit;
+		line-height: inherit;
+		white-space: nowrap;
+		cursor: pointer;
+	}
+	:global(.sysml-edge-label.editable:hover) {
+		border-color: var(--accent);
+		color: var(--accent);
+	}
+	:global(.sysml-edge-label.editable button:focus-visible) {
+		outline: 2px solid var(--focus);
+		outline-offset: 2px;
+	}
+	@media (pointer: coarse) {
+		/* A bigger target without moving the pill: the press area reaches past it. */
+		:global(.sysml-edge-label.editable button) {
+			position: relative;
+		}
+		:global(.sysml-edge-label.editable button::after) {
+			content: '';
+			position: absolute;
+			inset: -12px -4px;
+		}
 	}
 	:global(.sysml-edge-label) {
 		padding: 1px 7px;

@@ -12,6 +12,8 @@ export interface EditingActions {
 	rename(id: string, name: string): Promise<string | null>;
 	/** Open the node's actions (context menu) at a client point, or by the node. */
 	menu(id: string, point?: { x: number; y: number }): void;
+	/** Change what an edge says (a transition's trigger, guard and effect), from its label. */
+	editEdge?(id: string, point?: { x: number; y: number }): void;
 }
 
 export class DiagramEditing {
