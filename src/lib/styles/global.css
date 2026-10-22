@@ -2,7 +2,7 @@
  * Fairtide design tokens and base styles.
  *
  * Calm and typographic: a warm neutral canvas, white surfaces, one ink-blue
- * accent. Colour encodes status and kind, always alongside a label or shape.
+ * accent (Fairtide's sea glass). Colour encodes status and kind, always alongside a label or shape.
  * Themes: light (default), dark, and "system" via prefers-color-scheme;
  * an explicit choice is set as data-theme on <html>.
  */
@@ -49,11 +49,11 @@
 	--text: #1a1b1e;
 	--text-2: #50535a;
 	--text-3: #686b72;
-	--accent: #2f55d4;
-	--accent-hover: #2546b8;
+	--accent: #1f6f60;
+	--accent-hover: #185a4e;
 	--accent-text: #ffffff;
-	--accent-weak: #e9eefc;
-	--focus: #2f55d4;
+	--accent-weak: #e2f1ed;
+	--focus: #2f8a78;
 
 	--ok: #18794e;
 	--ok-weak: #e3f4ea;
@@ -105,11 +105,11 @@
 		--text: #ecedef;
 		--text-2: #a9acb3;
 		--text-3: #8f939b;
-		--accent: #7d95ff;
-		--accent-hover: #98abff;
+		--accent: #5fb3a1;
+		--accent-hover: #7cc4b4;
 		--accent-text: #0f1012;
-		--accent-weak: #1d2440;
-		--focus: #98abff;
+		--accent-weak: #15302b;
+		--focus: #7cc4b4;
 		--ok: #4cc38a;
 		--ok-weak: #13281e;
 		--warn: #e2a33d;
@@ -155,11 +155,11 @@
 	--text: #ecedef;
 	--text-2: #a9acb3;
 	--text-3: #8f939b;
-	--accent: #7d95ff;
-	--accent-hover: #98abff;
+	--accent: #5fb3a1;
+	--accent-hover: #7cc4b4;
 	--accent-text: #0f1012;
-	--accent-weak: #1d2440;
-	--focus: #98abff;
+	--accent-weak: #15302b;
+	--focus: #7cc4b4;
 	--ok: #4cc38a;
 	--ok-weak: #13281e;
 	--warn: #e2a33d;

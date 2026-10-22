@@ -983,10 +983,10 @@
 		width: 40%;
 		height: 7px;
 		border-radius: 4px;
-		background: #2f55d4;
+		background: #1f6f60;
 	}
 	.preview.dark .bar {
-		background: #7d95ff;
+		background: #5fb3a1;
 	}
 	.preview .line {
 		height: 5px;
