@@ -352,7 +352,7 @@ function probeOf(ctx: ViewContext, spec: string, rows: Row[]): Probe {
 
 // --- expose and filter ----------------------------------------------------------
 
-type ExposeKind = 'element' | 'members' | 'recursive' | 'nested';
+export type ExposeKind = 'element' | 'members' | 'recursive' | 'nested';
 
 interface Exposure {
 	kind: ExposeKind;
@@ -363,7 +363,7 @@ interface Exposure {
  * `X` / `X::*` / `X::**` / `X::*::**`, with a trailing `[filter]` left out and
  * a leading `$::` (the global scope, as the toolkit prints lifted JSON) dropped.
  */
-function parseExpose(text: string): { kind: ExposeKind; base: string } {
+export function parseExpose(text: string): { kind: ExposeKind; base: string } {
 	const t = text
 		.replace(/\[[^\]]*\]\s*$/, '')
 		.trim()

@@ -198,6 +198,13 @@ export class ModelEditing {
 			case 'setTableColumns':
 				this.setTableColumns(path, request.view, request.columns);
 				return;
+			case 'setViewMetadata': {
+				const view = this.find(path, { id: request.id, name: request.view });
+				if (!this.header(view).parts.some((p) => p.slot === 'keyword' && p.word === 'view'))
+					throw new Error(`\`${request.view}\` is not a view`);
+				this.setMetadata(view, request.metadata, request.field, request.value);
+				return;
+			}
 		}
 	}
 

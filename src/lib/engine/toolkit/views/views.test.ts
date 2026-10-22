@@ -718,8 +718,8 @@ describe('the demo’s tables', () => {
 		// verification matrices, less the design gaps (the overview lists them).
 		// The risk library's worksheets for each kind of FMEA, the risk reduction and the
 		// demo's risk matrix and hazard log are six more; its saved review and risk
-		// reduction two more.
-		expect(views).toHaveLength(59);
+		// reduction two more. The dependency matrices: four view defs and the demo's four.
+		expect(views).toHaveLength(67);
 		expect(views.filter((v) => v.hasTable)).toHaveLength(43);
 		expect(views.every((v) => !v.builtin)).toBe(true);
 		expect(views.find((v) => v.name === 'droneBreakdown')).toEqual({
@@ -1104,7 +1104,8 @@ describe('the demo’s tables', () => {
 		const row = (kind: string) => stats.rows.find((r) => r[0] === kind);
 		expect(row('part def')).toEqual(['part def', '19', '0']);
 		expect(row('requirement')).toEqual(['requirement', '0', '24']);
-		expect(row('attribute')).toEqual(['attribute', '0', '228']);
+		// The dependency matrices' metadata def has five.
+		expect(row('attribute')).toEqual(['attribute', '0', '233']);
 		// Enum literals count as usages, metadata annotations are anonymous.
 		expect(row('enum')).toEqual(['enum', '0', '43']);
 		expect(row('metadata')).toBeUndefined();

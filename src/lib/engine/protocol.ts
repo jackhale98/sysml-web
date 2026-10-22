@@ -13,6 +13,7 @@ import type {
 	FeatureValue,
 	Completion,
 	DefinitionTarget,
+	DependencyMatrix,
 	FileChange,
 	FileRange,
 	Hover,
@@ -58,6 +59,8 @@ export interface EngineApi {
 	edit(request: EditRequest): EditResult;
 	listViews(files: SourceFile[]): ViewInfo[];
 	renderView(files: SourceFile[], name: string): RenderedTable;
+	/** A view with `@MatrixRendering` as a dependency matrix: its elements and the links between them. */
+	dependencyMatrix(files: SourceFile[], name: string): DependencyMatrix;
 	/** The view libraries the engine bundles (`Reporting`, `ModelViews`). */
 	viewLibraries(): SourceFile[];
 	/** The risk policy the project's risk library states: zones, RPN bands, what worksheets lead with. */

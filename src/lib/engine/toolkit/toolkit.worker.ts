@@ -183,6 +183,7 @@ const handlers: { [M in Method]: Handler } = {
 	related: (host, files: SourceFile[], id: string) => host.related(files, id),
 	listViews: (host, files: SourceFile[]) => host.listViews(files),
 	renderView: (host, files: SourceFile[], name: string) => host.renderView(files, name),
+	dependencyMatrix: (host, files: SourceFile[], name: string) => host.dependencyMatrix(files, name),
 	viewLibraries: (host) => host.viewLibraries(),
 	riskPolicy: (host, files: SourceFile[]) => host.riskPolicy(files),
 	fmeaLines: (host, files: SourceFile[], id: string) => host.fmeaLines(files, id),

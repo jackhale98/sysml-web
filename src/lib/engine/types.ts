@@ -160,6 +160,96 @@ export interface ViewInfo {
 	exposes?: string[];
 	/** From a library the engine bundles, not from the project's files. */
 	builtin: boolean;
+	/** Whether a `@MatrixRendering` applies: the view is a dependency matrix (DSM) of these elements. */
+	matrix?: MatrixElements;
+}
+
+/** What a dependency matrix's rows and columns are. */
+export type MatrixElements = 'parts' | 'actions' | 'requirements';
+
+/** A relationship a dependency matrix can count, read from the row's element to the column's. */
+export type DependencyKind =
+	| 'connection'
+	| 'flow'
+	| 'binding'
+	| 'allocation'
+	| 'typing'
+	| 'satisfy'
+	| 'succession'
+	| 'derivation'
+	| 'refinement';
+
+/**
+ * A view as a dependency matrix (`@MatrixRendering`, docs/dsm.md): the
+ * elements it exposes, in model order, and every link between them of
+ * the kinds this kind of matrix offers; the view's settings say which of
+ * them count and how to order and show them.
+ */
+export interface DependencyMatrix {
+	view: string;
+	elements: MatrixElements;
+	/** The kinds of link the view counts (its `dependencies`). */
+	kinds: DependencyKind[];
+	/** The kinds this kind of matrix offers, in the order to show them. */
+	available: DependencyKind[];
+	order: 'model' | 'clustered';
+	cells: 'marks' | 'names';
+	/** What the parts are of, when the view exposes one element's (`drone`). */
+	scope: string | null;
+	items: MatrixItem[];
+	/** Links of every available kind (not only the counted ones), so a choice shows at once. */
+	links: MatrixLink[];
+	/** Each item's links to elements the matrix doesn't list, by kind (`binding` to the drone itself). */
+	outside: { item: number; kind: DependencyKind; direction: 'out' | 'in'; name: string }[];
+	warnings: string[];
+}
+
+export interface MatrixItem {
+	/** The element's id: an inherited part (`frontLeft.esc`) is its definition's feature. */
+	id: string;
+	name: string;
+	qualifiedName: string;
+	/** Its short name: a requirement's ID (`SYS-001`). */
+	shortName?: string;
+	/** The path from what the matrix is of (`frontLeft.esc`), for a nested part. */
+	path: string;
+	kind: string;
+	/** Its definition's name (`Battery`), for a usage. */
+	type: string | null;
+	/** How deep below the matrix's scope (0 for its direct members). */
+	depth: number;
+	/** The item it is nested in, by index. */
+	parent: number | null;
+	file: string;
+	start: number;
+	end: number;
+}
+
+export interface MatrixLink {
+	from: number;
+	to: number;
+	kind: DependencyKind;
+	/** Connections and bindings go both ways: the cell (to, from) shows them too. */
+	mutual: boolean;
+	/** The connection's, flow's or feature's name, when it has one. */
+	name?: string;
+	/** What types it: the interface or connection definition. */
+	definition?: string;
+	/** What passes: a flow's item. */
+	item?: string;
+	/**
+	 * What an interface carries, from its definition's own flows: each item,
+	 * and whether it goes from the first end written to the second.
+	 */
+	carries?: { item: string; forward: boolean }[];
+	/** Its ends as written (`battery.powerOut`), for a connector. */
+	ends?: [string, string];
+	/** The element that states it, by id, when it has one (the inspector shows it). */
+	element?: string;
+	/** Where it is written. */
+	file: string;
+	start: number;
+	end: number;
 }
 
 /** A view rendered as a table by the engine. */
@@ -965,6 +1055,15 @@ export type EditOperation =
 			value: string;
 	  }
 	| { op: 'setTableColumns'; view: string; columns: string[] }
+	/** Set one value of a view's own rendering metadata (`@MatrixRendering { order = "clustered"; }`), adding it when the view has none. */
+	| {
+			op: 'setViewMetadata';
+			view: string;
+			id?: string;
+			metadata: string;
+			field: string;
+			value: string;
+	  }
 	| {
 			op: 'setDeclaration';
 			element: string;
