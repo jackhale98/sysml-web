@@ -250,3 +250,24 @@ export function convert(value: number, from: string, to: string): number {
 		throw new Error(`no conversion from \`${from}\` to \`${to}\``);
 	return (value * a.factor + a.offset - b.offset) / b.factor;
 }
+
+/**
+ * A simulated time or duration in seconds, said plainly: `45 s`, `25 min`,
+ * `1 min 30 s`, `2 h 5 min`. Fractions of a second keep up to three decimals.
+ */
+export function formatDuration(seconds: number): string {
+	if (!Number.isFinite(seconds)) return String(seconds);
+	const s = Math.round(Math.abs(seconds) * 1000) / 1000;
+	const sign = seconds < 0 && s > 0 ? '-' : '';
+	if (s < 60) return `${sign}${s} s`;
+	const parts: string[] = [];
+	const days = Math.floor(s / 86400);
+	const hours = Math.floor((s % 86400) / 3600);
+	const minutes = Math.floor((s % 3600) / 60);
+	const rest = Math.round((s % 60) * 1000) / 1000;
+	if (days) parts.push(`${days} d`);
+	if (hours) parts.push(`${hours} h`);
+	if (minutes) parts.push(`${minutes} min`);
+	if (rest) parts.push(`${rest} s`);
+	return sign + parts.join(' ');
+}

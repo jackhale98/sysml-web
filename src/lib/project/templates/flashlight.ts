@@ -144,10 +144,10 @@ export function flashlightProject(
 
     state def FlashlightModes {
         doc /* Off, on, and on with a low battery. */
-        in attribute charge : Real {
+        attribute charge : Real = 1.0 {
             doc /* Battery charge left: 0 is empty, 1 is full. */
         }
-        attribute lowLevel : Real = 0.1 {
+        attribute lowLevel : Real = 0.15 {
             doc /* Below this charge, the light dims to last longer. */
         }
 
@@ -157,7 +157,7 @@ export function flashlightProject(
             doc /* Dark. */
         }
         state on {
-            doc /* Lit at full brightness. */
+            doc /* Lit at full brightness. Each hour lit uses 30 % of the battery. */
         }
         state lowBattery {
             doc /* Still lit, but dimmed to save the battery. */
@@ -165,6 +165,7 @@ export function flashlightProject(
 
         transition switchOn first off accept ButtonPress then on;
         transition switchOff first on accept ButtonPress then off;
+        transition drain first on accept after 1 [SI::h] do assign charge := charge - 0.3 then on;
         transition batteryLow first on accept when charge < lowLevel then lowBattery;
         transition switchOffLow first lowBattery accept ButtonPress then off;
     }

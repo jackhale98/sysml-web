@@ -3,12 +3,13 @@
  * `StateMachine` structure (whoever extracted it) and a JSON-friendly
  * `StateSession`:
  *
- * - `start` enters the machine: the initial transition of each region,
- *   outermost first, running entry and `do` actions.
- * - `step` takes one run-to-completion step: on an event (a signal, a
- *   change trigger by its `when …` text, a time trigger by its text), on no
- *   event (completion, guard-only, change and time transitions — a Step
- *   with no clock means "time passes"), or on one chosen transition.
+ * - `start` enters the machine at time 0: the initial transition of each
+ *   region, outermost first, running entry actions and starting `do` actions.
+ * - `step` takes one run-to-completion step: on an event (a signal, or a
+ *   change trigger by its `when …` text), on no event (a Step: what is ready
+ *   now, else time passes to the next timer), on one chosen transition, or
+ *   waits (`wait`: time passes by an amount, or to the next timer, firing what
+ *   comes due on the way).
  * - `withVariables` re-evaluates what is enabled after variables change,
  *   without stepping.
  *
@@ -17,11 +18,33 @@
  * transitions from inner states take priority over ones from their
  * ancestors; of the enabled transitions, a maximal set that exit disjoint
  * states fires, so orthogonal regions each take their own step. Firing a
- * transition exits the states it leaves (innermost first, running their
- * exit actions), runs its effect, then enters the target and its default
- * substates (running entry and `do` actions). `assign x := e` statements in
- * actions and effects update the variables; other actions are recorded in
- * the trace only.
+ * transition stops the `do` actions still running in the states it leaves
+ * and runs their exit actions (innermost first), runs its effect, then
+ * enters the target and its default substates (running entry actions, then
+ * starting `do` actions). `assign x := e` statements in actions and effects
+ * update the variables; other actions are recorded in the trace only.
+ *
+ * Time is simulated: the session keeps the time and when each active state
+ * was entered. A time trigger is the library's `TriggerAfter` / `TriggerAt`
+ * (KerML 9.2.14): its duration or time is evaluated when its source state is
+ * entered (after the entry actions), so `after d` is due `d` after the entry
+ * (re-entering starts it again) and `at t` at time `t` (one already past
+ * never comes). Time passes only when nothing is ready at the current time:
+ * completion transitions, change triggers whose condition holds and timers
+ * that are due all come first, so a condition an assignment makes true is
+ * taken before the next timer. When the guard of a time trigger is false
+ * at its time, that time signal is lost until the state is entered again.
+ * Durations are numbers with time units (`5 [s]`, `2 [SI::min]`); a bare
+ * number counts seconds. One that cannot be evaluated is noted in the trace
+ * and does not fire; variables changed later evaluate it again, from then.
+ * `docs/simulator.md` says more, with the parts of the specifications used.
+ *
+ * A `do` action starts after its state's entry action and runs while the
+ * state is active (SysML v2 7.18.1). One made only of assignments runs them
+ * once and completes; any other (a named action, a `send`) keeps running
+ * until the state is exited, which stops it (7.18.3, step 1). As in the
+ * `StatePerformances` library, a transition without a trigger waits for the
+ * state's substates to finish, not for its `do` action (`nonDoMiddle`).
  *
  * Action, trigger and guard texts are read as the extraction writes them
  * (`engine/toolkit/machines.ts`): a trigger is a signal name, `when <condition>`, or `after …` /
@@ -31,7 +54,9 @@
 import type { SimStep, StateMachine, StateSession } from '#lib/engine/types.ts';
 import {
 	EnumLiteral,
+	EvalError,
 	Quantity,
+	display,
 	evaluate,
 	evaluateCondition,
 	parseExpr,
@@ -39,7 +64,7 @@ import {
 	type Scope,
 	type Value
 } from './expr.ts';
-import { convert } from './units.ts';
+import { convert, formatDuration } from './units.ts';
 
 export type Enabled = StateSession['enabled'][number];
 type MachineState = StateMachine['states'][number];
@@ -50,22 +75,30 @@ export type Variables = Record<string, unknown>;
 
 /** What a step does. */
 export type Choice =
-	/** Send an event; `null` fires completion, guard-only, change and time transitions. */
+	/**
+	 * Send an event; `null` is a Step: the completion, guard-only, change and
+	 * due time transitions ready now, else time passes to the next timer.
+	 */
 	| { event: string | null; variables?: Variables }
 	/** Fire this transition (an index into `machine.transitions`), if it is ready. */
-	| { transition: number; variables?: Variables };
+	| { transition: number; variables?: Variables }
+	/** Let time pass, by this many seconds or to the next timer, taking what comes due on the way. */
+	| { wait: number | 'next'; variables?: Variables };
 
 export interface Options {
 	/** Stop with status `max steps reached` once this many transitions have fired. */
 	maxSteps?: number;
 }
 
+/** A wait stops after this many transitions, in case the machine never lets time pass. */
+const WAIT_STEPS = 200;
+
 // ---------------------------------------------------------------- the machine, compiled
 
 type Trigger =
 	| { kind: 'signal'; name: string }
 	| { kind: 'change'; text: string; expr: Expr | null }
-	| { kind: 'time'; text: string };
+	| { kind: 'time'; text: string; mode: 'after' | 'at'; expr: Expr | null };
 
 interface Assignment {
 	target: string;
@@ -110,7 +143,11 @@ function parseTrigger(text: string | undefined): Trigger | null {
 	if (!trimmed) return null;
 	const when = /^when\s+([\s\S]+)$/.exec(trimmed);
 	if (when) return { kind: 'change', text: when[1]!.trim(), expr: parseOrNull(when[1]!) };
-	if (/^(after|at)\b/.test(trimmed)) return { kind: 'time', text: trimmed };
+	const time = /^(after|at)\b\s*([\s\S]*)$/.exec(trimmed);
+	if (time) {
+		const mode = time[1] as 'after' | 'at';
+		return { kind: 'time', text: trimmed, mode, expr: parseOrNull(time[2]!) };
+	}
 	return { kind: 'signal', name: trimmed };
 }
 
@@ -366,16 +403,112 @@ function status(
 	return candidates(chart, active).length ? 'running' : 'deadlocked';
 }
 
+// ---------------------------------------------------------------- the clock
+
+/** Simulated time, and the time triggers of the active states. */
+interface Clock {
+	/** Seconds since the start. */
+	time: number;
+	/** When each active state was entered. */
+	entered: Map<string, number>;
+	/** By transition index: when its time trigger is due, or why it will not fire. */
+	timers: Map<number, number | string>;
+}
+
+type TimeTrigger = Extract<Trigger, { kind: 'time' }>;
+
+/** A time or a duration in seconds: a number with a time unit, or a bare number (seconds). */
+function seconds(value: Value): number {
+	let out: number | null = null;
+	if (value instanceof Quantity) {
+		try {
+			out = convert(value.value, value.unit, 's');
+		} catch {
+			// Not a time unit.
+		}
+	} else if (typeof value === 'number') out = value;
+	if (out === null || !Number.isFinite(out)) throw new EvalError(`${display(value)} is not a time`);
+	return out;
+}
+
+/** Why a time trigger cannot fire because its time could not be evaluated. */
+const unevaluated = (text: string, why: string) => `time \`${text}\`: ${why}`;
+const isUnevaluated = (reason: number | string | undefined) =>
+	typeof reason === 'string' && reason.startsWith('time `');
+
+/**
+ * When a time trigger is due, evaluated as its source state is entered at
+ * `base` (TriggerAfter adds the delay to the time it is evaluated at), or
+ * why it will not come.
+ */
+function arm(t: Transition, base: number, env: Env): number | string {
+	const trigger = t.trigger as TimeTrigger;
+	if (!trigger.expr) return unevaluated(trigger.text, 'the time is not supported by the evaluator');
+	let value: number;
+	try {
+		value = seconds(evaluate(trigger.expr, env));
+	} catch (error) {
+		return unevaluated(trigger.text, (error as Error).message);
+	}
+	if (trigger.mode === 'after') return base + Math.max(0, value);
+	return value < base
+		? `\`${trigger.text}\` had passed when \`${t.source.from}\` was entered, at ${formatDuration(base)}`
+		: value;
+}
+
+/** Start the time triggers of the states just entered; what will not fire is noted. */
+function armStates(run: Run, states: string[], notes: string[]) {
+	const entered = new Set(states);
+	for (const t of run.chart.transitions) {
+		if (t.trigger?.kind !== 'time' || !entered.has(t.source.from)) continue;
+		const due = arm(t, run.clock.entered.get(t.source.from) ?? run.clock.time, run.env);
+		run.clock.timers.set(t.index, due);
+		if (typeof due === 'string') notes.push(`\`${t.label}\` will not fire: ${due}`);
+	}
+}
+
+/** The earliest timer of the active states still to come. */
+function nextDue(clock: Clock): number | undefined {
+	let next: number | undefined;
+	for (const due of clock.timers.values()) {
+		if (typeof due === 'number' && due > clock.time && (next === undefined || due < next))
+			next = due;
+	}
+	return next;
+}
+
+/**
+ * A time signal that comes while its transition cannot take it (its guard
+ * is false) is lost: the timer will not fire again until its state is
+ * entered again.
+ */
+function expire(run: Run, list: Transition[], env: Env) {
+	const { clock } = run;
+	for (const t of list) {
+		if (t.trigger?.kind !== 'time') continue;
+		const due = clock.timers.get(t.index);
+		if (typeof due !== 'number' || due > clock.time) continue;
+		const c = check(run.chart, t, run.active, env, clock);
+		if (!c.ready && c.reason) {
+			clock.timers.set(
+				t.index,
+				`\`${t.trigger.text}\` came at ${formatDuration(due)} while ${c.reason}`
+			);
+		}
+	}
+}
+
 // ---------------------------------------------------------------- readiness
 
 interface Check {
 	guardResult?: boolean;
 	conditionResult?: boolean;
+	due?: number;
 	ready: boolean;
 	reason?: string;
 }
 
-function check(chart: Chart, t: Transition, active: Set<string>, env: Env): Check {
+function check(chart: Chart, t: Transition, active: Set<string>, env: Env, clock: Clock): Check {
 	const out: Check = { ready: true };
 	if (t.trigger?.kind === 'change') {
 		const text = t.trigger.text;
@@ -389,6 +522,12 @@ function check(chart: Chart, t: Transition, active: Set<string>, env: Env): Chec
 				out.reason = `condition \`${text}\`: ${(error as Error).message}`;
 			}
 		}
+	} else if (t.trigger?.kind === 'time') {
+		const due = clock.timers.get(t.index);
+		if (typeof due === 'number') {
+			out.due = due;
+			if (due > clock.time) out.reason = `\`${t.trigger.text}\` is due at ${formatDuration(due)}`;
+		} else out.reason = due ?? `\`${t.trigger.text}\` is not running`;
 	}
 	const guard = t.source.guard;
 	if (guard) {
@@ -425,11 +564,14 @@ function signalMatches(signal: string, event: string): boolean {
 	return signal === event || last(signal) === last(event);
 }
 
-/** Whether a transition's trigger accepts `event` (`null`: a Step). */
+/**
+ * Whether a transition's trigger accepts `event` (`null`: a Step). A time
+ * trigger takes no event: it fires when its time comes.
+ */
 function accepts(t: Transition, event: string | null): boolean {
 	const trigger = t.trigger;
 	if (event === null) return trigger?.kind !== 'signal';
-	if (!trigger) return false;
+	if (!trigger || trigger.kind === 'time') return false;
 	if (trigger.kind === 'signal') return signalMatches(trigger.name, event);
 	return eventName(trigger) === event;
 }
@@ -442,7 +584,14 @@ function eventName(trigger: Trigger): string {
 			: trigger.text;
 }
 
-/** Firing order among candidates: inner sources first, completion before change and time triggers. */
+/**
+ * Firing order among candidates: inner sources first, completion before
+ * triggered transitions (as UML's completion events), then document
+ * order. Timing already orders change and time triggers: a timer is not
+ * ready before its time. Two triggered transitions from one state ready at
+ * the same instant (a change trigger and a timer due then) are a tie the
+ * specifications leave open; the one written first fires.
+ */
 function priority(chart: Chart, list: Transition[]): Transition[] {
 	return [...list]
 		.map((t) => ({ t, d: depth(chart, t.source.from), c: t.trigger ? 1 : 0 }))
@@ -487,9 +636,9 @@ function select(chart: Chart, ready: Transition[], active: Set<string>): Transit
 }
 
 /** Every transition leaving an active state, inner states first, with its guard evaluated. */
-function enabled(chart: Chart, active: Set<string>, env: Env): Enabled[] {
+function enabled(chart: Chart, active: Set<string>, env: Env, clock: Clock): Enabled[] {
 	const list = candidates(chart, active);
-	const checks = new Map(list.map((t) => [t, check(chart, t, active, env)]));
+	const checks = new Map(list.map((t) => [t, check(chart, t, active, env, clock)]));
 	// A ready transition that a higher-priority one pre-empts on the same event is not ready.
 	const winner = new Map<Transition, Transition>();
 	const groups = new Map<string, Transition[]>();
@@ -522,6 +671,7 @@ function enabled(chart: Chart, active: Set<string>, env: Env): Enabled[] {
 		if (t.source.guard) e.guard = t.source.guard;
 		if (c.guardResult !== undefined) e.guardResult = c.guardResult;
 		if (c.conditionResult !== undefined) e.conditionResult = c.conditionResult;
+		if (c.due !== undefined) e.due = c.due;
 		const reason = c.reason ?? (by ? `\`${by.label}\` fires first` : undefined);
 		if (reason !== undefined) e.reason = reason;
 		return e;
@@ -534,6 +684,9 @@ interface Run {
 	chart: Chart;
 	active: Set<string>;
 	env: Env;
+	clock: Clock;
+	/** Active states whose `do` action is still running. */
+	doing: Set<string>;
 	messages: string[];
 	trace: SimStep[];
 	step: number;
@@ -542,6 +695,7 @@ interface Run {
 function markEntered(run: Run, name: string, entered: string[]) {
 	if (!run.active.has(name)) {
 		run.active.add(name);
+		run.clock.entered.set(name, run.clock.time);
 		entered.push(name);
 	}
 }
@@ -577,35 +731,57 @@ function enterDefault(run: Run, parent: string | undefined, entered: string[]) {
 	});
 }
 
-/** Run the entry and `do` actions of the states entered, in order; the entry actions as text. */
-function runEntries(run: Run, entered: string[]): string | null {
-	const texts: string[] = [];
+/**
+ * Run the entry actions of the states entered, outermost first, each
+ * followed by starting its `do` action: one of assignments runs them and
+ * completes, any other keeps running while the state is active.
+ */
+function runEntries(run: Run, entered: string[]): { entry: string | null; doing: string | null } {
+	const entries: string[] = [];
+	const dos: string[] = [];
 	for (const name of entered) {
 		const state = run.chart.states.get(name);
 		if (!state) continue;
 		if (state.entry) {
-			texts.push(state.entry);
+			entries.push(state.entry);
 			runAction(run.chart, state.entry, run.env, run.messages);
 		}
-		if (state.do) runAction(run.chart, state.do, run.env, run.messages);
+		if (state.do) {
+			dos.push(state.do);
+			const assignments = actionOf(run.chart, state.do);
+			if (assignments.length) runAssignments(assignments, run.env, run.messages);
+			else run.doing.add(name);
+		}
 	}
-	return texts.length ? texts.join('; ') : null;
+	return {
+		entry: entries.length ? entries.join('; ') : null,
+		doing: dos.length ? dos.join('; ') : null
+	};
+}
+
+/** Leave a state: stop its running `do` action, run its exit action, drop its timers. */
+function leave(run: Run, name: string, stopped: string[], exited: string[]) {
+	const { chart } = run;
+	run.active.delete(name);
+	const state = chart.states.get(name);
+	if (run.doing.delete(name) && state?.do) stopped.push(state.do);
+	if (state?.exit) {
+		exited.push(state.exit);
+		runAction(chart, state.exit, run.env, run.messages);
+	}
+	run.clock.entered.delete(name);
+	for (const t of chart.transitions) {
+		if (t.source.from === name) run.clock.timers.delete(t.index);
+	}
 }
 
 /** Fire a transition: exit, effect, enter. */
 function take(run: Run, t: Transition) {
 	const { chart } = run;
 	const { target, targetLine } = branches(chart, t);
-	const left = exits(chart, t, run.active);
 	const exitTexts: string[] = [];
-	for (const s of left) {
-		run.active.delete(s);
-		const action = chart.states.get(s)?.exit;
-		if (action) {
-			exitTexts.push(action);
-			runAction(chart, action, run.env, run.messages);
-		}
-	}
+	const stopped: string[] = [];
+	for (const s of exits(chart, t, run.active)) leave(run, s, stopped, exitTexts);
 
 	runAssignments(t.assignments, run.env, run.messages);
 
@@ -626,10 +802,12 @@ function take(run: Run, t: Transition) {
 			}
 		}
 	});
-	const entryText = runEntries(run, entered);
+	const { entry, doing } = runEntries(run, entered);
+	const notes: string[] = [];
+	armStates(run, entered, notes);
 
 	run.step += 1;
-	run.trace.push({
+	const s: SimStep = {
 		step: run.step,
 		from_state: t.source.from,
 		transition_name: t.source.name ?? null,
@@ -639,17 +817,24 @@ function take(run: Run, t: Transition) {
 		effect: t.source.effect ?? null,
 		to_state: t.source.to,
 		exit_action: exitTexts.length ? exitTexts.join('; ') : null,
-		entry_action: entryText
-	});
+		entry_action: entry,
+		time: run.clock.time,
+		do_action: doing,
+		do_stopped: stopped.length ? stopped.join('; ') : null
+	};
+	if (notes.length) s.notes = notes;
+	run.trace.push(s);
 }
 
 // ---------------------------------------------------------------- sessions
 
 function session(run: Run, options: Options): StateSession {
-	const { chart } = run;
+	const { chart, clock } = run;
 	const variables: Record<string, unknown> = {};
 	for (const v of chart.machine.variables) variables[v.name] = null;
 	for (const [name, value] of run.env.values) variables[name] = toJson(value);
+	const inOrder = (names: Iterable<string>) =>
+		[...names].sort((a, b) => (chart.order.get(a) ?? 0) - (chart.order.get(b) ?? 0));
 	const out: StateSession = {
 		machine: chart.machine.qualifiedName ?? chart.machine.name,
 		current: leaves(chart, run.active),
@@ -657,7 +842,15 @@ function session(run: Run, options: Options): StateSession {
 		variables,
 		trace: run.trace,
 		status: status(chart, run.active, run.step, options),
-		enabled: enabled(chart, run.active, run.env)
+		time: clock.time,
+		entered: Object.fromEntries(
+			inOrder(clock.entered.keys()).map((s) => [s, clock.entered.get(s)!])
+		),
+		timers: Object.fromEntries(
+			[...clock.timers].sort((a, b) => a[0] - b[0]).map(([i, due]) => [String(i), due])
+		),
+		doing: inOrder(run.doing),
+		enabled: enabled(chart, run.active, run.env, clock)
 	};
 	if (run.messages.length) out.messages = run.messages;
 	return out;
@@ -672,14 +865,33 @@ function resume(chart: Chart, from: StateSession, variables: Variables | null | 
 	const env = new Env(chart);
 	env.apply(from.variables);
 	env.apply(variables);
-	return {
+	const active = activeSet(chart, from.current);
+	const time = from.time ?? 0;
+	const clock: Clock = {
+		time,
+		entered: new Map([...active].map((s) => [s, from.entered?.[s] ?? 0])),
+		timers: new Map()
+	};
+	const run: Run = {
 		chart,
-		active: activeSet(chart, from.current),
+		active,
 		env,
+		clock,
+		doing: new Set((from.doing ?? []).filter((s) => active.has(s))),
 		messages: [],
 		trace: [...from.trace],
 		step: from.step
 	};
+	if (from.timers) {
+		for (const [index, due] of Object.entries(from.timers)) clock.timers.set(Number(index), due);
+	} else armStates(run, [...active], []);
+	// A time that could not be evaluated is tried again with the new values, counting from now.
+	if (variables && Object.keys(variables).length) {
+		for (const [index, due] of clock.timers) {
+			if (isUnevaluated(due)) clock.timers.set(index, arm(chart.transitions[index]!, time, env));
+		}
+	}
+	return run;
 }
 
 /** Start a machine. `variables` override the defaults (`null` keeps the default). */
@@ -693,6 +905,8 @@ export function start(
 		chart,
 		active: new Set(),
 		env: seed(chart, variables ?? {}),
+		clock: { time: 0, entered: new Map(), timers: new Map() },
+		doing: new Set(),
 		messages: [],
 		trace: [],
 		step: 0
@@ -703,8 +917,10 @@ export function start(
 			if (region.kind === 'state') enterState(run, region.name, entered);
 		}
 	} else enterDefault(run, undefined, entered);
-	const entryAction = runEntries(run, entered);
-	run.trace.push({
+	const { entry, doing } = runEntries(run, entered);
+	const notes: string[] = [];
+	armStates(run, entered, notes);
+	const first: SimStep = {
 		step: 0,
 		from_state: childrenOf(chart, undefined).find((s) => s.kind === 'initial')?.name ?? '',
 		transition_name: null,
@@ -713,9 +929,64 @@ export function start(
 		effect: null,
 		to_state: entered[0] ?? '',
 		exit_action: null,
-		entry_action: entryAction
-	});
+		entry_action: entry,
+		time: 0,
+		do_action: doing,
+		do_stopped: null
+	};
+	if (notes.length) first.notes = notes;
+	run.trace.push(first);
 	return session(run, options);
+}
+
+/** What a Step would fire now, with guards and conditions read from `env`. */
+function readyNow(run: Run, list: Transition[], env: Env): Transition[] {
+	return list.filter(
+		(t) => accepts(t, null) && check(run.chart, t, run.active, env, run.clock).ready
+	);
+}
+
+/** The reasons of the timers that just came and were lost, for a message. */
+function lostAt(run: Run, list: Transition[]): string[] {
+	return list
+		.filter((t) => t.trigger?.kind === 'time')
+		.map((t) => run.clock.timers.get(t.index))
+		.filter((due): due is string => typeof due === 'string' && due.includes(' came at '));
+}
+
+/**
+ * Let time pass to `target`, firing what is ready at each instant on the way
+ * (one run-to-completion step at a time) and each timer as it comes due.
+ */
+function waitUntil(run: Run, target: number, options: Options) {
+	const { chart, clock } = run;
+	for (let steps = 0; ;) {
+		const now = status(chart, run.active, run.step, options);
+		// Time goes on for a machine that is stuck, not for one that finished or hit its limit.
+		if (now === 'deadlocked') clock.time = Math.max(clock.time, target);
+		if (now !== 'running') return;
+		const list = candidates(chart, run.active);
+		const before = run.env.clone();
+		const ready = readyNow(run, list, before);
+		expire(run, list, before);
+		if (ready.length) {
+			if (steps++ >= WAIT_STEPS) {
+				run.messages.push(
+					`stopped after ${WAIT_STEPS} steps at ${formatDuration(clock.time)}: the machine keeps moving without time passing`
+				);
+				return;
+			}
+			for (const t of select(chart, ready, run.active)) take(run, t);
+			continue;
+		}
+		const next = nextDue(clock);
+		if (next !== undefined && next <= target) {
+			clock.time = next;
+			continue;
+		}
+		clock.time = Math.max(clock.time, target);
+		return;
+	}
 }
 
 /**
@@ -743,6 +1014,19 @@ export function step(
 		return session(run, options);
 	}
 
+	if ('wait' in choice) {
+		let target: number | undefined;
+		if (choice.wait === 'next') target = nextDue(run.clock);
+		else if (Number.isFinite(choice.wait) && choice.wait > 0) target = run.clock.time + choice.wait;
+		else throw new Error(`cannot wait for ${String(choice.wait)} seconds`);
+		if (target === undefined) {
+			run.messages.push(`no timer is running in ${where}`);
+			return session(run, options);
+		}
+		waitUntil(run, target, options);
+		return session(run, options);
+	}
+
 	const list = candidates(chart, run.active);
 	// Guards and conditions are evaluated once, before anything fires.
 	const before = run.env.clone();
@@ -754,7 +1038,7 @@ export function step(
 			run.messages.push(`\`${t.label}\` does not leave ${where}`);
 			return session(run, options);
 		}
-		const c = check(chart, t, run.active, before);
+		const c = check(chart, t, run.active, before, run.clock);
 		if (!c.ready) {
 			run.messages.push(`\`${t.label}\` cannot fire: ${c.reason}`);
 			return session(run, options);
@@ -762,14 +1046,39 @@ export function step(
 		ready = [t];
 	} else {
 		const event = choice.event?.trim() || null;
-		ready = list.filter((t) => accepts(t, event) && check(chart, t, run.active, before).ready);
-		if (!ready.length) {
-			run.messages.push(
-				event !== null
-					? `\`${event}\` fires no transition from ${where}`
-					: `no completion, guard-only or change transition is ready in ${where}`
+		if (event !== null) {
+			ready = list.filter(
+				(t) => accepts(t, event) && check(chart, t, run.active, before, run.clock).ready
 			);
-			return session(run, options);
+			if (!ready.length) {
+				const timed = list.some((t) => t.trigger?.kind === 'time' && t.trigger.text === event);
+				run.messages.push(
+					timed
+						? `\`${event}\` is a time trigger: it fires when its time comes (Step or Wait)`
+						: `\`${event}\` fires no transition from ${where}`
+				);
+				return session(run, options);
+			}
+		} else {
+			ready = readyNow(run, list, before);
+			// Nothing to do now: time passes to the next timer.
+			if (!ready.length) {
+				const next = nextDue(run.clock);
+				if (next === undefined) {
+					run.messages.push(`nothing is ready in ${where}, and no timer is running`);
+					return session(run, options);
+				}
+				run.clock.time = next;
+				ready = readyNow(run, list, before);
+			}
+			expire(run, list, before);
+			if (!ready.length) {
+				const lost = lostAt(run, list);
+				run.messages.push(
+					`at ${formatDuration(run.clock.time)} nothing fired: ${lost.join('; ') || 'nothing was ready'}`
+				);
+				return session(run, options);
+			}
 		}
 	}
 	for (const t of select(chart, ready, run.active)) take(run, t);

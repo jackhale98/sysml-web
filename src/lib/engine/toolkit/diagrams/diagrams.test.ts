@@ -340,18 +340,22 @@ describe('state transition view', () => {
 		expect(ids(tk)).toEqual([
 			'__initial__',
 			'armed',
+			'charging',
 			'failsafe',
 			'flying',
+			'flying.__initial__',
+			'flying.cruising',
 			'idle',
 			'landing',
 			'returningHome'
 		]);
-		expect(tk.edges).toHaveLength(12);
+		expect(tk.edges).toHaveLength(17);
 		expect(edges(tk)).toEqual(
 			expect.arrayContaining([
 				'__initial__ -transition-> idle',
 				'idle -transition-> armed (ArmCommand [preflightChecksPassed])',
-				'flying -transition-> returningHome (when stateOfCharge < returnThreshold)'
+				'flying -transition-> returningHome (when stateOfCharge < returnThreshold)',
+				'charging -transition-> idle (when stateOfCharge >= readyCharge)'
 			])
 		);
 		expect(node(tk, 'failsafe').attributes).toEqual([['entry', 'alertOperator']]);

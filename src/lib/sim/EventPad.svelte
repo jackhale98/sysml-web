@@ -1,6 +1,8 @@
 <script lang="ts">
 	import {
 		ArrowRight,
+		Clock,
+		Hourglass,
 		Pause,
 		Play,
 		Redo2,
@@ -9,7 +11,7 @@
 		Undo2,
 		Zap
 	} from '@lucide/svelte';
-	import { explain, type EventOption, type StepOption } from './model.ts';
+	import { WAITS, explain, timeText, type EventOption, type StepOption } from './model.ts';
 
 	interface Props {
 		events: EventOption[];
@@ -24,7 +26,11 @@
 		speed: number;
 		/** Variables changed since the last step. */
 		pendingCount: number;
+		/** Simulated time, in seconds since the start. */
+		time: number;
 		onfire: (event: string | null) => void;
+		/** Let time pass: so many seconds, or to the next timer. */
+		onwait: (amount: number | 'next') => void;
 		onback: () => void;
 		onforward: () => void;
 		onrestart: () => void;
@@ -44,7 +50,9 @@
 		auto,
 		speed,
 		pendingCount,
+		time,
 		onfire,
+		onwait,
 		onback,
 		onforward,
 		onrestart,
@@ -55,6 +63,7 @@
 
 	const uid = $props.id();
 	let nudged = $state<string | null>(null);
+	let waitFor = $state('next');
 
 	/** Shake a blocked event so its reason gets noticed. */
 	export function nudge(trigger: string) {
@@ -74,6 +83,20 @@
 		...new Set(o.transitions.filter((t) => t.ready || !o.ready).map((t) => labelOf(t.to)))
 	];
 	const stepTargets = $derived(step.transitions.filter((t) => t.ready));
+	const moves = (list: StepOption['transitions']) =>
+		list.map((t) => `${t.transition} → ${labelOf(t.to)}`).join(', ');
+	/** The next timer still to come, if one is running. */
+	const nextDue = $derived.by(() => {
+		const dues = step.transitions.flatMap((t) =>
+			t.due !== undefined && t.due > time ? [t.due] : []
+		);
+		return dues.length ? Math.min(...dues) : null;
+	});
+
+	/** Wait for the amount chosen (the W key). */
+	export function wait() {
+		onwait(waitFor === 'next' ? 'next' : Number(waitFor));
+	}
 </script>
 
 <section class="pad" aria-labelledby="{uid}-title">
@@ -150,6 +173,31 @@
 		</p>
 	{/if}
 
+	<div class="clock" role="group" aria-labelledby="{uid}-time">
+		<span class="now" id="{uid}-time" title="Simulated time since the start">
+			<Clock size={15} aria-hidden="true" />
+			<span><span class="visually-hidden">Time </span>{timeText(time)}</span>
+		</span>
+		<label class="visually-hidden" for="{uid}-wait">How long to wait</label>
+		<select id="{uid}-wait" bind:value={waitFor}>
+			<option value="next"
+				>Next timer{nextDue !== null ? ` (${timeText(nextDue - time)})` : ''}</option
+			>
+			{#each WAITS as w (w)}<option value={String(w)}>{timeText(w)}</option>{/each}
+		</select>
+		<button
+			type="button"
+			class="wait"
+			onclick={wait}
+			aria-disabled={busy || !running}
+			aria-keyshortcuts="W"
+			title="Let time pass, taking what comes due on the way (W)"
+		>
+			<Hourglass size={16} aria-hidden="true" />
+			<span>Wait</span>
+		</button>
+	</div>
+
 	<div class="transport" role="toolbar" aria-label="Emulation">
 		<button
 			type="button"
@@ -188,14 +236,16 @@
 			onclick={() => onfire(null)}
 			aria-disabled={busy || !running}
 			aria-keyshortcuts="S"
-			title="Take completion, guard-only, change (when …) and time (after …) transitions (S)"
+			title="Take what is ready now (completion, guard-only, when … and due after … transitions); if nothing is, let time pass to the next timer (S)"
 		>
 			<StepForward size={17} aria-hidden="true" />
 			<span class="step-text">
 				<span>Step</span>
 				<small>
 					{#if stepTargets.length}
-						{stepTargets.map((t) => `${t.transition} → ${labelOf(t.to)}`).join(', ')}
+						{moves(stepTargets)}
+					{:else if step.next}
+						in {timeText(step.next.due - time)}: {moves(step.next.transitions)}
 					{:else if step.transitions.length}
 						waiting: {step.transitions.map((t) => t.transition).join(', ')}
 					{:else}
@@ -212,7 +262,9 @@
 				onclick={onauto}
 				aria-pressed={auto}
 				aria-keyshortcuts="P"
-				title={auto ? 'Pause auto-run (P)' : 'Auto-run: fire ready events by themselves (P)'}
+				title={auto
+					? 'Pause auto-run (P)'
+					: 'Auto-run: Step, letting time pass, and send ready events by themselves (P)'}
 			>
 				{#if auto}<Pause size={16} aria-hidden="true" />{:else}<Play
 						size={16}
@@ -411,6 +463,62 @@
 	.none {
 		color: var(--text-2);
 		font-size: var(--text-sm);
+	}
+
+	.clock {
+		display: flex;
+		align-items: center;
+		gap: var(--space-2);
+		min-width: 0;
+	}
+	.now {
+		display: inline-flex;
+		flex: 1 0 auto;
+		align-items: center;
+		gap: 6px;
+		min-width: 0;
+		color: var(--text);
+		font-size: var(--text-sm);
+		font-weight: 650;
+		font-variant-numeric: tabular-nums;
+		white-space: nowrap;
+	}
+	.now :global(svg) {
+		flex: none;
+		color: var(--kind-behavior);
+	}
+	.clock select {
+		flex: 0 1 auto;
+		min-width: 0;
+		min-height: 44px;
+		padding: 0 8px;
+		color: var(--text);
+		background: var(--surface);
+		border: 1px solid var(--border-strong);
+		border-radius: var(--radius-md);
+		font: inherit;
+		font-size: var(--text-sm);
+	}
+	.wait {
+		display: inline-flex;
+		flex: none;
+		align-items: center;
+		gap: 6px;
+		min-height: 44px;
+		padding: 0 14px;
+		color: var(--text);
+		background: var(--surface);
+		border: 1px solid var(--border-strong);
+		border-radius: var(--radius-md);
+		font-weight: 600;
+		cursor: pointer;
+	}
+	.wait:hover:not([aria-disabled='true']) {
+		background: var(--surface-hover);
+	}
+	.wait[aria-disabled='true'] {
+		color: var(--text-3);
+		cursor: default;
 	}
 
 	.transport {

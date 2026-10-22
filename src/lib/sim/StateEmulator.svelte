@@ -33,6 +33,7 @@
 		stepOption,
 		stepsSince,
 		structureKey,
+		timeText,
 		transitionOf,
 		within,
 		type History
@@ -336,7 +337,11 @@
 		void start();
 	}
 
-	async function fire(event: string | null) {
+	const fire = (event: string | null) => run({ event });
+	const wait = (amount: number | 'next') => run({ wait: amount });
+
+	/** Send an event, Step (`event: null`) or let time pass. */
+	async function run(choice: { event: string | null } | { wait: number | 'next' }) {
 		const before = session;
 		if (!before || busy || !def) return;
 		if (before.status !== 'running') {
@@ -347,14 +352,19 @@
 		stepError = null;
 		const changes = Object.keys(pending).length ? pending : null;
 		try {
-			const next = stepMachine(def, before, { event, variables: changes ?? undefined }, LIMITS);
+			const next = stepMachine(def, before, { ...choice, variables: changes ?? undefined }, LIMITS);
 			pending = {};
 			const steps = stepsSince(before, next);
 			if (steps.length) override = [...before.current];
 			history = record(history, next);
 			if (!steps.length) {
-				const text = next.messages?.join(' ') || 'Nothing happened.';
-				flash(text.replace(/`/g, ''));
+				const waited = (next.time ?? 0) > (before.time ?? 0);
+				const text = next.messages?.length
+					? next.messages.join(' ')
+					: waited
+						? `Time ${timeText(next.time)}: still in ${next.current.join(' and ')}`
+						: 'Nothing happened.';
+				if (next.messages?.length || !waited) flash(text.replace(/`/g, ''));
 				announce = text.replace(/`/g, '');
 				return;
 			}
@@ -449,6 +459,9 @@
 		} else if (e.key === 's' || e.key === 'S') {
 			e.preventDefault();
 			void fire(null);
+		} else if (e.key === 'w' || e.key === 'W') {
+			e.preventDefault();
+			pad?.wait();
 		} else if (e.key === 'b' || e.key === 'B') {
 			e.preventDefault();
 			goTo(history.cursor - 1);
@@ -707,7 +720,9 @@
 				{auto}
 				{speed}
 				pendingCount={changedCount}
+				time={view?.time ?? 0}
 				onfire={(event) => void fire(event)}
+				onwait={(amount) => void wait(amount)}
 				onback={() => goTo(history.cursor - 1)}
 				onforward={() => goTo(history.cursor + 1)}
 				onrestart={restart}
@@ -998,7 +1013,7 @@
 	.section summary {
 		position: sticky;
 		top: 0;
-		z-index: 1;
+		z-index: 2;
 		display: flex;
 		align-items: center;
 		gap: var(--space-2);

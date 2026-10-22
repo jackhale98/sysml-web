@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { Check, CircleDot, X } from '@lucide/svelte';
+	import { Check, CircleDot, TriangleAlert, X } from '@lucide/svelte';
 	import type { SimStep } from '#lib/engine/types.ts';
-	import { isChangeTrigger } from './model.ts';
+	import { explain, isChangeTrigger, timeText } from './model.ts';
 
 	interface Props {
 		/** The trace of the latest session (steps after the cursor are "future"). */
@@ -75,15 +75,20 @@
 					{#if s.step === 0}<CircleDot size={12} />{:else}{s.step}{/if}
 				</span>
 				<span class="body">
-					<span class="move">
-						{#if s.step === 0}
-							<span class="from">start</span>
-						{:else}
-							<span class="from">{labelOf(s.from_state)}</span>
-						{/if}
-						<span class="arrow" aria-hidden="true">→</span><span class="visually-hidden">to</span>
-						<span class="to">{labelOf(s.to_state)}</span>
-						{#if s.transition_name}<span class="tname">{s.transition_name}</span>{/if}
+					<span class="head">
+						<span class="move">
+							{#if s.step === 0}
+								<span class="from">start</span>
+							{:else}
+								<span class="from">{labelOf(s.from_state)}</span>
+							{/if}
+							<span class="arrow" aria-hidden="true">→</span><span class="visually-hidden">to</span>
+							<span class="to">{labelOf(s.to_state)}</span>
+							{#if s.transition_name}<span class="tname">{s.transition_name}</span>{/if}
+						</span>
+						{#if s.time !== undefined}<span class="when"
+								><span class="visually-hidden">at </span>{timeText(s.time)}</span
+							>{/if}
 					</span>
 					<span class="details">
 						{#if s.trigger}
@@ -100,10 +105,21 @@
 								guard {s.guard_result ? 'true' : 'false'}
 							</span>
 						{/if}
+						{#if s.do_stopped}<span class="act"><i>stopped</i> {s.do_stopped}</span>{/if}
 						{#if s.exit_action}<span class="act"><i>exit</i> {s.exit_action}</span>{/if}
 						{#if s.effect}<span class="act"><i>do</i> / {s.effect}</span>{/if}
 						{#if s.entry_action}<span class="act"><i>entry</i> {s.entry_action}</span>{/if}
+						{#if s.do_action}<span class="act"><i>started</i> {s.do_action}</span>{/if}
 					</span>
+					{#each s.notes ?? [] as note, n (n)}
+						<span class="note">
+							<TriangleAlert size={12} aria-hidden="true" />
+							<span
+								>{#each explain(note) as part, p (p)}{#if part.code}<code>{part.text}</code
+										>{:else}{part.text}{/if}{/each}</span
+							>
+						</span>
+					{/each}
 				</span>
 			</button>
 		</li>
@@ -237,6 +253,7 @@
 	}
 	.body {
 		display: flex;
+		flex: 1;
 		flex-direction: column;
 		gap: 3px;
 		min-width: 0;
@@ -265,6 +282,39 @@
 	}
 	.tname::before {
 		content: '· ';
+	}
+	.head {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 6px;
+	}
+	.when {
+		flex: none;
+		color: var(--text-2);
+		font-size: 11px;
+		font-variant-numeric: tabular-nums;
+		white-space: nowrap;
+	}
+	.note {
+		display: flex;
+		align-items: flex-start;
+		gap: 4px;
+		color: var(--text-2);
+		font-size: var(--text-xs);
+		line-height: 1.4;
+	}
+	.note :global(svg) {
+		flex: none;
+		margin-top: 2px;
+		color: var(--warn);
+	}
+	.note code {
+		padding: 0 3px;
+		color: var(--text);
+		background: var(--surface-2);
+		border-radius: 4px;
+		font-size: 11px;
 	}
 	.details {
 		display: flex;

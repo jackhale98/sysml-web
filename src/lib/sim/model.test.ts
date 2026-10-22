@@ -20,6 +20,7 @@ import {
 	stepOption,
 	stepsSince,
 	structureKey,
+	timeText,
 	transitionOf,
 	variableUses,
 	type Enabled,
@@ -128,6 +129,47 @@ describe('controls', () => {
 		expect(autoMove(flyingEnabled, visited, () => 0)).toEqual({ event: 'FaultDetected' });
 		expect(autoMove(flyingEnabled.map((e) => ({ ...e, ready: false })))).toBeNull();
 	});
+
+	it('a Step with nothing ready lets time pass to the next timer, which auto-run takes too', () => {
+		const timer = (index: number, due: number): Enabled => ({
+			transition: `t${index}`,
+			index,
+			from: 'cruising',
+			to: 'cruising',
+			trigger: `after ${due} [s]`,
+			due,
+			ready: false,
+			reason: `\`after ${due} [s]\` is due at ${due} s`
+		});
+		const enabled = [...flyingEnabled, timer(7, 300), timer(8, 60), timer(9, 60)];
+		const step = stepOption(enabled);
+		expect(step.ready).toBe(false);
+		expect(step.next).toEqual({ due: 60, transitions: [timer(8, 60), timer(9, 60)] });
+		// Time passing comes before the events.
+		expect(autoMove(enabled)).toEqual({ event: null });
+		expect(stepOption(flyingEnabled).next).toBeUndefined();
+	});
+
+	it('explains a time it cannot work out, linking to its variable', () => {
+		expect(explain('time `after delay`: undefined variable `delay`')[0]).toMatchObject({
+			code: true,
+			variable: 'delay'
+		});
+	});
+
+	it('says simulated times plainly', () => {
+		expect([0, 0.25, 45, 60, 90, 1500, 3600, 3900, 90061].map(timeText)).toEqual([
+			'0 s',
+			'0.25 s',
+			'45 s',
+			'1 min',
+			'1 min 30 s',
+			'25 min',
+			'1 h',
+			'1 h 5 min',
+			'1 d 1 h 1 min 1 s'
+		]);
+	});
 });
 
 describe('variables', () => {
@@ -160,10 +202,11 @@ describe('variables', () => {
 	it('finds the guards and change triggers each variable affects', () => {
 		const uses = variableUses(flightModes);
 		expect(uses.get('preflightChecksPassed')).toEqual([
-			{ index: 1, name: 'arm', kind: 'guard', expression: 'preflightChecksPassed' }
+			{ index: 3, name: 'arm', kind: 'guard', expression: 'preflightChecksPassed' }
 		]);
 		expect(uses.get('stateOfCharge')!.map((u) => [u.name, u.kind])).toEqual([
-			['lowBattery', 'when']
+			['lowBattery', 'when'],
+			['charged', 'when']
 		]);
 		expect(uses.get('returnThreshold')!.map((u) => u.name)).toEqual(['lowBattery']);
 		expect(mentions('a.count > 2', 'count')).toBe(false);
@@ -176,7 +219,6 @@ describe('variables', () => {
 			max: 1,
 			step: 0.01
 		});
-		// stateOfCharge has no default, but is compared with returnThreshold = 0.3.
 		expect(sliderRange(flightModes, 'stateOfCharge', 'real')).toEqual({
 			min: 0,
 			max: 1,
@@ -199,7 +241,7 @@ describe('trace and history', () => {
 					transition_name: 'lowBattery'
 				})
 			)
-		).toBe(6);
+		).toBe(8);
 		expect(
 			transitionOf(flightModes, step({ step: 0, from_state: 'entry', to_state: 'idle' }))
 		).toBe(0);
@@ -222,6 +264,7 @@ describe('trace and history', () => {
 		expect(stepsSince(s1, s1)).toEqual([]);
 		expect(announcement(s0, [t0])).toBe('Started in idle');
 		expect(announcement(s1, [t1])).toBe('Now in armed after arm');
+		expect(announcement({ ...s1, time: 300 }, [t1])).toBe('Now in armed after arm, at 5 min');
 	});
 
 	it('marks composite states active with their active children', () => {
@@ -254,6 +297,9 @@ describe('trace and history', () => {
 		expect(h.sessions).toHaveLength(3);
 		expect(sessionAt(h, 1)).toBe(2);
 		expect(sessionAt(h, 0)).toBe(0);
+		// Time passing with nothing else changing is a step back too.
+		h = record(h, { ...withVars, time: 60 });
+		expect(h.sessions).toHaveLength(4);
 		h = record({ ...h, cursor: 0 }, s1);
 		expect(h.sessions).toEqual([ignored, s1]);
 	});

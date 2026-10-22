@@ -5,6 +5,7 @@
  * `StateMachine` and the emulator's `StateSession`.
  */
 import type { SimStep, StateMachine, StateSession } from '#lib/engine/types.ts';
+import { formatDuration } from './units.ts';
 
 export type Enabled = StateSession['enabled'][number];
 export type Variable = StateMachine['variables'][number];
@@ -47,21 +48,38 @@ export function eventOptions(enabled: Enabled[]): EventOption[] {
 }
 
 export interface StepOption {
+	/** Something is ready now. */
 	ready: boolean;
-	/** Completion, guard-only and change transitions from the current state(s). */
+	/** Completion, guard-only, change and time transitions from the current state(s). */
 	transitions: Enabled[];
 	reasons: string[];
+	/** When nothing is ready now: the next timer (seconds since the start) and what it fires. */
+	next?: { due: number; transitions: Enabled[] };
 }
 
-/** What a Step (null event) would do. */
+/** What a Step (null event) would do: what is ready now, else let time pass to the next timer. */
 export function stepOption(enabled: Enabled[]): StepOption {
 	const transitions = enabled.filter((e) => !isEventTrigger(e.trigger));
-	return {
+	const out: StepOption = {
 		ready: transitions.some((e) => e.ready),
 		transitions,
 		reasons: transitions.filter((e) => !e.ready && e.reason).map((e) => e.reason!)
 	};
+	const timers = transitions.filter((e) => !e.ready && e.due !== undefined);
+	if (!out.ready && timers.length) {
+		const due = Math.min(...timers.map((e) => e.due!));
+		out.next = { due, transitions: timers.filter((e) => e.due === due) };
+	}
+	return out;
 }
+
+/** Simulated time, said plainly: `0 s`, `25 min`, `1 h 5 min`. */
+export function timeText(seconds: number | undefined): string {
+	return formatDuration(seconds ?? 0);
+}
+
+/** Amounts of time the controls offer to wait, in seconds. */
+export const WAITS = [10, 60, 5 * 60, 10 * 60, 30 * 60, 60 * 60] as const;
 
 /** A piece of an explanation; `code` parts are model text. */
 export interface Part {
@@ -77,7 +95,7 @@ export interface Part {
  * "guard `p`: undefined variable `p`" → p has no value yet.
  */
 export function explain(reason: string): Part[] {
-	const undefinedVar = /^(guard|condition) `(.+)`: undefined variable `(.+)`$/.exec(reason);
+	const undefinedVar = /^(guard|condition|time) `(.+)`: undefined variable `(.+)`$/.exec(reason);
 	if (undefinedVar) {
 		return [
 			{ text: undefinedVar[3]!, code: true, variable: undefinedVar[3]! },
@@ -241,7 +259,8 @@ export function announcement(session: StateSession, steps: SimStep[]): string {
 			: session.status === 'deadlocked'
 				? '. Nothing more can happen'
 				: '';
-	return `Now in ${where} after ${list(via)}${done}`;
+	const at = session.time ? `, at ${timeText(session.time)}` : '';
+	return `Now in ${where} after ${list(via)}${at}${done}`;
 }
 
 /** Names that shape the machine; when they change, a running session no longer fits. */
@@ -275,6 +294,7 @@ export function record(history: History, next: StateSession): History {
 		current &&
 		current.step === next.step &&
 		current.trace.length === next.trace.length &&
+		(current.time ?? 0) === (next.time ?? 0) &&
 		JSON.stringify(current.variables) === JSON.stringify(next.variables);
 	// An ignored event changes nothing worth a step back; keep its messages only.
 	if (same) return { sessions: [...kept.slice(0, -1), next], cursor: kept.length - 1 };
@@ -291,7 +311,8 @@ export function sessionAt(history: History, step: number): number {
 }
 
 /**
- * Auto-run's next move: a ready Step first, else the ready event whose targets
+ * Auto-run's next move: a Step whenever one can happen (what is ready now,
+ * else time passing to the next timer), else the ready event whose targets
  * were visited least (so a run tours the machine), ties broken at random.
  */
 export function autoMove(
@@ -299,7 +320,8 @@ export function autoMove(
 	trace: SimStep[] = [],
 	random: () => number = Math.random
 ): { event: string | null } | null {
-	if (stepOption(enabled).ready) return { event: null };
+	const step = stepOption(enabled);
+	if (step.ready || step.next) return { event: null };
 	const ready = eventOptions(enabled).filter((o) => o.ready);
 	if (!ready.length) return null;
 	const visits = new Map<string, number>();
