@@ -98,11 +98,20 @@ export class ToolkitHost {
 	private readonly language: LanguageServices;
 	readonly syntax: SyntaxServices;
 
-	constructor(tk: Toolkit, library: TkLibrary, syntax = new SyntaxServices(tk)) {
+	/** The instance's WebAssembly memory in MiB (0 when unknown). */
+	private readonly memoryMiB: () => number;
+
+	constructor(
+		tk: Toolkit,
+		library: TkLibrary,
+		syntax = new SyntaxServices(tk),
+		memoryMiB: () => number = () => 0
+	) {
 		this.tk = tk;
 		this.library = library;
 		this.language = new LanguageServices(tk, library);
 		this.syntax = syntax;
+		this.memoryMiB = memoryMiB;
 	}
 
 	highlight(source: string): Highlights {
@@ -305,9 +314,12 @@ export class ToolkitHost {
 	 */
 	checks(files: SourceFile[]): CheckReport {
 		const evaluation = this.evaluationOf(this.build(files));
-		return evaluation
-			? evaluation.checks()
-			: { checks: [], summary: { satisfied: 0, violated: 0, undecided: 0 }, ms: 0 };
+		if (!evaluation)
+			return { checks: [], summary: { satisfied: 0, violated: 0, undecided: 0 }, ms: 0 };
+		const report = evaluation.checks();
+		// A large model's second session costs hundreds of MB: free it until values are asked for.
+		if (this.memoryMiB() > RELEASE_EVALUATION_AT_MIB) evaluation.release();
+		return report;
 	}
 
 	/** Elements' bound values, evaluated, by element id; cached per analysis. */
@@ -363,6 +375,7 @@ export class ToolkitHost {
 		this.built = null;
 		previous?.evaluation?.free();
 		previous?.session?.free();
+		if (withViewLibraries) this.language.textsChanged(files);
 		const { session, units, parse, lenient } = this.prepare(files, withViewLibraries);
 		const prepared = performance.now();
 		const findings = session ? (JSON.parse(session.check()) as TkFinding[]) : [];
@@ -495,6 +508,13 @@ export class ToolkitHost {
 		return session;
 	}
 }
+
+/**
+ * WebAssembly memory (MiB) from which the evaluation session is freed after
+ * the checks. The toolkit's instance can't grow past 2 GiB; a model of 50k
+ * lines passes 1 GiB (the demo takes about 300 MiB).
+ */
+const RELEASE_EVALUATION_AT_MIB = 1024;
 
 const isModel = (path: string) => path.endsWith('.sysml') || path.endsWith('.kerml');
 

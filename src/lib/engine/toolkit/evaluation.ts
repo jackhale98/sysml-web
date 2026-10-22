@@ -134,6 +134,16 @@ export class Evaluation {
 		this.own = null;
 	}
 
+	/**
+	 * Free the evaluation session until it is needed again (values already
+	 * evaluated and the checks stay cached): on a large model it is as big as
+	 * the analysed session, and the language server needs memory next.
+	 */
+	release() {
+		this.free();
+		this.opened = false;
+	}
+
 	/** The session to evaluate in, opened on first use. */
 	get session(): TkSession {
 		if (!this.opened) {

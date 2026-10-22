@@ -87,7 +87,7 @@ async function boot(i: ToolkitInit): Promise<ToolkitHost> {
 		}
 	}
 	library ??= new tk.PreparedLibrary(bundle, null);
-	const host = new ToolkitHost(tk, library, early);
+	const host = new ToolkitHost(tk, library, early, memoryMiB);
 	latest = host;
 	post({
 		type: 'ready',

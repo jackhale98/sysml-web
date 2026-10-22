@@ -111,7 +111,6 @@ const ELEMENT_FIELDS = [
 	'valueSource',
 	'valueIsDefault',
 	'docs',
-	'owner',
 	'property:owningRelationship',
 	'property:isAbstract',
 	'property:direction',
@@ -122,9 +121,13 @@ const ELEMENT_FIELDS = [
 
 type Row = Record<string, unknown> & { errors?: Record<string, string> };
 
-/** Deepest nesting walked, and most elements read: guards against pathological input. */
+/**
+ * Deepest nesting walked, and most elements read: guards against pathological
+ * input. A project of 100k lines has about 110k elements (it lost its last
+ * files' elements to a limit of 100k).
+ */
 const MAX_DEPTH = 64;
-const MAX_ELEMENTS = 100_000;
+const MAX_ELEMENTS = 2_000_000;
 
 export function extractModel(
 	tk: Toolkit,

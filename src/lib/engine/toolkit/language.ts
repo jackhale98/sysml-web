@@ -123,6 +123,11 @@ class Server {
 		);
 	}
 
+	/** Drop the server's navigation sessions (resolved copies of the workspace). */
+	invalidate() {
+		this.lsp.invalidateSessions();
+	}
+
 	free() {
 		this.lsp.free();
 	}
@@ -368,6 +373,21 @@ export class LanguageServices {
 				};
 			})
 			.filter((a) => a.changes.length);
+	}
+
+	/**
+	 * The project's texts are now `files`. When the server has others, its
+	 * navigation sessions (a resolved copy of the whole workspace, which hover,
+	 * definition and references read) are out of date and would be rebuilt on
+	 * the next such request anyway: drop them now, so their memory is free for
+	 * the analysis (WebAssembly memory never shrinks; at 30k lines this keeps
+	 * it about 150 MB lower).
+	 */
+	textsChanged(files: SourceFile[]) {
+		if (!this.server) return;
+		const known = (f: SourceFile) => this.open.get(f.path)?.text ?? this.workspace.get(f.path);
+		if (files.length === this.workspace.size && files.every((f) => known(f) === f.text)) return;
+		this.server.invalidate();
 	}
 
 	free() {
