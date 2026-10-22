@@ -84,8 +84,10 @@
 		<ol class="scores">
 			{#each ranked as { a, i } (i)}
 				<li class:selected={i === study.selected}>
-					<span class="name mono">{a.name}</span>
-					{#if i === study.current}<span class="tag">in the design</span>{/if}
+					<span class="name"
+						><span class="mono">{a.name}</span>
+						{#if i === study.current}<span class="tag">in the design</span>{/if}</span
+					>
 					<span class="bar" aria-hidden="true"
 						><span
 							style:width="{a.score.kind === 'number' && top > 0
@@ -151,15 +153,18 @@
 	}
 	.scores li {
 		display: grid;
-		grid-template-columns: minmax(0, 1fr) auto 3.5rem 2.25rem;
+		grid-template-columns: minmax(0, 1fr) 3.5rem 2.25rem;
 		align-items: center;
 		gap: var(--space-2);
 		padding: 2px 0;
 	}
 	.name {
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 2px var(--space-2);
+		min-width: 0;
+		overflow-wrap: anywhere;
 	}
 	.selected .name {
 		font-weight: 650;
@@ -171,9 +176,6 @@
 		color: var(--text-2);
 		font-size: var(--text-xs);
 		white-space: nowrap;
-	}
-	.scores li:not(:has(.tag)) .bar {
-		grid-column: 3;
 	}
 	.bar {
 		display: block;
