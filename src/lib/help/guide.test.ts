@@ -23,6 +23,7 @@ describe('the help', () => {
 			'Add a part',
 			'Connect ports',
 			'Write a requirement',
+			'Link a requirement to the design',
 			'Check a budget',
 			'Compare options',
 			'Draw a state machine',

@@ -148,12 +148,18 @@ export async function runGuideAction(action: GuideAction, context: GuideContext)
 			openAdd(ui, 'part', partOwner(workspace));
 			return;
 		case 'link': {
-			const first = own(workspace).find((e) => e.kind === 'requirement' && !e.isDefinition);
-			const pkg = first && packageOf(workspace, first);
-			if (pkg) ui.open({ kind: 'diagram', view: 'general', scope: pkg.name, title: pkg.label });
-			toasts.show(
-				'Select a part, choose Connect, then the requirement it meets, and pick “satisfies”.'
-			);
+			// The requirement's details, where "Add what satisfies it" picks the part.
+			const rows = workspace.requirements;
+			const gap = rows.find((r) => r.satisfiedBy.length === 0) ?? rows[0];
+			const requirement = gap && workspace.elements.find((e) => e.key === gap.key);
+			if (!requirement) {
+				toasts.show('Add a requirement first, then say which part meets it.');
+				return;
+			}
+			ui.select(requirement.key, 'explorer');
+			if (ui.phone) ui.showDetails('full');
+			else ui.inspectorOpen = true;
+			toasts.show('Under “Satisfied by”, choose Add what satisfies it, and pick the part.');
 			return;
 		}
 		case 'connect-ports': {

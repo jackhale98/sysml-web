@@ -156,7 +156,7 @@ In the app: **Add a requirement**.
 
 ### Satisfy and verify
 
-**Satisfy** says which part of the design meets a requirement. **Verify** says which test checks it. Together they make the trace: a requirement with neither is a gap.
+**Satisfy** says which part of the design meets a requirement. **Verify** says which test checks it. Together they make the trace: a requirement with neither is a gap. Add them from the requirement’s details: **Add what satisfies it** and **Add a test that verifies it**.
 
 > **Satisfy**: Claims that a design element meets a requirement; the element is bound to the requirement as its subject.
 
@@ -251,6 +251,16 @@ In the app: **New interconnection diagram**.
 3. To make it checkable, select it and choose **Set a limit**: “mass at most 150 g”.
 
 In the app: **Add a requirement**.
+
+### Link a requirement to the design
+
+1. Select the requirement (in the requirements table, a diagram or the explorer).
+2. In its details, under **Satisfied by**, choose **Add what satisfies it** and pick the part that meets it.
+3. Under **Verified by**, choose **Add a test that verifies it**: pick a test, or type a name to make a new one.
+
+Each pick writes a `satisfy` or `verify` line, and the requirement leaves the **Gaps** list once both are there. In a diagram, **Connect** from a part to a requirement does the same.
+
+In the app: **Link a requirement**.
 
 ### Check a budget
 

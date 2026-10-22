@@ -184,7 +184,7 @@ export const HELP: HelpSection[] = [
 				title: 'Satisfy and verify',
 				keywords: 'trace traceability meets tested coverage gap link',
 				blocks: [
-					'**Satisfy** says which part of the design meets a requirement. **Verify** says which test checks it. Together they make the trace: a requirement with neither is a gap.',
+					'**Satisfy** says which part of the design meets a requirement. **Verify** says which test checks it. Together they make the trace: a requirement with neither is a gap. Add them from the requirement’s details: **Add what satisfies it** and **Add a test that verifies it**.',
 					concept('satisfy'),
 					concept('verify'),
 					{ code: "satisfy 'Maximum mass' by flashlight;" }
@@ -295,6 +295,22 @@ export const HELP: HelpSection[] = [
 					}
 				],
 				action: { action: 'add-requirement', label: 'Add a requirement' }
+			},
+			{
+				id: 'link-requirement',
+				title: 'Link a requirement to the design',
+				keywords: 'satisfy verify trace meets test link gap coverage',
+				blocks: [
+					{
+						steps: [
+							'Select the requirement (in the requirements table, a diagram or the explorer).',
+							'In its details, under **Satisfied by**, choose **Add what satisfies it** and pick the part that meets it.',
+							'Under **Verified by**, choose **Add a test that verifies it**: pick a test, or type a name to make a new one.'
+						]
+					},
+					'Each pick writes a `satisfy` or `verify` line, and the requirement leaves the **Gaps** list once both are there. In a diagram, **Connect** from a part to a requirement does the same.'
+				],
+				action: { action: 'link', label: 'Link a requirement' }
 			},
 			{
 				id: 'check-budget',

@@ -140,7 +140,21 @@ test('the next steps tick themselves as they are done, and can be put away', asy
 	await page.keyboard.press('Escape');
 	await expect(limit).toBeHidden();
 
-	// Link a part and give a requirement a limit, in the text.
+	// Link them: the requirement's details, where the picker adds what satisfies it.
+	await step(page, 'link').getByRole('button', { name: 'Show me' }).click();
+	const inspector = page.getByRole('complementary', { name: 'Inspector' });
+	await expect(inspector.getByRole('heading', { level: 2 })).toContainText('Max mass');
+	await inspector.getByRole('button', { name: 'Add what satisfies it' }).click();
+	await inspector
+		.getByRole('list', { name: 'Can satisfy it' })
+		.getByRole('button', { name: /^system\b/ })
+		.first()
+		.click();
+	await page.getByRole('button', { name: 'Project overview' }).click();
+	await expect(steps(page)).toContainText('4 of 6 done', { timeout: 20_000 });
+	await expect(step(page, 'link')).toHaveClass(/ticked/);
+
+	// A requirement with a limit, written in the text.
 	await page.getByRole('tab', { name: 'Files' }).click();
 	await page
 		.locator('.explorer-pane')
@@ -149,12 +163,11 @@ test('the next steps tick themselves as they are done, and can be put away', asy
 	await page.locator('.cm-content').getByText("satisfy 'First requirement' by system;").click();
 	await page.keyboard.press('End');
 	await page.keyboard.insertText(
-		"\n    satisfy 'First requirement' by system.battery;\n    requirement 'Light enough' { subject system : System; require constraint { system.mass <= 10 [kg] } }"
+		"\n    requirement 'Light enough' { subject system : System; require constraint { system.mass <= 10 [kg] } }"
 	);
 	await page.getByRole('tab', { name: 'Model' }).click();
 	await page.getByRole('button', { name: 'Project overview' }).click();
 	await expect(steps(page)).toContainText('5 of 6 done', { timeout: 20_000 });
-	await expect(step(page, 'link')).toHaveClass(/ticked/);
 	await expect(step(page, 'numbers')).toHaveClass(/ticked/);
 
 	// Keep a copy: a download ticks the last one.

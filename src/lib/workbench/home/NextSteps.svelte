@@ -104,7 +104,7 @@
 		{
 			id: 'link',
 			title: 'Link a part to a requirement',
-			hint: 'Say which part meets it (a “satisfy” link).',
+			hint: 'In a requirement’s details, say which part meets it (a “satisfy” link).',
 			actions: [{ label: 'Show me', action: 'link', primary: true }]
 		},
 		{
