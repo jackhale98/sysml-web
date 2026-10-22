@@ -58,6 +58,7 @@
 	.hidden-panel {
 		display: grid;
 		gap: 4px;
+		width: max-content;
 		max-width: min(20rem, calc(100vw - 7rem));
 		padding: 4px;
 		border: 1px solid var(--border);
@@ -87,6 +88,7 @@
 		color: var(--text-2);
 		font: inherit;
 		font-weight: 600;
+		white-space: nowrap;
 		cursor: pointer;
 	}
 	button:hover {
@@ -107,6 +109,9 @@
 		overflow-y: auto;
 		list-style: none;
 	}
+	.show {
+		flex: none;
+	}
 	li {
 		display: flex;
 		align-items: center;
@@ -115,6 +120,7 @@
 	}
 	.name {
 		flex: 1;
+		min-width: 0;
 		overflow: hidden;
 		color: var(--text);
 		text-overflow: ellipsis;

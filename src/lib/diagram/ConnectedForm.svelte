@@ -55,11 +55,11 @@
 </script>
 
 <FormPanel label="Add connected elements of {name}" {mode} {x} {y} {onclose}>
-	<div class="choices">
+	<div class="directions">
 		<p class="title">Add what is connected to <strong>{name}</strong></p>
 		<button
 			type="button"
-			class="choice"
+			class="direction"
 			disabled={busy || !outgoing.length}
 			onclick={() => add('out')}
 		>
@@ -75,7 +75,7 @@
 		</button>
 		<button
 			type="button"
-			class="choice"
+			class="direction"
 			disabled={busy || !incoming.length}
 			onclick={() => add('in')}
 		>
@@ -91,7 +91,7 @@
 		</button>
 		<button
 			type="button"
-			class="choice"
+			class="direction"
 			disabled={busy || !neighbours.length}
 			onclick={() => add('both')}
 		>
@@ -110,7 +110,7 @@
 </FormPanel>
 
 <style>
-	.choices {
+	.directions {
 		display: grid;
 		gap: var(--space-2);
 	}
@@ -122,7 +122,7 @@
 	.title strong {
 		color: var(--text);
 	}
-	.choice {
+	.direction {
 		display: flex;
 		align-items: flex-start;
 		gap: var(--space-3);
@@ -136,20 +136,20 @@
 		text-align: left;
 		cursor: pointer;
 	}
-	.choice :global(svg) {
+	.direction :global(svg) {
 		flex: none;
 		margin-top: 2px;
 		color: var(--accent);
 	}
-	.choice:hover:not(:disabled) {
+	.direction:hover:not(:disabled) {
 		border-color: var(--accent);
 		background: var(--accent-weak);
 	}
-	.choice:disabled {
+	.direction:disabled {
 		cursor: default;
 		opacity: 0.6;
 	}
-	.choice > span {
+	.direction > span {
 		display: grid;
 		gap: 2px;
 		min-width: 0;
