@@ -267,7 +267,7 @@ describe('making views', () => {
 				{ ...base, name: 'bom', isUsage: true, definition: 'BillOfMaterials' },
 				{ ...base, name: 'chapter', isUsage: true, file: 'libraries/ModelViews.sysml' }
 			]).map((i) => i.label)
-		).toEqual(['Bom']);
+		).toEqual(['BOM']);
 		const s = {
 			elements: [],
 			views: [],
