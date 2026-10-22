@@ -7,13 +7,14 @@
 		typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 </script>
 
-<!-- Toasts wait while the pointer is on them or focus is in them. -->
+<!--
+	Toasts wait while focus is in them, so one reached by keyboard stays. Not on
+	hover: a toast held under the pointer would sit over whatever is beneath it.
+-->
 <section
 	class="toaster"
 	aria-label="Notifications"
 	aria-live="polite"
-	onpointerenter={() => toasts.pause()}
-	onpointerleave={() => toasts.resume()}
 	onfocusin={() => toasts.pause()}
 	onfocusout={(event) => {
 		const to = event.relatedTarget as Node | null;
@@ -57,7 +58,8 @@
 <style>
 	.toaster {
 		position: fixed;
-		right: var(--space-4);
+		/* The workbench moves them clear of its details panel. */
+		right: var(--toast-right, var(--space-4));
 		bottom: calc(var(--space-4) + 1.75rem);
 		z-index: 50;
 		display: grid;
