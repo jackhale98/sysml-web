@@ -11,6 +11,7 @@
 		BookOpen,
 		CircleAlert,
 		Code,
+		CopyPlus,
 		FileCode,
 		Gauge,
 		Link2,
@@ -24,9 +25,16 @@
 	import type { ModelElement, TreeNode } from '#lib/project/elements.ts';
 	import { displayReference } from '#lib/project/names.ts';
 	import { humanize, statusLabel } from '#lib/project/status.ts';
-	import type { Workspace } from '#lib/project/workspace.svelte.ts';
+	import { isLibraryFile, type Workspace } from '#lib/project/workspace.svelte.ts';
 	import Pill from '#lib/ui/Pill.svelte';
-	import { addElement, applySteps, deleteElement, deleteImpact, renameElement } from './actions.ts';
+	import {
+		addElement,
+		applySteps,
+		deleteElement,
+		deleteImpact,
+		duplicateElement,
+		renameElement
+	} from './actions.ts';
 	import { ownersOf } from '#lib/diagram/model.ts';
 	import { planLinkRemoval } from '#lib/diagram/relationships.ts';
 	import { toasts } from '#lib/ui/toasts.svelte.ts';
@@ -442,6 +450,20 @@
 						<Plus size={15} /> Add to {element.label}
 					</button>
 				{/if}
+			{/if}
+			{#if !isLibraryFile(element.file)}
+				<button
+					type="button"
+					class="button"
+					title="Copy it under a new name, right after it (Ctrl+D or ⌘D)"
+					onclick={async () => {
+						const { error, copy } = await duplicateElement(workspace, element);
+						if (error) message = error;
+						else if (copy) ui.select(copy.key, 'inspector');
+					}}
+				>
+					<CopyPlus size={15} /> Duplicate
+				</button>
 			{/if}
 			{#if confirmDelete}
 				<div class="confirm" role="alert">

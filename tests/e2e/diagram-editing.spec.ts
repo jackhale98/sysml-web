@@ -190,6 +190,38 @@ test('in a saved view, add connected elements writes expose lines, and says what
 	}).toPass({ timeout: 15_000 });
 });
 
+test('duplicate copies an element beside it, selects the copy, and undoes in one step', async ({
+	page
+}) => {
+	await openDemo(page);
+	const diagram = await openFileDiagram(
+		page,
+		/^DroneArchitecture\.sysml/,
+		/DroneArchitecture diagram/
+	);
+	const inspector = page.getByRole('complementary', { name: 'Inspector' });
+	await node(diagram, 'drone.battery').click({ button: 'right' });
+	await page.getByRole('menuitem', { name: /^Duplicate/ }).click();
+	await expect(node(diagram, 'drone.battery2')).toBeVisible({ timeout: 10_000 });
+	await expect(toasts(page)).toContainText('Duplicated battery as battery2');
+	await expect(inspector.getByRole('heading', { level: 2 })).toHaveText('battery2');
+	await expect(page.locator('.cm-content')).toContainText('part battery2 : Battery;');
+	await toasts(page).getByRole('button', { name: 'Undo' }).last().click();
+	await expect(node(diagram, 'drone.battery2')).toHaveCount(0);
+
+	// The keyboard: Ctrl+D (⌘D on a Mac) on the node.
+	await node(diagram, 'drone.camera').focus();
+	await page.keyboard.press('Control+d');
+	await expect(node(diagram, 'drone.camera2')).toBeVisible({ timeout: 10_000 });
+	// And the inspector's button, counting on from the last copy.
+	await inspector.getByRole('button', { name: 'Duplicate' }).click();
+	await expect(inspector.getByRole('heading', { level: 2 })).toHaveText('camera3', {
+		timeout: 10_000
+	});
+	await expect(node(diagram, 'drone.camera3')).toBeVisible();
+	await expectAccessible(page);
+});
+
 test.describe('on a phone', () => {
 	test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 
@@ -218,7 +250,7 @@ test.describe('on a phone', () => {
 		return diagram;
 	}
 
-	test('a long press opens the node’s actions as a sheet; remove from diagram works by touch', async ({
+	test('the node’s actions are a sheet: remove, show again, duplicate and add connected by touch', async ({
 		page
 	}) => {
 		await openDemo(page);
@@ -239,6 +271,13 @@ test.describe('on a phone', () => {
 		expect((await all.boundingBox())!.height).toBeGreaterThanOrEqual(44);
 		await all.tap();
 		await expect(node(catalogue, 'Camera')).toBeVisible();
+		// Duplicate is in the sheet too.
+		await longPress(page, node(catalogue, 'Camera'));
+		await page
+			.getByRole('dialog', { name: 'Camera' })
+			.getByRole('menuitem', { name: 'Duplicate' })
+			.click();
+		await expect(node(catalogue, 'Camera2')).toBeVisible({ timeout: 10_000 });
 
 		// Adding connected elements is a bottom sheet with thumb-sized choices.
 		await longPress(page, node(catalogue, 'Battery'));

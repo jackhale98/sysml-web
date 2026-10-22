@@ -106,7 +106,8 @@ export const HELP: HelpSection[] = [
 			{
 				id: 'diagram-show-hide',
 				title: 'Change what a diagram shows',
-				keywords: 'hide remove delete diagram view expose model add connected neighbours related',
+				keywords:
+					'hide remove delete diagram view expose model add connected neighbours related duplicate copy',
 				blocks: [
 					'Right-click a box (long-press on a phone) to see its actions. Two of them look alike but do very different things:',
 					{
@@ -117,6 +118,7 @@ export const HELP: HelpSection[] = [
 					},
 					'In a saved view, removing an element its `expose` line names removes that line (the view’s own record of what it shows). Anything else is hidden on that diagram, and the layout remembers it beside the positions.',
 					'Hidden elements are listed at the foot of the diagram (“2 hidden · Show all”): open the list to show one again, or show them all. Other diagrams are not affected.',
+					'**Duplicate** (Ctrl D, ⌘ D on a Mac, or in a box’s actions and the details panel) copies the element right after it in the text, with everything inside it, under a free name (`battery2`), and selects the copy.',
 					'**Add connected elements** (in a box’s actions, on structure diagrams) puts on the diagram what the element refers to (**Outgoing**: its type, what it specializes, satisfies or is connected to), what refers to it (**Incoming**), or both, in one step. A saved view gets an `expose` line for each; its filter may still leave some out, and it says so.'
 				]
 			},
@@ -462,6 +464,7 @@ export const HELP: HelpSection[] = [
 							['Ctrl K', 'Search the model, views and commands'],
 							['?', 'Open this help'],
 							['Ctrl S', 'Save to the folder (projects opened from a folder)'],
+							['Ctrl D', 'Duplicate the selected element (not in the text)'],
 							['Ctrl ,', 'Settings'],
 							['Esc', 'Close a dialog or menu']
 						]
@@ -497,6 +500,7 @@ export const HELP: HelpSection[] = [
 							['C', 'Connect from the selected element'],
 							['F2', 'Rename'],
 							['H', 'Remove from this diagram (it stays in the model)'],
+							['Ctrl D', 'Duplicate, beside it'],
 							['Delete', 'Delete from the model'],
 							['Arrow keys', 'Move the selected boxes'],
 							['Shift F10', 'The element’s menu'],

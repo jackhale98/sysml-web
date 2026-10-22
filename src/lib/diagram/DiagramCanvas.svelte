@@ -19,6 +19,7 @@
 		Cable,
 		CircleDot,
 		CircleStop,
+		CopyPlus,
 		EyeOff,
 		FileCode,
 		LayoutGrid,
@@ -43,6 +44,7 @@
 		applySteps,
 		deleteElement,
 		deleteImpact,
+		duplicateElement,
 		renameElement,
 		undoable
 	} from '#lib/workbench/actions.ts';
@@ -52,6 +54,7 @@
 	import type { WorkbenchUi } from '#lib/workbench/ui.svelte.ts';
 	import ConnectPicker, { type ConnectTarget } from './ConnectPicker.svelte';
 	import ConnectedForm from './ConnectedForm.svelte';
+	import { planDuplicate } from './duplicate.ts';
 	import DiagramExport from './DiagramExport.svelte';
 	import { DiagramEditing, provideEditing } from './editing.svelte.ts';
 	import FlowBridge, { type FlowApi } from './FlowBridge.svelte';
@@ -158,6 +161,7 @@
 	const reducedMotion =
 		typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 	const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+	const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 	const FIT = { padding: 0.15, maxZoom: 1.1 };
 
 	let nodes = $state.raw<Node<SysmlNodeData>[]>([]);
@@ -735,8 +739,10 @@
 		const delay = untrack(() => nodes.length) ? 300 : 0;
 		clearTimeout(timer);
 		timer = setTimeout(() => void refresh(), delay);
-		return () => clearTimeout(timer);
 	});
+	// Not on every run above: a write to another file (the layout) in the meantime
+	// would cancel the redraw the model text asked for.
+	$effect(() => () => clearTimeout(timer));
 
 	// Redraw when what the diagram hides or adds changes (also by undo).
 	let lastShown: string | null = null;
@@ -1399,6 +1405,14 @@
 				run: () => void askAddConnected(id, point)
 			});
 		}
+		if (element && !isLibrary(element)) {
+			items.push({
+				label: 'Duplicate',
+				icon: CopyPlus,
+				shortcut: isMac ? '⌘D' : 'Ctrl+D',
+				run: () => void duplicateNode(id)
+			});
+		}
 		items.push({
 			label: 'Remove from diagram',
 			detail: 'It stays in the model',
@@ -1613,6 +1627,28 @@
 		return null;
 	}
 
+	/** Copy a node's element under a free name, placed beside it and selected. */
+	async function duplicateNode(id: string) {
+		menu = null;
+		const element = elementOf(id);
+		const node = nodes.find((n) => n.id === id);
+		if (!element || !node || isLibrary(element)) return;
+		const planned = planDuplicate(element, ctx);
+		if (typeof planned !== 'string') {
+			const { x, y } = node.position;
+			pendingPlace = {
+				name: formatName(planned.name),
+				at: { x: x + (node.width ?? 0) / 2 + 48, y: y + (node.height ?? 0) / 2 + 48 },
+				until: Date.now() + 8000
+			};
+		}
+		const { error, copy } = await duplicateElement(workspace, element, checkSyntax);
+		if (error) {
+			pendingPlace = null;
+			toasts.show(error, { tone: 'error' });
+		} else if (copy) ui.select(copy.key, 'diagram');
+	}
+
 	/** Put hidden nodes back on this diagram (one undoable step). */
 	async function showAgain(ids: string[] | 'all') {
 		const names = hiddenHere.filter((h) => ids === 'all' || ids.includes(h.id)).map((h) => h.label);
@@ -1774,6 +1810,16 @@
 		} else if (event.key.toLowerCase() === 'c' && plain && !event.shiftKey && id) {
 			event.preventDefault();
 			startConnect(id);
+		} else if (
+			event.key.toLowerCase() === 'd' &&
+			(isMac ? event.metaKey : event.ctrlKey) &&
+			!event.altKey &&
+			!event.shiftKey &&
+			id
+		) {
+			// Before the browser's bookmark shortcut, and the workbench's own (for other panes).
+			event.preventDefault();
+			void duplicateNode(id);
 		} else if (event.key.toLowerCase() === 'h' && plain && !event.shiftKey && id) {
 			event.preventDefault();
 			void removeFromDiagram(id);

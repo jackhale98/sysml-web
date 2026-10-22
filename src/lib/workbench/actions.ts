@@ -7,6 +7,8 @@ import type { DeclarationSet } from '#lib/engine/types.ts';
 import type { ModelElement } from '#lib/project/elements.ts';
 import type { Workspace } from '#lib/project/workspace.svelte.ts';
 import { toasts } from '#lib/ui/toasts.svelte.ts';
+import { planDuplicate } from '#lib/diagram/duplicate.ts';
+import { modelContext } from '#lib/diagram/modelContext.ts';
 import { elementText, formatName, type AddKind } from './templates';
 
 /**
@@ -113,6 +115,34 @@ export async function deleteElement(
 			...(element.id ? { id: element.id } : {})
 		})
 	);
+}
+
+/**
+ * Copy an element under a free name, right after it (one undoable step), and
+ * give back the copy once the model has read it, to select it.
+ */
+export async function duplicateElement(
+	workspace: Workspace,
+	element: ModelElement,
+	check?: (path: string, before: string, after: string) => Promise<string | null>
+): Promise<{ error: string | null; copy?: ModelElement }> {
+	if (element.file.startsWith('libraries/'))
+		return { error: 'Library elements can’t be changed here.' };
+	const ctx = modelContext(workspace);
+	const owner = ctx.owners.get(element.key);
+	const plan = planDuplicate(element, ctx);
+	if (typeof plan === 'string') return { error: plan };
+	const error = await applySteps(workspace, plan.label, plan.steps, check);
+	if (error) return { error };
+	for (let i = 0; i < 200 && !workspace.settled; i++) {
+		await new Promise((done) => setTimeout(done, 40));
+	}
+	const now = modelContext(workspace);
+	const copy = workspace.elements.find(
+		(e) =>
+			e.label === plan.name && e.file === element.file && now.owners.get(e.key)?.key === owner?.key
+	);
+	return { error: null, ...(copy ? { copy } : {}) };
 }
 
 /** What else a delete affects, in a line for its confirmation. */

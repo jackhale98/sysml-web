@@ -198,7 +198,7 @@
 		gap: var(--space-1);
 	}
 	.in-sheet button {
-		min-height: 2.75rem;
+		min-height: 3rem;
 		padding: 0 var(--space-3);
 	}
 	button:hover,
