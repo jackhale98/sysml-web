@@ -372,6 +372,10 @@ An import says what came across and what didn’t, in a few lines; **Download th
 1. **Open from server**: choose the project, its branch and a version (the latest, or an earlier commit). It opens as a new project on this device.
 2. **Save to server**: Fairtide reads the branch’s latest version, matches your elements to the server’s and saves only what differs, as one commit. What the server has and your project doesn’t is removed in that commit; earlier commits keep it.
 
+If someone else saved to the branch since you opened the project from the server (or last saved it there), saving merges first. Their changes come into your project, as one step you can undo, and yours go to the server on top of theirs. Where you both changed the same element differently, or one of you removed something the other changed, both versions are shown in plain words: choose **Keep mine** or **Keep theirs** for each (or **Keep all mine**, **Keep all theirs**). Nothing is written until you save, and the result says what came in and what was sent.
+
+The merge works on the model, not on your text: your files keep their notes and layout, and a new element of theirs is added where it belongs. An element they changed is written again the way the formatter writes it, so `//` notes and layout inside it don’t come through; the review names those elements first.
+
 The browser talks to the server directly (there is no Fairtide server in between), so the server must allow this page. It answers `OPTIONS` requests and sends `Access-Control-Allow-Origin` with this page’s address (or `*`), `Access-Control-Allow-Headers: Authorization, Content-Type`, `Access-Control-Allow-Methods: GET, POST` and `Access-Control-Expose-Headers: Link` (for long lists). If it doesn’t, Fairtide says so: ask whoever runs it. A token stays on this device and goes only to its server.
 
 In the app: **Download as SysML v2 JSON**.

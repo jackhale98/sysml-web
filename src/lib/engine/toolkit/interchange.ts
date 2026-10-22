@@ -98,6 +98,66 @@ export function exportModel(
 	};
 }
 
+/** Properties the compact form doesn't have, per type (those found so far). */
+const derivedProperties = new WeakMap<Toolkit, Map<string, Set<string>>>();
+
+/**
+ * Element JSON from elsewhere (a server's) in the form the export writes: only
+ * the properties the compact form has, each spelled (at its default when
+ * absent), the redefined ones written out, and no implied relationships (the
+ * text implies them). Two versions of a model then compare property by
+ * property. Elements of a type the toolkit doesn't know stay as they are.
+ */
+export function canonicalModel(tk: Toolkit, elements: readonly ElementJson[]): ElementJson[] {
+	let derived = derivedProperties.get(tk);
+	if (!derived) derivedProperties.set(tk, (derived = new Map()));
+	// The toolkit names one property it doesn't take at a time: ask per type, with every
+	// property the elements of that type have (it doesn't look at values).
+	const seen = new Map<string, Set<string>>();
+	for (const e of elements) {
+		const properties = seen.get(e['@type']) ?? seen.set(e['@type'], new Set()).get(e['@type'])!;
+		for (const p of Object.keys(e)) properties.add(p);
+	}
+	const unknown = new Set<string>();
+	for (const [type, properties] of seen) {
+		const dropped = derived.get(type) ?? derived.set(type, new Set()).get(type)!;
+		for (let tries = 0; tries <= properties.size; tries++) {
+			const stub: Record<string, unknown> = { '@id': 'x', '@type': type };
+			for (const p of properties) if (!p.startsWith('@') && !dropped.has(p)) stub[p] = null;
+			try {
+				tk.canonicalizeCompact(JSON.stringify([stub]));
+				break;
+			} catch (error) {
+				const property = new RegExp(`^${type}\\.(\\w+): not a compact-form property`).exec(
+					String(error instanceof Error ? error.message : error)
+				)?.[1];
+				if (!property || dropped.has(property)) {
+					unknown.add(type);
+					break;
+				}
+				dropped.add(property);
+			}
+		}
+	}
+	const kept: ElementJson[] = [];
+	const others: ElementJson[] = [];
+	for (const e of elements) {
+		if (e.isImplied === true) continue;
+		if (unknown.has(e['@type'])) {
+			others.push(e);
+			continue;
+		}
+		const dropped = derived.get(e['@type'])!;
+		const out: ElementJson = { '@id': e['@id'], '@type': e['@type'] };
+		for (const [property, value] of Object.entries(e))
+			if (!dropped.has(property) && !isSpelling(value)) out[property] = value;
+		kept.push(out);
+	}
+	const canonical = JSON.parse(tk.canonicalizeCompact(JSON.stringify(kept))) as ElementJson[];
+	for (const e of canonical) spellRedefined(e);
+	return [...canonical, ...others];
+}
+
 const isSpelling = (value: unknown): value is { '@ref': string } =>
 	!!value &&
 	typeof value === 'object' &&

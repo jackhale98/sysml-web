@@ -280,17 +280,15 @@ export function compareModels(
 }
 
 /**
- * `ours` with the ids of `theirs` wherever an element sits in the same place
- * (same ownership key and type), so a change sent to a server that holds
- * `theirs` updates its elements instead of replacing them. Elements of ours
- * that have no counterpart keep their ids, or get a fresh one when theirs
- * already uses that id for another element.
+ * Which element of `theirs` each element of `ours` is, by place: the same
+ * ownership key and type, then (for what was renamed, or moved within its
+ * owner) the same kind and position under an owner that matched, and so on
+ * down. Gives `ours` id → `theirs` id for the elements that matched.
  */
-export function rebaseIds(
+export function matchIds(
 	ours: readonly ElementJson[],
-	theirs: readonly ElementJson[],
-	freshId: () => string = () => crypto.randomUUID()
-): { elements: ElementJson[]; matched: number } {
+	theirs: readonly ElementJson[]
+): Map<string, string> {
 	const ourKeys = ownershipKeys(ours);
 	const theirKeys = ownershipKeys(theirs);
 	const theirByKey = new Map<string, ElementJson>();
@@ -300,11 +298,9 @@ export function rebaseIds(
 	}
 	const map = new Map<string, string>();
 	const used = new Set<string>();
-	let matched = 0;
 	const pair = (ours: ElementJson, counterpart: ElementJson) => {
 		map.set(ours['@id'], counterpart['@id']);
 		used.add(counterpart['@id']);
-		matched++;
 	};
 	for (const e of ours) {
 		const key = ourKeys.get(e['@id']);
@@ -350,6 +346,44 @@ export function rebaseIds(
 			}
 		}
 	}
+	return map;
+}
+
+/** `value` with every reference's id passed through `map` (ids it lacks stay). */
+export function swapRefs(value: unknown, map: ReadonlyMap<string, string>): unknown {
+	return isRef(value)
+		? { '@id': map.get(value['@id']) ?? value['@id'] }
+		: Array.isArray(value)
+			? value.map((v) => swapRefs(v, map))
+			: value;
+}
+
+/** An element under new ids: its own and those of what it refers to. */
+export function withIds(e: ElementJson, map: ReadonlyMap<string, string>): ElementJson {
+	const out: ElementJson = { ...e, '@id': map.get(e['@id']) ?? e['@id'] };
+	for (const [property, value] of Object.entries(e)) {
+		if (property === '@id' || property === '@type') continue;
+		out[property] = swapRefs(value, map);
+	}
+	if (typeof e.elementId === 'string') out.elementId = out['@id'];
+	return out;
+}
+
+/**
+ * `ours` with the ids of `theirs` wherever an element sits in the same place
+ * (`matchIds`), so a change sent to a server that holds `theirs` updates its
+ * elements instead of replacing them. Elements of ours that have no
+ * counterpart keep their ids, or get a fresh one when theirs already uses
+ * that id for another element.
+ */
+export function rebaseIds(
+	ours: readonly ElementJson[],
+	theirs: readonly ElementJson[],
+	freshId: () => string = () => crypto.randomUUID()
+): { elements: ElementJson[]; matched: number } {
+	const map = matchIds(ours, theirs);
+	const matched = map.size;
+	const used = new Set(map.values());
 	const theirIds = new Set(theirs.map((e) => e['@id']));
 	for (const e of ours) {
 		if (map.has(e['@id'])) continue;
@@ -358,22 +392,7 @@ export function rebaseIds(
 		map.set(e['@id'], id);
 		used.add(id);
 	}
-	const swap = (value: unknown): unknown =>
-		isRef(value)
-			? { '@id': map.get(value['@id']) ?? value['@id'] }
-			: Array.isArray(value)
-				? value.map(swap)
-				: value;
-	const elements = ours.map((e) => {
-		const out: ElementJson = { ...e, '@id': map.get(e['@id'])! };
-		for (const [property, value] of Object.entries(e)) {
-			if (property === '@id' || property === '@type') continue;
-			out[property] = swap(value);
-		}
-		if (typeof e.elementId === 'string') out.elementId = out['@id'];
-		return out;
-	});
-	return { elements, matched };
+	return { elements: ours.map((e) => withIds(e, map)), matched };
 }
 
 export interface ChangeSet {

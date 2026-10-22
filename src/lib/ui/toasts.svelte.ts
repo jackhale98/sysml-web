@@ -49,8 +49,8 @@ class Toasts {
 	}
 
 	/**
-	 * Hold every toast while the pointer is on them or focus is in them, so one
-	 * being read or reached by keyboard doesn't go (WCAG 2.2.1, timing adjustable).
+	 * Hold every toast while focus is in them, so one reached by keyboard
+	 * doesn't go before its action is used (WCAG 2.2.1, timing adjustable).
 	 */
 	pause() {
 		if (this.paused) return;

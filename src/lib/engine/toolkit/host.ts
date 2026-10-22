@@ -9,10 +9,13 @@
  * incremental path).
  */
 import { compareSnapshots } from '#lib/review/semantic.ts';
+import { referencesOf, type ElementJson } from '#lib/exchange/elements.ts';
 import type {
 	InterchangeExport,
 	InterchangeExportOptions,
-	InterchangeImport
+	InterchangeImport,
+	MergeInputs,
+	WeaveResult
 } from '#lib/exchange/types.ts';
 import type { ModelComparison, ModelSnapshot } from '#lib/review/types.ts';
 import type { SourceFile } from '../protocol';
@@ -62,7 +65,8 @@ import { extractMachines } from './machines';
 import { detailsOf, extractModel, findElement, type ExtractedModel, type UnitInfo } from './model';
 import { TextIndexCache } from './offsets';
 import { RepairMap } from './repair';
-import { exportModel, importModel } from './interchange';
+import { canonicalModel, exportModel, importModel } from './interchange';
+import { weaveModel } from './weave';
 import { buildSnapshot } from './snapshot';
 import * as views from './views';
 
@@ -437,6 +441,47 @@ export class ToolkitHost {
 	/** SysML v2 JSON as project files, with what didn't carry over (`interchange.ts`). */
 	importInterchange(json: string): InterchangeImport {
 		return importModel(this.tk, this.library, json);
+	}
+
+	/**
+	 * What a merge with a server's versions works from (`#lib/exchange/merge.ts`):
+	 * the project exported, the base and the head in the same form, and the
+	 * names of what they refer to outside themselves (the standard library).
+	 */
+	mergeInputs(files: SourceFile[], base: ElementJson[], theirs: ElementJson[]): MergeInputs {
+		const exported = this.exportInterchange(files, {});
+		const ours = JSON.parse(exported.json) as ElementJson[];
+		const canonicalBase = canonicalModel(this.tk, base);
+		const canonicalTheirs = canonicalModel(this.tk, theirs);
+		const known = new Set([...ours, ...canonicalBase, ...canonicalTheirs].map((e) => e['@id']));
+		const names: Record<string, string> = {};
+		const session = this.build(files).session;
+		for (const e of [...canonicalBase, ...canonicalTheirs, ...ours])
+			for (const { id } of referencesOf(e)) {
+				if (known.has(id) || id in names || !session) continue;
+				const h = session.elementById(id);
+				names[id] = (h && session.qualifiedName(h)) || '';
+				h?.free();
+			}
+		return {
+			ours,
+			base: canonicalBase,
+			theirs: canonicalTheirs,
+			names,
+			broken: exported.broken
+		};
+	}
+
+	/** The project's files changed to hold a merged model (`weave.ts`). */
+	weaveInterchange(files: SourceFile[], merged: ElementJson[]): WeaveResult {
+		const ours = JSON.parse(this.exportInterchange(files, {}).json) as ElementJson[];
+		const session = this.build(files).session;
+		if (!session) throw new Error('The model could not be read, so nothing can be merged into it.');
+		const rename = (path: string, offset: number, name: string) => {
+			const result = this.language.rename(files, path, offset, name);
+			return 'changes' in result ? result.changes : null;
+		};
+		return weaveModel(this.tk, this.library, session, files, ours, merged, rename);
 	}
 
 	/** The snapshot of an analysed build, made on first ask. */

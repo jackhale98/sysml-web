@@ -235,6 +235,35 @@ export class MockApiServer {
 		};
 	}
 
+	/**
+	 * Someone else saves: `edit` changes a copy of the elements at the
+	 * branch's head (in place, or by returning the new list), and what differs
+	 * is one commit on that branch. Gives the commit's id.
+	 */
+	commitAs(
+		projectId: string,
+		description: string,
+		edit: (elements: ElementJson[]) => ElementJson[] | void,
+		branch = 'main'
+	): string {
+		const project = this.projects.get(projectId)!;
+		const [branchId] = [...project.branches].find(([, b]) => b.name === branch)!;
+		const before = this.headElements(projectId, branch);
+		const copy = structuredClone(before);
+		const after = edit(copy) ?? copy;
+		const was = new Map(before.map((e) => [e['@id'], JSON.stringify(e)]));
+		const now = new Set(after.map((e) => e['@id']));
+		const change = [
+			...after
+				.filter((e) => was.get(e['@id']) !== JSON.stringify(e))
+				.map((e) => ({ identity: { '@id': e['@id'] }, payload: e })),
+			...before
+				.filter((e) => !now.has(e['@id']))
+				.map((e) => ({ identity: { '@id': e['@id'] }, payload: null }))
+		];
+		return this.applyCommit(project, branchId, { description, change })['@id'] as string;
+	}
+
 	/** The elements at a branch's head. */
 	headElements(projectId: string, branch = 'main'): ElementJson[] {
 		const project = this.projects.get(projectId)!;

@@ -13,8 +13,9 @@ Systems Modeling API) is in `docs/reference/interchange.md`.
 | Systems Modeling API (REST) | Save to server | Open from server | `src/lib/exchange/` |
 
 All of it loads on first use: the dialogs, the client and the import code
-are separate chunks; the worker gains two methods (`exportInterchange`,
-`importInterchange`).
+are separate chunks; the worker gains four methods (`exportInterchange`,
+`importInterchange`, and for saving when the server moved on, `mergeInputs`
+and `weaveInterchange`).
 
 ## What the toolkit provides, and what the app adds
 
@@ -64,9 +65,9 @@ The app adds (`interchange.ts`, `src/lib/exchange/`):
   Identity), so two versions are matched by place: each element's
   _ownership key_ (its owner's key and its name, or its kind and position
   among its owner's unnamed parts of that kind); renamed elements are then
-  matched by position under an owner that matched. `compareModels` reports
-  what differs; `rebaseIds` gives a model another's ids; `changeSet` lists
-  what to send.
+  matched by position under an owner that matched (`matchIds`).
+  `compareModels` reports what differs; `rebaseIds` gives a model another's
+  ids; `changeSet` lists what to send; `merge.ts` merges three versions.
 
 ## SysML v2 JSON
 
@@ -148,13 +149,99 @@ null` deletes). Given a site's address without the API path, it also tries
   doesn't is removed in that commit; earlier commits keep it. The parent is
   the branch head (the server's choice when `branchId` is given); no
   `previousCommit` is sent. "Save … as a new project there" makes the
-  project first. Merging with changes made on the server since the last
-  open is not attempted: the commit makes the branch hold this project.
+  project first. When the branch's head is not the commit the project was
+  opened from or last saved to, saving merges first (below).
 - **Connections** are kept in this browser's local storage
   (`sysml-web:api-servers`, the link per project in `sysml-web:api-links`),
   like the GitHub accounts. A token is sent only to its own server, as
   `Authorization: Bearer …`, never shown again, and removed with
   **Settings › Delete all local data**.
+
+### Saving when someone else saved meanwhile (merging)
+
+The link of a project to its server (`sysml-web:api-links`) records the
+commit it was opened from or last saved to: the **base**. When the branch's
+head has moved on from it, Save to server makes a three-way merge of
+**base**, **mine** (this project, exported) and **theirs** (the head), in
+`merge.ts` (pure) and `src/lib/engine/toolkit/weave.ts` (in the worker):
+
+1. **Same form.** The base and the head are read; the worker puts them in
+   the form the export writes (`canonicalModel`: only compact-form
+   properties, each spelled, redefined ones written out, no implied
+   relationships), so the three compare property by property. A project
+   with syntax errors is refused: the merge needs every element in place.
+2. **Matching**, as for a save: base and theirs by the server's ids (then
+   by place, for a tool that renumbers), mine to base by place
+   (`matchIds`), and what both added by the same ownership key. The merge
+   works in mine's ids wherever mine has the element.
+3. **Merging** element by element, property by property: what only one
+   side changed is taken, the same change on both sides once, and the lists
+   of what an element owns merge both sides' insertions and removals (the
+   side that reordered leads). What is left is a **conflict**: a property
+   both changed differently (or an element both added differently), or a
+   part of the model one side removed while the other changed something in
+   it, added to it, or made something refer to it. Conflicts are gathered
+   per element as people know it (the nearest named member: a typing's
+   conflict is its part's) and described in words (`name: “myCar”`,
+   `type: Garage::Engine`, `removed it`).
+4. **Review** (`MergeReview.svelte`): what comes in, what goes out, and each
+   conflict with **Keep mine** / **Keep theirs** (and both for all). Save is
+   off until every conflict is decided. Nothing is read from or written to
+   the text, and nothing sent, before Save.
+5. **Their changes into the text** (`weaveInterchange`), as one undoable
+   step through the workspace's edit path, then **ours to the server**: the
+   project is exported again and saved against the head as an ordinary save
+   (so the server ends up holding exactly what the text says), one commit
+   whose parent is their head. Just before writing, the branch's head is
+   read again; if someone saved meanwhile, nothing is written and the
+   dialog says to save again. The link then records the new commit (or the
+   head, when there is nothing of ours to send). The result says what came
+   in, which files changed, and what was sent.
+
+#### How their changes are written into the text
+
+Text is the source of truth, and a server holds no text, so their changes
+are written into the files as narrowly as the toolkit allows (the decision
+this feature turns on). Lifting the whole merged model to text, as an
+import does, would lose every `//` note, blank line and layout choice in
+the project; regenerating each file their changes touch would lose them in
+those files. Instead the merged model is lifted to text once (formatted as
+the editor formats, short names), and each of their changes is placed by
+the toolkit's member extents:
+
+- **An element they added** is written where it belongs: after the member
+  it follows in the merged model (or before the one it precedes), indented
+  like its neighbour, spaced by blank lines when the neighbours are.
+- **An element they removed** is taken out with its lines.
+- **A rename** goes through the editor's rename, so references follow.
+- **Any other change** writes the smallest member declaration holding it
+  again (a part, a definition, an attribute) from the lifted text.
+- A file they added is written whole, named after what it declares; a file
+  they emptied (its root namespace gone) is removed.
+
+Then the result is checked: the changed files are read again and compared,
+element by element, with the lifted text. A file where they differ is
+written whole from the lifted text instead; whatever still differs is
+listed, and the save waits for **Save anyway** (it would replace the
+server's version of those elements with the text's).
+
+What doesn't merge, and is said rather than dropped:
+
+- **Text-only detail inside what is written again.** `//` notes, blank
+  lines and layout inside a declaration they changed don't come through
+  (the review names those declarations, with how many notes each had, before
+  saving; the result again). Elsewhere the text is untouched.
+- **Spelling.** A declaration written again spells references as the
+  toolkit prints them: shortest names that resolve, and units by their
+  names (`700 [gram]` where the file had `[g]`).
+- **Element-level granularity.** Two changes to the same property conflict
+  even if they are textually far apart (a documentation comment edited on
+  both sides is one conflict, not merged line by line). An element matched
+  by place can be mistaken for another when one side both removed an
+  element and added one of the same kind in its place (as with saving).
+- **References into what was removed.** Choosing to remove something the
+  other side started using leaves that reference unresolved: the conflict
+  says so, and the checks then show it.
 
 ### What the server must allow (CORS)
 

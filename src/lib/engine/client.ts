@@ -42,6 +42,8 @@ export function toolkitEngine(toolkit: ToolkitClient): Engine {
 		compareModels: (...params) => toolkit.call('compareModels', ...params),
 		exportInterchange: (...params) => toolkit.call('exportInterchange', ...params),
 		importInterchange: (...params) => toolkit.call('importInterchange', ...params),
+		mergeInputs: (...params) => toolkit.call('mergeInputs', ...params),
+		weaveInterchange: (...params) => toolkit.call('weaveInterchange', ...params),
 		terminate: () => toolkit.terminate()
 	};
 }

@@ -5,7 +5,11 @@
 	 * optional token. Lists its projects, their branches and commits; opens a
 	 * commit as a new project here ("Open from server"), or saves this project
 	 * to a branch as one commit holding only what differs ("Save to server").
-	 * Connections stay on this device (`servers.svelte.ts`).
+	 * When others saved to the branch since this project was opened from it,
+	 * saving merges: a review of both sides' changes and of the conflicts
+	 * (`MergeReview`), their changes into the text as one undoable step, then
+	 * ours on top of theirs (`MergeResult`). Connections stay on this device
+	 * (`servers.svelte.ts`).
 	 */
 	import {
 		ArrowLeft,
@@ -26,12 +30,34 @@
 	import type { Workspace } from '#lib/project/workspace.svelte.ts';
 	import SheetDialog from '#lib/ui/SheetDialog.svelte';
 	import { toasts } from '#lib/ui/toasts.svelte.ts';
-	import { connectTo, type ApiBranch, type ApiCommit, type ApiProject, type SysmlApi } from './api';
+	import { minimalChange } from '#lib/project/workspace.svelte.ts';
+	import {
+		ApiError,
+		connectTo,
+		dataVersions,
+		type ApiBranch,
+		type ApiCommit,
+		type ApiProject,
+		type SysmlApi
+	} from './api';
 	import { readElements } from './elements';
 	import ImportSummary from './ImportSummary.svelte';
+	import { changeLine, type Side } from './merge';
+	import MergeResult from './MergeResult.svelte';
+	import MergeReview from './MergeReview.svelte';
 	import { apiServers, type ServerLink } from './servers.svelte';
-	import { changeCount, planPush, push, type PushPlan } from './sync';
-	import type { InterchangeImport } from './types';
+	import {
+		changeCount,
+		planMergeSave,
+		planPush,
+		push,
+		pushPlanAgainst,
+		weaveMerge,
+		type MergeOutcome,
+		type MergeSave,
+		type PushPlan
+	} from './sync';
+	import type { InterchangeImport, WeaveResult } from './types';
 	import './exchange.css';
 
 	let {
@@ -49,7 +75,7 @@
 	} = $props();
 
 	const uid = $props.id();
-	let view = $state<'connect' | 'browse' | 'save' | 'pulled'>('connect');
+	let view = $state<'connect' | 'browse' | 'save' | 'pulled' | 'merged'>('connect');
 	let api = $state.raw<SysmlApi | null>(null);
 	let address = $state('');
 	let token = $state('');
@@ -65,6 +91,13 @@
 	let plan = $state.raw<PushPlan | null>(null);
 	let description = $state('');
 	let pulled = $state<{ result: InterchangeImport; name: string; link: ServerLink } | null>(null);
+	/** A save that merges with what others saved, its choices, and the text it writes when that needs a second look. */
+	let merge = $state.raw<MergeSave | null>(null);
+	let choices = $state<Record<string, Side>>({});
+	let woven = $state.raw<WeaveResult | null>(null);
+	/** The texts the merge was planned from: it is made only if they are still the files'. */
+	let planned: string | null = null;
+	let outcome = $state.raw<MergeOutcome | null>(null);
 
 	const project = $derived(projects.find((p) => p.id === projectId) ?? null);
 	const branch = $derived(branches.find((b) => b.id === branchId) ?? null);
@@ -99,6 +132,7 @@
 		error = null;
 		const link = localId ? apiServers.linkOf(localId) : null;
 		const saved = link ? apiServers.get(link.url) : apiServers.list[0];
+		if (view === 'merged') view = 'browse';
 		if (api && view !== 'connect') return;
 		view = 'connect';
 		if (saved) {
@@ -199,9 +233,34 @@
 		if (!api || !project) return;
 		view = 'save';
 		plan = null;
+		merge = null;
+		choices = {};
+		woven = null;
 		description = `Saved from Fairtide: ${projectName}`;
 		await attempt('Comparing with the server…', async () => {
-			const exported = await engine.exportInterchange(workspace.sourceFiles(), {});
+			// Others saved since this project was opened from (or saved to) this branch: merge.
+			const link = localId ? apiServers.linkOf(localId) : null;
+			const base =
+				link?.url === api!.base &&
+				link.project.id === project!.id &&
+				(link.branch?.id ?? null) === (branch?.id ?? null)
+					? link.commit
+					: null;
+			const head = branch?.head ?? null;
+			const files = workspace.sourceFiles();
+			if (base && head && base !== head) {
+				try {
+					merge = await planMergeSave(api!, engine, project!.id, base, head, files, (what) => {
+						busy = what;
+					});
+					planned = JSON.stringify(files);
+					return;
+				} catch (e) {
+					// The version it started from is gone from the server: save as before, with its warning.
+					if (!(e instanceof ApiError && e.kind === 'not-found')) throw e;
+				}
+			}
+			const exported = await engine.exportInterchange(files, {});
 			const ours = readElements(exported.json);
 			plan = await planPush(api!, project!.id, branch, ours, (n) => {
 				busy = `Reading the server’s version… ${n.toLocaleString('en')} elements`;
@@ -222,6 +281,129 @@
 			view = 'browse';
 			await choose(project!.id, branchId);
 		});
+	}
+
+	const mergeReady = $derived(
+		!!merge &&
+			merge.plan.conflicts.every((c) => choices[c.id] === 'mine' || choices[c.id] === 'theirs')
+	);
+	const takesTheirs = $derived(
+		!!merge &&
+			(merge.plan.incoming.length > 0 ||
+				merge.plan.conflicts.some((c) => choices[c.id] === 'theirs'))
+	);
+	/** Whether the merge may send something: changes of ours, or a conflict that may keep ours. */
+	const mightSend = $derived(
+		!!merge && (merge.plan.outgoing.length > 0 || merge.plan.conflicts.length > 0)
+	);
+
+	/**
+	 * Make the merge: their changes into the text (one undoable step), then
+	 * ours to the server on top of theirs. Nothing is written when the text
+	 * would differ from the merged model until that is confirmed (`anyway`).
+	 */
+	async function confirmMerge(anyway = false) {
+		if (!api || !project || !merge || !mergeReady) return;
+		const save = merge;
+		const decided = $state.snapshot(choices);
+		const files = workspace.sourceFiles();
+		await attempt('Bringing their changes in…', async () => {
+			if (JSON.stringify(files) !== planned)
+				throw new Error(
+					'The project changed while you were reviewing. Save again to compare anew.'
+				);
+			let result: WeaveResult | null = null;
+			if (takesTheirs) {
+				result = anyway && woven ? woven : await weaveMerge(engine, save, files, decided);
+				if (!anyway && result.differences.length) {
+					woven = result;
+					return;
+				}
+			}
+			// Nobody saved meanwhile: the commit goes on top of the head that was merged.
+			busy = 'Checking the server…';
+			const now = (await api!.branches(project!.id)).find((b) => b.id === branch?.id);
+			if ((now?.head ?? null) !== save.head)
+				throw new Error(
+					'Someone saved to this branch again while you were reviewing. Nothing was changed: save again to see their changes too.'
+				);
+			const after = result ? await bringIn(result, files) : files;
+			if (localId) apiServers.setLink(localId, linkFor(save.head));
+
+			busy = 'Saving…';
+			const exported = await engine.exportInterchange(after, {});
+			const pushing = pushPlanAgainst(save.head, save.headElements, readElements(exported.json));
+			const changes = changeCount(pushing.changes);
+			const message = description.trim() || 'Saved';
+			let commit: { description: string; changes: number } | null = null;
+			if (changes) {
+				const made = await api!.commit(
+					project!.id,
+					branch?.id ?? null,
+					dataVersions(pushing.changes),
+					message
+				);
+				if (localId) apiServers.setLink(localId, linkFor(made.id));
+				commit = { description: message, changes };
+			}
+			const kept = (side: Side) =>
+				save.plan.conflicts
+					.filter((c) => decided[c.id] === side)
+					.map(
+						(c) =>
+							`${c.where || c.what}: ${side === 'mine' ? 'your' : 'their'} version (${(side === 'mine' ? c.mine : c.theirs).join('; ')})`
+					);
+			outcome = {
+				incoming: [...save.plan.incoming.map(changeLine), ...kept('theirs')],
+				outgoing: commit ? [...save.plan.outgoing.map(changeLine), ...kept('mine')] : [],
+				woven: result,
+				commit,
+				server: project!.name,
+				branch: branch?.name ?? 'the default branch'
+			};
+			view = 'merged';
+			const branchesNow = await api!.branches(project!.id).catch(() => null);
+			if (branchesNow) branches = branchesNow;
+		});
+	}
+
+	/** Their changes into the project's files, as one undoable step; gives the files after. */
+	async function bringIn(result: WeaveResult, files: { path: string; text: string }[]) {
+		if (!result.files.length) return files;
+		const label = 'Brought in changes from the server';
+		const before = workspace.undoStack.length;
+		const error = await workspace.transact(label, async () => {
+			for (const f of result.files) {
+				if (f.status === 'added') await workspace.createFile(f.path, f.text);
+				else if (f.status === 'removed') await workspace.deleteFile(f.path);
+				else {
+					const change = minimalChange(workspace.text(f.path) ?? '', f.text);
+					if (change) await workspace.applyFileChanges(label, [{ path: f.path, ...change }]);
+				}
+			}
+			return null;
+		});
+		if (error) throw new Error(error);
+		if (workspace.undoStack.length > before)
+			toasts.show(`${label}.`, {
+				tone: 'success',
+				action: {
+					label: 'Undo',
+					run: () => {
+						const undone = workspace.undo();
+						if (undone) toasts.show(`Undid: ${undone}`);
+					}
+				}
+			});
+		const byPath = new Map(result.files.map((f) => [f.path, f]));
+		return [
+			...files
+				.filter((f) => byPath.get(f.path)?.status !== 'removed')
+				.map((f) => ({ path: f.path, text: byPath.get(f.path)?.text ?? f.text })),
+			...result.files
+				.filter((f) => f.status === 'added')
+				.map((f) => ({ path: f.path, text: f.text }))
+		];
 	}
 
 	async function newServerProject() {
@@ -320,12 +502,22 @@
 				<small>Opens as a new project on this device, linked to {pulled.link.project.name}.</small>
 			</label>
 			<ImportSummary result={pulled.result} source="{pulled.link.project.name} ({api.host})" />
+		{:else if view === 'merged' && outcome}
+			<MergeResult {outcome} />
 		{:else if view === 'save'}
 			<p>
 				Save <strong>{projectName}</strong> to <strong>{project?.name}</strong>{#if branch}, branch
 					<strong>{branch.name}</strong>{/if}, as one commit.
 			</p>
-			{#if plan}
+			{#if merge}
+				<MergeReview save={merge} bind:choices {woven} branch={branch?.name ?? 'the branch'} />
+				{#if mightSend}
+					<label class="xc-field" for="{uid}-message">
+						Describe the change
+						<input id="{uid}-message" bind:value={description} autocomplete="off" />
+					</label>
+				{/if}
+			{:else if plan}
 				{@const c = plan.changes}
 				{#if changeCount(c) === 0}
 					<p class="xc-note ok" role="status">
@@ -439,6 +631,26 @@
 			</button>
 			<button type="button" class="xc-primary" disabled={!!busy} onclick={openPulled}>
 				Open project
+			</button>
+		{:else if view === 'merged'}
+			<button type="button" class="xc-primary" onclick={() => (view = 'browse')}>Done</button>
+		{:else if view === 'save' && merge}
+			<button type="button" class="xc-button" onclick={() => (view = 'browse')}>
+				<ArrowLeft size={16} aria-hidden="true" /> Back
+			</button>
+			<button
+				type="button"
+				class="xc-primary"
+				disabled={!!busy || !mergeReady}
+				onclick={() => void confirmMerge(!!woven?.differences.length)}
+			>
+				{#if woven?.differences.length}
+					<CloudUpload size={16} aria-hidden="true" /> Save anyway
+				{:else if mightSend}
+					<CloudUpload size={16} aria-hidden="true" /> Save
+				{:else}
+					<CloudDownload size={16} aria-hidden="true" /> Bring their changes in
+				{/if}
 			</button>
 		{:else if view === 'save'}
 			<button type="button" class="xc-button" onclick={() => (view = 'browse')}>
