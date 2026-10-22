@@ -62,6 +62,8 @@ In a saved view, removing an element its `expose` line names removes that line (
 
 Hidden elements are listed at the foot of the diagram (“2 hidden · Show all”): open the list to show one again, or show them all. Other diagrams are not affected.
 
+**Add connected elements** (in a box’s actions, on structure diagrams) puts on the diagram what the element refers to (**Outgoing**: its type, what it specializes, satisfies or is connected to), what refers to it (**Incoming**), or both, in one step. A saved view gets an `expose` line for each; its filter may still leave some out, and it says so.
+
 ### The overview and the details panel
 
 The **Overview** shows the project at a glance: what the model has, how many requirements are met and tested, and any problems.

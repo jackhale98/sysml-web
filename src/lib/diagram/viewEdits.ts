@@ -8,7 +8,7 @@
  * Pure: the model is passed in as a `ModelContext`; edits come back as
  * `EditStep`s for `applySteps`.
  */
-import type { DiagramGraph } from '#lib/engine/types.ts';
+import type { DiagramGraph, RelatedElement } from '#lib/engine/types.ts';
 import { byteToUtf16, type ModelElement } from '#lib/project/elements.ts';
 import type { EditStep } from '#lib/workbench/actions.ts';
 import { qualifiedName } from './model.ts';
@@ -160,4 +160,46 @@ export function withoutHidden(graph: DiagramGraph, hidden: readonly string[]): D
 			node_ids: s.node_ids.filter((id) => !gone.has(id))
 		}))
 	};
+}
+
+/** An element related to another, as a diagram can add it. */
+export interface NeighbourElement {
+	element: ModelElement;
+	direction: 'out' | 'in';
+	/** As the engine names it, which a diagram that is not a saved view adds it by. */
+	qualified: string;
+}
+
+/**
+ * The project's elements an element is related to, each way, that are not
+ * on the diagram (`drawn`: element keys): what it refers to (`out`) and
+ * what refers to it (`in`). Library elements are left out.
+ */
+export function neighbours(
+	related: RelatedElement[],
+	elements: ModelElement[],
+	drawn: ReadonlySet<string>
+): NeighbourElement[] {
+	const byId = new Map(elements.flatMap((e) => (e.id ? [[e.id, e] as const] : [])));
+	const byKey = new Map(elements.map((e) => [e.key, e]));
+	const found: NeighbourElement[] = [];
+	const seen = new Set<string>();
+	for (const r of related) {
+		const element =
+			byId.get(r.element.id) ?? byKey.get(`${r.element.file}@${r.element.start_byte}`);
+		if (!element || !r.element.qualifiedName || element.file.startsWith('libraries/')) continue;
+		if (drawn.has(element.key) || seen.has(`${r.direction} ${element.key}`)) continue;
+		seen.add(`${r.direction} ${element.key}`);
+		found.push({ element, direction: r.direction, qualified: r.element.qualifiedName });
+	}
+	return found;
+}
+
+/** The neighbours to add for a choice of direction, each element once. */
+export function chooseNeighbours(
+	list: NeighbourElement[],
+	direction: 'out' | 'in' | 'both'
+): NeighbourElement[] {
+	const chosen = list.filter((n) => direction === 'both' || n.direction === direction);
+	return chosen.filter((n, i) => chosen.findIndex((m) => m.element.key === n.element.key) === i);
 }

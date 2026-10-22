@@ -119,6 +119,77 @@ test('delete from model says what uses the element before it goes', async ({ pag
 	await expect(node(catalogue, 'Motor')).toBeVisible();
 });
 
+async function openFileDiagram(page: Page, file: RegExp, name: RegExp) {
+	await page.getByRole('tab', { name: 'Files' }).click();
+	await page
+		.getByRole('navigation', { name: 'Explorer' })
+		.getByRole('button', { name: file })
+		.click();
+	const diagram = page.getByRole('region', { name });
+	await expect(diagram.locator('.svelte-flow__node').first()).toBeVisible({ timeout: 15_000 });
+	return diagram;
+}
+
+test('add connected elements puts what refers to an element on the diagram, in one step', async ({
+	page
+}) => {
+	await openDemo(page);
+	const diagram = await openFileDiagram(page, /^Components\.sysml/, /DroneComponents diagram/);
+	const before = await diagram.locator('.svelte-flow__node').count();
+	await node(diagram, 'Battery').click({ button: 'right' });
+	await page.getByRole('menuitem', { name: /Add connected elements/ }).click();
+	const form = page.getByRole('dialog', { name: 'Add connected elements of Battery' });
+	await expect(form.getByRole('button', { name: /Outgoing/ })).toBeDisabled();
+	await expect(form.getByRole('button', { name: /Incoming \(\d+\)/ })).toContainText(
+		'What refers to Battery: '
+	);
+	await expectAccessible(page);
+	await form.getByRole('button', { name: /Incoming/ }).click();
+	await expect(form).toHaveCount(0);
+	// The part typed by it, from another package, with the line to its type.
+	await expect(node(diagram, 'battery')).toBeVisible();
+	expect(await diagram.locator('.svelte-flow__node').count()).toBeGreaterThan(before);
+	await expect(
+		diagram.getByRole('group', { name: 'typing from battery : Battery to Battery' })
+	).toHaveCount(1);
+	await expect(toasts(page)).toContainText(/Added \d+ connected elements to this diagram/);
+	// Removing it again takes it off the diagram's list, not into the hidden ones.
+	await node(diagram, 'battery').focus();
+	await page.keyboard.press('h');
+	await expect(node(diagram, 'battery')).toHaveCount(0);
+	await expect(diagram.getByRole('group', { name: 'Hidden on this diagram' })).toHaveCount(0);
+	await toasts(page).getByRole('button', { name: 'Undo' }).last().click();
+	await expect(node(diagram, 'battery')).toBeVisible();
+	await toasts(page).getByRole('button', { name: 'Undo' }).last().click();
+	await expect(node(diagram, 'battery')).toHaveCount(0);
+});
+
+test('in a saved view, add connected elements writes expose lines, and says what the filter leaves out', async ({
+	page
+}) => {
+	await openDemo(page);
+	const catalogue = await openView(page, 'Component catalogue');
+	await node(catalogue, 'Battery').click({ button: 'right' });
+	await page.getByRole('menuitem', { name: /Add connected elements/ }).click();
+	const form = page.getByRole('dialog', { name: 'Add connected elements of Battery' });
+	await form.getByRole('button', { name: /Incoming/ }).click();
+	await expect(toasts(page)).toContainText(/Added \d+ connected elements to this diagram/);
+	await expect(toasts(page)).toContainText('this view’s filter leaves them out');
+	// The view's text says so.
+	await page.getByRole('tab', { name: 'Files' }).click();
+	await page
+		.getByRole('navigation', { name: 'Explorer' })
+		.getByRole('button', { name: /^Views\.sysml/ })
+		.click();
+	const text = page.locator('.cm-content');
+	await expect(async () => {
+		await page.locator('.cm-scroller').evaluate((el) => el.scrollTo(0, 900));
+		await expect(text).toContainText('expose DroneArchitecture::drone::battery;', {
+			timeout: 1000
+		});
+	}).toPass({ timeout: 15_000 });
+});
+
 test.describe('on a phone', () => {
 	test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 
@@ -168,5 +239,19 @@ test.describe('on a phone', () => {
 		expect((await all.boundingBox())!.height).toBeGreaterThanOrEqual(44);
 		await all.tap();
 		await expect(node(catalogue, 'Camera')).toBeVisible();
+
+		// Adding connected elements is a bottom sheet with thumb-sized choices.
+		await longPress(page, node(catalogue, 'Battery'));
+		await page
+			.getByRole('dialog', { name: 'Battery' })
+			.getByRole('menuitem', { name: /Add connected elements/ })
+			.click();
+		const form = page.getByRole('dialog', { name: 'Add connected elements of Battery' });
+		await expect(form).toHaveClass(/sheet/);
+		const incoming = form.getByRole('button', { name: /Incoming/ });
+		expect((await incoming.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+		await expectAccessible(page);
+		await incoming.tap();
+		await expect(toasts(page)).toContainText(/Added \d+ connected elements to this diagram/);
 	});
 });

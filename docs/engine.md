@@ -244,6 +244,10 @@ its resolver recorded, reparses, and refuses an edit that doesn't parse
   "assignment action". Every transition and succession edge carries its
   statement's extent (`DiagramEdge.element`, with `end_byte`), which the
   canvas changes and removes it by.
+- **Added elements.** A general view also draws the elements a diagram
+  that is not a saved view adds by qualified name (`diagram(…, added)`,
+  from the layout file), with their features as rows, joined to the rest
+  like any other.
 - **requirements**, **trace**, **packages** (`trace.ts`) — from the records
   and the satisfy/verify ends the adapter resolved (`ExtractedModel.traces`).
 - **sequence** (`sequence.ts`) — from the records. The toolkit's sequence
@@ -280,6 +284,16 @@ the element instead of matching names (a sequence view's messages, drawn as
 edges, carry it too). A general view is opened with the
 view usage's qualified name as scope (`workbench/views.ts`), so its layout key
 is `general:Views::name`.
+
+`EngineApi.related(files, id)` (`diagrams/related.ts`) says how an element
+is related to others, both ways: what it specializes and is typed by, what
+it satisfies and verifies (the adapter's resolved ids), what derives from
+what, and what it is connected, bound, allocated or flows to. A connector's
+ends are read from its declaration and resolved by name from where it is
+written, as a feature chain resolves (the toolkit's resolved ends cost the
+whole-model pass); an end on a port stands for the part it is on. The index
+is built once per analysis. The inspector's related elements and a general
+view's "Add connected elements" read it.
 
 Cost on the demo in Node, after analysis: 0.4–16 ms per view. The one
 expensive read (a connector's resolved ends, a whole-model pass of ~300 ms

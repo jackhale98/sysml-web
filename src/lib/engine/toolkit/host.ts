@@ -26,6 +26,7 @@ import type {
 	DefinitionTarget,
 	Diagnostic,
 	DiagramGraph,
+	RelatedElement,
 	DiagramView,
 	EditRequest,
 	EditResult,
@@ -52,6 +53,8 @@ import type {
 } from './api';
 import { toProblems } from './diagnostics';
 import { buildDiagram } from './diagrams';
+import { DiagramContext } from './diagrams/context';
+import { Relations } from './diagrams/related';
 import { ModelEditing } from './edits';
 import { Evaluation } from './evaluation';
 import { LanguageServices, SyntaxServices } from './language';
@@ -91,6 +94,8 @@ interface Built {
 	snapshot?: ModelSnapshot;
 	/** Files with syntax errors. */
 	broken?: string[];
+	/** How elements are related, on first ask. */
+	relations?: Relations;
 }
 
 export class ToolkitHost {
@@ -507,7 +512,12 @@ export class ToolkitHost {
 	}
 
 	/** A standard view of the project as a diagram graph (`diagrams/`). */
-	diagram(view: DiagramView, files: SourceFile[], scope: string | null): DiagramGraph {
+	diagram(
+		view: DiagramView,
+		files: SourceFile[],
+		scope: string | null,
+		added: string[] = []
+	): DiagramGraph {
 		const built = this.build(files);
 		if (!built.session || !built.extracted) {
 			return { title: '', nodes: [], edges: [], subgraphs: [], direction: 'top_bottom' };
@@ -515,8 +525,24 @@ export class ToolkitHost {
 		return buildDiagram(
 			{ tk: this.tk, session: built.session, model: built.extracted, units: built.units },
 			view,
-			scope
+			scope,
+			added
 		);
+	}
+
+	/** What an element is related to, both ways (`diagrams/related.ts`); indexed once per analysis. */
+	related(files: SourceFile[], id: string): RelatedElement[] {
+		const built = this.build(files);
+		if (!built.session || !built.extracted) return [];
+		built.relations ??= new Relations(
+			new DiagramContext({
+				tk: this.tk,
+				session: built.session,
+				model: built.extracted,
+				units: built.units
+			})
+		);
+		return built.relations.of(id);
 	}
 
 	/** The project's state machines (`machines.ts`), for the emulator. */

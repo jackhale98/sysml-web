@@ -106,7 +106,7 @@ export const HELP: HelpSection[] = [
 			{
 				id: 'diagram-show-hide',
 				title: 'Change what a diagram shows',
-				keywords: 'hide remove delete diagram view expose model',
+				keywords: 'hide remove delete diagram view expose model add connected neighbours related',
 				blocks: [
 					'Right-click a box (long-press on a phone) to see its actions. Two of them look alike but do very different things:',
 					{
@@ -116,7 +116,8 @@ export const HELP: HelpSection[] = [
 						]
 					},
 					'In a saved view, removing an element its `expose` line names removes that line (the view’s own record of what it shows). Anything else is hidden on that diagram, and the layout remembers it beside the positions.',
-					'Hidden elements are listed at the foot of the diagram (“2 hidden · Show all”): open the list to show one again, or show them all. Other diagrams are not affected.'
+					'Hidden elements are listed at the foot of the diagram (“2 hidden · Show all”): open the list to show one again, or show them all. Other diagrams are not affected.',
+					'**Add connected elements** (in a box’s actions, on structure diagrams) puts on the diagram what the element refers to (**Outgoing**: its type, what it specializes, satisfies or is connected to), what refers to it (**Incoming**), or both, in one step. A saved view gets an `expose` line for each; its filter may still leave some out, and it says so.'
 				]
 			},
 			{

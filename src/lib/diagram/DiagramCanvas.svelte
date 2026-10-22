@@ -29,7 +29,8 @@
 		Plus,
 		Spline,
 		Trash2,
-		Unlink
+		Unlink,
+		Waypoints
 	} from '@lucide/svelte';
 	import type { Engine } from '#lib/engine/client.ts';
 	import type { DiagramGraph, DiagramView } from '#lib/engine/types.ts';
@@ -50,6 +51,7 @@
 	import { canOwnMembers, formatName, type AddKind } from '#lib/workbench/templates.ts';
 	import type { WorkbenchUi } from '#lib/workbench/ui.svelte.ts';
 	import ConnectPicker, { type ConnectTarget } from './ConnectPicker.svelte';
+	import ConnectedForm from './ConnectedForm.svelte';
 	import DiagramExport from './DiagramExport.svelte';
 	import { DiagramEditing, provideEditing } from './editing.svelte.ts';
 	import FlowBridge, { type FlowApi } from './FlowBridge.svelte';
@@ -123,7 +125,14 @@
 		type RelationOption
 	} from './relationships.ts';
 	import SysmlEdge from './SysmlEdge.svelte';
-	import { planUnexpose, withoutHidden } from './viewEdits.ts';
+	import {
+		chooseNeighbours,
+		neighbours,
+		planExpose,
+		planUnexpose,
+		withoutHidden,
+		type NeighbourElement
+	} from './viewEdits.ts';
 	import SysmlNode from './SysmlNode.svelte';
 	import type { SysmlEdgeData, SysmlNodeData } from './types.ts';
 	import { MARK_WORDS, reviewMarks, type ReviewMark } from '#lib/review/marks.svelte.ts';
@@ -159,7 +168,7 @@
 	let renameTo = $state('');
 	let actionError = $state<string | null>(null);
 	/** The nodes this diagram hides (that its scope would draw), with their names. */
-	let hiddenHere = $state.raw<{ id: string; label: string }[]>([]);
+	let hiddenHere = $state.raw<{ id: string; label: string; key: string | null }[]>([]);
 	/** The diagram frame's name, as SysML writes it: "gv [Scope]". */
 	let frameTitle = $state('');
 	let timer: ReturnType<typeof setTimeout> | undefined;
@@ -494,12 +503,17 @@
 		try {
 			const files = workspace.sourceFiles();
 			const hidden = untrack(() => shown.hidden);
-			const full = await engine.diagram(view, files, scope);
+			const added = untrack(() => shown.added);
+			const full = await engine.diagram(view, files, scope, added.length ? added : undefined);
 			if (current !== generation) return;
 			const graph = withoutHidden(full, hidden);
 			hiddenHere = full.nodes
 				.filter((n) => hidden.includes(n.id))
-				.map((n) => ({ id: n.id, label: n.label || n.id }));
+				.map((n) => ({
+					id: n.id,
+					label: n.label || n.id,
+					key: n.element ? `${n.element.file}@${n.element.start_byte}` : null
+				}));
 			// Laying out thousands of boxes takes the page minutes and draws nothing readable.
 			if (graph.nodes.length > MAX_NODES) {
 				nodes = [];
@@ -663,6 +677,21 @@
 				else pinAll();
 			}
 			if (!hadNodes || relayout || settle) fit();
+			if (addedCheck && current > addedCheck.after) {
+				const drawnKeys = new Set(
+					graph.nodes.flatMap((n) =>
+						n.element ? [`${n.element.file}@${n.element.start_byte}`] : []
+					)
+				);
+				const missing = addedCheck.keys.filter((k) => !drawnKeys.has(k)).length;
+				addedCheck = null;
+				if (missing)
+					toasts.show(
+						missing === 1
+							? 'One of them is not drawn: this view’s filter leaves it out.'
+							: `${missing} of them are not drawn: this view’s filter leaves them out.`
+					);
+			}
 		} catch (error) {
 			if (current !== generation) return;
 			status = 'error';
@@ -1362,6 +1391,14 @@
 		if (element) {
 			items.push({ label: 'Show in text', icon: FileCode, run: () => showInText(element) });
 		}
+		if (view === 'general' && element?.id) {
+			items.push({
+				label: 'Add connected elements…',
+				detail: 'What it refers to, or what refers to it',
+				icon: Waypoints,
+				run: () => void askAddConnected(id, point)
+			});
+		}
 		items.push({
 			label: 'Remove from diagram',
 			detail: 'It stays in the model',
@@ -1479,19 +1516,101 @@
 			savedView && element && !isLibrary(savedView)
 				? planUnexpose(savedView, element, ctx)
 				: { steps: [], removed: [], stillShown: true };
-		const label = unexposed.steps.length
-			? `Removed ${name} from this view (it stays in the model)`
-			: `Hid ${name} on this diagram (it stays in the model)`;
+		// An element added to this diagram goes off its list rather than being hidden.
+		const plain = (q: string) => q.replace(/'/g, '');
+		const wasAdded =
+			!savedView && element
+				? shown.added.filter((q) => plain(q) === plain(qualifiedName(element, owners)))
+				: [];
+		const label =
+			unexposed.steps.length || wasAdded.length
+				? `Removed ${name} from this ${savedView ? 'view' : 'diagram'} (it stays in the model)`
+				: `Hid ${name} on this diagram (it stays in the model)`;
 		const error = await undoable(workspace, label, async () => {
 			if (unexposed.steps.length) {
 				const refused = await applySteps(workspace, label, unexposed.steps, checkSyntax);
 				if (refused) return refused;
 			}
-			if (unexposed.stillShown) saveShown({ hidden: [...shown.hidden, id] });
+			if (wasAdded.length) saveShown({ added: shown.added.filter((q) => !wasAdded.includes(q)) });
+			else if (unexposed.stillShown) saveShown({ hidden: [...shown.hidden, id] });
 			return null;
 		});
 		if (error) toasts.show(error, { tone: 'error' });
 		else host.focus({ preventScroll: true });
+	}
+
+	// ---- Adding what an element is connected to ----
+
+	/** The "Add connected elements" choice open for a node. */
+	let connected = $state<{
+		id: string;
+		name: string;
+		list: NeighbourElement[];
+		x: number;
+		y: number;
+	} | null>(null);
+	/** Elements just added, to say which the diagram does not draw (a saved view's filter). */
+	let addedCheck: { keys: string[]; after: number } | null = null;
+
+	async function askAddConnected(id: string, point?: XY) {
+		menu = null;
+		const element = elementOf(id);
+		if (!element?.id) return;
+		const at = formAt(point ?? underNode(id));
+		const related = await engine.related(workspace.sourceFiles(), element.id);
+		const drawn = new Set(nodes.flatMap((n) => (n.data.elementKey ? [n.data.elementKey] : [])));
+		const list = neighbours(related, workspace.elements, drawn);
+		if (!list.length) {
+			toasts.show(`Everything connected to ${element.label} is on this diagram already.`);
+			return;
+		}
+		connected = { id, name: element.label, list, ...at };
+	}
+
+	function closeConnected() {
+		const back = connected?.id;
+		connected = null;
+		focusNode(back);
+	}
+
+	/**
+	 * Put an element's neighbours on the diagram, as one undoable step: a
+	 * saved view gets an `expose` line for each; another diagram adds them in
+	 * the layout file. Hidden ones are shown again. ELK places them.
+	 */
+	async function addConnected(direction: 'out' | 'in' | 'both'): Promise<string | null> {
+		if (!connected) return null;
+		const chosen = chooseNeighbours(connected.list, direction);
+		const keys = new Set(chosen.map((n) => n.element.key));
+		const unhide = hiddenHere.filter((h) => h.key && keys.has(h.key));
+		const rest = chosen.filter((n) => !unhide.some((h) => h.key === n.element.key));
+		const exposed = savedView
+			? planExpose(
+					savedView,
+					rest.map((n) => n.element),
+					ctx
+				)
+			: null;
+		const label =
+			chosen.length === 1
+				? `Added ${chosen[0]!.element.label} to this diagram`
+				: `Added ${chosen.length} connected elements to this diagram`;
+		const after = generation;
+		const error = await undoable(workspace, label, async () => {
+			if (exposed) {
+				const refused = await applySteps(workspace, label, exposed.steps, checkSyntax);
+				if (refused) return refused;
+			}
+			saveShown({
+				hidden: shown.hidden.filter((h) => !unhide.some((u) => u.id === h)),
+				added: savedView ? shown.added : [...shown.added, ...rest.map((n) => n.qualified)]
+			});
+			return null;
+		});
+		if (error) return error;
+		if (savedView) addedCheck = { keys: [...keys], after };
+		closeConnected();
+		return null;
 	}
 
 	/** Put hidden nodes back on this diagram (one undoable step). */
@@ -2122,6 +2241,18 @@
 			prepare={settle}
 			onapply={applyFromForm}
 			onclose={closeBehaviorForm}
+		/>
+	{/if}
+
+	{#if connected}
+		<ConnectedForm
+			name={connected.name}
+			neighbours={connected.list.map((n) => ({ label: n.element.label, direction: n.direction }))}
+			mode={formMode}
+			x={connected.x}
+			y={connected.y}
+			onapply={addConnected}
+			onclose={closeConnected}
 		/>
 	{/if}
 

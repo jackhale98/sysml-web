@@ -6,7 +6,15 @@ import { buildTree, collectElements, type ModelElement } from '#lib/project/elem
 import type { EditStep } from '#lib/workbench/actions.ts';
 import { ownersOf, qualifiedName } from './model.ts';
 import type { ModelContext } from './relationships.ts';
-import { coverage, exposesOf, planExpose, planUnexpose, withoutHidden } from './viewEdits.ts';
+import {
+	chooseNeighbours,
+	coverage,
+	exposesOf,
+	neighbours,
+	planExpose,
+	planUnexpose,
+	withoutHidden
+} from './viewEdits.ts';
 
 let host: ToolkitHost;
 let files: Record<string, string>;
@@ -207,5 +215,32 @@ describe('hidden nodes', () => {
 		expect(shown.edges).toEqual([]);
 		expect(shown.subgraphs[0]!.node_ids).toEqual(['a']);
 		expect(withoutHidden(graph, ['gone'])).toBe(graph);
+	});
+});
+
+describe('connected elements', () => {
+	it('are the project’s elements related each way that are not drawn yet', () => {
+		const battery = find('DroneArchitecture::drone::battery');
+		const related = host.related(demoFiles(), battery.id!);
+		const drawn = new Set([find('DroneComponents::Battery').key]);
+		const list = neighbours(related, ctx.elements, drawn);
+		const names = (direction: 'out' | 'in' | 'both') =>
+			chooseNeighbours(list, direction)
+				.map((n) => qualifiedName(n.element, ctx.owners))
+				.sort();
+		// Its type is drawn already; what it satisfies and is wired to is not.
+		expect(names('out')).toEqual(
+			expect.arrayContaining([
+				"SystemRequirements::'Battery protection'",
+				'DroneArchitecture::drone::powerDistribution'
+			])
+		);
+		expect(names('out')).not.toContain('DroneComponents::Battery');
+		const both = names('both');
+		expect(new Set(both).size).toBe(both.length);
+		expect(both.length).toBeGreaterThanOrEqual(names('out').length);
+		// Each comes with the name the engine adds it to a diagram by.
+		const requirement = list.find((n) => n.element.label === 'Battery protection')!;
+		expect(requirement.qualified).toBe("SystemRequirements::'Battery protection'");
 	});
 });

@@ -33,6 +33,7 @@ export function toolkitEngine(toolkit: ToolkitClient): Engine {
 		renderView: (...params) => toolkit.call('renderView', ...params),
 		viewLibraries: (...params) => toolkit.call('viewLibraries', ...params),
 		diagram: (...params) => toolkit.call('diagram', ...params),
+		related: (...params) => toolkit.call('related', ...params),
 		stateMachines: (...params) => toolkit.call('stateMachines', ...params),
 		edit: (...params) => toolkit.call('edit', ...params),
 		checks: (...params) => toolkit.call('checks', ...params),

@@ -16,6 +16,7 @@ import type {
 	FileChange,
 	FileRange,
 	Hover,
+	RelatedElement,
 	OutlineItem,
 	RenderedTable,
 	StateMachine,
@@ -40,7 +41,15 @@ export interface EngineApi {
 	analyze(path: string, source: string): Analysis;
 	analyzeProject(files: SourceFile[]): Analysis[];
 	highlight(source: string): Highlights;
-	diagram(view: DiagramView, files: SourceFile[], scope: string | null): DiagramGraph;
+	/** A standard view as a graph; a general view also draws `added` (qualified names). */
+	diagram(
+		view: DiagramView,
+		files: SourceFile[],
+		scope: string | null,
+		added?: string[]
+	): DiagramGraph;
+	/** What an element is related to, both ways: types, specializations, links, connections. */
+	related(files: SourceFile[], id: string): RelatedElement[];
 	edit(request: EditRequest): EditResult;
 	listViews(files: SourceFile[]): ViewInfo[];
 	renderView(files: SourceFile[], name: string): RenderedTable;

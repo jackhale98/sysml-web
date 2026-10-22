@@ -599,6 +599,36 @@ export interface StateSession {
 	messages?: string[];
 }
 
+/** How two elements are related, as the model says it. */
+export type RelationKind =
+	| 'specializes'
+	| 'typed'
+	| 'satisfies'
+	| 'verifies'
+	| 'connects'
+	| 'binds'
+	| 'flows'
+	| 'allocates'
+	| 'derives';
+
+/** An element related to another, and how (`EngineApi.related`). */
+export interface RelatedElement {
+	kind: RelationKind;
+	/** `out`: the element says it (it specializes, satisfies… the other); `in`: the other does. */
+	direction: 'out' | 'in';
+	element: {
+		id: string;
+		name: string;
+		qualifiedName: string | null;
+		kind: string;
+		isDefinition: boolean;
+		file: string;
+		start_byte: number;
+	};
+	/** The connection, flow or allocation that relates them, when it has a name. */
+	via?: string;
+}
+
 /**
  * What the guided forms (`#lib/create`) need to know about an element: what
  * it is one of, how to refer to it, and its features — its own and those

@@ -15,12 +15,13 @@ export type { DiagramInput } from './context';
 export function buildDiagram(
 	input: DiagramInput,
 	view: DiagramView,
-	scope: string | null
+	scope: string | null,
+	added: string[] = []
 ): DiagramGraph {
 	const ctx = new DiagramContext(input);
 	switch (view) {
 		case 'general':
-			return generalView(ctx, scope);
+			return generalView(ctx, scope, added);
 		case 'interconnection':
 			if (!scope) throw new Error('an interconnection view needs a scope');
 			return interconnectionView(ctx, scope);
