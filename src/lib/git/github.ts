@@ -1,9 +1,10 @@
 /**
  * GitHub through its REST API, straight from the browser (the API allows
  * cross-origin requests, so no proxy is needed). Authenticated with a
- * fine-grained personal access token; an OAuth token works the same way.
+ * fine-grained personal access token, or with the token from "Sign in with
+ * GitHub" (a GitHub App user token, which can be refreshed).
  */
-import { GitError, errorFor, networkError } from './errors.ts';
+import { GitError, errorFor, networkError, type Access } from './errors.ts';
 import type {
 	BranchSummary,
 	CommitRequest,
@@ -29,6 +30,17 @@ const HOST = 'GitHub';
 /** Parallel blob downloads: quick without tripping GitHub's abuse limits. */
 const PARALLEL = 6;
 const MAX_REPO_PAGES = 5;
+const MAX_INSTALLATIONS = 20;
+
+/** Where the provider gets its token. */
+export interface TokenSource {
+	/** The token to send (refreshed first if it is about to expire). */
+	token(): string | Promise<string>;
+	/** GitHub refused `rejected` (401): a fresh token to retry with once, or null. */
+	renew?(rejected: string): Promise<string | null>;
+	/** How the account connected; decides how errors are worded and how repositories are listed. */
+	access?: Access;
+}
 
 /**
  * Where to create a fine-grained token with the right permissions filled
@@ -127,25 +139,25 @@ function summary(r: GitHubRepo): RepoSummary {
 export class GitHubProvider implements GitProvider {
 	readonly id = 'github' as const;
 	readonly label = HOST;
+	readonly access: Access;
 	private fetch: typeof fetch;
 	private api: string;
+	private auth: TokenSource;
 
-	constructor(
-		private token: string,
-		options: { fetch?: typeof fetch; api?: string } = {}
-	) {
+	constructor(auth: string | TokenSource, options: { fetch?: typeof fetch; api?: string } = {}) {
+		this.auth = typeof auth === 'string' ? { token: () => auth } : auth;
+		this.access = this.auth.access ?? 'token';
 		this.fetch = options.fetch ?? ((...args) => globalThis.fetch(...args));
 		this.api = options.api ?? API;
 	}
 
-	private async request<T>(method: string, url: string, body?: unknown, what?: string): Promise<T> {
-		let response: Response;
+	private async send(method: string, url: string, body: unknown, token: string) {
 		try {
-			response = await this.fetch(url.startsWith('http') ? url : this.api + url, {
+			return await this.fetch(url.startsWith('http') ? url : this.api + url, {
 				method,
 				headers: {
 					Accept: 'application/vnd.github+json',
-					Authorization: `Bearer ${this.token}`,
+					Authorization: `Bearer ${token}`,
 					'X-GitHub-Api-Version': '2022-11-28',
 					...(body === undefined ? {} : { 'Content-Type': 'application/json' })
 				},
@@ -154,6 +166,16 @@ export class GitHubProvider implements GitProvider {
 			});
 		} catch (error) {
 			throw networkError(HOST, error);
+		}
+	}
+
+	private async request<T>(method: string, url: string, body?: unknown, what?: string): Promise<T> {
+		const token = await this.auth.token();
+		let response = await this.send(method, url, body, token);
+		// An expired sign-in: refresh it and try once more.
+		if (response.status === 401 && this.auth.renew) {
+			const fresh = await this.auth.renew(token);
+			if (fresh && fresh !== token) response = await this.send(method, url, body, fresh);
 		}
 		if (!response.ok) {
 			let detail = '';
@@ -168,7 +190,7 @@ export class GitHubProvider implements GitProvider {
 			} catch {
 				// No JSON body.
 			}
-			throw errorFor(response, detail, HOST, what);
+			throw errorFor(response, detail, HOST, what, this.access);
 		}
 		if (response.status === 204) return undefined as T;
 		return (await response.json()) as T;
@@ -185,6 +207,7 @@ export class GitHubProvider implements GitProvider {
 	}
 
 	async listRepos(): Promise<RepoSummary[]> {
+		if (this.access === 'app') return this.listInstalledRepos();
 		const out: RepoSummary[] = [];
 		for (let page = 1; page <= MAX_REPO_PAGES; page++) {
 			const repos = await this.request<GitHubRepo[]>(
@@ -197,6 +220,38 @@ export class GitHubProvider implements GitProvider {
 			if (repos.length < 100) break;
 		}
 		return out;
+	}
+
+	/**
+	 * A signed-in (GitHub App) account sees the repositories the app was given:
+	 * those of every installation the person can use.
+	 */
+	private async listInstalledRepos(): Promise<RepoSummary[]> {
+		const installations: number[] = [];
+		for (let page = 1; page <= MAX_REPO_PAGES; page++) {
+			const result = await this.request<{ installations: { id: number }[] }>(
+				'GET',
+				`/user/installations?per_page=100&page=${page}`,
+				undefined,
+				'your repositories'
+			);
+			installations.push(...result.installations.map((i) => i.id));
+			if (result.installations.length < 100) break;
+		}
+		const byName = new Map<string, RepoSummary>();
+		for (const id of installations.slice(0, MAX_INSTALLATIONS)) {
+			for (let page = 1; page <= MAX_REPO_PAGES; page++) {
+				const result = await this.request<{ repositories: GitHubRepo[] }>(
+					'GET',
+					`/user/installations/${id}/repositories?per_page=100&page=${page}`,
+					undefined,
+					'your repositories'
+				);
+				for (const repo of result.repositories) byName.set(repo.full_name, summary(repo));
+				if (result.repositories.length < 100) break;
+			}
+		}
+		return [...byName.values()].sort((a, b) => (b.pushedAt ?? '').localeCompare(a.pushedAt ?? ''));
 	}
 
 	async getRepo(ref: RepoRef): Promise<RepoSummary> {

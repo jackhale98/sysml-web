@@ -1,22 +1,38 @@
 <script lang="ts">
 	/**
-	 * Connect a GitHub account with a fine-grained access token, explained
-	 * step by step for people who have never made one.
+	 * Connect a GitHub account. When this build has sign-in set up, "Sign in
+	 * with GitHub" comes first (a round trip to GitHub, then back to this
+	 * page, which reopens what the person was doing). Making a fine-grained
+	 * access token, explained step by step for people who have never made
+	 * one, is always available: as the quieter fallback, or on its own when
+	 * sign-in isn't set up.
 	 */
-	import { ExternalLink, Eye, EyeOff, LoaderCircle, Lock } from '@lucide/svelte';
+	import { ChevronRight, ExternalLink, Eye, EyeOff, LoaderCircle, Lock } from '@lucide/svelte';
 	import { pwa } from '#lib/offline/pwa.svelte.ts';
 	import { accounts } from './account.svelte.ts';
 	import { messageOf } from './errors.ts';
+	import GitHubMark from './GitHubMark.svelte';
 	import { tokenUrl } from './github.ts';
+	import type { Resume } from './oauth.ts';
+	import { SIGN_IN, signInWithGitHub } from './signin.ts';
 	import type { GitUser } from './types.ts';
 
-	let { onconnected }: { onconnected?: (user: GitUser) => void } = $props();
+	let {
+		onconnected,
+		resume
+	}: {
+		onconnected?: (user: GitUser) => void;
+		/** What to reopen after coming back from signing in on GitHub. */
+		resume?: Resume;
+	} = $props();
 
 	const uid = $props.id();
 	let token = $state('');
 	let reveal = $state(false);
 	let busy = $state(false);
 	let error = $state<string | null>(null);
+	let leaving = $state(false);
+	let signInError = $state<string | null>(null);
 
 	async function connect(event: SubmitEvent) {
 		event.preventDefault();
@@ -32,80 +48,202 @@
 			busy = false;
 		}
 	}
+
+	async function signIn() {
+		leaving = true;
+		signInError = null;
+		try {
+			if (await signInWithGitHub(resume))
+				// On the way to GitHub; if the browser stays (it was stopped), allow another try.
+				setTimeout(() => (leaving = false), 5000);
+			else leaving = false;
+		} catch (e) {
+			signInError = messageOf(e);
+			leaving = false;
+		}
+	}
 </script>
 
-<form class="connect" onsubmit={connect}>
-	<p class="intro">
-		SysML Web works with GitHub straight from your browser. To let it open and save your models,
-		give it an <strong>access token</strong>: a password just for this app, limited to the
-		repositories you choose.
-	</p>
-	<ol class="steps">
-		<li>
-			<span class="n" aria-hidden="true">1</span>
-			<div>
-				<strong>Create a token on GitHub</strong>
-				<p>
-					The permissions are filled in for you: <em>Contents</em> and <em>Pull requests</em>, read
-					and write. Under <em>Repository access</em>, choose <em>Only select repositories</em> and pick
-					the ones with your models.
-				</p>
-				<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external link -->
-				<a class="button" href={tokenUrl()} target="_blank" rel="noopener noreferrer">
-					Create a token on GitHub <ExternalLink size={14} aria-hidden="true" />
-					<span class="visually-hidden">(opens in a new tab)</span>
-				</a>
-			</div>
-		</li>
-		<li>
-			<span class="n" aria-hidden="true">2</span>
-			<div>
-				<label for="{uid}-token"><strong>Paste the token here</strong></label>
-				<div class="field">
-					<input
-						id="{uid}-token"
-						type={reveal ? 'text' : 'password'}
-						bind:value={token}
-						placeholder="github_pat_…"
-						autocomplete="off"
-						spellcheck="false"
-						aria-describedby="{uid}-privacy"
-						aria-invalid={error ? 'true' : undefined}
-					/>
-					<button
-						type="button"
-						class="reveal"
-						aria-label={reveal ? 'Hide token' : 'Show token'}
-						aria-pressed={reveal}
-						onclick={() => (reveal = !reveal)}
-					>
-						{#if reveal}<EyeOff size={16} />{:else}<Eye size={16} />{/if}
-					</button>
+{#snippet tokenForm(fallback: boolean)}
+	<form class="connect" class:fallback onsubmit={connect}>
+		{#if fallback}
+			<p class="intro">
+				Rather not sign in? Give SysML Web an <strong>access token</strong> instead: a password just for
+				this app, limited to the repositories you choose.
+			</p>
+		{:else}
+			<p class="intro">
+				SysML Web works with GitHub straight from your browser. To let it open and save your models,
+				give it an <strong>access token</strong>: a password just for this app, limited to the
+				repositories you choose.
+			</p>
+		{/if}
+		<ol class="steps">
+			<li>
+				<span class="n" aria-hidden="true">1</span>
+				<div>
+					<strong>Create a token on GitHub</strong>
+					<p>
+						The permissions are filled in for you: <em>Contents</em> and <em>Pull requests</em>,
+						read and write. Under <em>Repository access</em>, choose
+						<em>Only select repositories</em> and pick the ones with your models.
+					</p>
+					<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external link -->
+					<a class="button" href={tokenUrl()} target="_blank" rel="noopener noreferrer">
+						Create a token on GitHub <ExternalLink size={14} aria-hidden="true" />
+						<span class="visually-hidden">(opens in a new tab)</span>
+					</a>
 				</div>
-			</div>
-		</li>
-	</ol>
-	{#if error}<p class="error" role="alert">{error}</p>{/if}
-	{#if !pwa.online}<p class="offline" role="status">
-			You're offline. Connect GitHub once you're back online.
-		</p>{/if}
-	<button type="submit" class="primary" disabled={busy || !token.trim() || !pwa.online}>
-		{#if busy}<LoaderCircle size={16} class="spin" aria-hidden="true" /> Checking…{:else}Connect
-			GitHub{/if}
-	</button>
-	<p class="privacy" id="{uid}-privacy">
-		<Lock size={13} aria-hidden="true" />
-		<span>
-			The token stays in this browser and is only ever sent to <code>api.github.com</code>. Sign out
-			any time in Settings → Accounts.
-		</span>
-	</p>
-</form>
+			</li>
+			<li>
+				<span class="n" aria-hidden="true">2</span>
+				<div>
+					<label for="{uid}-token"><strong>Paste the token here</strong></label>
+					<div class="field">
+						<input
+							id="{uid}-token"
+							type={reveal ? 'text' : 'password'}
+							bind:value={token}
+							placeholder="github_pat_…"
+							autocomplete="off"
+							spellcheck="false"
+							aria-describedby="{uid}-privacy"
+							aria-invalid={error ? 'true' : undefined}
+						/>
+						<button
+							type="button"
+							class="reveal"
+							aria-label={reveal ? 'Hide token' : 'Show token'}
+							aria-pressed={reveal}
+							onclick={() => (reveal = !reveal)}
+						>
+							{#if reveal}<EyeOff size={16} />{:else}<Eye size={16} />{/if}
+						</button>
+					</div>
+				</div>
+			</li>
+		</ol>
+		{#if error}<p class="error" role="alert">{error}</p>{/if}
+		{#if !pwa.online && !fallback}<p class="offline" role="status">
+				You're offline. Connect GitHub once you're back online.
+			</p>{/if}
+		<button
+			type="submit"
+			class={fallback ? 'button' : 'primary'}
+			disabled={busy || !token.trim() || !pwa.online}
+		>
+			{#if busy}<LoaderCircle size={16} class="spin" aria-hidden="true" /> Checking…{:else}Connect
+				GitHub{/if}
+		</button>
+		<p class="privacy" id="{uid}-privacy">
+			<Lock size={13} aria-hidden="true" />
+			<span>
+				The token stays in this browser and is only ever sent to <code>api.github.com</code>. Sign
+				out any time in Settings → Accounts.
+			</span>
+		</p>
+	</form>
+{/snippet}
+
+{#if SIGN_IN}
+	<div class="connect">
+		<p class="intro">
+			Sign in with GitHub to open your models and save them back. You choose which repositories
+			SysML Web can use.
+		</p>
+		<button
+			type="button"
+			class="signin"
+			onclick={signIn}
+			disabled={leaving || !pwa.online}
+			aria-describedby="{uid}-how"
+		>
+			{#if leaving}
+				<LoaderCircle size={18} class="spin" aria-hidden="true" /> Opening GitHub…
+			{:else}
+				<GitHubMark size={18} /> Sign in with GitHub
+			{/if}
+		</button>
+		{#if signInError}<p class="error" role="alert">{signInError}</p>{/if}
+		{#if !pwa.online}<p class="offline" role="status">
+				You're offline. Sign in once you're back online.
+			</p>{/if}
+		<p class="privacy" id="{uid}-how">
+			<Lock size={13} aria-hidden="true" />
+			<span>
+				You'll confirm on GitHub, then come straight back here. Your sign-in is kept only in this
+				browser; sign out any time in Settings → Accounts.
+			</span>
+		</p>
+		<details class="other">
+			<summary><ChevronRight size={15} aria-hidden="true" /> Use an access token instead</summary>
+			{@render tokenForm(true)}
+		</details>
+	</div>
+{:else}
+	{@render tokenForm(false)}
+{/if}
 
 <style>
 	.connect {
 		display: grid;
 		gap: var(--space-4);
+	}
+	.connect.fallback {
+		gap: var(--space-3);
+		padding-top: var(--space-3);
+	}
+	.signin {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: var(--space-2);
+		justify-self: start;
+		min-height: 2.75rem;
+		padding: 0 var(--space-5);
+		border: 0;
+		border-radius: var(--radius-sm);
+		background: var(--text);
+		color: var(--surface);
+		font-weight: 600;
+		cursor: pointer;
+	}
+	.signin:hover:not(:disabled) {
+		opacity: 0.9;
+	}
+	.signin:disabled {
+		opacity: 0.55;
+		cursor: default;
+	}
+	.signin :global(.spin) {
+		animation: spin 900ms linear infinite;
+	}
+	.other {
+		border-top: 1px solid var(--border);
+		padding-top: var(--space-3);
+	}
+	.other summary {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-1);
+		min-height: 2.25rem;
+		color: var(--text-2);
+		font-size: var(--text-sm);
+		font-weight: 600;
+		list-style: none;
+		cursor: pointer;
+	}
+	.other summary::-webkit-details-marker {
+		display: none;
+	}
+	.other summary:hover {
+		color: var(--text);
+	}
+	.other summary :global(svg) {
+		transition: transform var(--duration) var(--ease);
+	}
+	.other[open] summary :global(svg) {
+		transform: rotate(90deg);
 	}
 	.intro {
 		color: var(--text-2);
@@ -190,6 +328,13 @@
 		border-color: var(--accent);
 		text-decoration: none;
 	}
+	.button:disabled {
+		opacity: 0.55;
+		cursor: default;
+	}
+	.connect.fallback > .button {
+		justify-self: start;
+	}
 	.primary {
 		justify-self: start;
 		border: 0;
@@ -206,6 +351,11 @@
 	@keyframes spin {
 		to {
 			transform: rotate(360deg);
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.other summary :global(svg) {
+			transition: none;
 		}
 	}
 	.error,

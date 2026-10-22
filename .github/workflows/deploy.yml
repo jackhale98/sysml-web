@@ -35,6 +35,11 @@ jobs:
         run: npm run build
         env:
           BASE_PATH: /sysml-web
+          # "Sign in with GitHub" (docs/setup-github-sign-in.md). Repository Actions
+          # variables; while they are unset, people connect with an access token.
+          PUBLIC_GITHUB_CLIENT_ID: ${{ vars.PUBLIC_GITHUB_CLIENT_ID }}
+          PUBLIC_GITHUB_APP_SLUG: ${{ vars.PUBLIC_GITHUB_APP_SLUG }}
+          PUBLIC_SYNC_WORKER: ${{ vars.PUBLIC_SYNC_WORKER }}
 
       - uses: actions/configure-pages@v5
 

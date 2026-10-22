@@ -153,6 +153,8 @@ export function routeRequest(request: RequestFacts, origin: string, plan: CacheP
 		if (pathname === plan.fallback) return { strategy: 'page', key: plan.fallback };
 		const page = pagePath(pathname, plan.base);
 		if (plan.pages.includes(page)) return { strategy: 'page', key: page };
+		// A page kept with its trailing slash (auth/callback/index.html).
+		if (plan.pages.includes(`${page}/`)) return { strategy: 'page', key: `${page}/` };
 		// A file that isn't an app route (a download, `robots.txt`, …).
 		if (/\.[a-z0-9]+$/i.test(pathname)) return network;
 		// Any other route (a stored project's `/p/<id>`) boots from the SPA fallback.

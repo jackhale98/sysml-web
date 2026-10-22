@@ -33,6 +33,12 @@
 	import { GitError, messageOf } from './errors.ts';
 	import GitHubMark from './GitHubMark.svelte';
 	import OpenRepository from './OpenRepository.svelte';
+	import {
+		chooseRepositories,
+		chooseRepositoriesUrl,
+		SIGN_IN,
+		signInWithGitHub
+	} from './signin.ts';
 	import { branchName, type Resolution } from './sync.ts';
 	import ChangeSummary from '#lib/review/ChangeSummary.svelte';
 	import { knowBlobs, modelFilesAt } from '#lib/review/remote.ts';
@@ -63,6 +69,15 @@
 	const record = $derived(session.record?.git ?? null);
 	const changes = $derived(git.changes);
 	const connected = $derived(accounts.connected);
+	/** Signed in with GitHub (rather than with an access token). */
+	const signedIn = $derived(accounts.github?.via === 'app');
+	/** Signed in: where to choose the repositories SysML Web can use. */
+	const installLink = $derived(signedIn ? chooseRepositoriesUrl() : null);
+
+	function chooseOnGitHub(event: MouseEvent) {
+		event.preventDefault();
+		void chooseRepositories('source-control');
+	}
 	/** Signed in and online: GitHub can be reached. */
 	const reachable = $derived(connected && pwa.online);
 	const ref = $derived(record ? { owner: record.owner, repo: record.repo } : null);
@@ -396,8 +411,21 @@
 							<button type="button" class="small-button" onclick={pull} disabled={working}>
 								<ArrowDownToLine size={14} aria-hidden="true" /> Get latest {@render term('pull')}
 							</button>
+						{:else if error.kind === 'auth' && signedIn && SIGN_IN}
+							<button
+								type="button"
+								class="small-button"
+								onclick={() => void signInWithGitHub('source-control')}
+							>
+								<GitHubMark size={14} /> Sign in again
+							</button>
 						{:else if error.kind === 'auth'}
 							<button type="button" class="small-button" onclick={reconnect}>Connect again</button>
+						{:else if (error.kind === 'permission' || error.kind === 'not-found') && installLink}
+							<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- GitHub's page; returns to this one -->
+							<a class="small-button" href={installLink} onclick={chooseOnGitHub}>
+								Choose repositories on GitHub <ExternalLink size={13} aria-hidden="true" />
+							</a>
 						{/if}
 					</div>
 				</div>
@@ -406,7 +434,7 @@
 			{#if !connected}
 				<section class="card" aria-labelledby="{uid}-connect">
 					<h3 id="{uid}-connect">Connect your GitHub account</h3>
-					<ConnectGitHub />
+					<ConnectGitHub resume="source-control" />
 				</section>
 			{/if}
 
@@ -835,6 +863,7 @@
 	title="Connect to a GitHub repository"
 	action="Connect"
 	intro="Pick the repository and branch to save this project to. Nothing is sent yet: you'll review the changes first."
+	resume="source-control"
 	run={link}
 />
 
@@ -1226,6 +1255,10 @@
 		font-size: var(--text-sm);
 		font-weight: 600;
 		cursor: pointer;
+	}
+	a.small-button {
+		color: var(--text);
+		text-decoration: none;
 	}
 	.danger {
 		border-color: transparent !important;
