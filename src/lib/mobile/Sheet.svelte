@@ -41,6 +41,11 @@
 			closing = false;
 			offset = 0;
 			dialog.showModal();
+		} else if (open && closing) {
+			// Opened again while sliding out: stay open rather than let the timer close it.
+			clearTimeout(closeTimer);
+			closing = false;
+			offset = 0;
 		} else if (!open && dialog.open && !closing) {
 			dismiss();
 		}
