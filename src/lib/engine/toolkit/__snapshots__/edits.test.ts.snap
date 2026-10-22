@@ -61,8 +61,8 @@ exports[`edits > changes a string field 1`] = `
 `;
 
 exports[`edits > changes a value 1`] = `
-"-         attribute capacity :> energy = 216 [W*h];
-+         attribute capacity :> energy = 300 [W*h];"
+"-         attribute capacity :> energy default 216 [W*h];
++         attribute capacity :> energy default 300 [W*h];"
 `;
 
 exports[`edits > chooses the columns of a view def 1`] = `
@@ -85,8 +85,8 @@ exports[`edits > gives a declaration without a body a doc comment 1`] = `
 `;
 
 exports[`edits > keeps the unit of a number 1`] = `
-"-         attribute :>> mass = 1100 [g];
-+         attribute :>> mass = 1150 [g];"
+"-         attribute :>> mass default 1100 [g];  // defaults: another pack can have its own (see BatteryTrade)
++         attribute :>> mass default 1150 [g];  // defaults: another pack can have its own (see BatteryTrade)"
 `;
 
 exports[`edits > lays out a doc comment like the one it replaces 1`] = `
@@ -107,8 +107,8 @@ exports[`edits > makes a definition concrete 1`] = `
 `;
 
 exports[`edits > makes a value a default 1`] = `
-"-         attribute capacity :> energy = 216 [W*h];
-+         attribute capacity :> energy default = 216 [W*h];"
+"-         attribute maxPower :> power = 450 [W];
++         attribute maxPower :> power default = 450 [W];"
 `;
 
 exports[`edits > removes a direction 1`] = `
@@ -129,7 +129,7 @@ exports[`edits > removes a type, keeping the multiplicity 1`] = `
 `;
 
 exports[`edits > removes a value 1`] = `
-"-         attribute capacity :> energy = 216 [W*h];
+"-         attribute capacity :> energy default 216 [W*h];
 +         attribute capacity :> energy;"
 `;
 

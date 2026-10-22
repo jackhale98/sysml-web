@@ -52,6 +52,11 @@ package DroneViews {
         doc /* Does the design meet its requirements? Each requirement's constraint, checked against the design's values. */
     }
 
+    view batteryTrade : TradeStudyTable {
+        doc /* Which battery to fly: today's pack against three candidates, on endurance, mass margin and price. */
+        expose BatteryTrade::batteryTradeStudy;
+    }
+
     // Diagrams.
 
     view serviceContext : InterconnectionView {

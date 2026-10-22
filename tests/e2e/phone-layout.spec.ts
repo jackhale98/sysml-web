@@ -63,12 +63,16 @@ test('on a phone, every main screen fits the width without panning sideways', as
 	await expectFitsWidth(page, 'the requirements table');
 });
 
-test('on a phone, the budgets and the checks are cards that fit the width', async ({ page }) => {
+test('on a phone, the budgets, the checks and the trade study are cards that fit the width', async ({
+	page
+}) => {
 	await openDemo(page);
 	for (const [view, card] of [
 		['Drone mass budget', '180 g'],
 		['Drone power budget', '397 W'],
-		['Design checks', 'Satisfied']
+		['Design checks', 'Satisfied'],
+		// A card per alternative, best first.
+		['Battery trade', 'semiSolidState']
 	] as const) {
 		await nav(page, 'Views');
 		const open = page.getByRole('button', { name: new RegExp(`^${view}`) }).first();

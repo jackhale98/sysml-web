@@ -39,6 +39,8 @@ describe('language services', () => {
 	it('finds references across files', () => {
 		const refs = host.references(files, path, battery);
 		expect(refs.map((r) => r.path).sort()).toEqual([
+			// The battery trade study: its options, the evaluation function and the result.
+			...Array<string>(8).fill('analysis/BatteryTrade.sysml'),
 			'system/Components.sysml',
 			'system/DroneArchitecture.sysml'
 		]);
@@ -48,12 +50,18 @@ describe('language services', () => {
 		const result = host.renameSymbol(files, path, battery, 'Pack');
 		const declared = components.indexOf('Battery :>');
 		const used = text.indexOf(': Battery') + 2;
-		expect(result).toEqual({
-			changes: [
-				{ path: 'system/Components.sysml', from: declared, to: declared + 7, insert: 'Pack' },
-				{ path, from: used, to: used + 7, insert: 'Pack' }
-			]
-		});
+		if (!('changes' in result)) throw new Error(result.error);
+		const elsewhere = result.changes.filter((c) => c.path === 'analysis/BatteryTrade.sysml');
+		expect(result.changes.filter((c) => !elsewhere.includes(c))).toEqual([
+			{ path: 'system/Components.sysml', from: declared, to: declared + 7, insert: 'Pack' },
+			{ path, from: used, to: used + 7, insert: 'Pack' }
+		]);
+		// Each use in the trade study: the name, and nothing around it.
+		const trade = files.find((f) => f.path === 'analysis/BatteryTrade.sysml')!.text;
+		expect(elsewhere).toHaveLength(8);
+		expect(
+			elsewhere.every((c) => trade.slice(c.from, c.to) === 'Battery' && c.insert === 'Pack')
+		).toBe(true);
 	});
 
 	it('completes types after `:`', () => {

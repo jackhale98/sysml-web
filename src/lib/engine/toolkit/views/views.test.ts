@@ -622,9 +622,10 @@ describe('the demo’s tables', () => {
 
 	it('lists the views the earlier engine listed', () => {
 		const views = host.listViews(demo);
-		// The earlier engine's 41, and the budgets and checks: 3 view defs, 3 usages.
-		expect(views).toHaveLength(47);
-		expect(views.filter((v) => v.hasTable)).toHaveLength(32);
+		// The earlier engine's 41, the budgets and checks (3 view defs, 3 usages) and the
+		// trade study (a view def and a usage).
+		expect(views).toHaveLength(49);
+		expect(views.filter((v) => v.hasTable)).toHaveLength(34);
 		expect(views.every((v) => !v.builtin)).toBe(true);
 		expect(views.find((v) => v.name === 'droneBreakdown')).toEqual({
 			name: 'droneBreakdown',
@@ -824,10 +825,12 @@ describe('the demo’s tables', () => {
 		expect(bom.sources[8]).toEqual({
 			element: 'DroneComponents::Rotor::motor',
 			file: 'system/Components.sysml',
-			line: 61
+			line: 62
 		});
 		// `ref part rotors` refers to the four rotors: they are counted once, where they are owned.
 		expect(col(bom, 'path')).not.toContain('deliveryService.drone.rotors');
+		// A variation lists choices (the battery trade study's), not parts.
+		expect(col(bom, 'path').filter((p) => /batteryOptions|lithium/.test(p))).toEqual([]);
 		const drone = table('droneBillOfMaterials');
 		// `expose DroneArchitecture::drone::**` exposes the drone too.
 		expect(shape(drone)).toEqual([26, 5]);
@@ -859,7 +862,7 @@ describe('the demo’s tables', () => {
 		const row = (kind: string) => stats.rows.find((r) => r[0] === kind);
 		expect(row('part def')).toEqual(['part def', '19', '0']);
 		expect(row('requirement')).toEqual(['requirement', '0', '20']);
-		expect(row('attribute')).toEqual(['attribute', '0', '174']);
+		expect(row('attribute')).toEqual(['attribute', '0', '195']);
 		// Enum literals count as usages, metadata annotations are anonymous.
 		expect(row('enum')).toEqual(['enum', '0', '33']);
 		expect(row('metadata')).toBeUndefined();
