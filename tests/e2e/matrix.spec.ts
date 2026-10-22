@@ -24,11 +24,27 @@ async function openDemo(page: Page) {
 	});
 }
 
+/**
+ * Make the matrix a saved view with "New view" (the explorer lists saved views,
+ * not the bare view defs), which opens it. It covers the whole model.
+ */
+async function makeView(page: Page, name: 'Trace matrix' | 'Verification matrix') {
+	await page.getByRole('button', { name: /Search the model/ }).click();
+	const palette = page.getByRole('dialog').filter({ has: page.getByRole('listbox') });
+	await palette.getByRole('combobox').fill(`new view ${name}`);
+	await palette.getByRole('option', { name: `New view: ${name}` }).click();
+	const form = page.getByRole('dialog', { name: 'New view' });
+	await form.getByRole('button', { name: 'Create' }).click();
+	await expect(form).toBeHidden();
+}
+
 async function openView(page: Page, name: string) {
-	await page
-		.locator('section[aria-labelledby="views-heading"]')
-		.getByRole('button', { name, exact: true })
-		.click();
+	if (name === 'Trace matrix' || name === 'Verification matrix') await makeView(page, name);
+	else
+		await page
+			.locator('section[aria-labelledby="views-heading"]')
+			.getByRole('button', { name, exact: true })
+			.click();
 	const view = page.getByRole('region', { name: `${name} view` });
 	await expect(view.getByText('20 rows')).toBeVisible({ timeout: 15_000 });
 	return view;
@@ -225,11 +241,7 @@ test.describe('on a phone', () => {
 
 	test('a card per requirement, what satisfies it as chips, gaps flagged', async ({ page }) => {
 		await openDemo(page);
-		await page
-			.getByRole('navigation', { name: 'Sections' })
-			.getByRole('button', { name: 'Views' })
-			.click();
-		await page.getByRole('button', { name: 'Trace matrix', exact: true }).first().click();
+		await makeView(page, 'Trace matrix');
 		const view = page.getByRole('region', { name: 'Trace matrix view' });
 		const cards = view.getByRole('list', { name: /Requirements and what they are satisfied by/ });
 		await expect(cards.locator(':scope > li')).toHaveCount(20, { timeout: 15_000 });

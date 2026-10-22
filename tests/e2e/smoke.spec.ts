@@ -103,8 +103,8 @@ test('requirements view lists requirements with their trace status', async ({ pa
 test('saved SysML views render as tables and diagrams', async ({ page }) => {
 	await openDemo(page);
 	const views = page.locator('section[aria-labelledby="views-heading"]');
-	await views.getByRole('button', { name: 'Requirement gaps' }).click();
-	const table = page.getByRole('region', { name: 'Requirement gaps view' });
+	await views.getByRole('button', { name: 'System requirements' }).click();
+	const table = page.getByRole('region', { name: 'System requirements view' });
 	await expect(table.locator('tbody tr').first()).toBeVisible();
 	await expect(table).toContainText('SYS-005');
 	await expectAccessible(page);

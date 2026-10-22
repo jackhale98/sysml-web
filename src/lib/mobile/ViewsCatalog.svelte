@@ -8,14 +8,16 @@
 		ListChecks,
 		Network,
 		Play,
+		Plus,
+		Scale,
 		Table2
 	} from '@lucide/svelte';
 	import type { LibraryEntry } from '#lib/engine/types.ts';
 	import { libraryIndex } from '#lib/library/library.ts';
 	import { isLibraryFile, type Workspace } from '#lib/project/workspace.svelte.ts';
 	import type { Tab, WorkbenchUi } from '#lib/workbench/ui.svelte.ts';
-	import { presentationOf, viewTitle } from '#lib/workbench/views.ts';
-	import { reportEntries } from '#lib/reports/kinds.ts';
+	import { groupViews, presentationOf, viewTitle } from '#lib/workbench/views.ts';
+	import { reportEntries, reportKindOf } from '#lib/reports/kinds.ts';
 
 	/**
 	 * Everything that can be looked at, as large touch targets: the overview
@@ -31,19 +33,12 @@
 	const savedViews = $derived(
 		workspace.views
 			.filter((v) => v.isUsage && !v.builtin && !isLibraryFile(v.file))
-			.map((v) => ({ info: v, presentation: presentationOf(v) }))
-			.filter((v) => v.presentation.kind !== 'none')
+			.map((v) => ({ info: v, presentation: presentationOf(v), report: !!reportKindOf(v) }))
+			.filter((v) => v.presentation.kind !== 'none' || v.report)
 	);
-	const standardViews = $derived(
-		workspace.views.filter(
-			(v) =>
-				(v.builtin || v.file.endsWith('ModelViews.sysml')) &&
-				!v.isUsage &&
-				v.hasTable &&
-				v.name !== 'RequirementsTable'
-		)
-	);
-	const reports = $derived(reportEntries(workspace.views, isLibraryFile));
+	const viewGroups = $derived(groupViews(savedViews, (v) => v.info));
+	// Saved reports are under Documents; the standard ones the project hasn't saved here.
+	const reports = $derived(reportEntries(workspace.views, isLibraryFile).filter((r) => !r.saved));
 	const packages = $derived(
 		workspace.tree.filter((n) => n.element.kind === 'package' && !isLibraryFile(n.element.file))
 	);
@@ -99,21 +94,40 @@
 		</ul>
 	</section>
 
-	{#if savedViews.length}
+	<section>
+		{@render heading('Make something new')}
+		<ul>
+			<li>
+				<button type="button" class="row" onclick={() => (ui.create = { kind: 'view' })}>
+					<span class="tile" style:--tone="var(--accent)"><Plus size={18} /></span>
+					<span class="label">New view</span>
+					<span class="detail">Table, diagram, budget</span>
+				</button>
+			</li>
+			<li>
+				<button type="button" class="row" onclick={() => (ui.create = { kind: 'trade' })}>
+					<span class="tile" style:--tone="var(--kind-analysis)"><Scale size={18} /></span>
+					<span class="label">New trade study</span>
+				</button>
+			</li>
+		</ul>
+	</section>
+
+	{#each viewGroups as g (g.id)}
 		<section>
-			{@render heading('Saved views')}
+			{@render heading(g.title)}
 			<ul>
-				{#each savedViews as v (v.info.name)}
+				{#each g.views as v (v.info.name)}
 					{@render row(
-						v.presentation.kind === 'table' ? Table2 : Network,
+						v.report ? FileText : v.presentation.kind === 'table' ? Table2 : Network,
 						viewTitle(v.info.name),
 						{ kind: 'view', name: v.info.name, title: viewTitle(v.info.name) },
-						v.presentation.kind === 'table' ? 'Table' : 'Diagram'
+						v.report ? 'Document' : v.presentation.kind === 'table' ? 'Table' : 'Diagram'
 					)}
 				{/each}
 			</ul>
 		</section>
-	{/if}
+	{/each}
 
 	{#if workspace.machines.length}
 		<section>
@@ -149,31 +163,18 @@
 		</section>
 	{/if}
 
-	<section>
-		{@render heading('Reports')}
-		<ul>
-			{#each reports as r (r.name)}
-				{@render row(
-					FileText,
-					r.title,
-					{ kind: 'view', name: r.name, title: r.title },
-					r.saved ? 'Saved' : 'Standard',
-					'var(--kind-view)'
-				)}
-			{/each}
-		</ul>
-	</section>
-
-	{#if standardViews.length}
+	{#if reports.length}
 		<section>
-			{@render heading('Standard tables')}
+			{@render heading('Reports')}
 			<ul>
-				{#each standardViews as v (v.name)}
-					{@render row(Table2, viewTitle(v.name), {
-						kind: 'view',
-						name: v.name,
-						title: viewTitle(v.name)
-					})}
+				{#each reports as r (r.name)}
+					{@render row(
+						FileText,
+						r.title,
+						{ kind: 'view', name: r.name, title: r.title },
+						r.saved ? 'Saved' : 'Standard',
+						'var(--kind-view)'
+					)}
 				{/each}
 			</ul>
 		</section>

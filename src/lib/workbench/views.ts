@@ -60,3 +60,74 @@ export function viewTitle(name: string): string {
 
 /** Abbreviations engineers write in capitals, even when a name is camel case (`fmeaWorksheet`). */
 const ACRONYMS = new Set(['fmea', 'icd', 'bom', 'rpn', 'uav', 'gps', 'id', 'si', 'ui', 'api']);
+
+/** The headings saved views are listed under, in order. */
+export type ViewFamily =
+	| 'requirements'
+	| 'structure'
+	| 'interfaces'
+	| 'behaviour'
+	| 'analysis'
+	| 'risk'
+	| 'documents'
+	| 'other';
+
+export const VIEW_FAMILIES: readonly { id: ViewFamily; title: string }[] = [
+	{ id: 'requirements', title: 'Requirements' },
+	{ id: 'structure', title: 'Structure' },
+	{ id: 'interfaces', title: 'Interfaces' },
+	{ id: 'behaviour', title: 'Behaviour' },
+	{ id: 'analysis', title: 'Budgets & analysis' },
+	{ id: 'risk', title: 'Risk' },
+	{ id: 'documents', title: 'Documents' },
+	{ id: 'other', title: 'Other' }
+];
+
+const FAMILY_OF: Record<string, ViewFamily> = {
+	RequirementsTable: 'requirements',
+	RequirementGaps: 'requirements',
+	TraceMatrix: 'requirements',
+	VerificationMatrix: 'requirements',
+	RequirementsTraceMatrix: 'requirements',
+	GeneralView: 'structure',
+	BillOfMaterials: 'structure',
+	ModelStats: 'structure',
+	InterfaceTable: 'interfaces',
+	PortTable: 'interfaces',
+	ConnectionTable: 'interfaces',
+	InterconnectionView: 'interfaces',
+	AllocationMatrix: 'behaviour',
+	StateTransitionView: 'behaviour',
+	ActionFlowView: 'behaviour',
+	SequenceView: 'behaviour',
+	MassBudget: 'analysis',
+	PowerBudget: 'analysis',
+	ConstraintChecks: 'analysis',
+	TradeStudyTable: 'analysis',
+	SpecificationDocument: 'documents',
+	InterfaceControlDocument: 'documents'
+};
+
+/** Which heading a saved view goes under, from the view def it is typed by. */
+export function viewFamily(view: ViewInfo): ViewFamily {
+	const definition = view.definition?.split('::').pop() ?? '';
+	const known = FAMILY_OF[definition];
+	if (known) return known;
+	if (view.renderAs === 'asDocument') return 'documents';
+	const words = `${definition} ${view.name}`;
+	if (/fmea|hazard|risk/i.test(words)) return 'risk';
+	if (/budget|check|trade|analysis/i.test(words)) return 'analysis';
+	if (/requirement/i.test(words)) return 'requirements';
+	return 'other';
+}
+
+/** Views grouped by family, in the families' order, without empty groups. */
+export function groupViews<T>(
+	views: readonly T[],
+	info: (v: T) => ViewInfo
+): { id: ViewFamily; title: string; views: T[] }[] {
+	return VIEW_FAMILIES.map((f) => ({
+		...f,
+		views: views.filter((v) => viewFamily(info(v)) === f.id)
+	})).filter((g) => g.views.length);
+}

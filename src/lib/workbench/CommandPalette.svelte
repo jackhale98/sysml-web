@@ -11,6 +11,7 @@
 		fileItems,
 		machineItems,
 		modelViewItems,
+		newViewItems,
 		search,
 		segments,
 		tableRowItems,
@@ -20,6 +21,7 @@
 		type Range
 	} from './palette.ts';
 	import type { WorkbenchUi } from './ui.svelte.ts';
+	import { VIEW_KINDS } from '#lib/create/view.ts';
 
 	let { workspace, ui }: { workspace: Workspace; ui: WorkbenchUi } = $props();
 
@@ -43,7 +45,11 @@
 			)
 		],
 		files: fileItems(workspace.modelPaths),
-		commands: [...machineItems(workspace.machines), ...commandItems(theme.choice)],
+		commands: [
+			...machineItems(workspace.machines),
+			...commandItems(theme.choice),
+			...newViewItems(VIEW_KINDS)
+		],
 		...(ui.table
 			? {
 					rows: tableRowItems(ui.table.view, ui.table.title, ui.table.columns, ui.table.rows),
@@ -134,6 +140,9 @@
 				break;
 			case 'import-requirements':
 				ui.importOpen = true;
+				break;
+			case 'create':
+				ui.create = action.request;
 				break;
 		}
 	}

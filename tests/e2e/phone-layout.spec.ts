@@ -134,3 +134,26 @@ test('on a phone, a sequence diagram scrolls inside its canvas, never the page',
 	expect(after!.x + after!.width).toBeLessThanOrEqual(390);
 	await expectFitsWidth(page, 'the panned sequence diagram');
 });
+
+test('on a phone, the guided forms fit the width', async ({ page }) => {
+	await openDemo(page);
+	await nav(page, 'Views');
+	await page.getByRole('button', { name: 'New view' }).click();
+	const view = page.getByRole('dialog', { name: 'New view' });
+	await expect(view.getByText('Bill of materials', { exact: true })).toBeVisible();
+	await expectFitsWidth(page, 'the new view form');
+	await view.getByText('Budget', { exact: true }).click();
+	await view.getByRole('button', { name: 'Next' }).click();
+	await expectFitsWidth(page, 'the new view form’s second step');
+	await page.keyboard.press('Escape');
+
+	await nav(page, 'Model');
+	await page
+		.getByRole('treeitem')
+		.getByRole('button', { name: 'drone', exact: true })
+		.first()
+		.click();
+	await page.getByRole('button', { name: 'Set a limit on takeOffMass of drone' }).click();
+	await expect(page.getByRole('dialog', { name: 'Set a limit' }).getByLabel('Limit')).toBeVisible();
+	await expectFitsWidth(page, 'the limit form');
+});

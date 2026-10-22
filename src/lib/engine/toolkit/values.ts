@@ -150,8 +150,14 @@ export function formatValue(ty: FieldType, value: string): string {
 		case 'longText':
 			return stringLiteral(v);
 		default:
-			// Nothing says: a number or boolean as typed, anything else as a string.
-			return isNumber(v) || v === 'true' || v === 'false' ? v : stringLiteral(v);
+			// Nothing says: a number (with its unit: `30 [kg]`) or boolean as typed, anything
+			// else as a string.
+			return isNumber(v) ||
+				(isNumber(v.split('[')[0]!.trim()) && /\[[^\]]+\]$/.test(v)) ||
+				v === 'true' ||
+				v === 'false'
+				? v
+				: stringLiteral(v);
 	}
 }
 

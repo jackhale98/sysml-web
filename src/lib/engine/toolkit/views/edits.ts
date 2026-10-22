@@ -36,6 +36,8 @@ interface Feature {
 	isAttribute: boolean;
 	typeId: string | null;
 	many: boolean;
+	/** What it specializes, as written (`ISQ::mass`), when it has no type of its own. */
+	specializes?: string[];
 }
 
 const NUMERIC = new Set([
@@ -183,8 +185,30 @@ export class ColumnEdits {
 			if (!declared.isAttribute) return null;
 			return edit(field, this.typeOf(declared), 'text');
 		}
+		// `mass :> ISQ::mass` has no type of its own: a quantity, a number with a unit.
+		for (const t of probe.typeIds)
+			for (const s of [t, ...this.ctx.supers(t)]) {
+				const found = this.featuresOf(s).find((x) => x.name === f);
+				if (found?.isAttribute && found.specializes?.some((w) => this.isQuantity(w)))
+					return edit(field, { kind: 'number' }, 'text');
+			}
 		if (!always && !probe.fields.includes(f)) return null;
 		return edit(field, this.fromFeatureValues(f), 'text');
+	}
+
+	/** Whether a written specialization names one of the ISQ's quantities (`ISQ::mass`, `mass`). */
+	private isQuantity(written: string): boolean {
+		const simple = unquoteName(simpleName(written));
+		if (/^ISQ\w*::/.test(written)) return true;
+		return (
+			!!this.resolve(`ISQ::${simple}`) ||
+			this.ctx.records.some(
+				(r) =>
+					r.kind === 'attribute' &&
+					r.name === simple &&
+					r.specializes.some((w) => /^ISQ\w*::/.test(w))
+			)
+		);
 	}
 
 	/** A metadata field `metadata:<Meta>.<f>`, declared by the metadata def or given on some row. */
@@ -248,7 +272,8 @@ export class ColumnEdits {
 					name: r.name!,
 					isAttribute: r.kind === 'attribute',
 					typeId: r.typeIds[0] ?? null,
-					many: isMany(multiplicityOf(r.header))
+					many: isMany(multiplicityOf(r.header)),
+					specializes: r.specializes
 				}));
 		} else {
 			list =

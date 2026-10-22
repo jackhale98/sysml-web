@@ -9,6 +9,8 @@
 		ListChecks,
 		Network,
 		Play,
+		Plus,
+		Scale,
 		Search,
 		Table2
 	} from '@lucide/svelte';
@@ -19,8 +21,8 @@
 	import { libraryIndex, librarySearch } from '#lib/library/library.ts';
 	import type { WorkbenchUi } from './ui.svelte.ts';
 	import { elementItems, modelViewItems, rank, type PaletteItem } from './palette.ts';
-	import { presentationOf, viewTitle } from './views.ts';
-	import { reportEntries } from '#lib/reports/kinds.ts';
+	import { groupViews, presentationOf, viewTitle } from './views.ts';
+	import { reportEntries, reportKindOf } from '#lib/reports/kinds.ts';
 
 	let { workspace, ui }: { workspace: Workspace; ui: WorkbenchUi } = $props();
 
@@ -68,25 +70,22 @@
 	const userRoots = $derived(workspace.tree.filter((n) => !isLibraryFile(n.element.file)));
 	const libraryRoots = $derived(workspace.tree.filter((n) => isLibraryFile(n.element.file)));
 	const packages = $derived(userRoots.filter((n) => n.element.kind === 'package'));
-	/** Views saved in the project's model (diagrams and tables). */
+	/** Views saved in the project's model (diagrams, tables and documents), by family. */
 	const savedViews = $derived(
 		workspace.views
 			.filter((v) => v.isUsage && !v.builtin && !isLibraryFile(v.file))
-			.map((v) => ({ info: v, presentation: presentationOf(v) }))
-			.filter((v) => v.presentation.kind !== 'none')
+			.map((v) => ({ info: v, presentation: presentationOf(v), report: !!reportKindOf(v) }))
+			.filter((v) => v.presentation.kind !== 'none' || v.report)
 	);
-	/** The standard tables the engine bundles (ModelViews). */
-	const standardViews = $derived(
-		workspace.views.filter(
-			(v) =>
-				(v.builtin || v.file.endsWith('ModelViews.sysml')) &&
-				!v.isUsage &&
-				v.hasTable &&
-				v.name !== 'RequirementsTable'
-		)
-	);
-	/** Reports: the ones saved in the model, then the standard ones. */
-	const reports = $derived(reportEntries(workspace.views, isLibraryFile));
+	const viewGroups = $derived(groupViews(savedViews, (v) => v.info));
+	/** The "New" menu (a view, a trade study). */
+	let newOpen = $state(false);
+	function create(request: NonNullable<WorkbenchUi['create']>) {
+		newOpen = false;
+		ui.create = request;
+	}
+	/** The standard reports the project hasn't saved (saved ones are under Documents). */
+	const reports = $derived(reportEntries(workspace.views, isLibraryFile).filter((r) => !r.saved));
 	let packagesOpen = $state(false);
 
 	const needle = $derived(query.trim().toLowerCase());
@@ -315,7 +314,12 @@
 			<!-- Phones list views in their own section (Views), so the tree comes first here. -->
 			{#if !ui.phone}
 				<section aria-labelledby="views-heading">
-					<h2 id="views-heading">Views</h2>
+					<div class="section-head">
+						<h2 id="views-heading">Views</h2>
+						<button type="button" class="mini" onclick={() => create({ kind: 'view' })}>
+							<Plus size={13} aria-hidden="true" /> New view
+						</button>
+					</div>
 					<ul class="flat">
 						<li>
 							<button type="button" class="item" onclick={() => ui.open({ kind: 'home' })}>
@@ -329,10 +333,10 @@
 							</button>
 						</li>
 					</ul>
-					{#if savedViews.length}
-						<h3>Saved views</h3>
+					{#each viewGroups as g (g.id)}
+						<h3>{g.title}</h3>
 						<ul class="flat">
-							{#each savedViews as v (v.info.name)}
+							{#each g.views as v (v.info.name)}
 								<li>
 									<button
 										type="button"
@@ -341,15 +345,22 @@
 										onclick={() =>
 											ui.open({ kind: 'view', name: v.info.name, title: viewTitle(v.info.name) })}
 									>
-										{#if v.presentation.kind === 'table'}<Table2 size={14} />{:else}<Network
+										{#if v.report}<FileText
 												size={14}
-											/>{/if}
+											/>{:else if v.presentation.kind === 'table'}<Table2
+												size={14}
+											/>{:else}<Network size={14} />{/if}
 										<span class="label">{viewTitle(v.info.name)}</span>
 									</button>
 								</li>
 							{/each}
 						</ul>
-					{/if}
+					{:else}
+						<p class="hint">
+							No saved views yet. <strong>New view</strong> makes a table, diagram or budget that is saved
+							in the model.
+						</p>
+					{/each}
 					{#if workspace.machines.length}
 						<h3>Simulations</h3>
 						<ul class="flat">
@@ -372,34 +383,18 @@
 							{/each}
 						</ul>
 					{/if}
-					<h3>Reports</h3>
-					<ul class="flat">
-						{#each reports as r (r.name)}
-							<li>
-								<button
-									type="button"
-									class="item"
-									title={r.doc}
-									onclick={() => ui.open({ kind: 'view', name: r.name, title: r.title })}
-								>
-									<FileText size={14} /> <span class="label">{r.title}</span>
-								</button>
-							</li>
-						{/each}
-					</ul>
-					{#if standardViews.length}
-						<h3>Standard tables</h3>
+					{#if reports.length}
+						<h3>Reports</h3>
 						<ul class="flat">
-							{#each standardViews as v (v.name)}
+							{#each reports as r (r.name)}
 								<li>
 									<button
 										type="button"
 										class="item"
-										title={v.doc}
-										onclick={() =>
-											ui.open({ kind: 'view', name: v.name, title: viewTitle(v.name) })}
+										title={r.doc}
+										onclick={() => ui.open({ kind: 'view', name: r.name, title: r.title })}
 									>
-										<Table2 size={14} /> <span class="label">{viewTitle(v.name)}</span>
+										<FileText size={14} /> <span class="label">{r.title}</span>
 									</button>
 								</li>
 							{/each}
@@ -432,7 +427,47 @@
 				</section>
 			{/if}
 			<section aria-labelledby="model-heading">
-				<h2 id="model-heading">Model</h2>
+				<div class="section-head">
+					<h2 id="model-heading">Model</h2>
+					<!-- Escape or leaving the menu closes it. -->
+					<div
+						class="new-menu"
+						role="presentation"
+						onkeydown={(e) => {
+							if (e.key === 'Escape' && newOpen) {
+								newOpen = false;
+								e.currentTarget.querySelector('button')?.focus();
+							}
+						}}
+						onfocusout={(e) => {
+							if (!e.currentTarget.contains(e.relatedTarget as Node | null)) newOpen = false;
+						}}
+					>
+						<button
+							type="button"
+							class="mini"
+							aria-expanded={newOpen}
+							aria-controls="explorer-new"
+							onclick={() => (newOpen = !newOpen)}
+						>
+							<Plus size={13} aria-hidden="true" /> New
+						</button>
+						{#if newOpen}
+							<ul id="explorer-new" class="new-list" aria-label="New">
+								<li>
+									<button type="button" class="item" onclick={() => create({ kind: 'view' })}>
+										<Table2 size={14} /> <span class="label">View…</span>
+									</button>
+								</li>
+								<li>
+									<button type="button" class="item" onclick={() => create({ kind: 'trade' })}>
+										<Scale size={14} /> <span class="label">Trade study…</span>
+									</button>
+								</li>
+							</ul>
+						{/if}
+					</div>
+				</div>
 				{@render tree(userRoots, 0, '')}
 			</section>
 			{#if libraryRoots.length}
@@ -653,6 +688,52 @@
 		letter-spacing: 0.06em;
 		cursor: pointer;
 	}
+	.section-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-2);
+	}
+	.mini {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		min-height: 1.75rem;
+		margin-right: var(--space-1);
+		padding: 0 var(--space-2);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-pill);
+		background: var(--surface);
+		color: var(--text-2);
+		font-size: var(--text-xs);
+		font-weight: 600;
+		cursor: pointer;
+	}
+	.mini:hover,
+	.mini[aria-expanded='true'] {
+		border-color: var(--border-strong);
+		color: var(--text);
+	}
+	.new-menu {
+		position: relative;
+	}
+	.new-list {
+		position: absolute;
+		top: calc(100% + 4px);
+		right: 0;
+		z-index: 5;
+		width: 12rem;
+		padding: var(--space-1);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-md);
+		background: var(--surface);
+		box-shadow: var(--shadow-lg);
+	}
+	.hint {
+		margin: var(--space-1) var(--space-2);
+		color: var(--text-3);
+		font-size: var(--text-xs);
+	}
 	.library-folder > summary {
 		cursor: pointer;
 		list-style: none;
@@ -682,7 +763,8 @@
 	}
 	@media (pointer: coarse) {
 		.item,
-		.twisty {
+		.twisty,
+		.mini {
 			min-height: 2.75rem;
 		}
 	}

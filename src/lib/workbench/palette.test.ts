@@ -250,3 +250,31 @@ describe('table rows', () => {
 		]);
 	});
 });
+
+describe('making views', () => {
+	it('offers a saved view per kind for a query, and not the bare view defs', async () => {
+		const { modelViewItems, newViewItems } = await import('./palette.ts');
+		const items = newViewItems([{ id: 'bom', label: 'Bill of materials', description: 'd' }]);
+		expect(items[0]).toMatchObject({
+			label: 'New view: Bill of materials',
+			quiet: true,
+			action: { type: 'create', request: { kind: 'view', viewKind: 'bom' } }
+		});
+		const base = { file: 'views/V.sysml', hasTable: true, builtin: false };
+		expect(
+			modelViewItems([
+				{ ...base, name: 'BillOfMaterials', isUsage: false },
+				{ ...base, name: 'bom', isUsage: true, definition: 'BillOfMaterials' },
+				{ ...base, name: 'chapter', isUsage: true, file: 'libraries/ModelViews.sysml' }
+			]).map((i) => i.label)
+		).toEqual(['BOM']);
+		const s = {
+			elements: [],
+			views: [],
+			files: [],
+			commands: [...commandItems('system'), ...items]
+		};
+		expect(search(s, '').some((r) => r.item.quiet)).toBe(false);
+		expect(search(s, 'bill of').map((r) => r.item.label)).toContain('New view: Bill of materials');
+	});
+});

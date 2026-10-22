@@ -6,7 +6,16 @@
 	import PropertyForm from './PropertyForm.svelte';
 	import TradeSummary from './TradeSummary.svelte';
 	import TransitionDetails from '#lib/diagram/TransitionDetails.svelte';
-	import { BookOpen, CircleAlert, Code, FileCode, Link2, Plus, Trash2 } from '@lucide/svelte';
+	import {
+		BookOpen,
+		CircleAlert,
+		Code,
+		FileCode,
+		Gauge,
+		Link2,
+		Plus,
+		Trash2
+	} from '@lucide/svelte';
 	import { conceptFor } from '#lib/learn/concepts.ts';
 	import KindGlyph from '#lib/ui/KindGlyph.svelte';
 	import { familyColor } from '#lib/ui/kinds.ts';
@@ -250,6 +259,13 @@
 				{#each requirement.issues as issue, i (i)}
 					<p class="issue"><CircleAlert size={14} /> {issue}</p>
 				{/each}
+				<button
+					type="button"
+					class="button limit"
+					onclick={() => (ui.create = { kind: 'limit', element: element.key })}
+				>
+					<Gauge size={15} aria-hidden="true" /> Set a limit
+				</button>
 				<h4>Satisfied by</h4>
 				{#if requirement.satisfiedBy.length}
 					<ul class="links">
@@ -593,6 +609,9 @@
 	}
 	.button:hover {
 		border-color: var(--border-strong);
+	}
+	.button.limit {
+		margin-top: var(--space-2);
 	}
 	.quiet {
 		color: var(--text-2);

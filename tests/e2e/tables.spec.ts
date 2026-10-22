@@ -62,9 +62,13 @@ test('an FMEA rating edits the annotation behind it, and the RPN follows', async
 	await expect(row.locator('td').last()).toHaveText('144', { timeout: 10_000 });
 });
 
-test('a standard table renders from the bundled view library', async ({ page }) => {
+test('a trace matrix made with New view renders from the view library', async ({ page }) => {
 	await openDemo(page);
-	await views(page).getByRole('button', { name: 'Trace matrix' }).click();
+	await views(page).getByRole('button', { name: 'New view' }).click();
+	const form = page.getByRole('dialog', { name: 'New view' });
+	await form.getByText('Trace matrix', { exact: true }).click();
+	await form.getByRole('button', { name: 'Next' }).click();
+	await form.getByRole('button', { name: 'Create' }).click();
 	const table = page.getByRole('region', { name: 'Trace matrix view' });
 	// Every requirement is a row, linked or not; the columns are named in words.
 	await expect(table.getByText('20 rows')).toBeVisible({ timeout: 15_000 });

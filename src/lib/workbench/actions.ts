@@ -164,6 +164,9 @@ export type EditStep =
 	| { kind: 'remove'; path: string; element: ModelElement }
 	| { kind: 'patch'; path: string; before: string; after: string };
 
+/** An edit step, or a new file of the project (undo removes it again). */
+export type WriteStep = EditStep | { kind: 'file'; path: string; text: string };
+
 /**
  * Apply edit steps as one undoable change, confirmed by a toast with Undo
  * ("Battery is now part of DeliveryDrone"). `check` can refuse a patched
@@ -172,12 +175,17 @@ export type EditStep =
 export async function applySteps(
 	workspace: Workspace,
 	label: string,
-	steps: EditStep[],
+	steps: WriteStep[],
 	check?: (path: string, before: string, after: string) => Promise<string | null>
 ): Promise<string | null> {
 	if (!steps.length) return 'Nothing to change.';
 	return undoable(workspace, label, async () => {
 		for (const step of steps) {
+			if (step.kind === 'file') {
+				if (workspace.text(step.path) !== undefined) return `${step.path} exists already.`;
+				workspace.setText(step.path, step.text);
+				continue;
+			}
 			const source = workspace.text(step.path);
 			if (source === undefined) return `${step.path} is not in the project.`;
 			if (step.kind === 'member') {
