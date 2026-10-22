@@ -229,13 +229,37 @@ its resolver recorded, reparses, and refuses an edit that doesn't parse
   source. A change trigger's label (`accept when …`) is read from the text.
 - **requirements**, **trace**, **packages** (`trace.ts`) — from the records
   and the satisfy/verify ends the adapter resolved (`ExtractedModel.traces`).
+- **sequence** (`sequence.ts`) — from the records. The toolkit's sequence
+  emitter only writes PlantUML (`toGraph` has no `sequence` view) and labels
+  a message by its name alone, so the builder reads the model the way that
+  emitter does: messages are the flow-family usages under the scope
+  (`message m of T from a.sent to b.received`), each end lands on the part
+  before an event occurrence (`producer.publishSent`) or on the deepest
+  part, item or occurrence it names, and a message without ends takes them
+  from events that name it (`event m.sourceEvent;`). Ends are resolved by
+  name from where the message is written (enclosing namespaces, members,
+  what their types define): the toolkit's own resolved ends
+  (`sourceFeature`) cost the whole-model derivation pass and are empty for
+  an end written as a plain part. Order: `then` and `first a then b`
+  between events on a lifeline and between messages; a message precedes
+  another when any of its events precedes any of the other's;
+  declaration order breaks ties. (The event `then event m.targetEvent;`
+  declares has no source extent, so no record; its succession stands in
+  for it.)
+  Lifelines are the interaction's parts, items and occurrences plus every
+  part a message reaches, in declaration order. Edges are the messages in
+  time order, with their element and `SequenceMessage` (name, payload,
+  doc, events). The page draws it with its own canvas
+  (`diagram/SequenceCanvas.svelte`, laid out by `sequenceLayout.ts`), not
+  Svelte Flow and ELK.
 
 Node ids are names as written, because `layout/diagrams.json` keys positions
 by them: a definition `Battery`, a usage its path `drone.battery`, a state or
 action its path in the machine, `__initial__`/`__final__`, unnamed control
 nodes `fork#1`, `decide#1`; a clash takes the qualified name. Each node also
 carries `element` (file and declaration byte), which the canvas uses to find
-the element instead of matching names. A general view is opened with the
+the element instead of matching names (a sequence view's messages, drawn as
+edges, carry it too). A general view is opened with the
 view usage's qualified name as scope (`workbench/views.ts`), so its layout key
 is `general:Views::name`.
 
@@ -403,3 +427,21 @@ Found while making the drone demo's budgets and checks (sysml-toolkit
 5. **`verify` bindings for satisfied constraints** are empty; the values a
    verdict rests on are worth reporting either way (the app evaluates them
    itself).
+
+Found while making the Sequence view (sysml-toolkit 0.10.10):
+
+- **A structured sequence graph.** `toGraph({view: 'sequence'})` fails ("no
+  structured-graph emitter for view: sequence"); only `toPlantuml` draws
+  it, with participant links (`linkTemplate`) but none for messages, and
+  a named message's payload left out of its label. A graph with lifelines,
+  messages (element ids, payload type, the events at their ends) and the
+  order it already computes would replace `diagrams/sequence.ts`.
+- **Message ends written as plain parts.** For `message m of T from
+  operator to groundStation` (ends that are parts, not events),
+  `sourceFeature`/`targetFeature` are empty and the ends have no reference
+  subsetting, though the PlantUML emitter resolves them.
+- **`then event m.targetEvent;`** in a lifeline (the form the
+  specification's Interaction Example-2 uses): the event occurrence it
+  declares has no `memberExtent`, so the model adapter, which keeps the
+  elements written in the text, has no record of it; `event
+  m.sourceEvent;` without `then` has one.

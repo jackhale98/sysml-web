@@ -65,6 +65,12 @@ steps at the same time, and `decide`/`merge` for a choice (drop the parcel only 
 the drop zone is clear).
 Diagram: **`DroneViews::deliveryFlightFlow`** (Action Flow View).
 
+Who tells whom what, and when: `DeliverySequence::ParcelDelivery` is the same delivery
+as an interaction between the operator, the ground station, the drone and the recipient.
+Each `message` says what it carries (`of FlightPlan`), who sends it and who receives it,
+and `then` puts it after the one before.
+Diagram: **`DroneViews::deliverySequence`** (Sequence View).
+
 ## 8. Who does what: `FunctionAllocation`
 
 `DeliveryDrone` performs the delivery flight (`perform`). `allocate` then assigns each

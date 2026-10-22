@@ -405,9 +405,9 @@ class Sequence {
 	}
 
 	/**
-	 * `then event m.sourceEvent;` is read as a succession alone: the event it
-	 * declares has no record of its own, so the succession stands in for it.
-	 * (`then event occurrence e;` has both, with the same header.)
+	 * The event `then event m.sourceEvent;` declares has no source extent in
+	 * the toolkit, so the adapter has no record of it: its succession stands
+	 * in for it. (`then event occurrence e;` has both, with the same header.)
 	 */
 	private standsIn(r: ElementRecord): boolean {
 		if (!/^Succession(AsUsage)?$/.test(r.metaclass) || !/^then\s+event\b/.test(r.header))
