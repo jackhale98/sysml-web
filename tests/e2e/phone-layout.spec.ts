@@ -66,6 +66,8 @@ test('on a phone, every main screen fits the width without panning sideways', as
 test('on a phone, the budgets, the checks and the trade study are cards that fit the width', async ({
 	page
 }) => {
+	// Four views opened one after another: more than the default 30 s when the machine is busy.
+	test.setTimeout(60_000);
 	await openDemo(page);
 	for (const [view, card] of [
 		['Drone mass budget', '180 g'],
