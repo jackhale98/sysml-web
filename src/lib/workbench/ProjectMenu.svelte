@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import {
@@ -26,6 +27,7 @@
 	import { accounts } from '#lib/git/account.svelte.ts';
 	import { messageOf } from '#lib/git/errors.ts';
 	import GitHubMark from '#lib/git/GitHubMark.svelte';
+	import { signInResume, takeResume } from '#lib/git/oauth.ts';
 	import { keepRepository } from '#lib/git/project.ts';
 	import OfflineBadge from '#lib/offline/OfflineBadge.svelte';
 	import { pwa } from '#lib/offline/pwa.svelte.ts';
@@ -78,6 +80,14 @@
 	$effect(() => {
 		settings.init();
 		accounts.init();
+	});
+
+	// Back from GitHub (signing in, or choosing repositories): reopen what was open.
+	onMount(() => {
+		if (takeResume('open-repository')) openRepo = true;
+		else if (takeResume('source-control')) showSourceControl();
+		// Settings itself picks this up once it opens, and shows the account.
+		else if (signInResume() === 'settings') showSettings();
 	});
 
 	// Check GitHub for newer versions when the project opens.
@@ -154,6 +164,11 @@
 		if (!menu?.contains(event.relatedTarget as Node | null)) open = false;
 	}
 
+	/** A tap outside closes it (Safari doesn't focus a tapped button, so no focusout follows). */
+	function onpointerdown(event: PointerEvent) {
+		if (open && !menu?.contains(event.target as Node | null)) open = false;
+	}
+
 	/**
 	 * Ctrl/⌘+S saves to the folder when there is one; otherwise it's already
 	 * saved (and a GitHub project offers the GitHub sheet). Ctrl/⌘+, opens settings.
@@ -176,7 +191,7 @@
 	}
 </script>
 
-<svelte:window {onkeydown} />
+<svelte:window {onkeydown} {onpointerdown} />
 
 <div class="project-menu" bind:this={menu} {onfocusout}>
 	<button

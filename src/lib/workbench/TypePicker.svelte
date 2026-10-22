@@ -55,6 +55,14 @@
 	let open = $state(false);
 	let active = $state(-1);
 	let focused = false;
+	/**
+	 * A press on a suggestion, from pointerdown to pointerup. Phones blur the
+	 * field when the finger lifts (preventing pointerdown doesn't stop it there),
+	 * and the keyboard closing moves the list, so a tap is taken on pointerup
+	 * rather than waiting for a click that may land elsewhere or not at all.
+	 */
+	let press: { index: number; x: number; y: number } | null = null;
+	let pressed = false;
 	let library = $state<TypeSuggestion[]>([]);
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	let request = 0;
@@ -123,6 +131,20 @@
 		text = clearOnCommit ? '' : next.trim();
 	}
 
+	/** Leaving the field keeps a name only when it is one of the suggestions; anything
+	 * else (half typed) is put back. Enter keeps what was typed. */
+	function leave() {
+		open = false;
+		active = -1;
+		const typed = text.trim();
+		const known = options.find(
+			(o) =>
+				o.type === 'suggestion' && (o.suggestion.insert === typed || o.suggestion.label === typed)
+		);
+		if (!clearOnCommit && known?.type === 'suggestion') commit(known.suggestion.insert);
+		else text = clearOnCommit ? '' : value;
+	}
+
 	function choose(option: Option) {
 		if (option.type === 'create') {
 			open = false;
@@ -157,6 +179,15 @@
 	}
 </script>
 
+<svelte:window
+	onpointerup={() => {
+		// A press that ended off the suggestions: leave as a blur would have.
+		if (!press) return;
+		press = null;
+		if (!focused) leave();
+	}}
+/>
+
 <div class="picker">
 	<input
 		{id}
@@ -178,17 +209,8 @@
 		}}
 		onblur={() => {
 			focused = false;
-			open = false;
-			active = -1;
-			// Leaving the field keeps a name only when it is one of the suggestions;
-			// anything else (half typed) is put back. Enter keeps what was typed.
-			const typed = text.trim();
-			const known = options.find(
-				(o) =>
-					o.type === 'suggestion' && (o.suggestion.insert === typed || o.suggestion.label === typed)
-			);
-			if (!clearOnCommit && known?.type === 'suggestion') commit(known.suggestion.insert);
-			else text = clearOnCommit ? '' : value;
+			// A tap on a suggestion: its pointerup chooses (or a scroll lets go and leaves).
+			if (!press) leave();
 		}}
 		oninput={() => {
 			open = true;
@@ -197,7 +219,16 @@
 		{onkeydown}
 	/>
 	{#if open && options.length}
-		<ul class="options" id={listId} role="listbox" aria-label="Suggestions">
+		<ul
+			class="options"
+			id={listId}
+			role="listbox"
+			aria-label="Suggestions"
+			onpointercancel={() => {
+				press = null;
+				if (!focused) leave();
+			}}
+		>
 			{#each options as option, i (option.type === 'create' ? 'create' : option.suggestion.id)}
 				{@const first =
 					option.type === 'suggestion' &&
@@ -221,8 +252,24 @@
 					role="option"
 					aria-selected={i === active}
 					class:active={i === active}
-					onpointerdown={(e) => e.preventDefault()}
-					onclick={() => choose(option)}
+					onpointerdown={(e) => {
+						e.preventDefault();
+						press = { index: i, x: e.clientX, y: e.clientY };
+					}}
+					onpointerup={(e) => {
+						const tap =
+							press?.index === i && Math.hypot(e.clientX - press.x, e.clientY - press.y) < 10;
+						press = null;
+						if (!tap) return;
+						pressed = true;
+						setTimeout(() => (pressed = false), 500);
+						choose(option);
+					}}
+					onclick={() => {
+						// Already chosen on pointerup; a click alone comes from the keyboard or a screen reader.
+						if (pressed) pressed = false;
+						else choose(option);
+					}}
 				>
 					{#if option.type === 'create'}
 						<span class="new" aria-hidden="true"><Plus size={14} /></span>

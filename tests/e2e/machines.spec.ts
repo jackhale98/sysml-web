@@ -38,7 +38,7 @@ test('a state machine typed into the model is listed and runs, its regions in pa
 }) => {
 	await openDemo(page);
 	const simulations = page.locator('section[aria-labelledby="views-heading"]');
-	await expect(simulations.getByRole('button', { name: 'Run FlightModes' })).toBeVisible();
+	await expect(simulations.getByRole('button', { name: 'Run Flight modes' })).toBeVisible();
 
 	await page.getByRole('tab', { name: 'Files' }).click();
 	await page
@@ -50,7 +50,7 @@ test('a state machine typed into the model is listed and runs, its regions in pa
 	await page.keyboard.insertText(PAYLOAD);
 
 	await page.getByRole('tab', { name: 'Model' }).click();
-	const run = simulations.getByRole('button', { name: 'Run PayloadModes' });
+	const run = simulations.getByRole('button', { name: 'Run Payload modes' });
 	await expect(run).toBeVisible({ timeout: 15_000 });
 	await run.click();
 	const emulator = page.locator('section.emulator');

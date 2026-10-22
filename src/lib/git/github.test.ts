@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { GitError } from './errors.ts';
 import { GitHubProvider, parseRepoUrl, tokenUrl, treePayload } from './github.ts';
 
@@ -289,5 +289,102 @@ describe('GitHubProvider', () => {
 		expect(((await offline.currentUser().catch((e: unknown) => e)) as GitError).kind).toBe(
 			'network'
 		);
+	});
+
+	it('lists a signed-in account’s repositories from the app’s installations', async () => {
+		const repo = (full: string, pushed: string, push = true) => ({
+			name: full.split('/')[1],
+			full_name: full,
+			owner: { login: full.split('/')[0] },
+			private: true,
+			default_branch: 'main',
+			description: null,
+			pushed_at: pushed,
+			html_url: `https://github.com/${full}`,
+			permissions: { push }
+		});
+		const { fetch, calls } = mockFetch({
+			'GET /user/installations\\?per_page=100&page=1': () => ({
+				body: { total_count: 2, installations: [{ id: 7 }, { id: 9 }] }
+			}),
+			'GET /user/installations/7/repositories\\?per_page=100&page=1': () => ({
+				body: { repositories: [repo('octo/rig', '2026-10-01T00:00:00Z')] }
+			}),
+			'GET /user/installations/9/repositories\\?per_page=100&page=1': () => ({
+				body: {
+					repositories: [
+						repo('acme/drone', '2026-10-20T00:00:00Z', false),
+						repo('octo/rig', '2026-10-01T00:00:00Z')
+					]
+				}
+			})
+		});
+		const github = new GitHubProvider({ token: () => 'ghu_1', access: 'app' }, { fetch });
+		const repos = await github.listRepos();
+		expect(repos.map((r) => [r.fullName, r.canPush])).toEqual([
+			['acme/drone', false],
+			['octo/rig', true]
+		]);
+		expect(calls.every((c) => c.auth === 'Bearer ghu_1')).toBe(true);
+		expect(calls.some((c) => c.url.startsWith('/user/repos'))).toBe(false);
+
+		// Nothing chosen yet: an empty list, so the app can offer to choose some.
+		const none = mockFetch({
+			'GET /user/installations\\?per_page=100&page=1': () => ({
+				body: { total_count: 0, installations: [] }
+			})
+		});
+		expect(
+			await new GitHubProvider(
+				{ token: () => 't', access: 'app' },
+				{ fetch: none.fetch }
+			).listRepos()
+		).toEqual([]);
+	});
+
+	it('explains failures for a signed-in account without talking about tokens', async () => {
+		const failing = async (status: number): Promise<GitError> =>
+			(await new GitHubProvider(
+				{ token: () => 'ghu_1', access: 'app' },
+				{
+					fetch: mockFetch({
+						'GET /repos/acme/drone': () => ({ status, body: { message: 'x' } })
+					}).fetch
+				}
+			)
+				.getRepo(ref)
+				.catch((e: unknown) => e)) as GitError;
+		for (const status of [401, 403, 404]) {
+			const error = await failing(status);
+			expect(error.message, String(status)).not.toMatch(/token/i);
+		}
+		expect((await failing(401)).message).toMatch(/Sign in again/);
+		expect((await failing(403)).message).toMatch(/choose repositories on GitHub/);
+		expect((await failing(404)).message).toMatch(/Fairtide can use this repository/);
+	});
+
+	it('retries once with a renewed token when GitHub refuses one', async () => {
+		const seen: string[] = [];
+		const fetch = (async (_url: string | URL | Request, init?: RequestInit) => {
+			const auth = new Headers(init?.headers).get('authorization')!;
+			seen.push(auth);
+			return auth === 'Bearer new'
+				? Response.json({ login: 'octo', name: null, avatar_url: '' })
+				: Response.json({ message: 'Bad credentials' }, { status: 401 });
+		}) as typeof globalThis.fetch;
+		const renew = vi.fn(async () => 'new');
+		const github = new GitHubProvider({ token: () => 'old', renew, access: 'app' }, { fetch });
+		expect((await github.currentUser()).login).toBe('octo');
+		expect(seen).toEqual(['Bearer old', 'Bearer new']);
+		expect(renew).toHaveBeenCalledWith('old');
+
+		// No new token: GitHub's refusal stands, and there is no second retry.
+		seen.length = 0;
+		const stuck = new GitHubProvider(
+			{ token: () => 'old', renew: async () => null, access: 'app' },
+			{ fetch }
+		);
+		await expect(stuck.currentUser()).rejects.toMatchObject({ kind: 'auth' });
+		expect(seen).toEqual(['Bearer old']);
 	});
 });

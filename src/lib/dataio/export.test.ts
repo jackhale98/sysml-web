@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { fileName, isWide, printHtml } from './export';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { toasts } from '#lib/ui/toasts.svelte.ts';
+import { fileName, isWide, printHtml, saveFile } from './export';
 
 describe('exporting tables', () => {
 	it('names files after the view, without characters file systems refuse', () => {
@@ -28,5 +29,24 @@ describe('exporting tables', () => {
 		expect(html).toContain('<p>Drone &amp; co · 21 October 2026 · 1 row</p>');
 		expect(html).toContain('<td>&lt;b&gt;R1&lt;/b&gt;</td>');
 		expect(html).toContain('<th scope="col">ID</th>');
+	});
+});
+
+describe('saveFile', () => {
+	afterEach(() => vi.unstubAllGlobals());
+
+	it('offers the share sheet from a tap of its own when Safari refuses a late one', async () => {
+		const share = vi
+			.fn()
+			.mockRejectedValueOnce(new DOMException('No gesture', 'NotAllowedError'))
+			.mockResolvedValueOnce(undefined);
+		vi.stubGlobal('navigator', { canShare: () => true, share, userAgent: 'iPhone' });
+		vi.stubGlobal('matchMedia', () => ({ matches: false }));
+		await saveFile('Drone breakdown.png', 'x', 'image/png', true);
+		const toast = toasts.items.at(-1)!;
+		expect(toast.message).toBe('Drone breakdown.png is ready.');
+		toast.action!.run();
+		expect(share).toHaveBeenCalledTimes(2);
+		expect(share.mock.calls[1]![0].files[0].name).toBe('Drone breakdown.png');
 	});
 });

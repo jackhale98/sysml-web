@@ -30,6 +30,21 @@ function findChromium(): string | undefined {
 
 const executablePath = process.env.CI ? process.env.PW_CHROMIUM_PATH : findChromium();
 
+/**
+ * The e2e build has "Sign in with GitHub" set up, with a test client ID and a
+ * worker address the tests answer for (tests/e2e/signin.spec.ts mocks GitHub
+ * and the worker). PW_SIGN_IN=off builds without it, as the site is until it
+ * is configured: the token-only connect flow.
+ */
+export const SIGN_IN_TEST =
+	process.env.PW_SIGN_IN === 'off'
+		? null
+		: {
+				PUBLIC_GITHUB_CLIENT_ID: 'Iv1.e2etestclient',
+				PUBLIC_GITHUB_APP_SLUG: 'sysml-web-e2e',
+				PUBLIC_SYNC_WORKER: 'https://sync.example.test'
+			};
+
 export default defineConfig({
 	testDir: 'tests/e2e',
 	fullyParallel: true,
@@ -53,6 +68,11 @@ export default defineConfig({
 		command: `npm run build && npm run preview -- --port ${PORT} --strictPort`,
 		port: PORT,
 		reuseExistingServer: !process.env.CI,
-		timeout: 180_000
+		timeout: 180_000,
+		env: SIGN_IN_TEST ?? {
+			PUBLIC_GITHUB_CLIENT_ID: '',
+			PUBLIC_GITHUB_APP_SLUG: '',
+			PUBLIC_SYNC_WORKER: ''
+		}
 	}
 });

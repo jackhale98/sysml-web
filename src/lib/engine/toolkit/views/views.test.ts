@@ -698,9 +698,10 @@ describe('the demo’s tables', () => {
 	it('lists the views the earlier engine listed', () => {
 		const views = host.listViews(demo);
 		// The earlier engine's 41, the budgets and checks (3 view defs, 3 usages), the
-		// trade study (a view def and a usage) and the sequence.
-		expect(views).toHaveLength(50);
-		expect(views.filter((v) => v.hasTable)).toHaveLength(34);
+		// trade study (a view def and a usage) and the sequence, less the design gaps (the
+		// overview lists them).
+		expect(views).toHaveLength(49);
+		expect(views.filter((v) => v.hasTable)).toHaveLength(33);
 		expect(views.every((v) => !v.builtin)).toBe(true);
 		expect(views.find((v) => v.name === 'droneBreakdown')).toEqual({
 			name: 'droneBreakdown',
@@ -771,9 +772,13 @@ describe('the demo’s tables', () => {
 
 	it('gaps, coverage and the trace and verification matrices', () => {
 		expect(shape(table('RequirementGaps'))).toEqual([11, 8]);
-		const gaps = table('designGaps');
-		expect(col(gaps, 'id')).toEqual(['SYS-005', 'SYS-006', 'SYS-011']);
-		expect(gaps.rows[2]).toEqual([
+		const gaps = table('RequirementGaps');
+		expect(col(gaps, 'id').filter((id) => id.startsWith('SYS'))).toEqual([
+			'SYS-005',
+			'SYS-006',
+			'SYS-011'
+		]);
+		expect(gaps.rows.find((r) => r[0] === 'SYS-011')).toEqual([
 			'SYS-011',
 			'Controlled parcel release',
 			'1',

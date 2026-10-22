@@ -4,6 +4,7 @@
  * none of it is in the workbench's first download.
  */
 import { download } from '#lib/project/sources.ts';
+import { toasts } from '#lib/ui/toasts.svelte.ts';
 import { writeDelimited } from './csv';
 import { escapeXml } from './xml';
 
@@ -39,19 +40,44 @@ export async function saveFile(
 	type: string,
 	share: boolean
 ): Promise<void> {
-	if (share && typeof navigator.canShare === 'function') {
+	// A Home Screen app on iPhone or iPad can't download at all: the share sheet is the way out.
+	if ((share || downloadsBlocked()) && typeof navigator.canShare === 'function') {
 		const file = new File([data as BlobPart], name, { type });
 		if (navigator.canShare({ files: [file] })) {
+			const files = { files: [file], title: name };
 			try {
-				await navigator.share({ files: [file], title: name });
+				await navigator.share(files);
 				return;
 			} catch (error) {
 				if (error instanceof DOMException && error.name === 'AbortError') return;
-				// Not allowed here (e.g. the gesture expired): download instead.
+				// Safari allows the share sheet only straight from a tap, and making the
+				// file took longer than that: offer it with a tap of its own.
+				if (error instanceof DOMException && error.name === 'NotAllowedError') {
+					toasts.show(`${name} is ready.`, {
+						tone: 'success',
+						duration: 0,
+						action: {
+							label: 'Share or save',
+							run: () => void navigator.share(files).catch(() => {})
+						}
+					});
+					return;
+				}
 			}
 		}
 	}
 	download(name, data, type);
+}
+
+/** An installed web app on iOS or iPadOS, where `<a download>` does nothing. */
+function downloadsBlocked(): boolean {
+	const ios =
+		/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+		(navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+	const standalone =
+		(navigator as Navigator & { standalone?: boolean }).standalone === true ||
+		matchMedia('(display-mode: standalone)').matches;
+	return ios && standalone;
 }
 
 export async function exportCsv(table: ExportTable, share: boolean) {

@@ -16,3 +16,6 @@ vite.config.ts.timestamp-*
 .lighthouseci
 # The sysml-toolkit engine, fetched by scripts/fetch-toolkit.sh
 /static/toolkit/
+# Wrangler's local state (worker/)
+.wrangler/
+.dev.vars
