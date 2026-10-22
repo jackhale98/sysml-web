@@ -135,6 +135,7 @@
 	let impact = $state<string | null>(null);
 	let message = $state<string | null>(null);
 	let learnMore = $state(false);
+	let satisfyOpen = $state(false);
 
 	$effect(() => {
 		name = element?.label ?? '';
@@ -142,6 +143,14 @@
 		confirmDelete = false;
 		impact = null;
 		message = null;
+	});
+
+	// Asked to link this requirement (the checklist's "Show me"): open its picker.
+	$effect(() => {
+		if (element && ui.satisfyRequest === element.key) {
+			satisfyOpen = true;
+			ui.satisfyRequest = null;
+		}
 	});
 
 	function askDelete() {
@@ -340,6 +349,7 @@
 						linked={requirement.satisfiedBy.map(traceTarget)}
 						{workspace}
 						{engine}
+						bind:open={satisfyOpen}
 					/>
 				{/if}
 				<h4>Verified by</h4>

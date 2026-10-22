@@ -140,11 +140,14 @@ test('the next steps tick themselves as they are done, and can be put away', asy
 	await page.keyboard.press('Escape');
 	await expect(limit).toBeHidden();
 
-	// Link them: the requirement's details, where the picker adds what satisfies it.
+	// Link them: the requirement's details, with the picker of what satisfies it open.
 	await step(page, 'link').getByRole('button', { name: 'Show me' }).click();
 	const inspector = page.getByRole('complementary', { name: 'Inspector' });
 	await expect(inspector.getByRole('heading', { level: 2 })).toContainText('Max mass');
-	await inspector.getByRole('button', { name: 'Add what satisfies it' }).click();
+	const find = inspector.getByRole('searchbox', { name: 'Find what satisfies Max mass' });
+	await expect(find).toBeFocused();
+	await expect(find).toBeInViewport();
+	await expectAccessible(page);
 	await inspector
 		.getByRole('list', { name: 'Can satisfy it' })
 		.getByRole('button', { name: /^system\b/ })
@@ -265,6 +268,19 @@ test.describe('on a phone', () => {
 		await add.getByLabel('Name').fill('Grip');
 		await add.getByRole('button', { name: 'Add', exact: true }).click();
 		await expect(steps(page)).toContainText('1 of 6 done', { timeout: 15_000 });
+
+		// "Show me" opens the details sheet at the picker of what satisfies the new requirement.
+		await step(page, 'link').getByRole('button', { name: 'Show me' }).click();
+		const details = page.getByRole('complementary', { name: 'Inspector' });
+		await expect(details.getByRole('heading', { level: 2 })).toContainText('Grip');
+		const find = details.getByRole('searchbox', { name: 'Find what satisfies Grip' });
+		await expect(find).toBeFocused();
+		await expect(find).toBeInViewport();
+		await expectAccessible(page);
+		await details.getByRole('list', { name: 'Can satisfy it' }).getByRole('button').first().click();
+		await expect(details.getByText('Nothing in the design satisfies this yet.')).toBeHidden();
+		await page.getByRole('button', { name: 'Close details' }).click();
+		await expect(steps(page)).toContainText('2 of 6 done', { timeout: 15_000 });
 
 		await page.getByRole('button', { name: /^More/ }).click();
 		await page.getByRole('button', { name: 'Help' }).click();

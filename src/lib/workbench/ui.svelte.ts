@@ -124,6 +124,8 @@ export class WorkbenchUi {
 	/** The help guide (mounted by the host when first opened), at a topic. */
 	helpOpen = $state(false);
 	helpTopic = $state<string | null>(null);
+	/** A requirement (`ModelElement.key`) whose "Add what satisfies it" picker should open. */
+	satisfyRequest = $state<string | null>(null);
 
 	/** Open the help, at a topic (`add-part`) or at the start. */
 	showHelp(topic: string | null = null) {
