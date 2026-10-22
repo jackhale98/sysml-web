@@ -191,6 +191,14 @@
 	} | null>(null);
 	let importedOpen = $state(false);
 
+	/** A `.json` file, or one whose content starts as JSON does (an archive starts with `PK`). */
+	async function isJson(file: File): Promise<boolean> {
+		if (/\.json$/i.test(file.name)) return true;
+		if (/\.(kpar|zip)$/i.test(file.name)) return false;
+		const start = new TextDecoder().decode(await file.slice(0, 64).arrayBuffer()).trimStart();
+		return start.startsWith('[') || start.startsWith('{');
+	}
+
 	/** SysML v2 JSON (KerML 10.4 elements): the engine writes it as SysML text. */
 	async function importJson(file: File) {
 		busy = 'Reading the model…';
@@ -209,7 +217,8 @@
 
 	async function openImported() {
 		if (!imported) return;
-		const { result, name } = imported;
+		// Plain data: the browser's storage can't keep reactive state.
+		const { result, name } = $state.snapshot(imported);
 		await keep({ info: { name: name.trim() }, files: result.files, origin: 'archive' }, 'Opening…');
 	}
 
@@ -218,7 +227,7 @@
 		const file = input.files?.[0];
 		input.value = '';
 		if (!file) return;
-		if (/\.json$/i.test(file.name)) {
+		if (await isJson(file)) {
 			await importJson(file);
 			return;
 		}

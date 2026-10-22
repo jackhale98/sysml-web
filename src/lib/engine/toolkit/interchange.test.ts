@@ -231,6 +231,10 @@ describe('round trip: the demo → JSON → text', () => {
 		// Everything the file holds is in the text; the only notes are the printer slips mended.
 		expect(result.carried).toBe(result.elements);
 		expect(result.notes.filter((n) => n.kind !== 'repaired')).toEqual([]);
+		// Views expose what they did, by the same names.
+		const views = result.files.find((f) => f.path === 'DroneViews.sysml')!.text;
+		expect(views).toContain('expose DroneArchitecture::drone::**;');
+		expect(views).not.toContain('$::');
 		// The same named elements, by qualified name and kind.
 		expect(await namedElements(result.files)).toEqual(await namedElements(demo));
 		// And the same structure, element by element (ids differ: they come from file names).

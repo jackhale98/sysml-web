@@ -257,9 +257,15 @@ interface Exposure {
 	target: string;
 }
 
-/** `X` / `X::*` / `X::**` / `X::*::**`, with a trailing `[filter]` left out. */
+/**
+ * `X` / `X::*` / `X::**` / `X::*::**`, with a trailing `[filter]` left out and
+ * a leading `$::` (the global scope, as the toolkit prints lifted JSON) dropped.
+ */
 function parseExpose(text: string): { kind: ExposeKind; base: string } {
-	const t = text.replace(/\[[^\]]*\]\s*$/, '').trim();
+	const t = text
+		.replace(/\[[^\]]*\]\s*$/, '')
+		.trim()
+		.replace(/^\$::/, '');
 	if (t.endsWith('::*::**')) return { kind: 'nested', base: t.slice(0, -7) };
 	if (t.endsWith('::**')) return { kind: 'recursive', base: t.slice(0, -4) };
 	if (t.endsWith('::*')) return { kind: 'members', base: t.slice(0, -3) };

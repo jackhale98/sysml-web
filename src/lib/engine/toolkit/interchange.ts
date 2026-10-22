@@ -456,6 +456,23 @@ export function importModel(tk: Toolkit, library: TkLibrary, text: string): Inte
 		}
 	}
 
+	// `expose $::A::**` (the global scope, spelled out) reads better as `expose A::**`.
+	const plain = files.map((f) => ({
+		path: f.path,
+		text: f.text.replace(/^(\s*expose\s+)\$::/gm, '$1')
+	}));
+	if (plain.some((f, i) => f.text !== files[i]!.text)) {
+		const recheck = checkFiles(tk, library, plain);
+		if (
+			recheck.errors <= check.errors &&
+			size(compareModels(liftedElements, recheck.elements)) <=
+				size(compareModels(liftedElements, check.elements))
+		) {
+			files = plain;
+			check = recheck;
+		}
+	}
+
 	const difference = compareModels(liftedElements, check.elements);
 	for (const d of difference.onlyInFirst)
 		notes.push({

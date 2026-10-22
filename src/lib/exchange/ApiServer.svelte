@@ -176,7 +176,8 @@
 
 	async function openPulled() {
 		if (!pulled) return;
-		const { result, name, link } = pulled;
+		// Plain data: the browser's storage can't keep reactive state.
+		const { result, name, link } = $state.snapshot(pulled);
 		if (!(await leaving.confirm('switch'))) return;
 		await attempt('Opening…', async () => {
 			const id = await newProjectId(name.trim() || 'Imported');
