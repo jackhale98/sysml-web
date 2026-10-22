@@ -209,8 +209,15 @@ export class WorkbenchUi {
 	}
 
 	select(key: string | null, source: SelectionSource) {
+		const again = !!key && this.selection?.key === key;
 		this.selection = key ? { key, source, nonce: (this.selection?.nonce ?? 0) + 1 } : null;
-		// On a phone, choosing an element (not moving the text cursor) shows its details.
-		if (key && source !== 'text' && this.phone) this.showDetails('half');
+		// On a phone, choosing an element (not moving the text cursor) shows its details. A tap
+		// in a diagram first only peeks, so the diagram and the element's connections stay in
+		// view; tapping the same element again opens them.
+		if (key && source !== 'text' && this.phone) {
+			if (source === 'diagram')
+				this.showDetails(again && this.details === 'peek' ? 'half' : 'peek');
+			else this.showDetails('half');
+		}
 	}
 }
