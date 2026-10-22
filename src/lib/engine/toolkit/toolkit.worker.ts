@@ -104,11 +104,18 @@ async function boot(i: ToolkitInit): Promise<ToolkitHost> {
 
 const memoryMiB = () => (memory ? Math.round(memory.buffer.byteLength / 1048576) : 0);
 
-/** For measurements (tests/perf): the worker's memory and the latest analysis' timings. */
+/**
+ * For measurements (tests/perf): the worker's memory, the latest analysis'
+ * timings and the latest calls (method, when it started, how long it took).
+ */
 let latest: ToolkitHost | undefined;
+const calls: { method: string; at: number; ms: number }[] = [];
+let callCount = 0;
 (scope as unknown as { sysmlStats: () => unknown }).sysmlStats = () => ({
 	memoryMiB: memoryMiB(),
-	lastBuild: latest?.lastBuild ?? null
+	lastBuild: latest?.lastBuild ?? null,
+	calls,
+	callCount
 });
 
 /** Download the prepared snapshot into Cache Storage, unless it is there already. */
@@ -193,7 +200,16 @@ async function call(message: ToolkitCall) {
 		}
 		const host = await booting;
 		const handler = handlers[message.method] as (host: ToolkitHost, ...p: unknown[]) => unknown;
-		post({ type: 'result', id: message.id, ok: true, result: handler(host, ...message.params) });
+		const at = performance.now();
+		const result = handler(host, ...message.params);
+		callCount++;
+		calls.push({
+			method: message.method,
+			at: Math.round(at),
+			ms: Math.round(performance.now() - at)
+		});
+		if (calls.length > 200) calls.shift();
+		post({ type: 'result', id: message.id, ok: true, result });
 	} catch (error) {
 		const fatal = isFatal(error);
 		post({ type: 'result', id: message.id, ok: false, error: String(error), fatal });

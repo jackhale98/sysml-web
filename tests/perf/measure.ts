@@ -57,11 +57,13 @@ export function analyse(host: ToolkitHost, files: SourceFile[], timings: Timings
 	return analyses;
 }
 
-/** A one-character edit inside a doc comment of `path`. */
+/** A one-character edit inside a doc comment of `path` (a space at its end when it has none). */
 export function typeOneCharacter(files: SourceFile[], path: string, round: number): SourceFile[] {
 	return files.map((f) => {
 		if (f.path !== path) return f;
-		const at = f.text.indexOf('doc /*') + 'doc /* '.length;
+		const doc = f.text.indexOf('doc /*');
+		if (doc < 0) return { path: f.path, text: f.text + (round % 2 ? ' ' : '  ') };
+		const at = doc + 'doc /* '.length;
 		const char = round % 2 ? 'x' : 'y';
 		return { path: f.path, text: f.text.slice(0, at) + char + f.text.slice(at + 1) };
 	});

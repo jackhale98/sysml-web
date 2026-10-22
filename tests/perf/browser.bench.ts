@@ -21,6 +21,8 @@ const lines = Number(process.env.BENCH_LINES ?? 10000);
 const runs = Number(process.env.BENCH_RUNS ?? 3);
 const throttle = Number(process.env.BENCH_THROTTLE || 1);
 const LONG = 600_000;
+/** For a step that waits on the page rather than the engine's analysis. */
+const STEP = 180_000;
 
 const files = generateLines(lines);
 const label = `${Math.round(lineCount(files) / 1000)}k${throttle > 1 ? ` (${throttle}× CPU)` : ''}`;
@@ -98,17 +100,52 @@ async function until(page: Page, from: number, check: () => Promise<void>): Prom
 	return (await pageNow(page)) - from;
 }
 
-async function workerStats(page: Page): Promise<{ memoryMiB: number } | null> {
+interface WorkerStats {
+	memoryMiB: number;
+	calls: { method: string; at: number; ms: number }[];
+	callCount: number;
+}
+
+async function workerStats(page: Page): Promise<WorkerStats | null> {
 	for (const worker of page.workers()) {
 		const stats = await worker
 			.evaluate(() => (self as unknown as { sysmlStats?: () => unknown }).sysmlStats?.())
 			.catch(() => null);
-		if (stats) return stats as { memoryMiB: number };
+		if (stats) return stats as WorkerStats;
 	}
 	return null;
 }
 
+/**
+ * Steps: each logs its start, and the engine's time in the step before it
+ * (the worker's calls, summed) goes into `<step>: worker`.
+ */
+class Steps {
+	private name = '';
+	private seen = 0;
+	constructor(
+		private readonly page: Page,
+		private readonly timings: Timings
+	) {}
+
+	async next(name: string) {
+		const stats = await workerStats(this.page);
+		// (Builds before the worker listed its calls have no `calls`.)
+		if (stats?.calls) {
+			const fresh = stats.calls.slice(-(stats.callCount - this.seen) || stats.calls.length);
+			if (this.name && stats.callCount > this.seen) {
+				this.timings[`${this.name}: worker`] = fresh.reduce((sum, c) => sum + c.ms, 0);
+				console.log(`    worker: ${fresh.map((c) => `${c.method} ${c.ms}`).join(', ')}`);
+			}
+			this.seen = stats.callCount;
+		}
+		this.name = name;
+		if (name) console.log(`${new Date().toISOString().slice(11, 19)} ${label}: ${name}`);
+	}
+}
+
 async function measure(page: Page, round: number, timings: Timings) {
+	const steps = new Steps(page, timings);
 	const id = `bench-${lines}-${round}`;
 	await page.goto('/projects');
 	await store(page, id);
@@ -117,6 +154,7 @@ async function measure(page: Page, round: number, timings: Timings) {
 		await cdp.send('Emulation.setCPUThrottlingRate', { rate: throttle });
 	}
 
+	await steps.next('open');
 	// Open: navigation → "Model ready" (analysis, views, machines), then the checks.
 	await page.goto(`/p/${id}`);
 	await expect(page.getByRole('status').filter({ hasText: 'Model ready' })).toBeVisible({
@@ -132,6 +170,7 @@ async function measure(page: Page, round: number, timings: Timings) {
 	timings['explorer: DOM nodes'] = await page.locator('nav.explorer *').count();
 	timings['page: DOM nodes'] = await page.locator('*').count();
 
+	await steps.next('explorer');
 	// Scroll the explorer to the end and back: the time to the next frame after each.
 	timings['explorer: scroll'] = await page.locator('nav.explorer').evaluate(async (nav) => {
 		const frame = () => new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
@@ -145,6 +184,7 @@ async function measure(page: Page, round: number, timings: Timings) {
 		return performance.now() - started;
 	});
 
+	await steps.next('editor');
 	// The largest file, as text.
 	let from = await pageNow(page);
 	await page.getByRole('tab', { name: 'Files' }).click();
@@ -154,6 +194,7 @@ async function measure(page: Page, round: number, timings: Timings) {
 		expect(page.locator('.cm-content .cm-line').first()).toBeVisible({ timeout: LONG })
 	);
 
+	await steps.next('keystroke');
 	// One character in a doc comment → the analysis of it on the page.
 	await page.locator('.cm-content').click();
 	await page.keyboard.press('Control+Home');
@@ -161,6 +202,8 @@ async function measure(page: Page, round: number, timings: Timings) {
 	await page.keyboard.type('doc /* A ');
 	await page.keyboard.press('Enter');
 	await page.keyboard.press('Escape');
+	// The match is selected: put the cursor after it, inside the comment.
+	await page.keyboard.press('ArrowRight');
 	from = await pageNow(page);
 	await page.keyboard.type('x');
 	const analysed = await nextMark(page, 'sysml:analysed', from);
@@ -170,32 +213,36 @@ async function measure(page: Page, round: number, timings: Timings) {
 	timings['edit: longest task'] = typing.longest;
 	timings['edit: blocking time'] = typing.blocking;
 
-	// Completion of a type name (`part partA : S…`).
+	await steps.next('completion');
+	// Completion of a type name (`subject sys : S…`).
 	await page.keyboard.press('Control+Home');
 	await page.keyboard.press('Control+f');
-	await page.keyboard.type('part partA : ');
+	await page.keyboard.type('subject sys : ');
 	await page.keyboard.press('Enter');
 	await page.keyboard.press('Escape');
+	await page.keyboard.press('ArrowRight');
 	from = await pageNow(page);
 	await page.keyboard.press('Control+Space');
 	timings['editor: completion'] = await until(page, from, () =>
-		expect(page.locator('.cm-tooltip-autocomplete')).toBeVisible({ timeout: LONG })
+		expect(page.locator('.cm-tooltip-autocomplete')).toBeVisible({ timeout: STEP })
 	);
 	await page.keyboard.press('Escape');
 
+	await steps.next('hover');
 	// Hover a type name (the editor waits ~300 ms before asking).
 	const type = page
 		.locator('.cm-content')
-		.getByText(/^S\d+Component$/)
+		.getByText(/^S\d+System$/)
 		.first();
 	await type.scrollIntoViewIfNeeded();
 	from = await pageNow(page);
 	await type.hover();
 	timings['editor: hover'] = await until(page, from, () =>
-		expect(page.locator('.cm-tooltip-hover')).toBeVisible({ timeout: LONG })
+		expect(page.locator('.cm-tooltip-hover')).toBeVisible({ timeout: STEP })
 	);
 	await page.mouse.move(0, 0);
 
+	await steps.next('table');
 	// The table of every requirement.
 	await page.getByRole('tab', { name: 'Model' }).click();
 	const views = page.locator('section[aria-labelledby="views-heading"]');
@@ -209,6 +256,7 @@ async function measure(page: Page, round: number, timings: Timings) {
 	const tabled = await longTasks(page, from);
 	timings['table: longest task'] = tabled.longest;
 
+	await steps.next('diagram');
 	// The product's interconnection diagram (every subsystem on the bus).
 	from = await pageNow(page);
 	await views.getByRole('button', { name: 'Product interconnection', exact: true }).click();
@@ -225,6 +273,7 @@ async function measure(page: Page, round: number, timings: Timings) {
 	const drawn = await longTasks(page, from);
 	timings['diagram: longest task'] = drawn.longest;
 
+	await steps.next('');
 	timings['memory: worker MiB'] = (await workerStats(page))?.memoryMiB ?? NaN;
 	timings['memory: page JS MiB'] = await page.evaluate(
 		() =>
