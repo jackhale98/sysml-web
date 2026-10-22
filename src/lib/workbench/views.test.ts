@@ -29,6 +29,11 @@ describe('presentationOf', () => {
 				view({ definition: 'ActionFlowView', exposes: ['DeliveryMission::DeliveryFlight'] })
 			)
 		).toEqual({ kind: 'diagram', view: 'actions', scope: 'DeliveryFlight' });
+		expect(
+			presentationOf(
+				view({ definition: 'SequenceView', exposes: ['DeliverySequence::ParcelDelivery'] })
+			)
+		).toEqual({ kind: 'diagram', view: 'sequence', scope: 'ParcelDelivery' });
 		// A general view is drawn from the view usage itself, so its filters apply.
 		expect(
 			presentationOf(

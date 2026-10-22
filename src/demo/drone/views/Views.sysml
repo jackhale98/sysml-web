@@ -89,6 +89,11 @@ package DroneViews {
         expose DeliveryMission::DeliveryFlight;
     }
 
+    view deliverySequence : SequenceView {
+        doc /* Who tells whom what during one delivery, in time order from top to bottom. */
+        expose DeliverySequence::ParcelDelivery;
+    }
+
     view flightModeStates : StateTransitionView {
         doc /* The flight modes and what makes the drone switch between them. */
         expose FlightControl::FlightModes;
