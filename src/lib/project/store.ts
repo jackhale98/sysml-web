@@ -26,6 +26,11 @@ export interface StoredProject {
 	checkpoint?: { files: ProjectFile[]; at: string };
 	/** For `folder` projects: files changed here and not yet written back to the folder. */
 	unsavedToFolder?: string[];
+	/**
+	 * For `folder` projects: the folder's text of each of those files it has
+	 * (one made here has none), so a reload still knows what the folder holds.
+	 */
+	folderTexts?: Record<string, string>;
 }
 
 export type ProjectSummary = Omit<StoredProject, 'files'> & {

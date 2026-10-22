@@ -3,6 +3,8 @@
  * used from the main file (by import), renamed (only the path changes, so
  * nothing breaks), and deleted (the dialog says what stops resolving, and
  * Undo brings it back). Once with a mouse, once on a phone with a long press.
+ * In a project opened from a folder, a file deleted and not yet saved to the
+ * folder is still a deleted file after a reload.
  */
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
@@ -178,6 +180,111 @@ test('make a file in a new folder, use it, rename it, delete it and undo', async
 	await page.getByRole('button', { name: 'New', exact: true }).click();
 	await page.getByRole('button', { name: 'File…' }).click();
 	await expect(dialog(page).getByRole('heading', { name: 'New file' })).toBeVisible();
+});
+
+/**
+ * Open a folder project: the folder is kept in the browser's private file
+ * system (a real folder handle), and choosing a folder picks it.
+ */
+async function openFolderProject(page: Page, files: Record<string, string>) {
+	await page.addInitScript(() => {
+		(window as unknown as { showDirectoryPicker: () => Promise<unknown> }).showDirectoryPicker =
+			async () => (await navigator.storage.getDirectory()).getDirectoryHandle('Rig');
+	});
+	await page.goto('/projects');
+	await page.evaluate(async (files) => {
+		const root = await (
+			await navigator.storage.getDirectory()
+		).getDirectoryHandle('Rig', {
+			create: true
+		});
+		for (const [path, text] of Object.entries(files)) {
+			const parts = path.split('/');
+			let dir = root;
+			for (const part of parts.slice(0, -1))
+				dir = await dir.getDirectoryHandle(part, { create: true });
+			const writable = await (
+				await dir.getFileHandle(parts.at(-1)!, { create: true })
+			).createWritable();
+			await writable.write(text);
+			await writable.close();
+		}
+	}, files);
+	await page.getByRole('button', { name: 'Choose a folder…' }).click();
+	await expect(page).toHaveURL(/\/p\//);
+	await ready(page);
+}
+
+/** The paths of the files in the folder project's folder. */
+const folderFiles = (page: Page) =>
+	page.evaluate(async () => {
+		const out: string[] = [];
+		const walk = async (dir: FileSystemDirectoryHandle, prefix: string) => {
+			for await (const entry of (
+				dir as unknown as { values(): AsyncIterable<FileSystemHandle> }
+			).values()) {
+				if (entry.kind === 'directory')
+					await walk(entry as FileSystemDirectoryHandle, `${prefix}${entry.name}/`);
+				else out.push(prefix + entry.name);
+			}
+		};
+		await walk(await (await navigator.storage.getDirectory()).getDirectoryHandle('Rig'), '');
+		return out.sort();
+	});
+
+test('a file deleted in a folder project shows as deleted in the review after a reload, and saving takes it out of the folder', async ({
+	page
+}) => {
+	await page.setViewportSize({ width: 1440, height: 900 });
+	await openFolderProject(page, {
+		'.project.json': '{\n\t"name": "Rig"\n}\n',
+		'model/Rig.sysml': 'package Rig {\n    part def Frame;\n}\n',
+		'model/Spares.sysml': 'package Spares {\n    part def Bolt;\n    part def Washer;\n}\n'
+	});
+	await page.getByRole('tab', { name: 'Files' }).click();
+	await more(page, 'Spares.sysml').click();
+	await page.getByRole('menuitem', { name: 'Delete…' }).click();
+	await dialog(page).getByRole('button', { name: 'Delete file' }).click();
+	await expect(files(page).getByRole('button', { name: /^Spares\.sysml/ })).toHaveCount(0);
+	const unsaved = page.getByRole('button', { name: /1 unsaved · Save to folder/ });
+	await expect(unsaved).toBeVisible();
+	// Kept in this browser (it saves a moment after each change), then reloaded.
+	await expect
+		.poll(() =>
+			page.evaluate(
+				() =>
+					new Promise<string[]>((done) => {
+						const open = indexedDB.open('sysml-web', 1);
+						open.onsuccess = () => {
+							const all = open.result.transaction('projects').objectStore('projects').getAll();
+							all.onsuccess = () => {
+								open.result.close();
+								done(
+									(all.result as { unsavedToFolder?: string[] }[]).flatMap(
+										(p) => p.unsavedToFolder ?? []
+									)
+								);
+							};
+						};
+					})
+			)
+		)
+		.toEqual(['model/Spares.sysml']);
+	await page.reload();
+	await ready(page);
+	await expect(unsaved).toBeVisible();
+
+	await command(page, 'Review changes', /Review changes/);
+	const review = page.getByRole('region', { name: 'Review changes' });
+	await expect(review).toContainText('Comparing your version with the files in the folder');
+	await expect(review.locator('[data-change]').filter({ hasText: /Removed .*Spares/ })).toBeVisible(
+		{ timeout: 30_000 }
+	);
+	await expectAccessible(page, 'the review of a deleted file');
+
+	await unsaved.click();
+	await expect(unsaved).toBeHidden();
+	expect(await folderFiles(page)).toEqual(['.project.json', 'model/Rig.sysml']);
 });
 
 test.describe('on a phone', () => {
