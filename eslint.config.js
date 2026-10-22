@@ -15,6 +15,7 @@ export default ts.config(
 			'static/toolkit/',
 			'.cache/',
 			'.lighthouseci/',
+			'worker/.wrangler/',
 			'lighthouserc.cjs'
 		]
 	},

@@ -16,6 +16,7 @@
 	import { accounts } from '#lib/git/account.svelte.ts';
 	import GitHubMark from '#lib/git/GitHubMark.svelte';
 	import OpenRepository from '#lib/git/OpenRepository.svelte';
+	import { takeResume } from '#lib/git/oauth.ts';
 	import { keepRepository } from '#lib/git/project.ts';
 	import type { Progress, RepoChoice } from '#lib/git/types.ts';
 	import Settings from '#lib/settings/Settings.svelte';
@@ -59,7 +60,9 @@
 		accounts.init();
 		folderAccess = canOpenFolders();
 		const params = new URLSearchParams(location.search);
-		if (params.has('github') || location.hash === '#github') githubOpen = true;
+		// Also back from GitHub (signing in, or choosing repositories) after starting there.
+		if (params.has('github') || location.hash === '#github' || takeResume('open-repository'))
+			githubOpen = true;
 		if (params.has('settings')) settingsOpen = true;
 		void refresh();
 		if (params.has('new') || location.hash === '#new') void tick().then(() => nameField?.focus());

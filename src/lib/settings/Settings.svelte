@@ -23,12 +23,15 @@
 		Type,
 		X
 	} from '@lucide/svelte';
+	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import type { Engine } from '#lib/engine/client.ts';
 	import type { LibraryLicense } from '#lib/engine/types.ts';
 	import { accounts } from '#lib/git/account.svelte.ts';
 	import ConnectGitHub from '#lib/git/ConnectGitHub.svelte';
 	import GitHubMark from '#lib/git/GitHubMark.svelte';
+	import { takeResume } from '#lib/git/oauth.ts';
+	import { chooseRepositories, chooseRepositoriesUrl, SIGN_IN } from '#lib/git/signin.ts';
 	import {
 		deleteAllData,
 		isStoragePersisted,
@@ -73,6 +76,19 @@
 		settings.init();
 		accounts.init();
 	});
+
+	// Back from signing in on GitHub, started here: show the account.
+	onMount(() => {
+		if (takeResume('settings')) {
+			section = 'accounts';
+			open = true;
+		}
+	});
+
+	function chooseOnGitHub(event: MouseEvent) {
+		event.preventDefault();
+		void chooseRepositories('settings');
+	}
 
 	$effect(() => {
 		if (!dialog) return;
@@ -488,42 +504,79 @@
 						<h3><GitHubMark size={18} /> GitHub</h3>
 						{#if accounts.github}
 							{@const user = accounts.github.user}
+							{@const signedIn = accounts.github.via === 'app'}
 							<div class="account">
 								{#if user.avatarUrl}<img src={user.avatarUrl} alt="" width="40" height="40" />{/if}
 								<div>
 									<strong>{user.name || user.login}</strong>
 									<span class="muted"
-										>@{user.login} · connected {new Date(
-											accounts.github.connectedAt
-										).toLocaleDateString()}</span
+										>@{user.login} · {signedIn ? 'signed in' : 'connected'}
+										{new Date(accounts.github.connectedAt).toLocaleDateString()}</span
 									>
 								</div>
-								<span class="pill"><Check size={13} aria-hidden="true" /> Connected</span>
-							</div>
-							<p class="muted">
-								Your access token is kept only in this browser. Signing out forgets it here; to
-								disable it everywhere, delete it on GitHub too.
-							</p>
-							<div class="row">
-								<button type="button" class="button" onclick={() => accounts.signOut()}>
-									<LogOut size={15} aria-hidden="true" /> Sign out and forget token
-								</button>
-								<a
-									class="button"
-									href="https://github.com/settings/personal-access-tokens"
-									target="_blank"
-									rel="noopener noreferrer"
+								<span class="pill"
+									><Check size={13} aria-hidden="true" />
+									{signedIn ? 'Signed in' : 'Connected'}</span
 								>
-									Manage tokens on GitHub <ExternalLink size={13} aria-hidden="true" /><span
-										class="visually-hidden">(opens in a new tab)</span
-									>
-								</a>
 							</div>
+							{#if signedIn}
+								<p class="muted">
+									You signed in with GitHub. Your sign-in is kept only in this browser and renews
+									itself while you use SysML Web. SysML Web can use only the repositories you chose
+									on GitHub.
+								</p>
+								<div class="row">
+									<button type="button" class="button" onclick={() => accounts.signOut()}>
+										<LogOut size={15} aria-hidden="true" /> Sign out
+									</button>
+									{#if chooseRepositoriesUrl()}
+										<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- GitHub's page; returns here -->
+										<a class="button" href={chooseRepositoriesUrl()} onclick={chooseOnGitHub}>
+											Choose repositories on GitHub <ExternalLink size={13} aria-hidden="true" />
+										</a>
+									{/if}
+								</div>
+								<p class="muted small">
+									Signing out forgets your sign-in here. To remove SysML Web's access everywhere,
+									revoke it on GitHub under
+									<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external link -->
+									<a
+										href="https://github.com/settings/apps/authorizations"
+										target="_blank"
+										rel="noopener noreferrer"
+										>Settings → Applications<span class="visually-hidden">
+											(opens in a new tab)</span
+										></a
+									>.
+								</p>
+							{:else}
+								<p class="muted">
+									Your access token is kept only in this browser. Signing out forgets it here; to
+									disable it everywhere, delete it on GitHub too.
+								</p>
+								<div class="row">
+									<button type="button" class="button" onclick={() => accounts.signOut()}>
+										<LogOut size={15} aria-hidden="true" /> Sign out and forget token
+									</button>
+									<a
+										class="button"
+										href="https://github.com/settings/personal-access-tokens"
+										target="_blank"
+										rel="noopener noreferrer"
+									>
+										Manage tokens on GitHub <ExternalLink size={13} aria-hidden="true" /><span
+											class="visually-hidden">(opens in a new tab)</span
+										>
+									</a>
+								</div>
+							{/if}
 						{:else}
-							<ConnectGitHub />
+							<ConnectGitHub resume="settings" />
 						{/if}
 					</section>
-					<p class="muted small">GitLab and sign-in without a token are planned.</p>
+					<p class="muted small">
+						{SIGN_IN ? 'GitLab is planned.' : 'GitLab and sign-in without a token are planned.'}
+					</p>
 				{:else if section === 'about'}
 					<section class="block about">
 						<div class="brand">

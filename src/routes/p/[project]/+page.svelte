@@ -46,16 +46,18 @@
 		})();
 	});
 
-	// Before reloading for a new version: save what's pending, and ask before losing anything.
+	// Before reloading for a new version or leaving to sign in: save what's pending,
+	// and ask before losing anything.
 	onMount(() =>
-		pwa.guardReload(async () => {
+		pwa.guardReload(async (leaving) => {
 			await session.flush();
+			const go = leaving === 'reload' ? 'Reload anyway?' : 'Go to GitHub anyway?';
 			if (session.saveState === 'error')
-				return confirm('Your latest changes could not be saved in this browser. Reload anyway?');
+				return confirm(`Your latest changes could not be saved in this browser. ${go}`);
 			const unsaved = session.unsavedToFolder.length;
 			if (unsaved)
 				return confirm(
-					`${unsaved} ${unsaved === 1 ? 'file is' : 'files are'} not saved to the folder yet. Reload anyway?`
+					`${unsaved} ${unsaved === 1 ? 'file is' : 'files are'} not saved to the folder yet. ${go}`
 				);
 			return true;
 		})
