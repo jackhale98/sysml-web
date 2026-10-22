@@ -131,6 +131,8 @@ export interface RepoChoice {
 	ref: RepoRef;
 	branch: string;
 	defaultBranch: string;
+	/** The GitHub account it was chosen with (its login); the default account when missing. */
+	account?: string;
 }
 
 export type Progress = (done: number, total: number) => void;
@@ -186,4 +188,10 @@ export interface GitRecord {
 	syncedAt: string;
 	/** The latest proposal (pull request) opened from here. */
 	pullRequest?: PullRequest & { branch: string };
+	/**
+	 * The login of the account that opened it, whose token it uses. Missing in
+	 * projects opened before several accounts could be kept: those use the
+	 * default account.
+	 */
+	account?: string;
 }

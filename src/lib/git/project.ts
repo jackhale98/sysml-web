@@ -11,7 +11,7 @@ export async function keepRepository(
 	progress?: Progress
 ): Promise<{ id: string; notice?: string }> {
 	const opened = await readRepository(
-		accounts.provider(),
+		accounts.provider(choice.account),
 		choice.ref,
 		choice.branch,
 		choice.defaultBranch,
@@ -24,12 +24,14 @@ export async function keepRepository(
 		);
 	const id = await newProjectId(opened.info.name);
 	const now = timestamp();
+	// The project keeps using the account it was opened with.
+	const account = choice.account ?? accounts.github?.user.login;
 	await saveProject({
 		id,
 		info: opened.info,
 		files: opened.files,
 		origin: 'git',
-		git: opened.git,
+		git: { ...opened.git, ...(account ? { account } : {}) },
 		created: now,
 		updated: now
 	});

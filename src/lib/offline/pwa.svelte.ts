@@ -1,11 +1,14 @@
 /**
  * The app as an installed, offline-capable web app: whether the network is
  * reachable, the service worker (registered after the page has loaded), a
- * quiet "new version" notice, and the browser's install prompt.
+ * quiet "new version" notice, and installing it: the browser's install
+ * prompt where there is one (Chromium), else a guide to the browser's own
+ * "Add to Home Screen" (`#lib/offline/install.ts`).
  */
 import { dev } from '$app/env';
 import { resolve } from '$app/paths';
 import { toasts } from '#lib/ui/toasts.svelte.ts';
+import { canOfferInstall, installPlatform, type InstallPlatform } from './install.ts';
 
 /** Chromium's install prompt (not in the DOM typings). */
 interface InstallPromptEvent extends Event {
@@ -26,6 +29,12 @@ class Pwa {
 	updateReady = $state(false);
 	/** The browser offered to install the app (Chromium, not yet installed). */
 	canInstall = $state(false);
+	/** Running as the installed app (from the Home Screen, Dock or app list). */
+	installed = $state(false);
+	/** How this browser installs web apps. */
+	platform = $state<InstallPlatform>('unsupported');
+	/** The "Add to Home Screen" guide is open. */
+	guideOpen = $state(false);
 
 	private started = false;
 	private installPrompt: InstallPromptEvent | null = null;
@@ -38,6 +47,12 @@ class Pwa {
 		this.started = true;
 
 		this.online = navigator.onLine;
+		this.detect();
+		try {
+			matchMedia('(display-mode: standalone)').addEventListener('change', () => this.detect());
+		} catch {
+			// Older browsers: the mode doesn't change while the page is open anyway.
+		}
 		addEventListener('online', () => (this.online = true));
 		addEventListener('offline', () => (this.online = false));
 
@@ -49,6 +64,7 @@ class Pwa {
 		addEventListener('appinstalled', () => {
 			this.installPrompt = null;
 			this.canInstall = false;
+			this.guideOpen = false;
 		});
 
 		if (dev || !('serviceWorker' in navigator)) return;
@@ -59,6 +75,33 @@ class Pwa {
 		};
 		if (document.readyState === 'complete') later();
 		else addEventListener('load', later, { once: true });
+	}
+
+	/** Whether this page runs as the installed app, and how this browser installs. */
+	private detect() {
+		let standalone = (navigator as { standalone?: boolean }).standalone === true;
+		try {
+			standalone ||= matchMedia('(display-mode: standalone)').matches;
+		} catch {
+			// No media queries: not installed.
+		}
+		this.installed = standalone;
+		this.platform = installPlatform({
+			userAgent: navigator.userAgent,
+			maxTouchPoints: navigator.maxTouchPoints,
+			standalone
+		});
+	}
+
+	/** Whether to offer "Install app" here (the prompt is ready, or the guide can explain how). */
+	get canOffer(): boolean {
+		return canOfferInstall(this.platform, this.canInstall);
+	}
+
+	/** "Install app": the browser's own dialog where there is one, else the guide. */
+	offerInstall() {
+		if (this.canInstall) void this.install();
+		else this.guideOpen = true;
 	}
 
 	private async register() {

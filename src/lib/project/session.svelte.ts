@@ -5,6 +5,7 @@
  */
 import { GitConnection } from '#lib/git/connection.svelte.ts';
 import { demoProject } from './demo.ts';
+import { leaveRisk, type LeaveRisk } from './pending.ts';
 import { download, writeToFolder } from './sources.ts';
 import { loadProject, saveProject, timestamp, type StoredProject } from './store.ts';
 import type { ProjectFile, ProjectSource, Workspace } from './workspace.svelte.ts';
@@ -41,13 +42,38 @@ export class ProjectSession {
 		return this.record?.origin === 'folder' && !!this.record.folder;
 	}
 
+	/**
+	 * What leaving the project now would leave behind: changes not on GitHub,
+	 * not in the folder, or not even saved in this browser. Null when nothing.
+	 */
+	get leaveRisk(): LeaveRisk | null {
+		const git = this.record?.git;
+		return leaveRisk({
+			saveFailed: this.saveState === 'error',
+			github: git
+				? {
+						owner: git.owner,
+						repo: git.repo,
+						branch: git.branch,
+						changes: this.git.changes.length
+					}
+				: null,
+			folder: this.canSaveToFolder ? this.unsavedToFolder.length : 0
+		});
+	}
+
 	/** The project with this id: stored in the browser, or the bundled demo. */
 	async load(id: string): Promise<ProjectSource | null> {
 		const stored = await loadProject(id).catch(() => undefined);
 		if (stored) {
 			this.record = stored;
 			if (stored.origin === 'folder') {
-				this.folderTexts = Object.fromEntries(stored.files.map((f) => [f.path, f.text]));
+				// Files changed here but not written back are not what the folder holds.
+				const unsaved = stored.unsavedToFolder ?? [];
+				this.folderTexts = Object.fromEntries(
+					stored.files.filter((f) => !unsaved.includes(f.path)).map((f) => [f.path, f.text])
+				);
+				this.unsavedToFolder = unsaved;
 			}
 			this.opened = stored.files;
 			return { id, info: stored.info, files: stored.files };
@@ -96,7 +122,13 @@ export class ProjectSession {
 		this.saveState = 'saving';
 		try {
 			const info = this.workspace.info ?? this.record.info;
-			this.record = { ...this.record, info, files: this.files() };
+			this.record = {
+				...this.record,
+				info,
+				files: this.files(),
+				// Remembered, so a reload still knows what isn't in the folder yet.
+				...(this.record.origin === 'folder' ? { unsavedToFolder: this.unsavedToFolder } : {})
+			};
 			await saveProject(this.record);
 			this.saveState = 'saved';
 			this.saveError = null;
@@ -124,6 +156,7 @@ export class ProjectSession {
 		}
 		for (const f of changed) this.folderTexts[f.path] = f.text;
 		this.unsavedToFolder = [];
+		await this.save();
 		return null;
 	}
 

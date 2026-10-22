@@ -14,11 +14,21 @@ export { SIGN_IN };
 /**
  * Go to GitHub to sign in, then come back here and reopen `resume`. False
  * when staying here (the person chose to keep unsaved work open).
+ * `another`: adding a second account (GitHub signs in whoever is signed in
+ * on github.com; it is asked to show its account picker where it can).
  */
-export async function signInWithGitHub(resume?: Resume): Promise<boolean> {
+export async function signInWithGitHub(
+	resume?: Resume,
+	options: { another?: boolean } = {}
+): Promise<boolean> {
 	if (!SIGN_IN) return false;
 	if (!(await pwa.beforeLeaving('sign-in'))) return false;
-	const url = await startSignIn(SIGN_IN, { redirectUri: redirectUri(), returnTo: here(), resume });
+	const url = await startSignIn(SIGN_IN, {
+		redirectUri: redirectUri(),
+		returnTo: here(),
+		resume,
+		selectAccount: options.another
+	});
 	location.assign(url);
 	return true;
 }

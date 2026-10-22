@@ -5,6 +5,7 @@
  * repository keeps where it came from and the version its files are based on.
  */
 import type { GitRecord } from '#lib/git/types.ts';
+import { changesNotInFolder, changesNotOnGitHub } from './pending.ts';
 import type { ProjectFile, ProjectInfo } from './workspace.svelte.ts';
 
 export interface StoredProject {
@@ -21,9 +22,17 @@ export interface StoredProject {
 	git?: GitRecord;
 	/** The version "Review changes" compares with when there is no repository: set by "Mark as reviewed". */
 	checkpoint?: { files: ProjectFile[]; at: string };
+	/** For `folder` projects: files changed here and not yet written back to the folder. */
+	unsavedToFolder?: string[];
 }
 
-export type ProjectSummary = Omit<StoredProject, 'files'> & { fileCount: number };
+export type ProjectSummary = Omit<StoredProject, 'files'> & {
+	fileCount: number;
+	/** Files changed here and not saved to GitHub yet (projects connected to a repository). */
+	notOnGitHub: number;
+	/** Files changed here and not saved to the folder yet (folder projects). */
+	notInFolder: number;
+};
 
 const DB = 'sysml-web';
 const STORE = 'projects';
@@ -55,7 +64,15 @@ async function run<T>(
 export async function listProjects(): Promise<ProjectSummary[]> {
 	const all = await run<StoredProject[]>('readonly', (s) => s.getAll());
 	return all
-		.map(({ files, ...rest }) => ({ ...rest, fileCount: files.length }))
+		.map((project) => {
+			const { files, ...rest } = project;
+			return {
+				...rest,
+				fileCount: files.length,
+				notOnGitHub: changesNotOnGitHub(project),
+				notInFolder: changesNotInFolder(project)
+			};
+		})
 		.sort((a, b) => b.updated.localeCompare(a.updated));
 }
 
@@ -69,6 +86,20 @@ export async function saveProject(project: StoredProject): Promise<void> {
 
 export async function deleteProject(id: string): Promise<void> {
 	await run('readwrite', (s) => s.delete(id));
+}
+
+/**
+ * Give every GitHub project that doesn't say which account it uses this one
+ * (the default account until now), so adding another account doesn't change
+ * the account those projects save with. Their `updated` time is kept.
+ */
+export async function claimProjects(login: string): Promise<void> {
+	const all = await run<StoredProject[]>('readonly', (s) => s.getAll());
+	for (const project of all)
+		if (project.git && !project.git.account)
+			await run('readwrite', (s) =>
+				s.put({ ...project, git: { ...project.git!, account: login } })
+			);
 }
 
 /** A short, URL-safe id derived from the name, unique among stored projects. */

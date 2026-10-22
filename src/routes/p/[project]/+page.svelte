@@ -1,10 +1,13 @@
 <script lang="ts">
 	import { onMount, untrack, type Component, type ComponentProps } from 'svelte';
+	import { beforeNavigate, goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { getEngine } from '#lib/engine/instance.ts';
+	import { rememberProject } from '#lib/offline/launch.ts';
 	import { pwa } from '#lib/offline/pwa.svelte.ts';
 	import { demoProject } from '#lib/project/demo.ts';
+	import { leaving } from '#lib/project/leaving.svelte.ts';
 	import { ProjectSession } from '#lib/project/session.svelte.ts';
 	import { Workspace } from '#lib/project/workspace.svelte.ts';
 	import Logo from '#lib/ui/Logo.svelte';
@@ -38,6 +41,8 @@
 				missing = true;
 				return;
 			}
+			// The installed app comes back here next time it is opened.
+			rememberProject(source.id);
 			// Let the first frame paint before the engine starts downloading.
 			await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
 			await workspace.open(source, engine);
@@ -62,6 +67,36 @@
 			return true;
 		})
 	);
+
+	// Leaving for another page of the app (all projects, a new one): first say if
+	// changes aren't on GitHub or in the folder yet (see #lib/project/leaving.svelte.ts).
+	onMount(() => leaving.register(session));
+	let confirmed = false;
+	beforeNavigate((navigation) => {
+		const to = navigation.to?.url;
+		if (confirmed || navigation.type === 'leave' || !to || to.pathname === location.pathname)
+			return;
+		if (!leaving.risk) {
+			void session.flush();
+			return;
+		}
+		navigation.cancel();
+		void leaving.confirm('leave').then((go) => {
+			if (!go) return;
+			confirmed = true;
+			// eslint-disable-next-line svelte/no-navigation-without-resolve -- the address SvelteKit was already going to
+			void goto(to.href);
+		});
+	});
+
+	// Phones stop apps in the background without warning: save before that can happen.
+	onMount(() => {
+		const hidden = () => {
+			if (document.visibilityState === 'hidden') void session.flush();
+		};
+		document.addEventListener('visibilitychange', hidden);
+		return () => document.removeEventListener('visibilitychange', hidden);
+	});
 
 	// Save every change to this browser shortly after it is made.
 	$effect(() => {

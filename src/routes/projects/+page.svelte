@@ -41,6 +41,9 @@
 		type StoredProject
 	} from '#lib/project/store.ts';
 	import type { ProjectFile } from '#lib/project/workspace.svelte.ts';
+	import { pendingLabel } from '#lib/project/pending.ts';
+	import InstallCard from '#lib/offline/InstallCard.svelte';
+	import { forgetProject, lastProject, launchTarget, LAUNCH_PARAM } from '#lib/offline/launch.ts';
 	import { pwa } from '#lib/offline/pwa.svelte.ts';
 	import Logo from '#lib/ui/Logo.svelte';
 	import ThemeToggle from '#lib/ui/ThemeToggle.svelte';
@@ -65,7 +68,22 @@
 		if (params.has('github') || location.hash === '#github' || takeResume('open-repository'))
 			githubOpen = true;
 		if (params.has('settings')) settingsOpen = true;
-		void refresh();
+		void (async () => {
+			await refresh();
+			// The installed app was just opened: back into the project that was open, if any.
+			const launched = params.has(LAUNCH_PARAM);
+			const reopen = launchTarget({
+				launched,
+				last: lastProject(),
+				stored: (projects ?? []).map((p) => p.id)
+			});
+			if (reopen) await goto(resolve('/p/[project]', { project: reopen }), { replaceState: true });
+			else {
+				// Here by choice: no project is open, so the next launch starts here.
+				forgetProject();
+				if (launched) history.replaceState(history.state, '', location.pathname);
+			}
+		})();
 		if (params.has('new') || location.hash === '#new') void tick().then(() => nameField?.focus());
 	});
 
@@ -183,6 +201,9 @@
 		await refresh();
 	}
 
+	/** Show which account a GitHub project saves with, when several are connected. */
+	const severalAccounts = $derived(accounts.list.length > 1);
+
 	const ORIGIN: Record<StoredProject['origin'], string> = {
 		new: 'Created here',
 		folder: 'Folder on this computer',
@@ -233,6 +254,8 @@
 
 		{#if error}<p class="error" role="alert">{error}</p>{/if}
 		{#if busy}<p class="busy" role="status">{busy}</p>{/if}
+
+		<InstallCard />
 
 		<section class="start" aria-label="Start">
 			<form class="card new" onsubmit={create} id="new">
@@ -332,9 +355,13 @@
 											><GitHubMark size={12} />
 											{p.git.owner}/{p.git.repo}
 											<GitBranch size={12} aria-hidden="true" />{p.git.branch}</span
-										>
+										>{#if severalAccounts && (p.git.account ?? accounts.github?.user.login)}
+											· as @{p.git.account ?? accounts.github?.user.login}{/if}
 									{:else}{ORIGIN[p.origin]}{/if} · {p.fileCount} files · edited {ago(p.updated)}
 								</span>
+								{#if pendingLabel(p)}
+									<span class="pending">{pendingLabel(p)}</span>
+								{/if}
 							</a>
 							{#if confirmDelete === p.id}
 								<span class="confirm">
@@ -614,6 +641,16 @@
 		color: var(--text-3);
 		font-size: var(--text-xs);
 	}
+	.pending {
+		justify-self: start;
+		margin-top: 2px;
+		padding: 1px var(--space-2);
+		border-radius: var(--radius-pill);
+		background: var(--warn-weak);
+		color: var(--warn);
+		font-size: var(--text-xs);
+		font-weight: 600;
+	}
 	.icon {
 		width: 2.5rem;
 		margin-right: var(--space-2);
@@ -635,5 +672,18 @@
 		border: 0;
 		background: var(--danger);
 		color: #fff;
+	}
+	@media (max-width: 760px) {
+		/* Comfortable to tap. */
+		button,
+		.file-button,
+		.icon-button {
+			min-height: 2.75rem;
+		}
+		.icon,
+		.icon-button {
+			width: 2.75rem;
+			height: 2.75rem;
+		}
 	}
 </style>

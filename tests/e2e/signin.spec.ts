@@ -157,7 +157,11 @@ test.describe('with sign-in set up', () => {
 		]);
 
 		// Kept in this browser, with what it needs to stay signed in.
-		const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('sysml-web:github')!));
+		const kept = await page.evaluate(() =>
+			JSON.parse(localStorage.getItem('sysml-web:github-accounts')!)
+		);
+		expect(kept.active).toBe('octo');
+		const stored = kept.accounts[0];
 		expect(stored).toMatchObject({
 			token: 'ghu_e2e',
 			refreshToken: 'ghr_e2e',

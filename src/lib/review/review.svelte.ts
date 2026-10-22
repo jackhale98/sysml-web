@@ -175,7 +175,7 @@ class Review {
 		}
 		if (!git) throw new Error('This project isn’t connected to a GitHub repository.');
 		knowBlobs(git.files);
-		const provider = accounts.provider();
+		const provider = accounts.provider(git.account);
 		const ref = { owner: git.owner, repo: git.repo };
 		if (source.kind === 'branch') {
 			const start = await provider.mergeBase(ref, git.defaultBranch, git.base);

@@ -6,7 +6,7 @@
 	 * `run` does the work (open as a project, or connect the current one)
 	 * while the dialog shows progress and any error.
 	 */
-	import { ExternalLink, GitBranch, Lock, Search, X } from '@lucide/svelte';
+	import { ExternalLink, GitBranch, Lock, Search, UserPlus, X } from '@lucide/svelte';
 	import { pwa } from '#lib/offline/pwa.svelte.ts';
 	import { accounts } from './account.svelte.ts';
 	import ConnectGitHub from './ConnectGitHub.svelte';
@@ -46,8 +46,14 @@
 	let error = $state<string | null>(null);
 
 	const connected = $derived(accounts.connected);
+	/** The account whose repositories are listed (the default one unless another is picked). */
+	let picked = $state<string | null>(null);
+	const browsing = $derived(accounts.find(picked) ?? accounts.github);
+	const login = $derived(browsing?.user.login ?? null);
+	/** Adding another account, from here. */
+	let adding = $state(false);
 	/** Signed in with GitHub: the app sees only the repositories chosen for it on GitHub. */
-	const installLink = $derived(accounts.github?.via === 'app' ? chooseRepositoriesUrl() : null);
+	const installLink = $derived(browsing?.via === 'app' ? chooseRepositoriesUrl() : null);
 	let errorKind = $state<string | null>(null);
 	const pasted = $derived(parseRepoUrl(query));
 	const results = $derived.by(() => {
@@ -74,14 +80,23 @@
 			progress = null;
 			busy = null;
 			dialog.showModal();
-			if (accounts.connected && !repos) void loadRepos();
+			if (accounts.connected && (!repos || reposFor !== login)) {
+				repos = null;
+				selected = null;
+				branches = null;
+				void loadRepos();
+			}
 		} else if (!open && dialog.open) dialog.close();
 	});
 
+	/** Whose repositories `repos` lists. */
+	let reposFor: string | null = null;
+
 	async function loadRepos() {
 		error = null;
+		reposFor = login;
 		try {
-			repos = await accounts.provider().listRepos();
+			repos = await accounts.provider(login).listRepos();
 		} catch (e) {
 			repos = [];
 			fail(e);
@@ -104,7 +119,7 @@
 		branch = wanted ?? repo.defaultBranch;
 		error = null;
 		try {
-			branches = await accounts.provider().listBranches(repo);
+			branches = await accounts.provider(login).listBranches(repo);
 			if (!branches.some((b) => b.name === branch)) branch = branches[0]?.name ?? branch;
 		} catch (e) {
 			fail(e);
@@ -116,7 +131,7 @@
 		busy = 'Looking it up…';
 		error = null;
 		try {
-			const repo = await accounts.provider().getRepo(pasted);
+			const repo = await accounts.provider(login).getRepo(pasted);
 			repos = [repo, ...(repos ?? []).filter((r) => r.fullName !== repo.fullName)];
 			query = '';
 			await choose(repo, pasted.branch);
@@ -138,7 +153,8 @@
 				{
 					ref: { owner: selected.owner, repo: selected.repo },
 					branch,
-					defaultBranch: selected.defaultBranch
+					defaultBranch: selected.defaultBranch,
+					...(login ? { account: login } : {})
 				},
 				(done, total) => (progress = { done, total })
 			);
@@ -148,6 +164,22 @@
 		} finally {
 			busy = null;
 		}
+	}
+
+	/** List another account's repositories (and make it the default for next time). */
+	function browseAs(next: string) {
+		picked = next;
+		accounts.use(next);
+		repos = null;
+		selected = null;
+		branches = null;
+		error = null;
+		void loadRepos();
+	}
+
+	function added() {
+		adding = false;
+		if (accounts.github) browseAs(accounts.github.user.login);
 	}
 
 	function ago(iso: string | null | undefined): string {
@@ -198,8 +230,33 @@
 			{/if}
 			{#if !connected}
 				<ConnectGitHub {resume} onconnected={() => void loadRepos()} />
+			{:else if adding}
+				<ConnectGitHub {resume} another onconnected={added} />
+				<button type="button" class="link-button" onclick={() => (adding = false)}>
+					Back to {login ? `@${login}'s` : 'your'} repositories
+				</button>
 			{:else}
 				<p class="intro">{intro}</p>
+				{#if accounts.list.length > 1}
+					<div class="account-row">
+						{#if browsing?.user.avatarUrl}
+							<img src={browsing.user.avatarUrl} alt="" width="24" height="24" />
+						{/if}
+						<label for="{uid}-account">Account</label>
+						<select
+							id="{uid}-account"
+							value={login}
+							disabled={!!busy}
+							onchange={(e) => browseAs(e.currentTarget.value)}
+						>
+							{#each accounts.list as a (a.user.login)}
+								<option value={a.user.login}
+									>@{a.user.login}{a.user.name ? ` (${a.user.name})` : ''}</option
+								>
+							{/each}
+						</select>
+					</div>
+				{/if}
 				<form id="{uid}-form" onsubmit={submit}>
 					<div class="search">
 						<Search size={16} aria-hidden="true" />
@@ -266,6 +323,9 @@
 							Don’t see a repository? {@render chooseLink('Choose repositories on GitHub')}
 						</p>
 					{/if}
+					<button type="button" class="link-button" onclick={() => (adding = true)}>
+						<UserPlus size={15} aria-hidden="true" /> Use another GitHub account
+					</button>
 
 					{#if selected}
 						<div class="branch-row">
@@ -311,10 +371,10 @@
 					</div>
 				{:else}
 					<span class="who">
-						{#if accounts.github?.user.avatarUrl}
-							<img src={accounts.github.user.avatarUrl} alt="" width="20" height="20" />
+						{#if browsing?.user.avatarUrl}
+							<img src={browsing.user.avatarUrl} alt="" width="20" height="20" />
 						{/if}
-						Signed in as <strong>{accounts.github?.user.login}</strong>
+						Signed in as <strong>{login}</strong>
 					</span>
 				{/if}
 				<button type="button" onclick={() => (open = false)} disabled={!!busy}>Cancel</button>
@@ -612,8 +672,45 @@
 		height: 6px;
 		accent-color: var(--accent);
 	}
-	.who img {
+	.who img,
+	.account-row img {
 		border-radius: 50%;
+	}
+	.account-row {
+		display: flex;
+		align-items: center;
+		gap: var(--space-2);
+		font-size: var(--text-sm);
+	}
+	.account-row label {
+		color: var(--text-2);
+		font-weight: 600;
+	}
+	.account-row select {
+		flex: 1;
+		min-width: 0;
+		min-height: 2.75rem;
+		padding: 0 var(--space-2);
+		border: 1px solid var(--border-strong);
+		border-radius: var(--radius-sm);
+		background: var(--surface);
+		color: var(--text);
+		font: inherit;
+	}
+	.link-button {
+		display: inline-flex;
+		align-items: center;
+		justify-self: start;
+		gap: var(--space-2);
+		min-height: 2.75rem;
+		padding: 0;
+		border: 0;
+		background: transparent;
+		color: var(--accent);
+		font: inherit;
+		font-size: var(--text-sm);
+		font-weight: 600;
+		cursor: pointer;
 	}
 	footer button {
 		min-height: 2.5rem;
