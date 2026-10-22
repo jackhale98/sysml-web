@@ -82,3 +82,51 @@ test('on a phone, the budgets and the checks are cards that fit the width', asyn
 		await expectFitsWidth(page, `the end of ${view}`);
 	}
 });
+
+test('on a phone, a sequence diagram scrolls inside its canvas, never the page', async ({
+	page
+}) => {
+	await openDemo(page);
+	await nav(page, 'Views');
+	const open = page.getByRole('button', { name: /^Delivery sequence/ }).first();
+	await open.scrollIntoViewIfNeeded();
+	await open.click();
+	const diagram = page.getByRole('group', { name: 'Delivery sequence diagram' });
+	await expect(diagram.getByRole('button', { name: /^Lifeline «ref part» operator/ })).toBeVisible({
+		timeout: 15_000
+	});
+	await expectFitsWidth(page, 'the sequence diagram');
+	const box = (await diagram.boundingBox())!;
+	expect(box.x).toBeGreaterThanOrEqual(0);
+	expect(box.x + box.width).toBeLessThanOrEqual(390);
+	// Readable rather than shrunk to fit: drawn at no less than 80 % of full size.
+	const size = await diagram
+		.locator('.message .name')
+		.first()
+		.evaluate((el) => el.getBoundingClientRect().height);
+	expect(size).toBeGreaterThanOrEqual(12);
+	// Panning sideways moves the drawing, not the page.
+	const before = await diagram
+		.getByRole('button', { name: /^Lifeline «ref part» recipient/ })
+		.boundingBox();
+	await diagram.evaluate((el) => {
+		const r = el.getBoundingClientRect();
+		const at = (x: number) => ({
+			clientX: x,
+			clientY: r.top + r.height / 2,
+			pointerId: 1,
+			bubbles: true
+		});
+		el.dispatchEvent(
+			new PointerEvent('pointerdown', { ...at(r.right - 20), pointerType: 'touch' })
+		);
+		el.dispatchEvent(new PointerEvent('pointermove', { ...at(r.left + 40), pointerType: 'touch' }));
+		el.dispatchEvent(new PointerEvent('pointerup', { ...at(r.left + 40), pointerType: 'touch' }));
+	});
+	const after = await diagram
+		.getByRole('button', { name: /^Lifeline «ref part» recipient/ })
+		.boundingBox();
+	expect(after!.x).toBeLessThan(before!.x - 100);
+	expect(after!.x + after!.width).toBeLessThanOrEqual(390);
+	await expectFitsWidth(page, 'the panned sequence diagram');
+});
