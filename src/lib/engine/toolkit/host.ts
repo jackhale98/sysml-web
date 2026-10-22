@@ -16,6 +16,7 @@ import type {
 	CheckReport,
 	CodeAction,
 	Completion,
+	ElementFeatures,
 	FeatureValue,
 	DefinitionTarget,
 	Diagnostic,
@@ -295,6 +296,11 @@ export class ToolkitHost {
 	/** A usage's attribute values, for the inspector. */
 	featureValues(files: SourceFile[], id: string): FeatureValue[] {
 		return views.featureValues(this.viewContext(files), id);
+	}
+
+	/** What the guided forms read about elements: their kinds, references and features (`views/features.ts`). */
+	elementFeatures(files: SourceFile[], ids: string[]): Record<string, ElementFeatures> {
+		return views.elementFeatures(this.viewContext(files), ids);
 	}
 
 	/** The view libraries every project has (`Reporting`, `ModelViews`). */

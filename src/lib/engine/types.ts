@@ -547,6 +547,63 @@ export interface StateSession {
 	messages?: string[];
 }
 
+/**
+ * What the guided forms (`#lib/create`) need to know about an element: what
+ * it is one of, how to refer to it, and its features — its own and those
+ * its definition and supertypes give it — with their values.
+ */
+export interface ElementFeatures {
+	id: string;
+	name: string;
+	qualifiedName: string;
+	kind: string;
+	isDefinition: boolean;
+	/** The definitions it is one of, nearest first (qualified): its type and their supertypes, or itself and its supertypes. */
+	kinds: string[];
+	/**
+	 * How to refer to it from another package: import `imports` (a package's
+	 * member, qualified), then write `text` (`drone.battery`,
+	 * `batteryOptions::lithiumPolymer`). Null for a package.
+	 */
+	reference: { imports: string; text: string } | null;
+	/** For a definition: the project's usages typed by it (qualified names). */
+	usedBy: string[];
+	features: FeatureInfo[];
+}
+
+export interface FeatureInfo {
+	/** Unquoted. */
+	name: string;
+	/** As SysML writes it (quoted when needed). */
+	written: string;
+	/** `attribute`, `part`, `item`, `port`, `subject`, … */
+	kind: string;
+	/** Whether the element declares or redefines it itself. */
+	own: boolean;
+	/** The record that declares it nearest (the element's own when `own`). */
+	id: string;
+	/** The definition that declares it, when it is not the element's own. */
+	declaredBy: string | null;
+	/** Where it is first declared (qualified): the element itself, or a definition it redefines it from. */
+	declaredIn: string | null;
+	/** For a part, item or subject: its type (qualified) and the type's id. */
+	type: string | null;
+	typeId: string | null;
+	/** `ref part` (counted where it is owned, not here). */
+	ref: boolean;
+	/** A `variation`: alternatives, not part of the design. */
+	variation: boolean;
+	multiplicity: string | null;
+	/** The value as written, own or inherited (null when none is given). */
+	value: string | null;
+	/** For an attribute: the simple name of its value type (`MassValue`, `Real`, `RotorSpin`). */
+	valueType: string | null;
+	/** Whether it holds a number (a quantity or a Real, Integer, …). */
+	numeric: boolean;
+	/** For an attribute: its value in this element, evaluated. */
+	evaluated: Evaluated | null;
+}
+
 /** How a table column maps back to the model. */
 /** One of a usage's attribute values, as the inspector edits it. */
 export interface FeatureValue {

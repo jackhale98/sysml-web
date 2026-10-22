@@ -162,7 +162,9 @@ export type EditStep =
 	| { kind: 'member'; path: string; parent: ModelElement; text: string }
 	| { kind: 'declaration'; path: string; element: ModelElement; set: DeclarationSet }
 	| { kind: 'remove'; path: string; element: ModelElement }
-	| { kind: 'patch'; path: string; before: string; after: string };
+	| { kind: 'patch'; path: string; before: string; after: string }
+	/** A new file of the project (undo removes it again). */
+	| { kind: 'file'; path: string; text: string };
 
 /**
  * Apply edit steps as one undoable change, confirmed by a toast with Undo
@@ -178,6 +180,11 @@ export async function applySteps(
 	if (!steps.length) return 'Nothing to change.';
 	return undoable(workspace, label, async () => {
 		for (const step of steps) {
+			if (step.kind === 'file') {
+				if (workspace.text(step.path) !== undefined) return `${step.path} exists already.`;
+				workspace.setText(step.path, step.text);
+				continue;
+			}
 			const source = workspace.text(step.path);
 			if (source === undefined) return `${step.path} is not in the project.`;
 			if (step.kind === 'member') {
