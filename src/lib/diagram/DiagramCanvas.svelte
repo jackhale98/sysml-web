@@ -14,7 +14,22 @@
 	} from '@xyflow/svelte';
 	import '@xyflow/svelte/dist/style.css';
 	import { untrack } from 'svelte';
-	import { Cable, FileCode, LayoutGrid, Pencil, Play, Plus, Trash2, Unlink } from '@lucide/svelte';
+	import {
+		ArrowRight,
+		Cable,
+		CircleDot,
+		CircleStop,
+		FileCode,
+		LayoutGrid,
+		ListTodo,
+		Network,
+		Pencil,
+		Play,
+		Plus,
+		Spline,
+		Trash2,
+		Unlink
+	} from '@lucide/svelte';
 	import type { Engine } from '#lib/engine/client.ts';
 	import type { DiagramGraph, DiagramView } from '#lib/engine/types.ts';
 	import type { ModelElement } from '#lib/project/elements.ts';
@@ -39,11 +54,45 @@
 		type Direction,
 		type Layout
 	} from './layout.ts';
-	import { ownersOf, resolveNode } from './model.ts';
+	import { ownersOf, qualifiedName, resolveNode } from './model.ts';
+	import BehaviorAddForm, { type BehaviorAddChoice } from './BehaviorAddForm.svelte';
+	import BranchForm from './BranchForm.svelte';
+	import FormPanel from './FormPanel.svelte';
+	import StateActionsForm from './StateActionsForm.svelte';
+	import TransitionForm from './TransitionForm.svelte';
+	import {
+		branchGuard,
+		CONTROL_WORDS,
+		flowStarts,
+		isBehavior,
+		isFlowNode,
+		isState,
+		planAddFlowNode,
+		planAddState,
+		planAddValue,
+		planEditBranch,
+		planEditTransition,
+		planRemoveEdge,
+		planRemoveNode,
+		planSetStart,
+		planStateAction,
+		planSuccession,
+		planTransition,
+		readTransition,
+		signalChoices,
+		startOf,
+		stateActions,
+		suggestName,
+		valuesAround,
+		type EdgeSource,
+		type FlowEnd,
+		type TransitionSpec
+	} from './behaviorEdits.ts';
 	import NodeMenu, { type MenuItem } from './NodeMenu.svelte';
 	import {
 		LAYOUT_FILE,
 		diagramKey,
+		freeSpot,
 		parseLayout,
 		placeAround,
 		renamedNode,
@@ -175,7 +224,8 @@
 					? renameElement(workspace, element, name)
 					: Promise.resolve('This node is not an element of the model.');
 			},
-			menu: (id, point) => openNodeMenu(id, point)
+			menu: (id, point) => openNodeMenu(id, point),
+			editEdge: (id, point) => void editEdge(id, point)
 		})
 	);
 
@@ -235,11 +285,51 @@
 			: undefined
 	);
 
+	// ---- Behaviour: state machines and action flows are drawn, not only shown ----
+
+	/** State and action diagrams: states, transitions, steps and successions are drawn here. */
+	const behavior = $derived(view === 'states' || view === 'actions');
+	/** The machine or action the diagram draws. */
+	const subject = $derived.by(() => {
+		if (!behavior || !scope) return undefined;
+		const fits = workspace.elements.filter(
+			(e) =>
+				isBehavior(e) &&
+				!isLibrary(e) &&
+				(e.name === scope || e.label === scope || qualifiedName(e, owners) === scope)
+		);
+		return fits.find((e) => e.isDefinition) ?? fits[0];
+	});
+	/** Whether `e` is `root` or inside it. */
+	function within(e: ModelElement, root: ModelElement | undefined): boolean {
+		for (let at: ModelElement | undefined = e; at; at = owners.get(at.key)) {
+			if (at.key === root?.key) return true;
+		}
+		return false;
+	}
+	/** Where Add puts a new state or step: the machine, or (a nested state) the selected state. */
+	const behaviorOwners = $derived.by(() => {
+		if (!subject) return [];
+		const inside =
+			view === 'states' && selected && isState(selected) && within(selected, subject)
+				? [selected]
+				: [];
+		return [subject, ...inside];
+	});
+	/** Add, opened from a state's menu, puts the new state inside it. */
+	let addInside = $state<string | null>(null);
+	/** Where the toolbar's Add puts things. */
+	const addOwner = $derived(behavior ? subject : owner);
+
 	function elementOf(id: string): ModelElement | undefined {
 		const node = nodes.find((n) => n.id === id);
 		if (node?.data.elementKey) {
 			const known = workspace.elements.find((e) => e.key === node.data.elementKey);
-			if (known) return known;
+			// Until the diagram is drawn again after an edit, a key may name what is now
+			// at that place in the text: only trust it while the names agree.
+			const named = (e: ModelElement) =>
+				id === e.name || id.endsWith(`.${e.name}`) || id.endsWith(`::${e.name}`);
+			if (known && named(known)) return known;
 		}
 		return resolveNode(id, node?.data.node.is_definition, scope, workspace.elements, owners);
 	}
@@ -339,10 +429,17 @@
 		);
 	}
 
+	/** The nodes and lines last drawn, to tell a new state or line from a changed label. */
+	let lastShape = '';
+
+	/** The texts the diagram was last drawn from. */
+	let drawnTexts: string[] = [];
+
 	async function refresh(relayout = false) {
 		const current = ++generation;
 		try {
-			const graph = await engine.diagram(view, workspace.sourceFiles(), scope);
+			const files = workspace.sourceFiles();
+			const graph = await engine.diagram(view, files, scope);
 			if (current !== generation) return;
 			// Laying out thousands of boxes takes the page minutes and draws nothing readable.
 			if (graph.nodes.length > MAX_NODES) {
@@ -357,6 +454,15 @@
 			const hadNodes = nodes.length > 0;
 			const previous = new Map(nodes.map((n) => [n.id, n]));
 			const stored = relayout ? {} : { ...storedPositions() };
+			// A state machine or flow nobody has arranged by hand is laid out afresh as it
+			// grows, so each new state or line lands where the layout reads best.
+			// Only when what is drawn changed: a new label alone moves nothing.
+			const shape = JSON.stringify([
+				graph.nodes.map((n) => n.id),
+				graph.edges.map((e) => [e.source, e.target])
+			]);
+			const settle = behavior && !Object.keys(stored).length && shape !== lastShape;
+			lastShape = shape;
 			const sizes = new Map(graph.nodes.map((n) => [n.id, nodeSize(n, view)]));
 
 			// A renamed element keeps its place.
@@ -384,17 +490,26 @@
 			if (pendingPlace && pendingPlace.until < Date.now()) pendingPlace = null;
 			for (const n of graph.nodes) {
 				const pinned = stored[n.id];
-				const before = relayout ? undefined : (carried.get(n.id) ?? previous.get(n.id)?.position);
+				const before =
+					relayout || settle ? undefined : (carried.get(n.id) ?? previous.get(n.id)?.position);
 				if (pinned) fixed.set(n.id, { x: pinned[0], y: pinned[1] });
 				else if (before) fixed.set(n.id, before);
-				else if (pendingPlace && hadNodes && nameOf(n.id) === pendingPlace.name) {
-					const size = sizes.get(n.id)!;
-					fixed.set(n.id, {
+				else if (pendingPlace && hadNodes && nameOf(n.id) === pendingPlace.name) dropped = n.id;
+			}
+			if (dropped && pendingPlace) {
+				// Where it was added, or the nearest free spot: never on top of another node.
+				const size = sizes.get(dropped)!;
+				const others = [...fixed].map(([id, p]) => ({ id, ...p, ...sizes.get(id)! }));
+				const spot = freeSpot(
+					{
+						id: dropped,
 						x: Math.round(pendingPlace.at.x - size.width / 2),
-						y: Math.round(pendingPlace.at.y - size.height / 2)
-					});
-					dropped = n.id;
-				}
+						y: Math.round(pendingPlace.at.y - size.height / 2),
+						...size
+					},
+					others
+				);
+				fixed.set(dropped, { x: spot.x, y: spot.y });
 			}
 			// Laid out every time, also when every node has its place: edges between
 			// nodes that are still where ELK put them follow its routes.
@@ -472,12 +587,15 @@
 							kind: e.kind,
 							label: e.label,
 							reversed,
+							...(e.element ? { element: e.element } : {}),
+							editable: canEditEdge(e, graph),
 							route: route && from && to ? { ...route, from, to } : undefined
 						}
 					};
 				});
 			frameTitle = graph.title;
 			status = 'ready';
+			drawnTexts = files.map((f) => f.text);
 
 			if (dropped) {
 				pendingPlace = null;
@@ -485,7 +603,7 @@
 				if (Object.keys(stored).length) savePositions({ [dropped]: p });
 				else pinAll();
 			}
-			if (!hadNodes || relayout) fit();
+			if (!hadNodes || relayout || settle) fit();
 		} catch (error) {
 			if (current !== generation) return;
 			status = 'error';
@@ -699,6 +817,20 @@
 		if (!from) return [];
 		const source = untrack(() => elementOf(from));
 		if (!source) return [];
+		if (behavior) {
+			// The states (or steps) on this diagram: a transition or a next step to each.
+			const fits = view === 'states' ? isState : isFlowNode;
+			const detail =
+				view === 'states' ? 'transition' : source.kind === 'decision_node' ? 'branch' : 'next step';
+			return nodes.flatMap((n) => {
+				const element = n.data.elementKey
+					? workspace.elements.find((e) => e.key === n.data.elementKey)
+					: undefined;
+				return element && n.id !== from && fits(element) && !isLibrary(element)
+					? [{ id: n.id, element, group: 'On this diagram', detail }]
+					: [];
+			});
+		}
 		const detail = (options: RelationOption[]) =>
 			[...new Set(options.map((o) => o.label))].join(', ');
 		const onDiagram: ConnectTarget[] = [];
@@ -741,7 +873,330 @@
 		const from = editing.connectingFrom;
 		if (!from) return;
 		editing.connectingFrom = null;
+		if (behavior && target.id) {
+			void linkNodes(from, target.id, underNode(target.id));
+			return;
+		}
 		openRelation(from, target.element, target.id ? underNode(target.id) : underNode(from));
+	}
+
+	// ---- Behaviour: drawing transitions and successions ----
+
+	/** A form open on the canvas: a transition, a decision branch, or what a state does. */
+	let behaviorForm = $state<
+		| {
+				kind: 'transition';
+				from: string;
+				to: string;
+				initial: TransitionSpec;
+				values: string[];
+				plan: (spec: TransitionSpec) => Plan | string;
+				submit: string;
+				x: number;
+				y: number;
+				focus?: string;
+		  }
+		| {
+				kind: 'branch';
+				from: string;
+				to: string;
+				initial: string;
+				values: string[];
+				plan: (guard: string) => Plan | string;
+				submit: string;
+				x: number;
+				y: number;
+				focus?: string;
+		  }
+		| { kind: 'state'; state: ModelElement; x: number; y: number; focus?: string }
+		| null
+	>(null);
+	/** Phones: forms are bottom sheets. */
+	const narrow = $derived(hostWidth < 560);
+	const formMode = $derived(narrow ? 'sheet' : 'popover');
+
+	/** Where a form opens: beside the point, inside the canvas (a sheet ignores it). */
+	function formAt(point: XY) {
+		return hostWidth < 560
+			? { x: 0, y: 0 }
+			: inCanvas({ x: point.x + 12, y: point.y + 12 }, 352, 440);
+	}
+
+	function closeBehaviorForm() {
+		const back = behaviorForm?.focus;
+		behaviorForm = null;
+		focusNode(back);
+	}
+
+	/**
+	 * Wait until the model describes the text as it is now, and the diagram
+	 * draws it: right after an edit, the analysis (where each element is in
+	 * the text) takes a moment, and a gesture planned on the old one would
+	 * write in the wrong place.
+	 */
+	async function settle(): Promise<void> {
+		for (let i = 0; i < 200 && !workspace.settled; i++) {
+			await new Promise((done) => setTimeout(done, 40));
+		}
+		const now = workspace.sourceFiles().map((f) => f.text);
+		if (drawnTexts.length !== now.length || drawnTexts.some((t, i) => t !== now[i])) {
+			clearTimeout(timer);
+			await refresh();
+		}
+	}
+
+	/** The element as the model has it now (ids survive edits that move it in the text). */
+	function fresh(e: ModelElement): ModelElement {
+		return (
+			(e.id ? workspace.elements.find((x) => x.id === e.id) : undefined) ??
+			workspace.elements.find((x) => x.key === e.key) ??
+			e
+		);
+	}
+
+	/** A drawn line by what it joins, as the diagram has it now. */
+	interface EdgeRef {
+		kind: string;
+		source: string;
+		target: string;
+		label: string | null;
+	}
+	const refOf = (e: Edge<SysmlEdgeData>): EdgeRef => ({
+		kind: e.data?.kind ?? '',
+		source: e.source,
+		target: e.target,
+		label: e.data?.label ?? null
+	});
+	function edgeNow(ref: EdgeRef): Edge<SysmlEdgeData> | undefined {
+		const same = edges.filter(
+			(e) => e.data?.kind === ref.kind && e.source === ref.source && e.target === ref.target
+		);
+		return same.find((e) => (e.data?.label ?? null) === ref.label) ?? same[0];
+	}
+
+	/** Apply a form's edit as one undoable step; the form closes when it is made, else says why. */
+	async function applyFromForm(plan: Plan): Promise<string | null> {
+		const error = await applySteps(workspace, plan.label, plan.steps, checkSyntax);
+		if (!error) closeBehaviorForm();
+		return error;
+	}
+
+	/** Apply an edit made without a form (a menu item, a drawn line); a toast says why not. */
+	async function applyBehavior(plan: Plan | string): Promise<string | null> {
+		const error =
+			typeof plan === 'string'
+				? plan
+				: await applySteps(workspace, plan.label, plan.steps, checkSyntax);
+		if (error) toasts.show(error);
+		return error;
+	}
+
+	/** A menu item that plans its edit once the model has settled, on the node's element as it is then. */
+	function onSettled(id: string, plan: (element: ModelElement) => Plan | string) {
+		return () =>
+			void settle().then(() => {
+				const element = elementOf(id);
+				if (element) void applyBehavior(plan(element));
+			});
+	}
+
+	/** The Add form's plan for a state, a value, an action or a control node. */
+	function planAdd(owner: ModelElement, choice: BehaviorAddChoice): Plan | string {
+		const o = fresh(owner);
+		switch (choice.kind) {
+			case 'state':
+				return planAddState(o, choice.name, choice.start, ctx);
+			case 'value':
+				return planAddValue(o, choice.name, choice.type, choice.value, ctx);
+			default:
+				return planAddFlowNode(o, choice.kind, choice.name, choice.start, ctx);
+		}
+	}
+
+	/** Add a state or a step, placed where the person last clicked, else beside the selection. */
+	async function addBehavior(
+		plan: Plan,
+		choice: BehaviorAddChoice,
+		o: ModelElement
+	): Promise<string | null> {
+		const error = await applySteps(workspace, plan.label, plan.steps, checkSyntax);
+		if (error) return error;
+		popover = null;
+		addInside = null;
+		const arranged = Object.keys(storedPositions()).length > 0;
+		if (choice.kind !== 'value' && (lastClick || arranged)) {
+			const name = formatName(choice.name);
+			const near = selectedNode ? nodeElement(selectedNode.id)?.getBoundingClientRect() : null;
+			const rect = host.getBoundingClientRect();
+			const at =
+				lastClick ??
+				flow?.screenToFlowPosition(
+					near
+						? { x: near.right + 120, y: near.top + near.height / 2 }
+						: { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+				);
+			if (at) pendingPlace = { name, at, until: Date.now() + 8000 };
+		}
+		if (choice.kind !== 'value') pendingSelect = { name: formatName(choice.name), owner: o.name };
+		lastClick = null;
+		return null;
+	}
+
+	/** Which edges' labels open a form: transitions (not the initial one) and decision branches. */
+	function canEditEdge(e: DiagramGraph['edges'][number], graph: DiagramGraph): boolean {
+		if (!behavior || !e.element || e.element.end_byte === undefined) return false;
+		if (view === 'states') {
+			const from = graph.nodes.find((n) => n.id === e.source);
+			return e.kind === 'transition' && from?.kind !== 'initial_state';
+		}
+		return !!e.label && /^\[.*\]$/.test(e.label);
+	}
+
+	/** The end of a drawn line as a flow end: an element, or the flow's start or done. */
+	function flowEnd(id: string): FlowEnd | undefined {
+		const kind = nodes.find((n) => n.id === id)?.data.node.kind;
+		if (kind === 'initial_state') return 'start';
+		if (kind === 'final_state') return 'done';
+		const e = elementOf(id);
+		return e && !isLibrary(e) && isFlowNode(e) ? e : undefined;
+	}
+	const freshEnd = (end: FlowEnd): FlowEnd => (typeof end === 'string' ? end : fresh(end));
+
+	/** A line drawn from one node to another on a state or action diagram. */
+	async function linkNodes(fromId: string, toId: string, point: XY) {
+		await settle();
+		const label = (id: string) => nodes.find((n) => n.id === id)?.data.node.label || id;
+		const fromKind = nodes.find((n) => n.id === fromId)?.data.node.kind;
+		const toKind = nodes.find((n) => n.id === toId)?.data.node.kind;
+		if (view === 'states') {
+			const target = toKind === 'final_state' ? 'done' : elementOf(toId);
+			if (fromKind === 'initial_state') {
+				if (target && target !== 'done' && isState(target))
+					void applyBehavior(planSetStart(target, ctx));
+				return;
+			}
+			const source = elementOf(fromId);
+			if (!source || !isState(source) || !target || (target !== 'done' && !isState(target))) {
+				toasts.show(`A transition goes from one state to another.`);
+				return;
+			}
+			behaviorForm = {
+				kind: 'transition',
+				from: source.label,
+				to: target === 'done' ? 'the end' : target.label,
+				initial: { trigger: { kind: 'signal', signal: '' }, guard: '', effect: '' },
+				values: valuesAround(source, ctx),
+				plan: (spec) =>
+					planTransition(fresh(source), target === 'done' ? 'done' : fresh(target), spec, ctx),
+				submit: 'Add transition',
+				...formAt(point),
+				focus: fromId
+			};
+			return;
+		}
+		const from = flowEnd(fromId);
+		const to = flowEnd(toId);
+		if (!from || !to) {
+			toasts.show(`Nothing to draw from ${label(fromId)} to ${label(toId)}.`);
+			return;
+		}
+		if (typeof from !== 'string' && from.kind === 'decision_node') {
+			const source = from;
+			behaviorForm = {
+				kind: 'branch',
+				from: source.label,
+				to: label(toId),
+				initial: '',
+				values: valuesAround(source, ctx),
+				plan: (guard) => planSuccession(fresh(source), freshEnd(to), guard, ctx),
+				submit: 'Add branch',
+				...formAt(point),
+				focus: fromId
+			};
+			return;
+		}
+		if (!(await applyBehavior(planSuccession(from, to, null, ctx)))) focusNode(fromId);
+	}
+
+	/** The named element a drawn line is (a named transition), if any. */
+	function edgeElement(source: EdgeSource | undefined): ModelElement | undefined {
+		return source
+			? workspace.elements.find((e) => e.key === `${source.file}@${source.start_byte}`)
+			: undefined;
+	}
+
+	/** Change a transition or a decision branch, from its label or its menu. */
+	async function editEdge(id: string, point?: XY) {
+		const before = edges.find((e) => e.id === id);
+		if (!before?.data?.editable) return;
+		menu = null;
+		const ref = refOf(before);
+		const at = formAt(point ?? underNode(before.source));
+		await settle();
+		const edge = edgeNow(ref);
+		const element = edge?.data?.element;
+		if (!edge || !element) return;
+		const label = (nodeId: string) => nodes.find((n) => n.id === nodeId)?.data.node.label || nodeId;
+		/** The line's text as it is when the form is sent. */
+		const written = () => edgeNow(ref)?.data?.element;
+		const gone = 'This line is no longer in the model.';
+		const source = elementOf(edge.source);
+		if (!source) return;
+		if (view === 'states') {
+			const read = readTransition(element, ctx);
+			if (!read) return;
+			const named = edgeElement(element);
+			const name = named?.kind === 'transition' ? named.name : null;
+			behaviorForm = {
+				kind: 'transition',
+				from: source.label,
+				to: label(edge.target),
+				initial: read.spec,
+				values: valuesAround(source, ctx),
+				plan: (spec) => {
+					const now = written();
+					return now ? planEditTransition(now, fresh(source), spec, name, ctx) : gone;
+				},
+				submit: 'Save',
+				...at,
+				focus: edge.source
+			};
+			return;
+		}
+		const guard = branchGuard(element, ctx);
+		if (guard === null) return;
+		behaviorForm = {
+			kind: 'branch',
+			from: source.label,
+			to: label(edge.target),
+			initial: guard,
+			values: valuesAround(source, ctx),
+			plan: (g) => {
+				const now = written();
+				return now ? planEditBranch(now, g, ctx) : gone;
+			},
+			submit: 'Save',
+			...at,
+			focus: edge.source
+		};
+	}
+
+	/** What a state does on entry, while in it and on exit. */
+	async function openStateActions(id: string, point?: XY) {
+		menu = null;
+		const at = formAt(point ?? underNode(id));
+		await settle();
+		const state = elementOf(id);
+		if (!state || !isState(state)) return;
+		behaviorForm = { kind: 'state', state, ...at, focus: id };
+	}
+
+	/** The lines drawn to and from a node and the nodes inside it, as written. */
+	function linesAt(id: string): EdgeSource[] {
+		const touches = (n: string) => n === id || n.startsWith(`${id}.`);
+		return edges
+			.filter((e) => touches(e.source) || touches(e.target))
+			.flatMap((e) => (e.data?.element ? [e.data.element] : []));
 	}
 
 	// ---- Menus, rename, delete ----
@@ -751,11 +1206,86 @@
 		const node = nodes.find((n) => n.id === id);
 		if (!node) return;
 		const items: MenuItem[] = [];
-		if (element && !isLibrary(element)) {
+		const own = element && !isLibrary(element);
+		if (own && behavior && view === 'states' && isState(element)) {
+			const region = owners.get(element.key);
+			items.push({
+				label: 'Add transition from here',
+				icon: Spline,
+				shortcut: 'C',
+				run: () => startConnect(id)
+			});
+			if (region && startOf(region, ctx) !== element.name)
+				items.push({
+					label: 'Starts here',
+					icon: CircleDot,
+					run: onSettled(id, (e) => planSetStart(e, ctx))
+				});
+			items.push(
+				{ label: 'What it does…', icon: ListTodo, run: () => void openStateActions(id, point) },
+				{
+					label: 'Add a state inside',
+					icon: Plus,
+					run: () => {
+						ui.select(element.key, 'diagram');
+						addInside = element.key;
+						lastClick = null;
+						popover = 'add';
+					}
+				},
+				{ label: 'Rename', icon: Pencil, shortcut: 'F2', run: () => editing.startRename(id) }
+			);
+		} else if (own && behavior && view === 'actions' && isFlowNode(element)) {
+			items.push({
+				label: element.kind === 'decision_node' ? 'Add a branch from here' : 'Add what comes next',
+				icon: ArrowRight,
+				shortcut: 'C',
+				run: () => startConnect(id)
+			});
+			// A flow can start at an action or a fork, and end after an action, a merge or a join.
+			const control = element.kind in CONTROL_WORDS;
+			if (!control || element.kind === 'fork_node')
+				items.push({
+					label: 'Starts here',
+					icon: CircleDot,
+					run: onSettled(id, (e) => planSuccession('start', e, null, ctx))
+				});
+			if (!control || element.kind === 'merge_node' || element.kind === 'join_node')
+				items.push({
+					label: 'Ends here',
+					icon: CircleStop,
+					run: onSettled(id, (e) => planSuccession(e, 'done', null, ctx))
+				});
+			items.push({
+				label: 'Rename',
+				icon: Pencil,
+				shortcut: 'F2',
+				run: () => editing.startRename(id)
+			});
+		} else if (own) {
 			items.push(
 				{ label: 'Rename', icon: Pencil, shortcut: 'F2', run: () => editing.startRename(id) },
 				{ label: 'Connect…', icon: Cable, shortcut: 'C', run: () => startConnect(id) }
 			);
+		}
+		// A state machine or action drawn here opens as its own diagram, where it is built.
+		const machineOrFlow =
+			element &&
+			(element.kind === 'exhibit' ||
+				(element.isDefinition && (element.kind === 'state' || element.kind === 'action')));
+		if (element && !behavior && machineOrFlow) {
+			const diagramView = element.kind === 'action' ? 'actions' : 'states';
+			items.push({
+				label: element.kind === 'action' ? 'Open its action flow' : 'Open its state diagram',
+				icon: Network,
+				run: () =>
+					ui.open({
+						kind: 'diagram',
+						view: diagramView,
+						scope: qualifiedName(element, owners),
+						title: element.label
+					})
+			});
 		}
 		if (element) {
 			items.push({ label: 'Show in text', icon: FileCode, run: () => showInText(element) });
@@ -775,14 +1305,21 @@
 	}
 
 	function openEdgeMenu(edge: Edge<SysmlEdgeData>, point: XY) {
-		const at = inCanvas(point, 220, 90);
-		menu = {
-			title: edge.ariaLabel ?? 'Relationship',
-			items: [
-				{ label: 'Delete relationship', icon: Unlink, danger: true, run: () => askDeleteEdge(edge) }
-			],
-			...at
-		};
+		const at = inCanvas(point, 220, 130);
+		const items: MenuItem[] = [];
+		if (edge.data?.editable)
+			items.push({
+				label: view === 'states' ? 'Change when, only if, then do…' : 'Change the condition…',
+				icon: Pencil,
+				run: () => void editEdge(edge.id, point)
+			});
+		items.push({
+			label: behavior ? 'Delete' : 'Delete relationship',
+			icon: Unlink,
+			danger: true,
+			run: () => askDeleteEdge(edge)
+		});
+		menu = { title: edge.ariaLabel ?? 'Relationship', items, ...at };
 	}
 
 	function showInText(element: ModelElement) {
@@ -803,6 +1340,32 @@
 	function askDeleteNode(id: string) {
 		const element = elementOf(id);
 		if (!element || isLibrary(element)) return;
+		if (behavior && (isState(element) || isFlowNode(element))) {
+			// The transitions or successions to and from it go too, so nothing points at nothing.
+			const plan = planRemoveNode(element, linesAt(id), ctx);
+			if (typeof plan === 'string') {
+				toasts.show(plan);
+				return;
+			}
+			menu = null;
+			confirmError = null;
+			confirm = {
+				title: `Delete ${element.label}?`,
+				detail: `${plan.label}.`,
+				statement: plan.statement,
+				action: 'Delete',
+				run: async () => {
+					await settle();
+					const now = elementOf(id);
+					const again = now ? planRemoveNode(now, linesAt(id), ctx) : `${element.label} is gone.`;
+					return typeof again === 'string'
+						? again
+						: applySteps(workspace, again.label, again.steps, checkSyntax);
+				},
+				focus: id
+			};
+			return;
+		}
 		askDeleteElement(element, id);
 	}
 
@@ -820,6 +1383,41 @@
 
 	function askDeleteEdge(edge: Edge<SysmlEdgeData>) {
 		menu = null;
+		const written = edge.data?.element;
+		if (behavior && written) {
+			const label = (id: string) => nodes.find((n) => n.id === id)?.data.node.label || id;
+			const fromKind = nodes.find((n) => n.id === edge.source)?.data.node.kind;
+			const what =
+				fromKind === 'initial_state'
+					? `${label(edge.target)} is no longer where it starts`
+					: view === 'states'
+						? `Removed the transition from ${label(edge.source)} to ${label(edge.target)}`
+						: `${label(edge.source)} no longer goes to ${label(edge.target) || 'done'}`;
+			const plan = planRemoveEdge(written, what, ctx);
+			if (typeof plan === 'string') {
+				toasts.show(plan);
+				return;
+			}
+			confirmError = null;
+			confirm = {
+				title: view === 'states' ? 'Delete this transition?' : 'Delete this line?',
+				detail: plan.label + '.',
+				statement: plan.statement,
+				action: 'Delete',
+				run: async () => {
+					const ref = refOf(edge);
+					await settle();
+					const now = edgeNow(ref)?.data?.element;
+					const again = now
+						? planRemoveEdge(now, what, ctx)
+						: 'This line is no longer in the model.';
+					return typeof again === 'string'
+						? again
+						: applySteps(workspace, again.label, again.steps, checkSyntax);
+				}
+			};
+			return;
+		}
 		const [from, to] = edge.data?.reversed
 			? [edge.target, edge.source]
 			: [edge.source, edge.target];
@@ -914,6 +1512,11 @@
 		if (event.key === 'Escape' && editing.connectingFrom) {
 			event.preventDefault();
 			cancelConnect();
+		} else if (event.key === 'Enter' && plain && edgeIn(event.target)?.data?.editable) {
+			// A transition or a branch: Enter opens the form that changes it.
+			event.preventDefault();
+			const edge = edgeIn(event.target)!;
+			void editEdge(edge.id, underNode(edge.source));
 		} else if ((event.key === 'Delete' || event.key === 'Backspace') && plain) {
 			const edge = edgeIn(event.target) ?? edges.find((e) => e.selected);
 			if (nodeIdIn(event.target) || (!edge && id)) {
@@ -1035,7 +1638,11 @@
 			const from = state.fromNode?.id;
 			const point = pointOf(event);
 			const to = state.toNode?.id ?? nodeIdAt(point);
-			if (!from || !to || from === to) return;
+			if (!from || !to || (from === to && !behavior)) return;
+			if (behavior) {
+				void linkNodes(from, to, point);
+				return;
+			}
 			const target = elementOf(to);
 			if (!target) {
 				toasts.show('That node is not an element of the model.');
@@ -1061,6 +1668,11 @@
 				press = null;
 			}
 			openNodeMenu(node.id, { x: event.clientX, y: event.clientY });
+		}}
+		onedgeclick={({ edge }) => {
+			// A named transition shows in the inspector, where it can be changed too.
+			const named = edgeElement((edge as Edge<SysmlEdgeData>).data?.element);
+			if (behavior && named) ui.select(named.key, 'diagram');
 		}}
 		onedgecontextmenu={({ edge, event }) => {
 			event.preventDefault();
@@ -1149,10 +1761,10 @@
 						actionError = null;
 						popover = popover === 'add' ? null : 'add';
 					}}
-					disabled={!owner}
+					disabled={!addOwner}
 					aria-expanded={popover === 'add'}
-					title={owner
-						? `Add to ${owner.label}${lastClick ? ', where you last clicked' : ''}`
+					title={addOwner
+						? `Add to ${addOwner.label}${lastClick ? ', where you last clicked' : ''}`
 						: 'Select a package or definition first'}
 				>
 					<Plus size={15} /> <span>Add</span>
@@ -1162,9 +1774,15 @@
 					onclick={() => selectedNode && startConnect(selectedNode.id)}
 					disabled={!selectedNode?.data.editable}
 					aria-pressed={!!editing.connectingFrom}
-					title="Draw a relationship from the selected element (C). You can also drag from the dots around a node."
+					title={view === 'states'
+						? 'Draw a transition from the selected state (C). You can also drag from the dots around a state.'
+						: view === 'actions'
+							? 'Draw what comes next after the selected step (C). You can also drag from the dots around a step.'
+							: 'Draw a relationship from the selected element (C). You can also drag from the dots around a node.'}
 				>
-					<Cable size={14} /> <span>Connect</span>
+					{#if view === 'states'}<Spline size={14} /> <span>Transition</span>
+					{:else if view === 'actions'}<ArrowRight size={14} /> <span>Next step</span>
+					{:else}<Cable size={14} /> <span>Connect</span>{/if}
 				</button>
 				<button
 					type="button"
@@ -1177,7 +1795,11 @@
 				</button>
 				<button
 					type="button"
-					onclick={() => selected && askDeleteElement(selected, selectedNode?.id)}
+					onclick={() =>
+						selected &&
+						(behavior && selectedNode
+							? askDeleteNode(selectedNode.id)
+							: askDeleteElement(selected, selectedNode?.id))}
 					disabled={!selected || isLibrary(selected)}
 					title="Delete (Delete key)"
 				>
@@ -1200,7 +1822,11 @@
 					disabled={status !== 'ready' || nodes.length === 0}
 				/>
 			</div>
-			{#if popover === 'add' && owner}
+			{#if popover === 'add' && behavior && subject && !narrow}
+				<div class="popover">
+					{@render behaviorAdd()}
+				</div>
+			{:else if popover === 'add' && owner && !behavior}
 				<div class="popover">
 					<AddForm
 						ownerLabel={owner.label}
@@ -1277,6 +1903,59 @@
 		/>
 	{/if}
 
+	{#if popover === 'add' && behavior && subject && narrow}
+		<FormPanel label="Add to {subject.label}" mode="sheet" onclose={() => (popover = null)}>
+			{@render behaviorAdd()}
+		</FormPanel>
+	{/if}
+
+	{#if behaviorForm?.kind === 'transition'}
+		<TransitionForm
+			from={behaviorForm.from}
+			to={behaviorForm.to}
+			initial={behaviorForm.initial}
+			signals={signalChoices(ctx)}
+			values={behaviorForm.values}
+			plan={behaviorForm.plan}
+			submitLabel={behaviorForm.submit}
+			mode={formMode}
+			x={behaviorForm.x}
+			y={behaviorForm.y}
+			prepare={settle}
+			onapply={applyFromForm}
+			onclose={closeBehaviorForm}
+		/>
+	{:else if behaviorForm?.kind === 'branch'}
+		<BranchForm
+			from={behaviorForm.from}
+			to={behaviorForm.to}
+			initial={behaviorForm.initial}
+			values={behaviorForm.values}
+			plan={behaviorForm.plan}
+			submitLabel={behaviorForm.submit}
+			mode={formMode}
+			x={behaviorForm.x}
+			y={behaviorForm.y}
+			prepare={settle}
+			onapply={applyFromForm}
+			onclose={closeBehaviorForm}
+		/>
+	{:else if behaviorForm?.kind === 'state'}
+		{@const state = fresh(behaviorForm.state)}
+		<StateActionsForm
+			stateName={state.label}
+			current={stateActions(state, ctx)}
+			values={valuesAround(state, ctx)}
+			plan={(kind, action) => planStateAction(state, kind, action, ctx)}
+			mode={formMode}
+			x={behaviorForm.x}
+			y={behaviorForm.y}
+			prepare={settle}
+			onapply={applyFromForm}
+			onclose={closeBehaviorForm}
+		/>
+	{/if}
+
 	{#if menu}
 		<NodeMenu
 			title={menu.title}
@@ -1328,6 +2007,22 @@
 		</div>
 	{/if}
 </div>
+
+{#snippet behaviorAdd()}
+	<BehaviorAddForm
+		view={view as 'states' | 'actions'}
+		owners={behaviorOwners}
+		flat={narrow}
+		initialOwner={addInside}
+		plan={planAdd}
+		suggest={(o, kind) =>
+			suggestName(o, kind === 'decide' ? 'decision' : kind === 'action' ? 'step' : kind, ctx)}
+		starts={(o) => (view === 'states' ? !!startOf(o, ctx) : flowStarts(o, ctx))}
+		prepare={settle}
+		onapply={addBehavior}
+		oncancel={() => (popover = null)}
+	/>
+{/snippet}
 
 {#snippet markers(suffix: string, ink: string)}
 	<marker
@@ -1446,7 +2141,8 @@
 		cursor: pointer;
 	}
 	.toolbar .run {
-		color: var(--kind-behavior);
+		/* The behaviour green, deep enough to read as text (WCAG AA). */
+		color: color-mix(in oklab, var(--kind-behavior) 78%, var(--text));
 		font-weight: 650;
 	}
 	.toolbar button:hover:not(:disabled) {

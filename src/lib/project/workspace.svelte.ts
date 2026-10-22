@@ -95,6 +95,8 @@ export class Workspace {
 	/** File texts by path. */
 	files = $state.raw<Record<string, string>>({});
 	analyses = $state.raw<Record<string, Analysis>>({});
+	/** The texts `analyses` were made from, to tell when they describe the files as they are. */
+	analysedTexts = $state.raw<Record<string, string>>({});
 	state = $state.raw<LoadState>({ phase: 'idle' });
 	engineVersion = $state<string | null>(null);
 	/** The project's views (and the standard ones the engine bundles). */
@@ -233,6 +235,7 @@ export class Workspace {
 			// Drop the result if any file changed while the engine was working.
 			if (files.some((f) => this.files[f.path] !== f.text)) return;
 			this.analyses = Object.fromEntries(files.map((f, i) => [f.path, results[i]!]));
+			this.analysedTexts = Object.fromEntries(files.map((f) => [f.path, f.text]));
 			// For measurements (tests/perf): when each analysis reached the page.
 			performance.mark('sysml:analysed');
 			if (this.engineError) {
@@ -284,6 +287,11 @@ export class Workspace {
 
 	text(path: string): string | undefined {
 		return this.files[path];
+	}
+
+	/** Whether the analyses (elements and their places in the text) are of the files as they are now. */
+	get settled(): boolean {
+		return this.modelPaths.every((p) => this.analysedTexts[p] === this.files[p]);
 	}
 
 	/** Record new text for a file (typed or applied) and re-analyse shortly. */
