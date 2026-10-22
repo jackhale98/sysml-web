@@ -56,6 +56,8 @@
 	onMount(() => {
 		if (review.status === 'idle' || review.status === 'error')
 			void review.start({ workspace, session, engine });
+		// What else there is to compare with: proposals and earlier versions.
+		void loadChoices();
 	});
 
 	/** The choice in the "Compare" menu. */

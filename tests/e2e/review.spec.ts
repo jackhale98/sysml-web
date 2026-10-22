@@ -302,3 +302,82 @@ test('saving to GitHub shows what changed in the model and suggests the descript
 	await expect(review.getByText(/the version on GitHub \(c0ffee1\)/)).toBeVisible();
 	await expect(group(review, 'Requirements')).toBeVisible({ timeout: 30_000 });
 });
+
+test('a proposal on GitHub is reviewed from both its sides, fetched through the API', async ({
+	page
+}) => {
+	await page.setViewportSize({ width: 1440, height: 900 });
+	const base = demoFiles();
+	const head = editedDemo();
+	await seedDemo(page, base, true);
+	await page.evaluate(() =>
+		localStorage.setItem(
+			'sysml-web:github',
+			JSON.stringify({ token: 't0ken', user: { login: 'jo' }, connectedAt: '2026-10-20' })
+		)
+	);
+	// GitHub, as far as this review needs it: the proposal, where it parts from main, two trees.
+	const blobs = new Map<string, string>();
+	const tree = (files: { path: string; text: string }[], tag: string) =>
+		files.map((f, i) => {
+			const unchanged = base[i]?.path === f.path && base[i]?.text === f.text;
+			const sha = unchanged ? `b${i}` : `${tag}${i}`;
+			blobs.set(sha, f.text);
+			return { path: f.path, type: 'blob', sha, size: f.text.length };
+		});
+	const trees: Record<string, unknown> = { tm1: tree(base, 'm'), th9: tree(head, 'h') };
+	const requested: string[] = [];
+	await page.route('https://api.github.com/**', (route) => {
+		const url = new URL(route.request().url());
+		const path = url.pathname.replace('/repos/acme/drone', '');
+		requested.push(path);
+		const json = (body: unknown) => route.fulfill({ json: body });
+		if (path === '/branches/main')
+			return json({ commit: { sha: 'c0ffee1234567890', commit: { tree: { sha: 'tree' } } } });
+		if (path === '/pulls')
+			return json([
+				{
+					number: 9,
+					html_url: 'https://github.com/acme/drone/pull/9',
+					title: 'Heavier motors',
+					user: { login: 'sam' },
+					head: { ref: 'motors', sha: 'h9' },
+					base: { ref: 'main', sha: 'b9' },
+					updated_at: '2026-10-20T10:00:00Z'
+				}
+			]);
+		if (path === '/commits') return json([]);
+		if (path === '/compare/b9...h9') return json({ merge_base_commit: { sha: 'm1' } });
+		if (path === '/git/commits/m1') return json({ tree: { sha: 'tm1' } });
+		if (path === '/git/commits/h9') return json({ tree: { sha: 'th9' } });
+		const t = /^\/git\/trees\/(\w+)$/.exec(path);
+		if (t) return json({ sha: t[1], truncated: false, tree: trees[t[1]!] });
+		const b = /^\/git\/blobs\/(\w+)$/.exec(path);
+		if (b && blobs.has(b[1]!))
+			return json({
+				content: Buffer.from(blobs.get(b[1]!)!).toString('base64'),
+				encoding: 'base64'
+			});
+		return route.fulfill({ status: 404, json: { message: 'Not Found' } });
+	});
+	await openDemo(page);
+	const review = await openReview(page);
+	await expect(review.getByText('No changes to the model')).toBeVisible({ timeout: 30_000 });
+	await expect(review.locator('option', { hasText: '#9 Heavier motors' })).toBeAttached();
+	await review.getByRole('combobox', { name: 'Compare' }).selectOption('pull:9');
+	await expect(
+		review.getByText('Comparing proposal #9 “Heavier motors” with main (m1)')
+	).toBeVisible();
+	await expect(group(review, 'Design')).toContainText('Motor.mass changed 120 g → 190 g', {
+		timeout: 30_000
+	});
+	await expect(group(review, 'What it changes')).toContainText('now violates SYS-003');
+	// Only the files that differ were downloaded: the base is the version the project has.
+	expect(requested.filter((p) => p.startsWith('/git/blobs/')).sort()).toEqual(
+		head
+			.map((f, i) => (base[i]!.text === f.text ? null : `/git/blobs/h${i}`))
+			.filter(Boolean)
+			.sort()
+	);
+	await expectAccessible(page);
+});

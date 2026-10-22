@@ -19,8 +19,19 @@ Open-MBEE sysml-toolkit engine (decision #16, migration done).**
   checks (does the design meet its requirements?); library browser; settings; offline and
   installable; touch-first phone layout. Lighthouse ≥ 0.9 performance and
   1.0 accessibility on mobile and desktop, enforced in CI.
-- Not yet started: semantic diff and review mode, Sequence view, FMEA and
-  hazard views, Systems Modeling API client, conformance dashboard.
+- Semantic diff and review mode: "Review changes" compares the model with
+  another version — changes since the last version on GitHub (or, in the
+  browser, since the version marked as reviewed, the folder's files or
+  the demo as it comes), everything on a branch, an earlier version, or
+  an open pull request — and says what changed in plain language, grouped
+  as Requirements, Design, Behaviour, Verification, Risk and Other, with
+  the requirement checks and budgets it changes first; changes link to
+  their elements, text and diagrams, and diagrams and tables mark them.
+  Source control shows the summary before saving and suggests it as the
+  commit message and the proposal's description (`docs/engine.md`,
+  "Comparing versions").
+- Not yet started: Sequence view, FMEA and hazard views, Systems Modeling
+  API client, conformance dashboard.
 
 ### Engine migration (decision #16)
 
@@ -545,7 +556,7 @@ SysML libraries so they travel with the model to other tools.
 | Test plans | verification cases with objectives and `verify` | verification matrix, coverage |
 | FMEA and hazard logs | `RiskAnalysis` / `HazardAnalysis` libraries | FMEA and risk-matrix Grid views (`@TableRendering`), RPN calc |
 | Budgets (mass, power) | attributes with units, calcs, constraints | ✅ mass and power budget tables (`budget:<attribute>`), constraint checks of every `satisfy` claim and `assert` (`ConstraintChecks`), violations in Problems, computed values in the inspector |
-| Design reviews | git branches, commits | semantic diff, review mode (Phase 4) |
+| Design reviews | git branches, commits | ✅ semantic diff and review mode: what changed, element by element and in plain language, the checks and budgets it changes, marks in diagrams and tables; against the last saved version, a branch, an earlier version or a pull request |
 
 On-ramps for existing material (later phases): import a requirements
 spreadsheet or document outline into `requirement` elements with a preview of
@@ -760,6 +771,9 @@ Engine gaps found while authoring the demo (inputs to Phase 1):
 **Phase 4 — Git & collaboration**
 - OAuth sign-in, Save version / Share / Propose change (commit, push, branch,
   PR), conflict resolver, semantic diff and review mode.
+  *Done:* semantic diff and review mode (`src/lib/review/`, the engine's
+  `compareModels`; `docs/engine.md`, "Comparing versions"). Per-element
+  merge assist for conflicts is not started.
 
 **Phase 5 — Behaviour**
 - Action Flow, State Transition and Sequence views (read, then visual
