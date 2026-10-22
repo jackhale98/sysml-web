@@ -3,6 +3,7 @@
 	import type { Evaluated } from '#lib/engine/types.ts';
 	import { valueText } from '#lib/project/checks.ts';
 	import PropertyForm from './PropertyForm.svelte';
+	import TradeSummary from './TradeSummary.svelte';
 	import { BookOpen, CircleAlert, Code, FileCode, Link2, Plus, Trash2 } from '@lucide/svelte';
 	import { conceptFor } from '#lib/learn/concepts.ts';
 	import KindGlyph from '#lib/ui/KindGlyph.svelte';
@@ -186,6 +187,10 @@
 			</dl>
 			{#if !engine && element.doc}<p class="doc">{element.doc}</p>{/if}
 		</section>
+
+		{#if engine && element.kind === 'analysis'}
+			<TradeSummary {element} {workspace} {ui} {engine} />
+		{/if}
 
 		{#if requirement}
 			<section>

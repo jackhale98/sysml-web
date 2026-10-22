@@ -29,14 +29,18 @@ async function openView(page: Page, title: string) {
 	return page.getByRole('region', { name: `${title} view` });
 }
 
-/** Select an element with the command palette: the `nth` one of that name and kind. */
-async function select(page: Page, name: string, kind: string, nth = 0) {
+/**
+ * Select an element with the command palette: the `nth` one of that name and kind (in `file`,
+ * when given: the trade study's evaluation function has attributes of the same names).
+ */
+async function select(page: Page, name: string, kind: string, nth = 0, file?: string) {
 	await page.keyboard.press('Control+k');
 	const palette = page.getByRole('dialog', { name: 'Command palette' });
 	await palette.getByRole('combobox').fill(name);
 	await palette
 		.getByRole('option')
 		.filter({ hasText: new RegExp(`^\\s*${name}\\s+${kind}\\b`) })
+		.filter({ hasText: file ?? '' })
 		.nth(nth)
 		.click();
 	await expect(palette).toBeHidden();
@@ -128,7 +132,7 @@ test('a value that breaks a requirement is a violation and a problem, until undo
 	await openDemo(page);
 	await expect(problems(page)).toHaveAccessibleName('Problems: 0 errors, 0 warnings');
 	// The drone's own hover power (the second `hoverPower` attribute: DeliveryDrone declares it).
-	const inspector = await select(page, 'hoverPower', 'attribute', 1);
+	const inspector = await select(page, 'hoverPower', 'attribute', 1, 'DroneArchitecture.sysml');
 	const value = inspector.getByLabel(/^Value/);
 	await expect(value).toHaveValue('400 [W]');
 	await value.fill('450 [W]');
@@ -157,7 +161,7 @@ test('the inspector shows what an expression comes to, and why when it cannot', 
 	page
 }) => {
 	await openDemo(page);
-	const endurance = await select(page, 'endurance', 'attribute', 1);
+	const endurance = await select(page, 'endurance', 'attribute', 1, 'DroneArchitecture.sysml');
 	await expect(endurance.getByLabel(/^Value/)).toHaveValue(
 		'HoverEndurance(battery.usableEnergy, hoverPower)'
 	);
@@ -169,7 +173,7 @@ test('the inspector shows what an expression comes to, and why when it cannot', 
 	await expect(empty.getByRole('button', { name: 'Why?' })).toHaveCount(0);
 
 	// What nothing gives a value stays unknown, with the reason.
-	const takeOff = await select(page, 'takeOffMass', 'attribute');
+	const takeOff = await select(page, 'takeOffMass', 'attribute', 0, 'DroneArchitecture.sysml');
 	await expect(takeOff.getByText('= ?')).toBeVisible({ timeout: 10_000 });
 	await takeOff.getByRole('button', { name: 'Why?' }).click();
 	await expect(takeOff).toContainText('`emptyMass` has no value in `DeliveryDrone`');
