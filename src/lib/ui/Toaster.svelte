@@ -58,8 +58,7 @@
 <style>
 	.toaster {
 		position: fixed;
-		/* The workbench moves them clear of its details panel. */
-		right: var(--toast-right, var(--space-4));
+		right: var(--space-4);
 		bottom: calc(var(--space-4) + 1.75rem);
 		z-index: 50;
 		display: grid;

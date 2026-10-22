@@ -10,8 +10,6 @@ export interface Toast {
 }
 
 const DURATION_MS = 6000;
-/** A toast that offers an action (such as Undo) stays longer, to give time to use it. */
-const ACTION_DURATION_MS = 10_000;
 
 interface Timer {
 	handle?: ReturnType<typeof setTimeout>;
@@ -33,7 +31,7 @@ class Toasts {
 		const others = this.items.filter((t) => t.duration !== 0);
 		const room = Math.max(0, 2 - stays.length);
 		this.items = [...stays, ...others.slice(others.length - room), toast];
-		const duration = options.duration ?? (options.action ? ACTION_DURATION_MS : DURATION_MS);
+		const duration = options.duration ?? DURATION_MS;
 		if (duration > 0) {
 			const timer: Timer = { started: Date.now(), left: duration };
 			this.timers.set(toast.id, timer);

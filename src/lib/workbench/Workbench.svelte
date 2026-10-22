@@ -921,12 +921,9 @@
 			'status status status';
 		height: 100dvh;
 		background: var(--bg);
-		/* Toasts sit beside the details panel, not over its buttons. */
-		--toast-right: calc(20rem + var(--space-4));
 	}
 	.workbench.no-inspector {
 		grid-template-columns: 16.5rem minmax(0, 1fr) 0;
-		--toast-right: var(--space-4);
 	}
 	.no-inspector .inspector-pane {
 		display: none;
@@ -1351,7 +1348,6 @@
 	@media (max-width: 1100px) {
 		.workbench,
 		.workbench.no-inspector {
-			--toast-right: var(--space-4);
 			grid-template-columns: 14rem minmax(0, 1fr);
 			grid-template-areas:
 				'top top'
