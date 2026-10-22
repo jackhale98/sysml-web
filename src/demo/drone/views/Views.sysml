@@ -12,6 +12,7 @@ package DroneViews {
     private import Views::asTreeDiagram;
     private import Reporting::*;
     private import RiskAnalysis::DesignFmeaWorksheet;
+    private import RiskAnalysis::FmeaRiskReduction;
     private import RiskAnalysis::RiskMatrix;
     private import HazardAnalysis::HazardLog;
     private import ModelViews::*;
@@ -118,8 +119,19 @@ package DroneViews {
         expose DroneFmea::*;
     }
 
+    view fmeaReview : DesignFmeaWorksheet {
+        doc /* The lines the risk policy does not accept as they are: a review of the worksheet, saved as a view. */
+        expose DroneFmea::*;
+        @TableRendering { where = "Acceptability(severity, likelihood) != RiskAcceptability::acceptable"; }
+    }
+
+    view riskReduction : FmeaRiskReduction {
+        doc /* The lines assessed before their controls too: the risk then and now, and what lowered it. */
+        expose DroneFmea::*;
+    }
+
     view riskMatrix : RiskMatrix {
-        doc /* The design FMEA's lines by severity and likelihood. */
+        doc /* The design FMEA's lines by severity and likelihood, each cell coloured by the risk policy. */
         expose DroneFmea::*;
     }
 

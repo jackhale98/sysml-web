@@ -32,6 +32,8 @@ export function toolkitEngine(toolkit: ToolkitClient): Engine {
 		listViews: (...params) => toolkit.call('listViews', ...params),
 		renderView: (...params) => toolkit.call('renderView', ...params),
 		viewLibraries: (...params) => toolkit.call('viewLibraries', ...params),
+		riskPolicy: (...params) => toolkit.call('riskPolicy', ...params),
+		fmeaLines: (...params) => toolkit.call('fmeaLines', ...params),
 		diagram: (...params) => toolkit.call('diagram', ...params),
 		related: (...params) => toolkit.call('related', ...params),
 		stateMachines: (...params) => toolkit.call('stateMachines', ...params),

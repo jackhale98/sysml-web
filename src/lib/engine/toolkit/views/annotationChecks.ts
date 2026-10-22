@@ -1,7 +1,9 @@
 /**
  * The checks metadata values make, beside the toolkit's: a value its
- * type's asserted constraints reject (`assertions.ts`), and an FMEA line
- * whose severity disagrees with its hazard's harms (`hazards.ts`). Each is
+ * type's asserted constraints reject (`assertions.ts`), an FMEA line
+ * whose severity disagrees with its hazard's harms (`hazards.ts`), and an
+ * FMEA line of unacceptable risk, or of high priority without a verified
+ * control (`riskLines.ts`). Each is
  * a violated `assert` check at the value, so it shows in Problems, in the
  * design checks table and in review like any other. Lines that pass add
  * nothing (as a type's invariant that holds doesn't).
@@ -10,12 +12,13 @@ import type { Check } from '../../types';
 import { valueProblems, type ValueProblem } from './assertions';
 import type { Annotation, ViewContext } from './context';
 import { severityProblem } from './hazards';
+import { riskProblems } from './riskLines';
 
 export function annotationChecks(ctx: ViewContext): Check[] {
 	const checks: Check[] = [];
 	for (const a of ctx.annotations) {
 		if (!ctx.content.has(a.path)) continue;
-		for (const p of [...valueProblems(ctx, a), severityProblem(ctx, a)])
+		for (const p of [...valueProblems(ctx, a), severityProblem(ctx, a), ...riskProblems(ctx, a)])
 			if (p) checks.push(checkOf(a, p));
 	}
 	return checks;

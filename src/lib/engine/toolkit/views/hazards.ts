@@ -97,8 +97,13 @@ export function harmSeverity(
 	return value === null ? null : { literal: literal?.name ?? displayValue(own.value), value };
 }
 
+/** Whether an element is (typed by) a definition of the libraries, by qualified name: `HazardAnalysis::RiskControl`. */
+export function isA(ctx: ViewContext, id: string, qualified: string): boolean {
+	return model(ctx).is(id, qualified);
+}
+
 /** A feature's value as an element gives it, or its type does: `:>> severity = …`. */
-function valueIn(
+export function valueIn(
 	ctx: ViewContext,
 	element: ElementRecord,
 	name: string

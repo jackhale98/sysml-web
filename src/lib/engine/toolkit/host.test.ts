@@ -140,8 +140,8 @@ describe('the demo, analysed by the toolkit', () => {
 
 	it('reads satisfy, verify and metadata from the resolved model', () => {
 		const requirements = collectRequirements(analyses);
-		// 6 stakeholder needs, 11 system requirements, 3 risk controls (as the earlier engine counted).
-		expect(requirements).toHaveLength(20);
+		// 6 stakeholder needs, 11 system requirements, 7 risk controls.
+		expect(requirements).toHaveLength(24);
 		const endurance = requirements.find((r) => r.id === 'SYS-001')!;
 		expect(endurance).toMatchObject({
 			title: 'Flight endurance',

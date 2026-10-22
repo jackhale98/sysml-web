@@ -194,12 +194,29 @@ ${Array.from({ length: 10 }, (_, o) => `    part p${o + 1} { @Fmea { failureMode
 			'Severity is 4, but its hazard leak can lead to scald, which is serious (6) (@Fmea about fill::connectHose).'
 		);
 		// The demo's lines agree with their hazards.
-		expect(host.checks(demo).checks.filter((c) => c.status === 'violated')).toEqual([]);
+		// The demo's lines agree with their hazards; its only problems are the risk review's.
+		expect(
+			host
+				.checks(demo)
+				.checks.filter((c) => c.status === 'violated')
+				.map((c) => c.name)
+		).toEqual([
+			'@Fmea about drone::camera: acceptability',
+			'@Fmea about drone::camera: riskControls'
+		]);
 	});
 
 	it('a risk matrix has every rating, and shows a rating outside the scale', () => {
 		const matrix = host.renderView(project(PUMP), 'matrix');
-		expect(matrix.counts).toEqual({ rows: 'severity', columns: 'likelihood' });
+		expect(matrix.counts).toMatchObject({ rows: 'severity', columns: 'likelihood' });
+		// Each cell has the zone the risk policy gives it; a rating outside the scale has none.
+		expect(matrix.counts?.levelValues).toEqual(['acceptable', 'reduce', 'unacceptable']);
+		expect(matrix.counts?.levels?.[0]).toEqual(Array(10).fill(''));
+		expect(matrix.counts?.levels?.[1]).toEqual([
+			'acceptable',
+			...Array(2).fill('reduce'),
+			...Array(7).fill('unacceptable')
+		]);
 		expect(matrix.rows.map((r) => r[0])).toEqual([
 			'14',
 			'10',
@@ -222,7 +239,16 @@ ${Array.from({ length: 10 }, (_, o) => `    part p${o + 1} { @Fmea { failureMode
 	it('the hazard log follows the causal chain to the harms and the controls', () => {
 		const log = host.renderView(project(PUMP), 'log');
 		expect(log.rows).toEqual([
-			['leak', 'Hot water escapes', 'scald, slip', 'serious', 'RC-001 Seal check', 'pump.seal', '']
+			[
+				'leak',
+				'Hot water escapes',
+				'sprayed',
+				'scald, slip',
+				'serious',
+				'RC-001 Seal check',
+				'pump.seal',
+				''
+			]
 		]);
 		expect(log.availableFields).toEqual(
 			expect.arrayContaining(['situations', 'failureModes', 'severityValue'])

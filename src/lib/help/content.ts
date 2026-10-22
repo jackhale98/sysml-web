@@ -366,7 +366,7 @@ export const HELP: HelpSection[] = [
 				id: 'fmea',
 				title: 'Analyse what can fail (FMEA)',
 				keywords:
-					'fmea dfmea pfmea ufmea failure mode effects analysis risk rpn action priority severity likelihood occurrence detection worksheet use error',
+					'fmea dfmea pfmea ufmea failure mode effects analysis risk rpn band action priority severity likelihood occurrence detection worksheet use error policy acceptability acceptable unacceptable alarp filter review mitigation control',
 				blocks: [
 					'An FMEA lists what can go wrong, what follows and why, and rates each line from 1 to 10 for **severity** (how bad the effect is), **likelihood** (how likely the cause is) and **detection** (how likely it is to go unnoticed). **New FMEA** asks which kind you want:',
 					{
@@ -377,8 +377,11 @@ export const HELP: HelpSection[] = [
 						]
 					},
 					'It opens as a worksheet. **Add a line** to choose the part, step or task, say how it fails, what follows and why, and choose the three ratings, each with what it means. Lines can link to the hazard they can lead to. Edit any cell in place; the bin at the end of a row removes the line.',
-					'The **risk priority number** (severity × likelihood × detection) and the **action priority** (high, medium or low, from the AIAG-VDA table) are calculated, never typed in. **Risk matrix** counts the lines by severity and likelihood.',
-					'A rating outside 1 to 10, or a severity that is not the worst harm of the line’s hazard, is flagged in its cell and under **Problems**. The rules come from the risk library in `libraries/RiskAnalysis.sysml`, which the first FMEA adds to the project.'
+					'The **risk priority number** (severity × likelihood × detection) with its **band** (low, medium, high or critical), the **action priority** (high, medium or low, from the AIAG-VDA table) and the **acceptability** (acceptable, reduce as far as possible, or unacceptable) are calculated, never typed in. **Risk matrix** counts the lines by severity and likelihood, each cell coloured and patterned by its zone.',
+					'**Risk policy** (on the risk matrix, or from the search box) is your organisation’s rule: paint which cells are acceptable, to reduce or unacceptable, say where the RPN bands start, and choose whether worksheets lead with the action priority or the RPN. Both figures stay on every worksheet.',
+					'To review the high risks, use the quick reviews above a worksheet (**High priority**, **Severity ≥ 9**, **Unacceptable**, **RPN ≥ …**) or **Filter** any column: numbers by range, levels by value, text that contains words. Export takes the rows shown. **Save as a view** keeps the filters in the model, as a view anyone can open.',
+					'Each line can name the **risk controls** and **mitigations** that address it: choose them when adding a line, or select the line’s part and use **Link a risk control or mitigation** in its details, which also shows whether each control is implemented and verified. The controls already in place stay as words in the line.',
+					'A rating outside 1 to 10, a severity that is not the worst harm of the line’s hazard, an unacceptable risk, or a high-priority or unacceptable line without a verified control is flagged in its cell and under **Problems**. The rules come from the risk library in `libraries/RiskAnalysis.sysml`, which the first FMEA adds to the project.'
 				],
 				action: { action: 'fmea', label: 'New FMEA' }
 			},

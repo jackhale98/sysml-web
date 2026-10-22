@@ -252,6 +252,9 @@ export interface FmeaLineSpec {
 	hazard?: string | null;
 	preventionControls?: string;
 	detectionControls?: string;
+	/** The risk controls and mitigations that address it, as the package spells them (`'RC-001'`). */
+	riskControls?: string[];
+	mitigations?: string[];
 }
 
 /** `@Fmea about drone::battery { … }`, as the demo writes its lines. */
@@ -270,6 +273,12 @@ export function fmeaLineText(spec: FmeaLineSpec): string {
 	text('preventionControls', spec.preventionControls);
 	text('detectionControls', spec.detectionControls);
 	if (spec.hazard) lines.push(`    hazard = ${spec.hazard};`);
+	const refs = (field: string, names: string[] | undefined) => {
+		if (names?.length)
+			lines.push(`    ${field} = ${names.length === 1 ? names[0] : `(${names.join(', ')})`};`);
+	};
+	refs('riskControls', spec.riskControls);
+	refs('mitigations', spec.mitigations);
 	lines.push('}');
 	return lines.join('\n');
 }

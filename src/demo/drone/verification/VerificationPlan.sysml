@@ -75,6 +75,41 @@ package DroneVerification {
         @VerificationMethod { kind = VerificationMethodKind::test; }
     }
 
+    // Risk controls (DroneFmea): each one proved by a test or an inspection.
+
+    verification <'VC-007'> rotorFailureTest {
+        doc /* In a tethered hover, cut the power to one motor at a time. The flight controller
+             * must detect it within 0.2 s and land without tipping over. */
+        subject testDrone :> drone;
+        objective { verify 'Rotor health monitoring'; }
+        @VerificationMethod { kind = VerificationMethodKind::test; }
+    }
+
+    verification <'VC-008'> propellerGuardInspection {
+        doc /* Check with the standard test finger that no propeller can be touched through or
+             * around its guard. */
+        subject testDrone :> drone;
+        objective { verify 'Propeller guards'; }
+        @VerificationMethod { kind = VerificationMethodKind::inspect; }
+    }
+
+    verification <'VC-009'> releaseInterlockTest {
+        doc /* Command a release at heights from 10 m down to touchdown. The hook must stay shut
+             * above 2 m every time. */
+        subject testDrone :> drone;
+        objective { verify 'Release height interlock'; }
+        @VerificationMethod { kind = VerificationMethodKind::test; }
+    }
+
+    verification <'VC-010'> handOverWarningReview {
+        doc /* Check the label on the airframe, listen for the tone until the rotors stop, and
+             * review the recipient's section of the manual. */
+        subject testDrone :> drone;
+        objective { verify 'Hand-over warnings'; }
+        @VerificationMethod { kind = (VerificationMethodKind::inspect, VerificationMethodKind::demo); }
+    }
+
     // Not yet planned: 'Ingress protection', 'Acoustic noise', 'Controlled parcel release',
-    // and the risk controls 'Rotor health monitoring' and 'Navigation integrity monitoring'.
+    // and the risk controls 'Navigation integrity monitoring' and 'Drop-zone clearance check'
+    // (the risk review lists the lines they leave without a verified control).
 }

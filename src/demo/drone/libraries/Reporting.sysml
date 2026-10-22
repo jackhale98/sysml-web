@@ -14,6 +14,7 @@ package Reporting {
         attribute sortBy : String[0..1];
         attribute pivot : String[0..1];
         attribute where : String[0..1];
+        attribute cellLevel : String[0..1];
     }
 
     // --- Domain-neutral views usable in any model ---------------------

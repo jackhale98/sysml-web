@@ -26,6 +26,7 @@ export const GUIDE_ACTIONS = [
 	'limit',
 	'trade',
 	'fmea',
+	'risk-policy',
 	'hazard',
 	'state-machine',
 	'action-flow',
@@ -217,6 +218,9 @@ export async function runGuideAction(action: GuideAction, context: GuideContext)
 			return;
 		case 'hazard':
 			ui.create = { kind: 'hazard' };
+			return;
+		case 'risk-policy':
+			ui.create = { kind: 'riskPolicy' };
 			return;
 		case 'import-requirements':
 			ui.importOpen = true;

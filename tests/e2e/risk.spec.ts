@@ -108,6 +108,10 @@ test('a design FMEA on a new Small system project: the libraries come with it, l
 	await expect(line.getByText('7 of 10: The main function works less well')).toBeVisible();
 	await expect(line.getByText('Risk priority number: 224')).toBeVisible();
 	await expectAccessible(page);
+	// The controls step is optional.
+	await line.getByRole('button', { name: 'Next' }).click();
+	await expect(line.getByRole('heading', { name: /What controls this risk/ })).toBeVisible();
+	await expectAccessible(page);
 	await line.getByRole('button', { name: 'Add line' }).click();
 	const row = sheet.locator('tbody tr').filter({ hasText: 'Cells leak' });
 	await expect(row).toContainText('224', { timeout: 15_000 });
@@ -209,15 +213,20 @@ test('the demo’s worksheet keeps its figures in view beside the details, and f
 		'Severity is 14, outside the scale of 1 to 10.'
 	);
 	const problems = page.getByRole('button', { name: /^Problems:/ });
-	// Out of scale, and not the battery fire's worst harm (critical, 8).
-	await expect(problems).toHaveAccessibleName('Problems: 0 errors, 2 warnings');
+	// Out of scale, and not the battery fire's worst harm (critical, 8), beside the demo's
+	// review item (the camera's line: unacceptable, no verified control).
+	await expect(problems).toHaveAccessibleName('Problems: 0 errors, 4 warnings');
 	await problems.click();
 	await expect(page.locator('section.problems-pane')).toContainText(
 		'Severity is 14, outside the scale of 1 to 10 (@Fmea about drone::battery).'
 	);
 	await expectAccessible(page);
 	await toasts(page).getByRole('button', { name: 'Undo' }).last().click();
-	await expect(sheet.locator('td.problem')).toHaveCount(0, { timeout: 15_000 });
+	// What stays flagged is the demo's review item: the camera's line.
+	await expect(sheet.locator('td.problem')).toHaveCount(2, { timeout: 15_000 });
+	await expect(
+		sheet.locator('tbody tr').filter({ hasText: 'Thermal runaway' }).locator('td.problem')
+	).toHaveCount(0);
 });
 
 test.describe('on a phone', () => {
@@ -265,6 +274,9 @@ test.describe('on a phone', () => {
 		const line = await addLine(page, /prepareFlight/, 'Uploads the wrong plan', ['5', '4', '4']);
 		await fits(page, 'the add a line form');
 		await tall(page, line.getByLabel(/^Severity/), 'a rating');
+		await line.getByRole('button', { name: 'Next' }).click();
+		await fits(page, 'the controls step');
+		await tall(page, line.getByRole('button', { name: 'Add line' }), 'Add line');
 		await line.getByRole('button', { name: 'Add line' }).click();
 		const card = sheet.locator('.cards .card').filter({ hasText: 'Uploads the wrong plan' });
 		await expect(card).toContainText('80', { timeout: 15_000 });

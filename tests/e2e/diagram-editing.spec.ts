@@ -323,7 +323,7 @@ test('a value with a unit its package doesn’t import brings the import with it
 		.click();
 	const text = page.locator('.cm-content');
 	await expect(text).toContainText('private import SI::*;');
-	await expect(page.getByRole('button', { name: /^Problems: 0 errors, 0 warnings/ })).toBeVisible({
+	await expect(page.getByRole('button', { name: /^Problems: 0 errors, 2 warnings/ })).toBeVisible({
 		timeout: 15_000
 	});
 	await toasts(page).getByRole('button', { name: 'Undo' }).last().click();

@@ -181,7 +181,7 @@ function bodyOf(text: string, pkg: PackageAt): Body | null {
 }
 
 /** Past a comment, string or quoted name starting at `i` (or `i` itself). */
-function skipTrivia(text: string, i: number): number {
+export function skipTrivia(text: string, i: number): number {
 	const c = text[i];
 	if (c === '/' && text[i + 1] === '*') {
 		const end = text.indexOf('*/', i + 2);

@@ -1,0 +1,60 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`a line’s controls > are written as references in the line, added, replaced and taken out 1`] = `
+"action 'Cell vents' : Mitigation {
+    doc /* Add vents. */
+    :>> kind = MitigationKind::prevention;
+    :>> status = MitigationStatus::proposed;
+    :>> owner = "A \\"B\\"";
+}"
+`;
+
+exports[`on the demo > a new line names its controls and mitigations, and can bring a new control 1`] = `
+"// in DroneFmea
+
+@Fmea about drone::camera {
+    failureMode = "Lens fogs up";
+    effect = "No picture of the drop zone";
+    cause = "Humidity";
+    category = RiskCategory::design;
+    severity = 4; likelihood = 5; detection = 3;
+    riskControls = ('RC-003', 'RC-008');
+    mitigations = navigationIntegrityMonitor;
+}
+
+// in DroneFmea
+
+requirement <'RC-008'> 'Lens heater' : RiskControl {
+    doc /* The camera shall keep its lens above the dew point. */
+    :>> hierarchy = ControlHierarchy::inherentSafety;
+}"
+`;
+
+exports[`on the demo > links a line to more controls and a mitigation, and makes new ones, in one step each 1`] = `
+"requirement <'RC-008'> 'Motor current limit' : RiskControl {
+    doc /* The motor driver shall limit the current to 30 A. */
+    :>> hierarchy = ControlHierarchy::protectiveMeasure;
+    ref :>> hazard = uncontrolledDescent;
+}
+
+action currentLimiter : Mitigation {
+    doc /* Add a current limiter to each motor driver. */
+    :>> kind = MitigationKind::prevention;
+    :>> status = MitigationStatus::proposed;
+    :>> owner = "R. Tanaka";
+}
+
+riskControls = ('RC-002', 'RC-008');
+
+mitigations = (rotorHealthMonitor, currentLimiter);"
+`;
+
+exports[`on the demo > saves a filtered worksheet as a view, which shows the same lines 1`] = `
+"// in DroneViews
+
+view linesToReview : DesignFmeaWorksheet {
+    doc /* The design FMEA: action priority ≥ medium, RPN ≥ 90. */
+    expose DroneFmea::*;
+    @TableRendering { where = "(ActionPriority(severity, likelihood, detection) == ActionPriorityLevel::medium or ActionPriority(severity, likelihood, detection) == ActionPriorityLevel::high) and Rpn(severity, likelihood, detection) >= 90"; }
+}"
+`;

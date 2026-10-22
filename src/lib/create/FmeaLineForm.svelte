@@ -3,8 +3,9 @@
 	 * Add a line to an FMEA worksheet: the element that can fail (a part, a
 	 * process step or a user task, as the sheet's kind says), how it fails,
 	 * what follows and why, its three ratings with what each means, and the
-	 * hazard it can lead to. It writes one `@Fmea` line into the package the
-	 * worksheet shows.
+	 * hazard it can lead to, and the risk controls and mitigations that
+	 * address it (or a new control). It writes one `@Fmea` line into the
+	 * package the worksheet shows.
 	 */
 	import { untrack } from 'svelte';
 	import type { Engine } from '#lib/engine/client.ts';
@@ -22,10 +23,10 @@
 		kindOfWorksheet,
 		type Rating
 	} from './fmea';
-	import { SEVERITY_CLASSES } from './hazard';
+	import { CONTROL_KINDS, SEVERITY_CLASSES } from './hazard';
 	import { flatten } from './model';
 	import ModelPicker from './ModelPicker.svelte';
-	import { planFmeaLine, type Chosen } from './plans';
+	import { nextControlId, planFmeaLine, type Chosen, type Linked } from './plans';
 
 	let {
 		open = $bindable(false),
@@ -130,6 +131,49 @@
 		if (value) untrack(() => (ratings.severity = String(value)));
 	});
 
+	/** The project's risk controls and mitigations, those on the line's hazard first. */
+	const onHazard = $derived.by(() => {
+		const row = hazard ? hazardLog?.rows.find((r) => r[0] === hazard.label) : undefined;
+		const at = hazardLog?.columns.indexOf('controls') ?? -1;
+		return new Set((row && at >= 0 ? (row[at] ?? '') : '').split(/,\s*/).filter(Boolean));
+	});
+	const controlsOffered = $derived(
+		nodes
+			.filter(
+				(n) =>
+					!n.node.element.isDefinition &&
+					!isLibraryFile(n.node.element.file) &&
+					n.node.element.kind === 'requirement' &&
+					n.node.element.typeRef?.split('::').pop() === 'RiskControl'
+			)
+			.map((n) => {
+				const e = n.node.element;
+				const label = e.shortName ? `${e.shortName} ${e.label}` : e.label;
+				return {
+					qualifiedName: n.qualifiedName,
+					label,
+					shortName: e.shortName,
+					on: onHazard.has(label)
+				};
+			})
+			.sort((a, b) => Number(b.on) - Number(a.on))
+	);
+	const mitigationsOffered = $derived(
+		nodes
+			.filter(
+				(n) =>
+					!n.node.element.isDefinition &&
+					!isLibraryFile(n.node.element.file) &&
+					n.node.element.kind === 'action' &&
+					n.node.element.typeRef?.split('::').pop() === 'Mitigation'
+			)
+			.map((n): Linked => ({ qualifiedName: n.qualifiedName, label: n.node.element.label }))
+	);
+	let chosenControls = $state<string[]>([]);
+	let chosenMitigations = $state<string[]>([]);
+	let newControl = $state({ title: '', statement: '', hierarchy: 'protectiveMeasure' });
+	const newControlId = $derived(nextControlId(workspace.elements.map((e) => e.shortName)));
+
 	const input = $derived(
 		pkg && element && rpn
 			? {
@@ -144,7 +188,12 @@
 					detection: numbers.detection!,
 					hazard: hazard ? { qualifiedName: hazard.qualifiedName, label: hazard.label } : null,
 					preventionControls,
-					detectionControls
+					detectionControls,
+					controls: controlsOffered.filter((c) => chosenControls.includes(c.qualifiedName)),
+					mitigations: mitigationsOffered.filter((m) =>
+						chosenMitigations.includes(m.qualifiedName)
+					),
+					newControl: newControl.title.trim() ? { id: newControlId, ...newControl } : null
 				}
 			: null
 	);
@@ -166,7 +215,8 @@
 			label: kind.id === 'use' ? 'Use error' : 'Failure',
 			question: kind.id === 'use' ? 'What could the user do wrong?' : 'How can it fail?'
 		},
-		{ id: 'ratings', label: 'Ratings', question: 'How serious is it?' }
+		{ id: 'ratings', label: 'Ratings', question: 'How serious is it?' },
+		{ id: 'controls', label: 'Controls', question: 'What controls this risk?' }
 	]);
 
 	function check(index: number): string | null {
@@ -183,11 +233,13 @@
 		});
 		if (id === 'element') return element ? null : problem;
 		if (id === 'failure') return failureMode.trim() ? null : problem;
+		if (id === 'controls' && newControl.statement.trim() && !newControl.title.trim())
+			return 'Give the new risk control a title, or clear what it requires.';
 		return problem;
 	}
 
 	async function finish(): Promise<string | null> {
-		if (!input) return check(2);
+		if (!input) return check(steps.length - 1);
 		const plan = planFmeaLine(workspace, input);
 		const error = await write(workspace, plan.label, plan.write);
 		if (error) return error;
@@ -264,6 +316,58 @@
 			<label class="field">
 				<span class="name">What would detect the failure</span>
 				<input bind:value={detectionControls} autocomplete="off" />
+			</label>
+		</details>
+	{:else if steps[step]?.id === 'controls'}
+		<p class="hint">
+			Optional. The risk controls are requirements; the worksheet shows whether each is implemented
+			and verified. The controls already in place (above) stay as written.
+		</p>
+		{#if controlsOffered.length}
+			<fieldset>
+				<legend>Risk controls</legend>
+				{#each controlsOffered as c (c.qualifiedName)}
+					<label class="check">
+						<input type="checkbox" value={c.qualifiedName} bind:group={chosenControls} />
+						<span
+							>{c.label}{#if c.on}<span class="hint"> · on its hazard</span>{/if}</span
+						>
+					</label>
+				{/each}
+			</fieldset>
+		{/if}
+		{#if mitigationsOffered.length}
+			<fieldset>
+				<legend>Mitigations</legend>
+				{#each mitigationsOffered as m (m.qualifiedName)}
+					<label class="check">
+						<input type="checkbox" value={m.qualifiedName} bind:group={chosenMitigations} />
+						<span class="mono">{m.label}</span>
+					</label>
+				{/each}
+			</fieldset>
+		{/if}
+		<details class="more" open={!controlsOffered.length}>
+			<summary>A new risk control ({newControlId})</summary>
+			<label class="field">
+				<span class="name">Title</span>
+				<input bind:value={newControl.title} autocomplete="off" placeholder="Thermal cut-off" />
+			</label>
+			<label class="field">
+				<span class="name">What it requires</span>
+				<textarea
+					bind:value={newControl.statement}
+					rows="2"
+					placeholder="The battery shall disconnect before any cell reaches its thermal limit."
+				></textarea>
+			</label>
+			<label class="field">
+				<span class="name">Kind</span>
+				<select bind:value={newControl.hierarchy}>
+					{#each CONTROL_KINDS as k (k.literal)}
+						<option value={k.literal}>{k.label}: {k.meaning}</option>
+					{/each}
+				</select>
 			</label>
 		</details>
 	{:else}

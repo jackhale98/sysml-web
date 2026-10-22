@@ -25,10 +25,18 @@ package RiskAnalysis {
      *   detection  (D): how likely the failure is to go unnoticed before it
      *                   reaches the user - 1 always caught, 10 cannot be
      *                   detected.
-     * Two figures are calculated from them, never typed in:
+     * Figures are calculated from them, never typed in:
      *   Rpn            - severity x likelihood x detection (1 to 1000);
+     *   RpnBand        - low, medium, high or critical: where the RPN falls
+     *                    among the thresholds the calc states;
      *   ActionPriority - high, medium or low: the AIAG-VDA table, which
-     *                    weighs severity first.
+     *                    weighs severity first;
+     *   Acceptability  - acceptable, reduce or unacceptable: the
+     *                    organisation's risk policy (ISO 14971), by
+     *                    severity and likelihood, which colours the risk
+     *                    matrix.
+     * The worksheets show the RPN and the action priority both; their
+     * `sortBy` says which one they lead with.
      * severity, likelihood and detection are the assessment now, with the
      * controls in place; initialSeverity, initialLikelihood and
      * initialDetection keep the assessment before risk reduction, so the
@@ -41,7 +49,11 @@ package RiskAnalysis {
      *
      * Risk controls are requirements (HazardAnalysis::RiskControl); what
      * implements one `satisfy`s it and a verification case `verify`s it, so
-     * ordinary traceability shows which risks lack a verified control.
+     * ordinary traceability shows which risks lack a verified control. A
+     * line names the controls that address it (`riskControls`) and the
+     * Mitigation actions that lower it (`mitigations`); a line of high
+     * action priority, or of unacceptable risk, without a verified control
+     * is flagged for review.
      */
 
     private import ScalarValues::*;
@@ -57,13 +69,41 @@ package RiskAnalysis {
         doc
         /*
          * Risk priority number: severity x likelihood x detection, from 1
-         * to 1000. Thresholds on it are a company's choice; AIAG-VDA
-         * recommends ActionPriority instead.
+         * to 1000. Thresholds on it are a company's choice (RpnBand);
+         * AIAG-VDA recommends ActionPriority instead.
          */
         in severity : FmeaRating;
         in likelihood : FmeaRating;
         in detection : FmeaRating;
         return : Integer = severity * likelihood * detection;
+    }
+
+    enum def RpnBandLevel {
+        doc /* Where a risk priority number falls, lowest first. */
+        enum low;
+        enum medium;
+        enum high;
+        enum critical;
+    }
+
+    calc def RpnBand {
+        doc
+        /*
+         * The band of a risk priority number: each band starts at its
+         * threshold below (by default 1-50 low, 51-150 medium, 151-400
+         * high, 401 and above critical). The thresholds are the
+         * organisation's choice: change the numbers here, or with the
+         * app's Risk policy form.
+         */
+        in rpn : Integer;
+        attribute mediumFrom : Integer = 51;
+        attribute highFrom : Integer = 151;
+        attribute criticalFrom : Integer = 401;
+        return : RpnBandLevel =
+            if rpn >= criticalFrom ? RpnBandLevel::critical
+            else if rpn >= highFrom ? RpnBandLevel::high
+            else if rpn >= mediumFrom ? RpnBandLevel::medium
+            else RpnBandLevel::low;
     }
 
     enum def ActionPriorityLevel {
@@ -112,6 +152,56 @@ package RiskAnalysis {
             else ActionPriorityLevel::low;
     }
 
+    // --- Risk policy: which risks are acceptable --------------------------------
+
+    enum def RiskAcceptability {
+        doc
+        /*
+         * How acceptable a risk is (ISO 14971), lowest first:
+         *   acceptable   - no further reduction needed;
+         *   reduce       - reduce it as far as possible, then weigh what
+         *                  remains against the benefit;
+         *   unacceptable - reduce it before release.
+         */
+        enum acceptable;
+        enum reduce;
+        enum unacceptable;
+    }
+
+    calc def Acceptability {
+        doc
+        /*
+         * The risk policy: how acceptable a risk is, by its severity and
+         * its likelihood (the zones of the risk matrix). It is the
+         * organisation's choice; change it here or with the app's Risk
+         * policy form. In plain words:
+         *   severity 9 to 10: unacceptable at likelihood 4 to 10, reduce at 2 to 3, acceptable at 1;
+         *   severity 7 to 8: unacceptable at likelihood 6 to 10, reduce at 3 to 5, acceptable at 1 to 2;
+         *   severity 4 to 6: unacceptable at likelihood 8 to 10, reduce at 5 to 7, acceptable at 1 to 4;
+         *   severity 2 to 3: reduce at likelihood 8 to 10, acceptable at 1 to 7;
+         *   severity 1: acceptable.
+         */
+        in severity : FmeaRating;
+        in likelihood : FmeaRating;
+        return : RiskAcceptability =
+            if severity >= 9 ?
+                (if likelihood >= 4 ? RiskAcceptability::unacceptable
+                 else if likelihood >= 2 ? RiskAcceptability::reduce
+                 else RiskAcceptability::acceptable)
+            else if severity >= 7 ?
+                (if likelihood >= 6 ? RiskAcceptability::unacceptable
+                 else if likelihood >= 3 ? RiskAcceptability::reduce
+                 else RiskAcceptability::acceptable)
+            else if severity >= 4 ?
+                (if likelihood >= 8 ? RiskAcceptability::unacceptable
+                 else if likelihood >= 5 ? RiskAcceptability::reduce
+                 else RiskAcceptability::acceptable)
+            else if severity >= 2 ?
+                (if likelihood >= 8 ? RiskAcceptability::reduce
+                 else RiskAcceptability::acceptable)
+            else RiskAcceptability::acceptable;
+    }
+
     enum def RiskCategory {
         doc /* The kind of FMEA a line belongs to: what fails (see the package's doc). */
         enum design;
@@ -153,8 +243,8 @@ package RiskAnalysis {
          *   }
          *
          * For a use FMEA, failureMode is the use error and the element the
-         * user task. The ratings are FmeaRatings (1 to 10); Rpn and
-         * ActionPriority are calculated from them.
+         * user task. The ratings are FmeaRatings (1 to 10); Rpn, RpnBand,
+         * ActionPriority and Acceptability are calculated from them.
          */
         attribute failureMode : String;
         attribute effect : String[0..1];
@@ -180,6 +270,20 @@ package RiskAnalysis {
              * these. The worst harm the hazard leads to (through Causation)
              * sets the severity this line should have.
              */
+        }
+        ref riskControls : RiskControl[0..*] {
+            doc
+            /*
+             * The risk controls (requirements) that address this line:
+             * `riskControls = 'RC-001';` or `riskControls = ('RC-001', 'RC-002');`.
+             * Whether each is satisfied and verified comes from ordinary
+             * `satisfy` and `verify` traceability. The free-text
+             * preventionControls and detectionControls stay the controls
+             * in place, as AIAG-VDA writes them.
+             */
+        }
+        ref mitigations : Mitigation[0..*] {
+            doc /* The Mitigation actions that lower this line's risk, with their status. */
         }
     }
 
@@ -214,10 +318,10 @@ package RiskAnalysis {
     // narrow screen; the effect and the cause follow.
 
     view def FmeaWorksheet {
-        doc /* Every FMEA line, of every kind, highest risk priority number first. */
+        doc /* Every FMEA line, of every kind, highest risk first. */
         @TableRendering {
             rows = "@Fmea";
-            columns = "element; failureMode; severity; likelihood; detection; rpn = Rpn(severity, likelihood, detection); actionPriority = ActionPriority(severity, likelihood, detection); effect; cause; category";
+            columns = "element; failureMode; severity; likelihood; detection; rpn = Rpn(severity, likelihood, detection); rpnBand = RpnBand(Rpn(severity, likelihood, detection)); actionPriority = ActionPriority(severity, likelihood, detection); acceptability = Acceptability(severity, likelihood); riskControls; effect; cause; category";
             sortBy = "-rpn";
         }
     }
@@ -226,7 +330,7 @@ package RiskAnalysis {
         doc /* A design FMEA: how the parts can fail. */
         @TableRendering {
             rows = "@Fmea";
-            columns = "part = element; failureMode; severity; likelihood; detection; rpn = Rpn(severity, likelihood, detection); actionPriority = ActionPriority(severity, likelihood, detection); effect; cause";
+            columns = "part = element; failureMode; severity; likelihood; detection; rpn = Rpn(severity, likelihood, detection); rpnBand = RpnBand(Rpn(severity, likelihood, detection)); actionPriority = ActionPriority(severity, likelihood, detection); acceptability = Acceptability(severity, likelihood); riskControls; effect; cause";
             where = "category == RiskCategory::design or category == RiskCategory::software";
             sortBy = "-rpn";
         }
@@ -236,7 +340,7 @@ package RiskAnalysis {
         doc /* A process FMEA: how the steps of a process can go wrong. */
         @TableRendering {
             rows = "@Fmea";
-            columns = "processStep = element; failureMode; severity; likelihood; detection; rpn = Rpn(severity, likelihood, detection); actionPriority = ActionPriority(severity, likelihood, detection); effect; cause";
+            columns = "processStep = element; failureMode; severity; likelihood; detection; rpn = Rpn(severity, likelihood, detection); rpnBand = RpnBand(Rpn(severity, likelihood, detection)); actionPriority = ActionPriority(severity, likelihood, detection); acceptability = Acceptability(severity, likelihood); riskControls; effect; cause";
             where = "category == RiskCategory::process";
             sortBy = "-rpn";
         }
@@ -246,17 +350,22 @@ package RiskAnalysis {
         doc /* A use FMEA: the use errors a user can make in each task, and what follows. */
         @TableRendering {
             rows = "@Fmea";
-            columns = "task = element; useError = failureMode; severity; likelihood; detection; rpn = Rpn(severity, likelihood, detection); actionPriority = ActionPriority(severity, likelihood, detection); effect; cause";
+            columns = "task = element; useError = failureMode; severity; likelihood; detection; rpn = Rpn(severity, likelihood, detection); rpnBand = RpnBand(Rpn(severity, likelihood, detection)); actionPriority = ActionPriority(severity, likelihood, detection); acceptability = Acceptability(severity, likelihood); riskControls; effect; cause";
             where = "category == RiskCategory::'use'";
             sortBy = "-rpn";
         }
     }
 
     view def FmeaRiskReduction {
-        doc /* The lines assessed before risk reduction too: their priority then and now. */
+        doc
+        /*
+         * The lines assessed before risk reduction too: their priority and
+         * acceptability then and now, and the controls and mitigations that
+         * made the difference.
+         */
         @TableRendering {
             rows = "@Fmea";
-            columns = "element; failureMode; rpnBefore = Rpn(initialSeverity, initialLikelihood, initialDetection); rpn = Rpn(severity, likelihood, detection); priorityBefore = ActionPriority(initialSeverity, initialLikelihood, initialDetection); actionPriority = ActionPriority(severity, likelihood, detection)";
+            columns = "element; failureMode; rpnBefore = Rpn(initialSeverity, initialLikelihood, initialDetection); rpn = Rpn(severity, likelihood, detection); priorityBefore = ActionPriority(initialSeverity, initialLikelihood, initialDetection); actionPriority = ActionPriority(severity, likelihood, detection); acceptabilityBefore = Acceptability(initialSeverity, initialLikelihood); acceptability = Acceptability(severity, likelihood); riskControls; controlStatus; mitigations; mitigationStatus";
             where = "initialSeverity >= 1";
             sortBy = "-rpn";
         }
@@ -267,11 +376,13 @@ package RiskAnalysis {
         /*
          * How many FMEA lines fall in each cell of severity (down) by
          * likelihood (across). Every rating of the scale is a row or a
-         * column, so the empty cells show too.
+         * column, so the empty cells show too, and each cell has the zone
+         * the risk policy (Acceptability) gives it.
          */
         @TableRendering {
             rows = "@Fmea";
             pivot = "severity; likelihood";
+            cellLevel = "Acceptability(severity, likelihood)";
         }
     }
 }

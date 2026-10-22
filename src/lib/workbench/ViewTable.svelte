@@ -11,8 +11,10 @@
 		FilePlus,
 		Gauge,
 		Grid3x3,
+		BookmarkPlus,
 		Info,
 		ListChecks,
+		ListFilter,
 		Minus,
 		Plus,
 		Search,
@@ -20,7 +22,8 @@
 		Table2,
 		Trash2,
 		TriangleAlert,
-		Upload
+		Upload,
+		X
 	} from '@lucide/svelte';
 	import ExportMenu from '#lib/dataio/ExportMenu.svelte';
 	import type { ExportTable } from '#lib/dataio/export.ts';
@@ -52,7 +55,19 @@
 		levelTone,
 		matrixOf
 	} from './risk.ts';
-	import { viewTitle } from './views.ts';
+	import { breakable, viewTitle } from './views.ts';
+	import TableFilters from './TableFilters.svelte';
+	import {
+		describeFilter,
+		isActive,
+		isPreset,
+		levelWord,
+		riskPresets,
+		rowPasses,
+		whereOf,
+		type ColumnFilter,
+		type Preset
+	} from './tableFilters.ts';
 
 	/** Do what an empty table suggests (add a requirement, set a limit). */
 	function guide(action: GuideAction) {
@@ -72,6 +87,8 @@
 	}: { name: string; workspace: Workspace; ui: WorkbenchUi; engine: Engine } = $props();
 
 	const COLUMNS_HINT = "Saved in the view's @TableRendering, so the table stays part of the model.";
+	const FILTERS_HINT =
+		'Show only the rows to review. Export takes what is shown; save the filters as a view to keep them.';
 	let table = $state.raw<RenderedTable | null>(null);
 	let error = $state<string | null>(null);
 	let query = $state('');
@@ -89,6 +106,10 @@
 	);
 	/** Rows are a tree (a budget): indented by depth, in the tree's order (not sortable). */
 	const isTree = $derived(!!table?.columnKinds?.includes('tree'));
+	/** A table of rows (not a grid, a trade study or a tree) can be filtered by its columns. */
+	const filterable = $derived(
+		!!table && !table.trade && !table.counts && !isPivot && !isTree && table.rows.length > 0
+	);
 	/** Rows are requirements (the requirements table and views like it): offer importing more. */
 	const listsRequirements = $derived(
 		!!table &&
@@ -103,6 +124,73 @@
 			: null
 	);
 	const hazardLog = $derived(isHazardLog(info));
+
+	/** Where the project's RPN band "high" starts, for the quick review "RPN ≥ …". */
+	let highFrom = $state<number | null>(null);
+	$effect(() => {
+		if (!fmea) return;
+		void workspace.files;
+		void engine
+			.riskPolicy(untrack(() => workspace.sourceFiles()))
+			.then((p) => (highFrom = p.bands.find((b) => b.level === 'high')?.value ?? null))
+			.catch(() => (highFrom = null));
+	});
+	/** The quick reviews of a risk worksheet (high priority, severity ≥ 9, …). */
+	const presets = $derived(table && fmea ? riskPresets(table, highFrom) : []);
+
+	function togglePreset(preset: Preset) {
+		filters = isPreset(filters, preset) ? [] : preset.filters.map((f) => ({ ...f }));
+	}
+
+	function removeFilter(filter: ColumnFilter) {
+		filters = filters.filter((f) => f.column !== filter.column);
+	}
+
+	/** The view's own `where`, as written (a saved review keeps it). */
+	function ownWhere(): string | null {
+		if (!info?.isUsage) return null;
+		const element = workspace.elements.find(
+			(e) => e.file === info.file && e.kind === 'view' && e.name === info.name
+		);
+		const text = element ? workspace.text(element.file) : undefined;
+		if (!element || text === undefined) return null;
+		const own = text.slice(element.span.from ?? 0, element.span.to ?? 0);
+		const found = /\bwhere\s*=\s*"((?:[^"\\]|\\.)*)"/.exec(own)?.[1];
+		return found ? found.replace(/\\(.)/g, '$1') : null;
+	}
+
+	/** Save the filtered table as a view: a usage of its view def with the filters as `where`. */
+	function saveReview() {
+		if (!table || !info) return;
+		const t = table;
+		const { where, left } = whereOf(t, active);
+		const definition = info.isUsage
+			? workspace.views.find(
+					(v) =>
+						!v.isUsage &&
+						!!v.qualifiedName &&
+						(v.name === info.definition || v.qualifiedName === info.definition)
+				)?.qualifiedName
+			: info.qualifiedName;
+		if (!definition) {
+			toasts.show('This view’s definition is not in the project, so it can’t be saved from here.', {
+				tone: 'error'
+			});
+			return;
+		}
+		const own = ownWhere();
+		const preset = presets.find((p) => isPreset(active, p));
+		ui.create = {
+			kind: 'savedReview',
+			title: `${preset ? preset.label : 'Filtered'} ${/^[A-Z][a-z]/.test(title) ? title[0]!.toLowerCase() + title.slice(1) : title}`,
+			definition,
+			exposes: info.isUsage ? (info.exposes ?? []) : [],
+			where: own && where ? `(${own}) and (${where})` : (own ?? where),
+			kept: active.filter((f) => !left.includes(f)).map((f) => describeFilter(t, f)),
+			left: left.map((f) => describeFilter(t, f)),
+			about: title
+		};
+	}
 
 	/** The table as shown (searched and sorted), for exporting. */
 	function exportData(): ExportTable {
@@ -145,19 +233,37 @@
 		return () => clearTimeout(timer);
 	});
 
-	/** Rows with their original index (for sources), filtered and sorted. */
+	/** Filters on columns (a viewing aid, until saved as a view). */
+	let filters = $state<ColumnFilter[]>([]);
+	let filtersOpen = $state(false);
+	const active = $derived(filters.filter(isActive));
+	// Another view starts unfiltered.
+	$effect(() => {
+		void name;
+		untrack(() => {
+			filters = [];
+			filtersOpen = false;
+		});
+	});
+
+	/** Rows with their original index (for sources), searched, filtered and sorted. */
 	const rows = $derived.by(() => {
 		if (!table) return [];
+		const t = table;
 		const needle = query.trim().toLowerCase();
-		const indexed = table.rows
+		const indexed = t.rows
 			.map((cells, index) => ({ cells, index }))
-			.filter(({ cells }) => !needle || cells.some((c) => c.toLowerCase().includes(needle)));
+			.filter(({ cells }) => !needle || cells.some((c) => c.toLowerCase().includes(needle)))
+			.filter(({ cells }) => !active.length || rowPasses(t, active, cells));
 		if (sortColumn === null) return indexed;
 		const column = sortColumn;
 		const sign = descending ? -1 : 1;
+		// Levels (an action priority, a band) sort in their order, lowest first.
+		const levels = t.columnLevels?.[column]?.values;
 		return indexed.toSorted((a, b) => {
 			const x = a.cells[column] ?? '';
 			const y = b.cells[column] ?? '';
+			if (levels) return sign * (levels.indexOf(x) - levels.indexOf(y));
 			const nx = Number(x);
 			const ny = Number(y);
 			const numeric = x !== '' && y !== '' && !Number.isNaN(nx) && !Number.isNaN(ny);
@@ -420,6 +526,11 @@
 		if (error) toasts.show(error, { tone: 'error' });
 	}
 
+	/** Open the risk policy form (the matrix's zones, the RPN bands, what worksheets lead with). */
+	function openPolicy() {
+		ui.create = { kind: 'riskPolicy' };
+	}
+
 	function addLine() {
 		ui.create = { kind: 'fmeaLine', view: info?.name ?? name };
 	}
@@ -494,10 +605,12 @@
 		| 'tree'
 		| 'trace'
 		| 'level'
-		| 'elements';
+		| 'elements'
+		| 'controls';
 	function cellKind(column: string, value: string, index?: number): CellKind {
 		const c = column.toLowerCase();
 		if (isPivot) return 'mark';
+		if (fmea && column === 'riskControls') return 'controls';
 		if (levelTone(column, value)) return 'level';
 		if (hazardLog && ELEMENT_LIST_COLUMNS.has(column)) return 'elements';
 		// What the row provider says the column holds.
@@ -553,7 +666,7 @@
 	{:else if kind === 'status' && value}
 		<span class="chip {STATUS_TONE[value.toLowerCase()] ?? 'plain'}">{value}</span>
 	{:else if kind === 'level'}
-		<span class="chip {levelTone('actionPriority', value)}">{value}</span>
+		<span class="chip {levelTone('actionPriority', value)}">{levelWord(value)}</span>
 	{:else if kind === 'elements'}
 		<TraceRefs {value} {workspace} {ui} gap="None yet" find={(n) => elementNamed(workspace, n)} />
 	{:else if (kind === 'verdict' || kind === 'verdictIcon') && isVerdict(value)}
@@ -604,11 +717,51 @@
 		{splitTreePath(value)[1] || '—'}
 	{:else if kind === 'verdict'}
 		{@render display(kind, value)}
-	{:else if value.includes('::')}
-		<!-- A path (`drone::rotors::motor`) may break after each `::` in a narrow column. -->
-		{#each value.split('::') as part, i (i)}{#if i}::<wbr />{/if}{part}{/each}
+	{:else if value}
+		<!-- A path (`drone::rotors::motor`) or a name (`burnInjury`) breaks between its words in a narrow column. -->
+		{#each breakable(value) as part, i (i)}{#if i}<wbr />{/if}{part}{/each}
 	{:else}
-		{value || '—'}
+		—
+	{/if}
+{/snippet}
+
+<!-- An FMEA line's risk controls: each a link to the control, with whether it is implemented and verified. -->
+{#snippet controlList(index: number)}
+	{@const controls = infoOf(index).controls ?? []}
+	{#if controls.length}
+		<ul class="line-controls">
+			{#each controls as control (control.element)}
+				{@const element = elementNamed(workspace, control.label)}
+				{@const state = control.verifiedBy.length
+					? 'verified'
+					: control.satisfiedBy.length
+						? 'implemented'
+						: 'open'}
+				<li>
+					{#if element}
+						<button
+							type="button"
+							class="control-link"
+							title="Select {control.label}"
+							onclick={(e) => {
+								e.stopPropagation();
+								ui.select(element.key, 'table');
+							}}
+							>{#each breakable(control.label) as part, i (i)}{#if i}<wbr
+									/>{/if}{part}{/each}</button
+						>
+					{:else}
+						<span>{control.label}</span>
+					{/if}
+					<span class="control-state chip {levelTone('controlStatus', state)}"
+						>{#if state === 'verified'}<Check size={12} aria-hidden="true" /> Verified{:else if state === 'implemented'}Not
+							verified{:else}Not implemented{/if}</span
+					>
+				</li>
+			{/each}
+		</ul>
+	{:else}
+		<span class="no-controls">None</span>
 	{/if}
 {/snippet}
 
@@ -699,6 +852,42 @@
 					<Plus size={14} aria-hidden="true" /> New hazard
 				</button>
 			{/if}
+			{#if table && filterable}
+				<div class="filter-menu">
+					<button
+						type="button"
+						class="source"
+						class:on={active.length > 0}
+						aria-expanded={filtersOpen}
+						aria-haspopup="dialog"
+						onclick={() => (filtersOpen = !filtersOpen)}
+					>
+						<ListFilter size={14} aria-hidden="true" />
+						<span class="button-label">Filter</span>{#if active.length}<span class="on-count"
+								>{active.length}<span class="visually-hidden">
+									filter{active.length === 1 ? '' : 's'} on</span
+								></span
+							>{/if}
+					</button>
+					{#if filtersOpen && !ui.phone}
+						<div class="columns-panel filters-panel" role="dialog" aria-label="Filter rows">
+							<p class="panel-hint">{FILTERS_HINT}</p>
+							<TableFilters {table} bind:filters {heading} />
+							<div class="panel-buttons">
+								<button
+									type="button"
+									class="source"
+									disabled={!filters.length}
+									onclick={() => (filters = [])}>Clear</button
+								>
+								<button type="button" class="apply" onclick={() => (filtersOpen = false)}
+									>Done</button
+								>
+							</div>
+						</div>
+					{/if}
+				</div>
+			{/if}
 			{#if table?.availableFields?.length && info && !info.builtin && !isPivot && !table.trade}
 				<div class="columns-menu">
 					<button
@@ -744,6 +933,49 @@
 				</div>
 			{/if}
 		</div>
+		{#if table && filterable && (presets.length || active.length)}
+			<!-- Quick reviews of a risk worksheet, and the filters on, each removable. -->
+			<div class="review-row">
+				{#if presets.length}
+					<div class="presets" role="group" aria-label="Review">
+						<span class="review-label" aria-hidden="true">Review</span>
+						{#each presets as preset (preset.id)}
+							<button
+								type="button"
+								class="preset"
+								aria-pressed={isPreset(active, preset)}
+								onclick={() => togglePreset(preset)}>{preset.label}</button
+							>
+						{/each}
+					</div>
+				{/if}
+				{#if active.length}
+					<ul class="filters-on" aria-label="Filters on">
+						{#each active as filter (filter.column)}
+							<li>
+								<button
+									type="button"
+									class="filter-chip"
+									aria-label="Remove the filter {describeFilter(table, filter)}"
+									onclick={() => removeFilter(filter)}
+									>{describeFilter(table, filter)}<X size={13} aria-hidden="true" /></button
+								>
+							</li>
+						{/each}
+					</ul>
+					<div class="filter-actions">
+						<button type="button" class="link-button" onclick={() => (filters = [])}
+							>Clear filters</button
+						>
+						{#if info && !info.builtin}
+							<button type="button" class="source save-view" onclick={saveReview}>
+								<BookmarkPlus size={14} aria-hidden="true" /> Save as a view
+							</button>
+						{/if}
+					</div>
+				{/if}
+			</div>
+		{/if}
 		{#if table?.warnings.length}
 			<p class="warnings"><TriangleAlert size={14} /> {table.warnings.join(' · ')}</p>
 		{/if}
@@ -766,7 +998,11 @@
 	{:else if table.trade}
 		<TradeMatrix trade={table.trade} {workspace} {ui} {name} />
 	{:else if table.counts}
-		<RiskGrid {table} {title} />
+		<RiskGrid
+			{table}
+			{title}
+			onpolicy={table.counts.levels && info && !info.builtin ? openPolicy : undefined}
+		/>
 	{:else if table.matrix}
 		<TraceGrid
 			matrix={table.matrix}
@@ -883,8 +1119,10 @@
 										? `${row.cells[0]}: ${row.cells.slice(1, 3).filter(Boolean).join(' ')}, show in the text`
 										: undefined}
 									onclick={() => openRow(row.index)}
-									>{#if kind0 === 'verdict'}{@render display(kind0, row.cells[0] ?? '')}{:else}{row
-											.cells[0] || '—'}{/if}</button
+									>{#if kind0 === 'verdict'}{@render display(
+											kind0,
+											row.cells[0] ?? ''
+										)}{:else}{@render first(kind0, row.cells[0] ?? '')}{/if}</button
 								>
 							{:else}
 								<strong>{row.cells[0] || '—'}</strong>
@@ -926,7 +1164,7 @@
 								{@const note = infoOf(row.index).notes?.[c]}
 								{@const inLine =
 									isTree && ['quantity', 'each', 'total', 'share', 'extended'].includes(column)}
-								{#if c > 0 && !inLine && !(subtitled && c === 1) && (canEdit || note || kind === 'trace' || (value !== '' && !(isPivot && value === '0')))}
+								{#if c > 0 && !inLine && !(subtitled && c === 1) && (canEdit || note || kind === 'trace' || kind === 'controls' || (value !== '' && !(isPivot && value === '0')))}
 									<div class="pair {kind}">
 										<dt>{isPivot ? column : heading(column)}</dt>
 										<dd>
@@ -952,6 +1190,10 @@
 												{value || '—'}<span class="card-note">{note}</span>
 											{:else if hazardLog && kind === 'trace' && !value}
 												{@render controlGap(row.cells, column)}
+											{:else if kind === 'controls'}
+												{@render controlList(row.index)}{@render flag(
+													infoOf(row.index).problems?.[c]
+												)}
 											{:else}
 												{@render display(kind, value)}{@render flag(
 													infoOf(row.index).problems?.[c]
@@ -1081,6 +1323,8 @@
 										>
 									{:else if hazardLog && kind === 'trace' && !value}
 										{@render controlGap(row.cells, table.columns[c] ?? '')}
+									{:else if kind === 'controls'}
+										{@render controlList(row.index)}{@render flag(problem)}
 									{:else}
 										{@render cell(
 											kind,
@@ -1116,6 +1360,22 @@
 	{/if}
 </section>
 
+{#if ui.phone && table && filterable}
+	<!-- On a phone the filters are a sheet over everything, within thumb reach. -->
+	<SheetDialog bind:open={filtersOpen} title="Filter rows" description={FILTERS_HINT}>
+		<TableFilters {table} bind:filters {heading} />
+		{#snippet footer()}
+			<button
+				type="button"
+				class="source sheet-button"
+				disabled={!filters.length}
+				onclick={() => (filters = [])}>Clear</button
+			>
+			<button type="button" class="apply" onclick={() => (filtersOpen = false)}>Done</button>
+		{/snippet}
+	</SheetDialog>
+{/if}
+
 {#if ui.phone}
 	<!-- On a phone the column choice is a sheet over everything, within thumb reach. -->
 	<SheetDialog bind:open={columnsOpen} title="Choose columns" description={COLUMNS_HINT}>
@@ -1130,6 +1390,18 @@
 {/if}
 
 {#snippet more()}
+	{#if table && !rows.length && table.rows.length}
+		<p class="no-match">
+			No rows match{active.length ? ' the filters' : ''}{query.trim() ? ' the search' : ''}.
+			<button
+				type="button"
+				onclick={() => {
+					filters = [];
+					query = '';
+				}}>Show all rows</button
+			>
+		</p>
+	{/if}
 	{#if rows.length > shown.length}
 		<p class="more">
 			<button type="button" onclick={() => (rowLimit += ROW_PAGE * 10)}>
@@ -1267,6 +1539,119 @@
 	.columns-menu {
 		position: relative;
 		margin-left: auto;
+	}
+	.filter-menu {
+		position: relative;
+	}
+	.filter-menu > .source.on {
+		border-color: color-mix(in oklab, var(--accent) 55%, var(--border));
+		background: var(--accent-weak);
+	}
+	.on-count {
+		display: inline-grid;
+		place-items: center;
+		min-width: 1.15rem;
+		height: 1.15rem;
+		padding: 0 4px;
+		border-radius: var(--radius-pill);
+		background: var(--accent);
+		color: var(--accent-text);
+		font-size: 11px;
+		font-weight: 700;
+	}
+	.filters-panel {
+		left: 0;
+		right: auto;
+		width: min(22rem, 86vw);
+		max-height: min(32rem, 70vh);
+		overflow-y: auto;
+	}
+	/* Quick reviews and the filters on, under the tools. */
+	.review-row {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: var(--space-2) var(--space-3);
+	}
+	.presets,
+	.filters-on,
+	.filter-actions {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: var(--space-2);
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	.review-label {
+		color: var(--text-2);
+		font-size: var(--text-xs);
+		font-weight: 650;
+		letter-spacing: 0.02em;
+		text-transform: uppercase;
+	}
+	.preset,
+	.filter-chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		min-height: 1.875rem;
+		padding: 0 var(--space-3);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-pill);
+		background: var(--surface);
+		color: var(--text);
+		font: inherit;
+		font-size: var(--text-sm);
+		white-space: nowrap;
+		cursor: pointer;
+	}
+	.preset:hover,
+	.filter-chip:hover {
+		border-color: var(--border-strong);
+	}
+	.preset[aria-pressed='true'] {
+		border-color: var(--accent);
+		background: var(--accent-weak);
+		font-weight: 600;
+	}
+	.filter-chip {
+		border-color: color-mix(in oklab, var(--accent) 45%, var(--border));
+		background: var(--accent-weak);
+	}
+	.link-button {
+		min-height: 1.875rem;
+		padding: 0 4px;
+		border: 0;
+		background: transparent;
+		color: var(--text-2);
+		font: inherit;
+		font-size: var(--text-sm);
+		font-weight: 600;
+		text-decoration: underline;
+		text-underline-offset: 2px;
+		cursor: pointer;
+	}
+	.save-view {
+		height: 1.875rem;
+	}
+	.no-match {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: var(--space-2);
+		padding: var(--space-4) var(--space-3);
+		color: var(--text-2);
+	}
+	.no-match button {
+		min-height: 2rem;
+		padding: 0 var(--space-3);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-sm);
+		background: var(--surface);
+		color: var(--text);
+		cursor: pointer;
 	}
 	/* Export and import sit at the end of the row, after Columns when it shows. */
 	.io {
@@ -1492,9 +1877,48 @@
 	td.list {
 		min-width: 6rem;
 	}
+	/* Names break between their words only, so these columns are wide enough for most. */
 	td.trace,
 	td.elements {
-		min-width: 5.5rem;
+		min-width: 10rem;
+	}
+	td.controls {
+		min-width: 11rem;
+	}
+	.line-controls {
+		display: grid;
+		gap: 4px;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	.line-controls li {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 2px 6px;
+	}
+	.control-link {
+		padding: 0;
+		border: 0;
+		background: transparent;
+		color: var(--accent);
+		font: inherit;
+		text-align: left;
+		cursor: pointer;
+	}
+	.control-link:hover {
+		text-decoration: underline;
+	}
+	.chip.control-state {
+		display: inline-flex;
+		align-items: center;
+		gap: 3px;
+		white-space: nowrap;
+		text-transform: none;
+	}
+	.no-controls {
+		color: var(--text-2);
 	}
 	td.number {
 		font-variant-numeric: tabular-nums;
@@ -1607,6 +2031,13 @@
 			min-width: 6.5rem;
 		}
 		td.long {
+			min-width: 9rem;
+		}
+		td.trace,
+		td.elements {
+			min-width: 8.5rem;
+		}
+		td.controls {
 			min-width: 9rem;
 		}
 		th button {
@@ -1906,7 +2337,7 @@
 			flex: 1 1 10rem;
 			min-width: 0;
 			font-weight: 600;
-			overflow-wrap: anywhere;
+			overflow-wrap: break-word;
 		}
 		dl {
 			display: grid;
@@ -1933,7 +2364,8 @@
 			min-width: 0;
 			margin: 0;
 			padding-top: 0.25rem;
-			overflow-wrap: anywhere;
+			/* Words stay whole; names break between their words (`burn|Injury`). */
+			overflow-wrap: break-word;
 		}
 		.pair.long dd {
 			color: var(--text-2);
@@ -1986,6 +2418,28 @@
 		}
 		.gap-link {
 			min-height: 2.75rem;
+		}
+		.preset,
+		.filter-chip,
+		.link-button,
+		.save-view,
+		.control-link,
+		.no-match button {
+			min-height: 2.75rem;
+		}
+		.save-view {
+			height: 2.75rem;
+		}
+		.review-row {
+			margin: 0 var(--space-3) var(--space-2);
+		}
+		.review-label {
+			flex-basis: 100%;
+		}
+		.filter-menu > .source {
+			justify-content: center;
+			min-width: 2.75rem;
+			padding: 0 var(--space-2);
 		}
 	}
 	/* Review mode: new and changed rows, with a badge saying so. */

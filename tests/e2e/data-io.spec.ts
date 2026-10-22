@@ -67,7 +67,7 @@ test('a searched table exports only its rows, as an Excel workbook', async ({ pa
 	const table = await openRequirements(page);
 	await table.getByRole('searchbox').fill('battery');
 	await table.getByRole('button', { name: 'Export' }).click();
-	await expect(page.getByText('Only the rows your search shows.')).toBeVisible();
+	await expect(page.getByText('Only the rows shown, as searched and filtered.')).toBeVisible();
 	const download = page.waitForEvent('download');
 	await page.getByRole('menuitem', { name: 'Excel workbook' }).click();
 	const file = await download;
@@ -96,7 +96,7 @@ test('a table prints on its own page with its title, project and date', async ({
 	await expect(sheet).toBeVisible();
 	await expect(sheet.getByRole('heading', { name: 'Requirements table' })).toBeVisible();
 	await expect(sheet).toContainText('Drone UAV ·');
-	await expect(sheet.getByRole('row')).toHaveCount(21);
+	await expect(sheet.getByRole('row')).toHaveCount(25);
 	await expect(page.locator('.workbench')).toBeHidden();
 });
 
@@ -134,11 +134,11 @@ test('requirements import from a CSV file in one undoable change', async ({ page
 	await expect(table.getByRole('row').filter({ hasText: 'SYS-103' })).toContainText(
 		'Parcel temperature'
 	);
-	await expect(page.getByRole('button', { name: /^Requirements/ }).first()).toContainText('23');
+	await expect(page.getByRole('button', { name: /^Requirements/ }).first()).toContainText('27');
 
 	await page.getByRole('button', { name: 'Undo' }).click();
 	await expect(table.getByRole('button', { name: 'SYS-101' })).toBeHidden({ timeout: 10_000 });
-	await expect(page.getByRole('button', { name: /^Requirements/ }).first()).toContainText('20');
+	await expect(page.getByRole('button', { name: /^Requirements/ }).first()).toContainText('24');
 	await page.getByRole('tab', { name: 'Files' }).click();
 	await expect(page.getByRole('button', { name: /Imported\.sysml/ })).toHaveCount(0);
 });

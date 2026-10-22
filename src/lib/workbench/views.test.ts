@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { ViewInfo } from '#lib/engine/types.ts';
-import { exposedName, groupViews, presentationOf, viewFamily, viewTitle } from './views.ts';
+import {
+	breakable,
+	exposedName,
+	groupViews,
+	presentationOf,
+	viewFamily,
+	viewTitle
+} from './views.ts';
 
 const view = (over: Partial<ViewInfo>): ViewInfo => ({
 	name: 'v',
@@ -86,5 +93,21 @@ describe('families', () => {
 			['Structure', ['b', 'd']],
 			['Budgets & analysis', ['a']]
 		]);
+	});
+
+	it('break names between their words, never inside one', () => {
+		expect(breakable('burnInjury')).toEqual(['burn', 'Injury']);
+		expect(breakable('drone::rotors::motor')).toEqual(['drone::', 'rotors::', 'motor']);
+		expect(breakable('RC-001 Battery thermal protection')).toEqual([
+			'RC-001 Battery thermal protection'
+		]);
+		expect(breakable('on-ground')).toEqual(['on-', 'ground']);
+		expect(breakable('flightController.gnss2Fix')).toEqual([
+			'flight',
+			'Controller.',
+			'gnss2',
+			'Fix'
+		]);
+		expect(breakable('ABC')).toEqual(['ABC']);
 	});
 });

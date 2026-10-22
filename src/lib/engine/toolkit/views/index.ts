@@ -9,3 +9,4 @@ export { renderView } from './render';
 export { featureValues } from './edits';
 export { elementFeatures } from './features';
 export { annotationChecks } from './annotationChecks';
+export { fmeaLines, riskPolicy } from './riskLines';

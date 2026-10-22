@@ -3,6 +3,7 @@
 	import type { ModelElement } from '#lib/project/elements.ts';
 	import type { Workspace } from '#lib/project/workspace.svelte.ts';
 	import type { WorkbenchUi } from './ui.svelte.ts';
+	import { breakable } from './views.ts';
 
 	/**
 	 * What satisfies or verifies a requirement, in a table cell: each name a
@@ -63,10 +64,17 @@
 					onclick={(e) => {
 						e.stopPropagation();
 						ui.select(element.key, 'table');
-					}}><Link2 size={12} aria-hidden="true" />{by}</button
+					}}
+					><Link2 size={12} aria-hidden="true" /><span
+						>{#each breakable(by) as part, i (i)}{#if i}<wbr />{/if}{part}{/each}</span
+					></button
 				>
 			{:else}
-				<span class="ref plain"><Link2 size={12} aria-hidden="true" />{by}</span>
+				<span class="ref plain"
+					><Link2 size={12} aria-hidden="true" /><span
+						>{#each breakable(by) as part, i (i)}{#if i}<wbr />{/if}{part}{/each}</span
+					></span
+				>
 			{/if}
 		{/each}
 	</span>
@@ -93,7 +101,8 @@
 		font-family: var(--font-mono);
 		font-size: var(--text-xs);
 		text-align: left;
-		overflow-wrap: anywhere;
+		/* Names break between their words (`burn|Injury`), not inside them. */
+		overflow-wrap: normal;
 		cursor: pointer;
 	}
 	.ref :global(svg) {
