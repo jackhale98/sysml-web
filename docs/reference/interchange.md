@@ -2,7 +2,8 @@
 
 Status: research reference, written for our earlier engine's `sysml-interchange` work (`sysml-cli`,
 replaced by the Open-MBEE sysml-toolkit under decision #16; the app now reads and writes `.kpar` in
-TypeScript, `src/lib/interchange/kpar.ts`). Sources are the formal OMG
+TypeScript, `src/lib/interchange/kpar.ts`, and exchanges element JSON and talks to API servers as
+`docs/interchange.md` describes). Sources are the formal OMG
 specs (KerML 1.0 formal/2025-09-01, SysML 2.0, Systems Modeling API and Services 1.0
 formal/2025-09-04) plus direct inspection of the release artifacts in
 `sysml-v2-release/` (`sysml.library.kpar/`, `sysml.library.xmi/`, `sysml.library.xmi.implied/`).

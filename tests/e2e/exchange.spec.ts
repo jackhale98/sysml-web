@@ -162,7 +162,7 @@ test('an API server: connect with a token, open a project, change it and save th
 
 	// Pull: the latest commit on main, as a new project.
 	await dialog.getByRole('radio', { name: /Garage/ }).check();
-	await expect(dialog.getByLabel('Branch')).toHaveValue(/.+/);
+	await expect(dialog.getByRole('combobox', { name: 'Branch' })).toHaveValue(/.+/);
 	await dialog.getByRole('button', { name: 'Open from server' }).click();
 	await expect(dialog.getByTestId('import-summary')).toContainText('Everything came across', {
 		timeout: 30_000

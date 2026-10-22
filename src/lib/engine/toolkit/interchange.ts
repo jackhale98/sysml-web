@@ -393,23 +393,28 @@ export function importModel(tk: Toolkit, library: TkLibrary, text: string): Inte
 	let liftedElements: ElementJson[];
 	let units: { name: string; text: string }[];
 	try {
-		for (const warning of JSON.parse(lifted.warnings()) as string[])
-			notes.push({ kind: 'warning', message: plainWarning(warning) });
 		liftedElements = JSON.parse(lifted.toCompactJson()) as ElementJson[];
-		// What the file had that the model lifted from it has not.
-		const kept = new Set(liftedElements.map((e) => e['@id']));
 		const byId = new Map(own.map((e) => [e['@id'], e]));
-		for (const e of own)
-			if (!kept.has(e['@id']) && e.isImplied !== true)
-				notes.push({
-					kind: 'left-out',
-					message: `Not carried over: ${article(e['@type'])}.`,
-					element: elementLabel(e, byId)
-				});
+		const kept = new Set(liftedElements.map((e) => e['@id']));
+		const lost = new Set(
+			own.filter((e) => !kept.has(e['@id']) && e.isImplied !== true).map((e) => e['@id'])
+		);
+		// The toolkit's warnings: types it doesn't know go with what was left out; that
+		// ids weren't kept says nothing new (text has no ids).
+		const unknown = new Set<string>();
+		for (const warning of JSON.parse(lifted.warnings()) as string[]) {
+			const type = /^unsupported owned element @type (\w+)/.exec(warning)?.[1];
+			if (type) unknown.add(type);
+			else if (!/no structural counterpart|ids are not preserved/.test(warning))
+				notes.push({ kind: 'warning', message: plainWarning(warning) });
+		}
+		notes.push(...leftOutNotes(own, lost, byId, unknown));
 		// What the file says that the lifted model doesn't (a value the text can't hold).
 		const canonical = JSON.parse(
 			tk.canonicalizeCompact(JSON.stringify(liftedElements))
 		) as ElementJson[];
+		const keptOnly = (value: unknown) =>
+			Array.isArray(value) ? value.filter((v) => !(isRef(v) && lost.has(v['@id']))) : value;
 		for (const l of canonical) {
 			spellRedefined(l);
 			const e = byId.get(l['@id']);
@@ -419,12 +424,14 @@ export function importModel(tk: Toolkit, library: TkLibrary, text: string): Inte
 					p !== '@id' &&
 					p !== 'elementId' &&
 					p in e &&
-					JSON.stringify(e[p] ?? null) !== JSON.stringify(l[p] ?? null)
+					JSON.stringify(keptOnly(e[p]) ?? null) !== JSON.stringify(l[p] ?? null)
 			);
 			if (properties.length)
 				notes.push({
 					kind: 'changed',
-					message: `${article(e['@type'], true)} reads differently from the file: ${properties.map((p) => `${p} ${JSON.stringify(e[p])} → ${JSON.stringify(l[p])}`).join(', ')}.`,
+					message: `${article(e['@type'], true)} reads differently from the file: ${properties
+						.map((p) => `${p} ${shown(e[p], byId)} → ${shown(l[p], byId)}`)
+						.join(', ')}.`,
 					element: elementLabel(e, byId)
 				});
 		}
@@ -632,6 +639,66 @@ export function mendPrinted(
 		return { path: file.path, text: lines.join('\n') };
 	});
 	return { files: out, changed, messages };
+}
+
+/**
+ * What the file had that the text hasn't, once each: an element left out
+ * takes what it owns and the membership that owned it along.
+ */
+function leftOutNotes(
+	own: ElementJson[],
+	lost: Set<string>,
+	byId: Map<string, ElementJson>,
+	unknown: Set<string>
+): ImportNote[] {
+	// A relationship that only owned lost elements goes with them.
+	const carrier = (e: ElementJson) =>
+		Array.isArray(e.ownedRelatedElement) &&
+		e.ownedRelatedElement.length > 0 &&
+		e.ownedRelatedElement.every((r) => isRef(r) && lost.has(r['@id']));
+	const notes: ImportNote[] = [];
+	const said = new Set<string>();
+	for (const e of own) {
+		if (!lost.has(e['@id']) || carrier(e)) continue;
+		let inside = false;
+		for (let owner = ownerOf(e), depth = 0; owner && depth < 64; depth++) {
+			const parent = byId.get(owner);
+			if (!parent) break;
+			if (lost.has(owner) && !carrier(parent)) {
+				inside = true;
+				break;
+			}
+			owner = ownerOf(parent);
+		}
+		if (inside) continue;
+		said.add(e['@type']);
+		notes.push({
+			kind: 'left-out',
+			message: unknown.has(e['@type'])
+				? `Left out: ${article(e['@type'])}, which isn’t a SysML element the engine knows.`
+				: `Not carried over: ${article(e['@type'])}.`,
+			element: elementLabel(e, byId)
+		});
+	}
+	for (const type of unknown)
+		if (!said.has(type))
+			notes.push({
+				kind: 'warning',
+				message: plainWarning(`unsupported owned element @type ${type}`)
+			});
+	return notes;
+}
+
+/** A property's value in a note: plain values as JSON, references by name. */
+function shown(value: unknown, byId: Map<string, ElementJson>): string {
+	const named = (id: string) => {
+		const e = byId.get(id);
+		return e ? namePath(e, byId) : id.slice(0, 8);
+	};
+	if (isRef(value)) return named(value['@id']);
+	if (Array.isArray(value) && value.some(isRef))
+		return `[${value.map((v) => (isRef(v) ? named(v['@id']) : JSON.stringify(v))).join(', ')}]`;
+	return JSON.stringify(value);
 }
 
 /** An element of a JSON file, by its qualified name when it has one. */

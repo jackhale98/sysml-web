@@ -337,7 +337,15 @@
 						<li><strong>{count(c.updated.length, 'element')}</strong> changed</li>
 						<li><strong>{count(c.deleted.length, 'element')}</strong> removed</li>
 					</ul>
-					{#if c.deleted.length}
+					{#if plan.matched === 0 && c.deleted.length}
+						<p class="xc-note warn" data-testid="push-unrelated">
+							<TriangleAlert size={16} aria-hidden="true" />
+							<span
+								>Nothing in {project?.name} matches this project: saving replaces all of it. Is it the
+								right project? To keep both, save as a new project there instead.</span
+							>
+						</p>
+					{:else if c.deleted.length}
 						<p class="xc-note warn">
 							<TriangleAlert size={16} aria-hidden="true" />
 							<span
@@ -395,7 +403,7 @@
 					<label class="xc-field" for="{uid}-commit">
 						Version to open
 						<select id="{uid}-commit" bind:value={commitId} disabled={!!busy}>
-							<option value="">Latest on {branch?.name ?? 'the branch'}</option>
+							<option value="">{branch ? `Latest on ${branch.name}` : 'The latest version'}</option>
 							{#each commits as c (c.id)}
 								<option value={c.id}
 									>{c.description || 'Commit'} · {when(c.created)} · {shortId(c.id)}</option

@@ -198,11 +198,11 @@ describe('import', () => {
 		sample.find((e) => e.declaredName === 'car')!.isComposite = true;
 		const result = host.importInterchange(JSON.stringify(sample));
 		const said = result.notes.map((n) => `${n.kind}: ${n.message} ${n.element ?? ''}`).join('\n');
-		expect(said).toMatch(/fancy widget/i);
-		expect(said).toContain('Garage::gizmo');
-		expect(said).toMatch(
-			/changed: A part usage reads differently from the file: isComposite true → false\. Garage::car/
-		);
+		// Once each, in plain words: the widget (with its membership), and the value that changed.
+		expect(said.split('\n')).toEqual([
+			'left-out: Left out: a fancy widget, which isn’t a SysML element the engine knows. Garage::gizmo (FancyWidget)',
+			'changed: A part usage reads differently from the file: isComposite true → false. Garage::car (PartUsage)'
+		]);
 		expect(result.files[0]!.text).toContain('part def Vehicle');
 	});
 
