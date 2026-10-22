@@ -106,6 +106,10 @@ export class WorkbenchUi {
 	sourceControlOpen = $state(false);
 	/** The "import requirements from a spreadsheet" dialog (mounted by the host). */
 	importOpen = $state(false);
+	/** "Download as SysML v2 JSON" (mounted by the host). */
+	exportJsonOpen = $state(false);
+	/** "Connect to a SysML v2 API server" (mounted by the host). */
+	apiServerOpen = $state(false);
 	/** The guided form on show, if any (mounted by the host). */
 	create = $state.raw<CreateRequest | null>(null);
 	/** The help guide (mounted by the host when first opened), at a topic. */

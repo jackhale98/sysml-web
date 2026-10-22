@@ -13,34 +13,43 @@ let toolkit: ToolkitClient | undefined;
 const absolute = (path: string) =>
 	new URL(asset(path as Parameters<typeof asset>[0]), location.href).href;
 
+/** Where the toolkit's files are. */
+const toolkitFiles = () => ({
+	glueUrl: absolute('toolkit/sysmlv2.js'),
+	wasmUrl: absolute('toolkit/sysmlv2_bg.wasm'),
+	bundleUrl: absolute('toolkit/stdlib/sysml-library.json.gz'),
+	preparedUrl: absolute('toolkit/stdlib/sysml-library.prepared.gz'),
+	version: toolkitRelease.version,
+	snapshotCache: SNAPSHOT_CACHE
+});
+
+/**
+ * A second engine for one heavy job (writing the standard library as JSON),
+ * to `terminate()` once it's done: the memory it took goes with its worker,
+ * and the workbench's engine is not slowed down meanwhile.
+ */
+export function startSpareEngine(): Engine {
+	return toolkitEngine(startToolkit(toolkitFiles, { restarts: 0 }));
+}
+
 /** The app-wide engine (the sysml-toolkit, in a worker), started on first use. */
 export function getEngine(): Engine {
 	if (engine) return engine;
-	toolkit = startToolkit(
-		() => ({
-			glueUrl: absolute('toolkit/sysmlv2.js'),
-			wasmUrl: absolute('toolkit/sysmlv2_bg.wasm'),
-			bundleUrl: absolute('toolkit/stdlib/sysml-library.json.gz'),
-			preparedUrl: absolute('toolkit/stdlib/sysml-library.prepared.gz'),
-			version: toolkitRelease.version,
-			snapshotCache: SNAPSHOT_CACHE
-		}),
-		{
-			onReady: (stats) => {
-				performance.mark('sysml:toolkit-ready', { detail: stats });
-				// Keep the engine for offline use, once it has been used.
-				pwa.warmEngineCache();
-				if (stats.library === 'source')
-					whenIdle(() => wantsSnapshot() && toolkit?.prefetchSnapshot());
-			},
-			// Once, plainly; the problems list has the reason.
-			onFailure: () =>
-				toasts.show('The SysML engine stopped working. Reload the page to try again.', {
-					tone: 'error',
-					duration: 0
-				})
-		}
-	);
+	toolkit = startToolkit(toolkitFiles, {
+		onReady: (stats) => {
+			performance.mark('sysml:toolkit-ready', { detail: stats });
+			// Keep the engine for offline use, once it has been used.
+			pwa.warmEngineCache();
+			if (stats.library === 'source')
+				whenIdle(() => wantsSnapshot() && toolkit?.prefetchSnapshot());
+		},
+		// Once, plainly; the problems list has the reason.
+		onFailure: () =>
+			toasts.show('The SysML engine stopped working. Reload the page to try again.', {
+				tone: 'error',
+				duration: 0
+			})
+	});
 	engine = toolkitEngine(toolkit);
 	return engine;
 }

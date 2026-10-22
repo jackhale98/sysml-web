@@ -445,7 +445,9 @@ export class SyntaxServices {
 }
 
 /** The formatter's settings (a `sysmlint.json`): four spaces, as the app writes SysML. */
-const FORMAT_CONFIG = JSON.stringify({ rules: { indentation: { style: 'spaces', size: 4 } } });
+export const FORMAT_CONFIG = JSON.stringify({
+	rules: { indentation: { style: 'spaces', size: 4 } }
+});
 
 /** A workspace edit as minimal changes per project file. */
 function workspaceChanges(edit: LspWorkspaceEdit, files: SourceFile[]): FileChange[] {

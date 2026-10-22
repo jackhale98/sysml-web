@@ -386,6 +386,31 @@ export const HELP: HelpSection[] = [
 				action: { action: 'save-github', label: 'Save to GitHub' }
 			},
 			{
+				id: 'exchange-models',
+				title: 'Exchange models with other tools',
+				keywords:
+					'json interchange kerml export import api server syson pilot omg rest cors kpar other tool standard library open save',
+				blocks: [
+					'Other SysML v2 tools read and write models in three ways, and Fairtide does all three. Your SysML text stays the source of truth: what comes in is written as text, and what goes out is made from it.',
+					{
+						list: [
+							'**A .kpar file**: the project’s SysML text in one archive. **Download as .kpar** in the project menu writes one; **Import** on **Your projects** opens one. Everything comes across exactly as written.',
+							'**SysML v2 JSON**: the standard file of model elements, each with an id and a type, that API servers and many tools exchange. **Download as SysML v2 JSON…** in the project menu writes it: only your model (it refers to the standard library by its standard ids, which every tool knows), or with the standard library too, so the file stands on its own. **Import** on **Your projects** reads one and writes it as SysML text.',
+							'**A SysML v2 API server**, such as the OMG pilot server or SysON (its address ends in `/api/rest`): **Connect to a SysML v2 API server…** in the project menu.'
+						]
+					},
+					'An import says what came across and what didn’t, in a few lines; **Download the full list** gives all of it as a text file. JSON holds no comments, blank lines or layout, so a model that went through JSON reads the way the engine writes SysML, and element ids are not kept in the text (they come from file names here).',
+					{
+						steps: [
+							'**Open from server**: choose the project, its branch and a version (the latest, or an earlier commit). It opens as a new project on this device.',
+							'**Save to server**: Fairtide reads the branch’s latest version, matches your elements to the server’s and saves only what differs, as one commit. What the server has and your project doesn’t is removed in that commit; earlier commits keep it.'
+						]
+					},
+					'The browser talks to the server directly (there is no Fairtide server in between), so the server must allow this page. It answers `OPTIONS` requests and sends `Access-Control-Allow-Origin` with this page’s address (or `*`), `Access-Control-Allow-Headers: Authorization, Content-Type`, `Access-Control-Allow-Methods: GET, POST` and `Access-Control-Expose-Headers: Link` (for long lists). If it doesn’t, Fairtide says so: ask whoever runs it. A token stays on this device and goes only to its server.'
+				],
+				action: { action: 'export-json', label: 'Download as SysML v2 JSON' }
+			},
+			{
 				id: 'install',
 				title: 'Install it on my phone',
 				keywords: 'app home screen offline pwa android iphone ipad desktop',
@@ -502,7 +527,8 @@ export const HELP: HelpSection[] = [
 						list: [
 							'**GitHub**: **Save to GitHub…** keeps every version, with who changed what, and lets your team work on it too. Only GitHub sees the files.',
 							'**A folder**: open a folder (in Chrome or Edge on a computer) and Fairtide saves back to the files there.',
-							'**A file**: **Download as .kpar** in the project menu saves the whole project as one file, which any SysML v2 tool can read. Import it again from **Your projects**.'
+							'**A file**: **Download as .kpar** in the project menu saves the whole project as one file, which any SysML v2 tool can read. Import it again from **Your projects**.',
+							'**Another tool or a server**: **Download as SysML v2 JSON…** and **Connect to a SysML v2 API server…** (see **Exchange models with other tools**).'
 						]
 					},
 					'**Settings** › **Projects & storage** shows how much space is used and can ask the browser to keep your projects.'
