@@ -1408,6 +1408,10 @@
 			.bar {
 			display: none;
 		}
+		/* So does it while a diagram's form is a bottom sheet: its buttons stay where they are tapped. */
+		.workbench:has(:global([data-form-sheet])) .bar {
+			display: none;
+		}
 	}
 
 	@media (prefers-reduced-motion: reduce) {

@@ -181,7 +181,10 @@ export async function layout(
 			'elk.edgeLabels.placement': 'CENTER',
 			'elk.layered.mergeEdges': 'false',
 			'elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF',
-			'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES'
+			'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES',
+			// A state machine reads from where it starts: the transitions that go back
+			// up are the ones to states declared earlier.
+			...(view === 'states' ? { 'elk.layered.cycleBreaking.strategy': 'MODEL_ORDER' } : {})
 		},
 		children: graph.nodes.map((node) => ({ id: node.id, ...nodeSize(node, view) })),
 		edges

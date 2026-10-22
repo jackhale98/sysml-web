@@ -10,6 +10,7 @@
  * `decide#1`, … for unnamed control nodes, numbered in declaration order.
  */
 import type { DiagramGraph, NodeKind } from '../../types';
+import { actionText, transitionParts, triggerText } from '../machines';
 import type { ElementRecord } from '../model';
 import { type DiagramContext, GraphBuilder, squash } from './context';
 import { labelName, toGraph, TkTree, type TkGraphNode } from './tkgraph';
@@ -90,14 +91,28 @@ class Behavior {
 			const source = this.ids.get(e.source);
 			const target = this.ids.get(e.target);
 			if (!source || !target) continue;
+			const record = e.id ? this.ctx.byId.get(e.id) : undefined;
 			if (this.view === 'state') {
-				this.g.edge(source, target, 'transition', e.label?.trim() || this.triggerOf(e.id));
+				const label = this.transitionLabel(record) ?? (e.label?.trim() || this.triggerOf(e.id));
+				this.g.edge(source, target, 'transition', label, record);
 			} else {
 				const payload = e.kind === 'flow' ? (e.label ?? '').replace(/^.*?:\s*/, '') : '';
-				this.g.edge(source, target, 'flow', e.kind === 'flow' ? payload || null : e.label || null);
+				this.g.edge(
+					source,
+					target,
+					'flow',
+					e.kind === 'flow' ? payload || null : e.label || null,
+					record
+				);
 			}
 		}
 		if (this.view === 'action') this.decisionBranches(placed);
+		else this.targetTransitions(placed);
+		// Where it starts first, so a layout in model order reads from the start down.
+		const first = (kind: string) => (kind === 'initial_state' ? 0 : 1);
+		this.g.nodes.sort((a, b) => first(a.kind) - first(b.kind));
+		const starts = new Set(this.g.nodes.filter((n) => n.kind === 'initial_state').map((n) => n.id));
+		this.g.edges.sort((a, b) => +!starts.has(a.source) - +!starts.has(b.source));
 	}
 
 	private node(n: TkGraphNode, root: TkGraphNode | undefined) {
@@ -146,6 +161,25 @@ class Behavior {
 		if (parent) this.g.edge(parent, id, 'containment');
 	}
 
+	/**
+	 * `trigger [guard] / effect` from the transition's text, as the emulator
+	 * reads it: the toolkit labels an assigning effect "assignment action".
+	 * Null when the text has none of them (the initial `entry; then x;`).
+	 */
+	private transitionLabel(record: ElementRecord | undefined): string | null {
+		if (!record || record.metaclass !== 'TransitionUsage') return null;
+		const parts = transitionParts(this.ctx.textOf(record));
+		const effect = parts.effect ? actionText(parts.effect) : undefined;
+		const label = [
+			parts.trigger && triggerText(parts.trigger),
+			parts.guard && `[${parts.guard}]`,
+			effect && `/ ${effect}`
+		]
+			.filter(Boolean)
+			.join(' ');
+		return label || null;
+	}
+
 	/** A transition's trigger as written, when the toolkit gives no label (`accept when …`). */
 	private triggerOf(id: string | undefined): string | null {
 		const record = id ? this.ctx.byId.get(id) : undefined;
@@ -156,6 +190,30 @@ class Behavior {
 		return [accept[1], accept[2] && `[${accept[2]}]`, accept[3] && `/ ${accept[3]}`]
 			.filter(Boolean)
 			.join(' ');
+	}
+
+	/**
+	 * `state b; accept Go then a;`: a transition without `first` leaves the
+	 * state declared before it, and the toolkit's state graph leaves it out.
+	 */
+	private targetTransitions(placed: Set<string>) {
+		for (const t of this.ctx.records) {
+			if (t.metaclass !== 'TransitionUsage' || placed.has(t.id) || !t.ownerId) continue;
+			const owner = t.ownerId === this.subject.id ? null : this.ids.get(t.ownerId);
+			if (t.ownerId !== this.subject.id && !owner) continue;
+			const parts = transitionParts(this.ctx.textOf(t));
+			if (parts.first || parts.head || !parts.target) continue;
+			let source: string | undefined;
+			for (const r of this.ctx.members(t.ownerId)) {
+				if (r.id === t.id) break;
+				if (r.metaclass === 'StateUsage' || r.metaclass === 'ExhibitStateUsage')
+					source = this.ids.get(r.id) ?? source;
+			}
+			if (!source) continue;
+			const name = squash(parts.target).replace(/::/g, '.');
+			const target = owner && this.g.has(`${owner}.${name}`) ? `${owner}.${name}` : name;
+			this.g.edge(source, target, 'transition', this.transitionLabel(t), t);
+		}
 	}
 
 	/**
@@ -193,7 +251,7 @@ class Behavior {
 			if (!source) continue;
 			const name = squash(branch[2]!);
 			const target = owner && this.g.has(`${owner}.${name}`) ? `${owner}.${name}` : name;
-			this.g.edge(source, target, 'flow', `[${branch[1] ?? 'else'}]`);
+			this.g.edge(source, target, 'flow', `[${branch[1] ?? 'else'}]`, t);
 		}
 	}
 }

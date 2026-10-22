@@ -152,13 +152,37 @@ export class GraphBuilder {
 		return full;
 	}
 
-	/** An edge between two drawn nodes; the same edge twice is kept once. */
-	edge(source: string, target: string, kind: EdgeKind, label: string | null = null): void {
+	/**
+	 * An edge between two drawn nodes; the same edge twice is kept once.
+	 * `record` is the element it draws (a transition, a succession), which
+	 * diagrams edit it through.
+	 */
+	edge(
+		source: string,
+		target: string,
+		kind: EdgeKind,
+		label: string | null = null,
+		record?: ElementRecord
+	): void {
 		if (!this.taken.has(source) || !this.taken.has(target)) return;
 		const key = `${kind}\u0000${source}\u0000${target}\u0000${label ?? ''}`;
 		if (this.edgeKeys.has(key)) return;
 		this.edgeKeys.add(key);
-		this.edges.push({ source, target, label, kind });
+		this.edges.push({
+			source,
+			target,
+			label,
+			kind,
+			...(record
+				? {
+						element: {
+							file: record.path,
+							start_byte: record.span.start_byte,
+							end_byte: record.span.end_byte
+						}
+					}
+				: {})
+		});
 	}
 
 	graph(direction = 'top_bottom'): DiagramGraph {
