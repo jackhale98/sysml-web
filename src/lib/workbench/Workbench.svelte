@@ -73,6 +73,8 @@
 	let sourceControlPrimed = $state(false);
 	let settingsPrimed = $state(false);
 	let importPrimed = $state(false);
+	let exportJsonPrimed = $state(false);
+	let apiServerPrimed = $state(false);
 	let createPrimed = $state(false);
 	let filesPrimed = $state(false);
 	let helpPrimed = $state(false);
@@ -86,6 +88,8 @@
 		if (ui.sourceControlOpen) sourceControlPrimed = true;
 		if (ui.settingsOpen) settingsPrimed = true;
 		if (ui.importOpen) importPrimed = true;
+		if (ui.exportJsonOpen) exportJsonPrimed = true;
+		if (ui.apiServerOpen) apiServerPrimed = true;
 	});
 	const loadEmulator = () => import('#lib/sim/StateEmulator.svelte').then((m) => m.default);
 	const loadLibraryFile = () => import('./LibraryFile.svelte').then((m) => m.default);
@@ -393,6 +397,8 @@
 				onopensettings={() => (ui.settingsOpen = true)}
 				onopensourcecontrol={() => (ui.sourceControlOpen = true)}
 				onimportrequirements={() => (ui.importOpen = true)}
+				onexportjson={() => (ui.exportJsonOpen = true)}
+				onapiserver={() => (ui.apiServerOpen = true)}
 				onreview={() => ui.open({ kind: 'review' })}
 				onhelp={() => ui.showHelp()}
 			/>
@@ -819,6 +825,27 @@
 	{#if importPrimed}
 		{#await import('#lib/dataio/ImportRequirements.svelte') then { default: ImportRequirements }}
 			<ImportRequirements {workspace} {ui} bind:open={ui.importOpen} />
+		{/await}
+	{/if}
+	{#if exportJsonPrimed}
+		{#await import('#lib/exchange/ExportJson.svelte') then { default: ExportJson }}
+			<ExportJson
+				{workspace}
+				{engine}
+				bind:open={ui.exportJsonOpen}
+				onhelp={() => ui.showHelp('exchange-models')}
+			/>
+		{/await}
+	{/if}
+	{#if apiServerPrimed}
+		{#await import('#lib/exchange/ApiServer.svelte') then { default: ApiServer }}
+			<ApiServer
+				{workspace}
+				{session}
+				{engine}
+				bind:open={ui.apiServerOpen}
+				onhelp={() => ui.showHelp('exchange-models')}
+			/>
 		{/await}
 	{/if}
 

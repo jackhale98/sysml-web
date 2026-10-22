@@ -156,6 +156,12 @@
 			case 'import-requirements':
 				ui.importOpen = true;
 				break;
+			case 'export-json':
+				ui.exportJsonOpen = true;
+				break;
+			case 'api-server':
+				ui.apiServerOpen = true;
+				break;
 			case 'create':
 				ui.create = action.request;
 				break;

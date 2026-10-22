@@ -33,6 +33,8 @@ export const GUIDE_ACTIONS = [
 	'problems',
 	'save-github',
 	'download',
+	'export-json',
+	'api-server',
 	'install',
 	'switch-project',
 	'new-project',
@@ -235,6 +237,12 @@ export async function runGuideAction(action: GuideAction, context: GuideContext)
 					toasts.show(error instanceof Error ? error.message : String(error), { tone: 'error' });
 				}
 			}
+			return;
+		case 'export-json':
+			ui.exportJsonOpen = true;
+			return;
+		case 'api-server':
+			ui.apiServerOpen = true;
 			return;
 		case 'install':
 			pwa.offerInstall();

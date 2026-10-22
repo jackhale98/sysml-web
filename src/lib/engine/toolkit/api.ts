@@ -69,6 +69,15 @@ export interface TkSession {
 	conforms(e: TkElement, ancestor: TkElement): boolean;
 	/** JSON `{qualifiedName, id, rendering, exposed: [{id, qualifiedName, metaclass}], …}` of a view usage (its filters applied to `exposed`). */
 	viewInfo(qualifiedName: string): string;
+	// Interchange (`interchange.ts`).
+	/** Compact interchange JSON (KerML 10.4) of the user units: non-derived properties, defaults elided. */
+	toCompactJson(): string;
+	/** Full interchange JSON: derived properties and implied relationships too. */
+	toFullJson(recoverRefs: boolean): string;
+	/** Non-fatal problems from lifting interchange JSON, a JSON string array. */
+	warnings(): string;
+	/** Respell references as the shortest names that resolve; JSON `{respelled, …}`. Handles go stale. */
+	minimizeQualifications(): string;
 }
 
 export interface TkLspServer {
@@ -102,6 +111,14 @@ export interface Toolkit {
 			library: TkLibrary,
 			settled: TkSettledOutcomes
 		): TkSession;
+		/** A session over sources alone (no library; `.kerml` units parse as KerML). */
+		fromSources(sourcesJson: string): TkSession;
+		/** Lift interchange JSON to text units (`units()`), resolved against the library. */
+		fromInterchangeJsonWithPreparedLibrary(
+			json: string,
+			library: TkLibrary,
+			indent?: string | null
+		): TkSession;
 	};
 	LspServer: {
 		/** A server for the syntax tier only (no standard library). */
@@ -115,6 +132,8 @@ export interface Toolkit {
 	/** JSON `{spelling, quoted}`. */
 	canonicalName(name: string, dialect?: string | null): string;
 	formatSource(text: string, configJson?: string | null): string;
+	/** A compact element array (JSON text) with every absent property spelled at its default. */
+	canonicalizeCompact(json: string): string;
 }
 
 /** A source unit as the toolkit takes it. */

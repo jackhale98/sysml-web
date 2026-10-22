@@ -1,0 +1,354 @@
+[
+	{
+		"@id": "7c84d004-dc5f-4098-a935-a93ed14ca1fd",
+		"@type": "Namespace",
+		"elementId": "7c84d004-dc5f-4098-a935-a93ed14ca1fd",
+		"ownedRelationship": [
+			{
+				"@id": "82484988-48b2-4beb-be55-708ee65a4126"
+			}
+		],
+		"owningRelationship": null
+	},
+	{
+		"@id": "82484988-48b2-4beb-be55-708ee65a4126",
+		"@type": "OwningMembership",
+		"elementId": "82484988-48b2-4beb-be55-708ee65a4126",
+		"owningRelatedElement": {
+			"@id": "7c84d004-dc5f-4098-a935-a93ed14ca1fd"
+		},
+		"ownedRelatedElement": [
+			{
+				"@id": "9820ca43-f039-42a6-902c-ce3c203a1ae1"
+			}
+		],
+		"visibility": "public",
+		"memberElement": {
+			"@id": "9820ca43-f039-42a6-902c-ce3c203a1ae1"
+		}
+	},
+	{
+		"@id": "9820ca43-f039-42a6-902c-ce3c203a1ae1",
+		"@type": "Package",
+		"elementId": "9820ca43-f039-42a6-902c-ce3c203a1ae1",
+		"declaredName": "Garage",
+		"name": "Garage",
+		"qualifiedName": "Garage",
+		"owningRelationship": {
+			"@id": "82484988-48b2-4beb-be55-708ee65a4126"
+		},
+		"ownedRelationship": [
+			{
+				"@id": "3f55485a-f9c7-4f03-8683-92be096e2a49"
+			},
+			{
+				"@id": "894c520d-f49f-4fd4-abb3-f6ac8ea13f57"
+			},
+			{
+				"@id": "678fb58a-5375-4eee-b0bc-6df38583d600"
+			},
+			{
+				"@id": "484724bc-a60e-4fa5-9303-e627a52e0e9b"
+			}
+		]
+	},
+	{
+		"@id": "3f55485a-f9c7-4f03-8683-92be096e2a49",
+		"@type": "OwningMembership",
+		"elementId": "3f55485a-f9c7-4f03-8683-92be096e2a49",
+		"owningRelatedElement": {
+			"@id": "9820ca43-f039-42a6-902c-ce3c203a1ae1"
+		},
+		"ownedRelatedElement": [
+			{
+				"@id": "0f708f8d-19f2-4b27-9995-c0eb29d5362b"
+			}
+		],
+		"visibility": "public",
+		"memberElement": {
+			"@id": "0f708f8d-19f2-4b27-9995-c0eb29d5362b"
+		}
+	},
+	{
+		"@id": "0f708f8d-19f2-4b27-9995-c0eb29d5362b",
+		"@type": "Documentation",
+		"elementId": "0f708f8d-19f2-4b27-9995-c0eb29d5362b",
+		"body": "A small model written by hand, the way another tool writes SysML v2 JSON.",
+		"owningRelationship": {
+			"@id": "3f55485a-f9c7-4f03-8683-92be096e2a49"
+		}
+	},
+	{
+		"@id": "894c520d-f49f-4fd4-abb3-f6ac8ea13f57",
+		"@type": "OwningMembership",
+		"elementId": "894c520d-f49f-4fd4-abb3-f6ac8ea13f57",
+		"owningRelatedElement": {
+			"@id": "9820ca43-f039-42a6-902c-ce3c203a1ae1"
+		},
+		"ownedRelatedElement": [
+			{
+				"@id": "8ada7d86-472d-4574-b0af-400cca146d8e"
+			}
+		],
+		"visibility": "public",
+		"memberElement": {
+			"@id": "8ada7d86-472d-4574-b0af-400cca146d8e"
+		}
+	},
+	{
+		"@id": "8ada7d86-472d-4574-b0af-400cca146d8e",
+		"@type": "PartDefinition",
+		"elementId": "8ada7d86-472d-4574-b0af-400cca146d8e",
+		"declaredName": "Vehicle",
+		"name": "Vehicle",
+		"qualifiedName": "Garage::Vehicle",
+		"isAbstract": false,
+		"owningRelationship": {
+			"@id": "894c520d-f49f-4fd4-abb3-f6ac8ea13f57"
+		},
+		"ownedRelationship": [
+			{
+				"@id": "96949829-9693-4e7d-8579-02e07fa4c537"
+			},
+			{
+				"@id": "d2b754cc-48a2-422e-bfea-290a3344e18c"
+			}
+		]
+	},
+	{
+		"@id": "96949829-9693-4e7d-8579-02e07fa4c537",
+		"@type": "FeatureMembership",
+		"elementId": "96949829-9693-4e7d-8579-02e07fa4c537",
+		"owningRelatedElement": {
+			"@id": "8ada7d86-472d-4574-b0af-400cca146d8e"
+		},
+		"ownedRelatedElement": [
+			{
+				"@id": "bbdfde91-286f-4c5a-91b1-6ae1570175d7"
+			}
+		],
+		"visibility": "public",
+		"memberElement": {
+			"@id": "bbdfde91-286f-4c5a-91b1-6ae1570175d7"
+		}
+	},
+	{
+		"@id": "bbdfde91-286f-4c5a-91b1-6ae1570175d7",
+		"@type": "AttributeUsage",
+		"elementId": "bbdfde91-286f-4c5a-91b1-6ae1570175d7",
+		"declaredName": "mass",
+		"owningRelationship": {
+			"@id": "96949829-9693-4e7d-8579-02e07fa4c537"
+		},
+		"ownedRelationship": [
+			{
+				"@id": "011a7b3a-ceee-46c0-bec8-4513ac5b7bfe"
+			}
+		]
+	},
+	{
+		"@id": "011a7b3a-ceee-46c0-bec8-4513ac5b7bfe",
+		"@type": "Subsetting",
+		"elementId": "011a7b3a-ceee-46c0-bec8-4513ac5b7bfe",
+		"owningRelatedElement": {
+			"@id": "bbdfde91-286f-4c5a-91b1-6ae1570175d7"
+		},
+		"subsettingFeature": {
+			"@id": "bbdfde91-286f-4c5a-91b1-6ae1570175d7"
+		},
+		"subsettedFeature": {
+			"@id": "9af08108-292b-534a-a527-068c17423dfd"
+		},
+		"general": {
+			"@id": "9af08108-292b-534a-a527-068c17423dfd"
+		},
+		"specific": {
+			"@id": "bbdfde91-286f-4c5a-91b1-6ae1570175d7"
+		}
+	},
+	{
+		"@id": "d2b754cc-48a2-422e-bfea-290a3344e18c",
+		"@type": "FeatureMembership",
+		"elementId": "d2b754cc-48a2-422e-bfea-290a3344e18c",
+		"owningRelatedElement": {
+			"@id": "8ada7d86-472d-4574-b0af-400cca146d8e"
+		},
+		"ownedRelatedElement": [
+			{
+				"@id": "232d230b-09bd-490c-bcdb-9394b3147d86"
+			}
+		],
+		"visibility": "public",
+		"memberElement": {
+			"@id": "232d230b-09bd-490c-bcdb-9394b3147d86"
+		}
+	},
+	{
+		"@id": "232d230b-09bd-490c-bcdb-9394b3147d86",
+		"@type": "PartUsage",
+		"elementId": "232d230b-09bd-490c-bcdb-9394b3147d86",
+		"declaredName": "engine",
+		"isComposite": true,
+		"owningRelationship": {
+			"@id": "d2b754cc-48a2-422e-bfea-290a3344e18c"
+		},
+		"ownedRelationship": [
+			{
+				"@id": "6bb527f7-1e13-42d3-8b23-18fd70f4f751"
+			}
+		]
+	},
+	{
+		"@id": "6bb527f7-1e13-42d3-8b23-18fd70f4f751",
+		"@type": "FeatureTyping",
+		"elementId": "6bb527f7-1e13-42d3-8b23-18fd70f4f751",
+		"owningRelatedElement": {
+			"@id": "232d230b-09bd-490c-bcdb-9394b3147d86"
+		},
+		"typedFeature": {
+			"@id": "232d230b-09bd-490c-bcdb-9394b3147d86"
+		},
+		"type": {
+			"@id": "ab2e9efb-4327-43eb-89d2-49cbd4f447bb"
+		},
+		"general": {
+			"@id": "ab2e9efb-4327-43eb-89d2-49cbd4f447bb"
+		},
+		"specific": {
+			"@id": "232d230b-09bd-490c-bcdb-9394b3147d86"
+		}
+	},
+	{
+		"@id": "678fb58a-5375-4eee-b0bc-6df38583d600",
+		"@type": "OwningMembership",
+		"elementId": "678fb58a-5375-4eee-b0bc-6df38583d600",
+		"owningRelatedElement": {
+			"@id": "9820ca43-f039-42a6-902c-ce3c203a1ae1"
+		},
+		"ownedRelatedElement": [
+			{
+				"@id": "ab2e9efb-4327-43eb-89d2-49cbd4f447bb"
+			}
+		],
+		"visibility": "public",
+		"memberElement": {
+			"@id": "ab2e9efb-4327-43eb-89d2-49cbd4f447bb"
+		}
+	},
+	{
+		"@id": "ab2e9efb-4327-43eb-89d2-49cbd4f447bb",
+		"@type": "PartDefinition",
+		"elementId": "ab2e9efb-4327-43eb-89d2-49cbd4f447bb",
+		"declaredName": "Engine",
+		"owningRelationship": {
+			"@id": "678fb58a-5375-4eee-b0bc-6df38583d600"
+		},
+		"ownedRelationship": [
+			{
+				"@id": "db1f057e-4890-4417-8af5-fb9acccd83da"
+			}
+		]
+	},
+	{
+		"@id": "db1f057e-4890-4417-8af5-fb9acccd83da",
+		"@type": "FeatureMembership",
+		"elementId": "db1f057e-4890-4417-8af5-fb9acccd83da",
+		"owningRelatedElement": {
+			"@id": "ab2e9efb-4327-43eb-89d2-49cbd4f447bb"
+		},
+		"ownedRelatedElement": [
+			{
+				"@id": "c5af0629-7772-4370-97f2-0a11d806e711"
+			}
+		],
+		"visibility": "public",
+		"memberElement": {
+			"@id": "c5af0629-7772-4370-97f2-0a11d806e711"
+		}
+	},
+	{
+		"@id": "c5af0629-7772-4370-97f2-0a11d806e711",
+		"@type": "AttributeUsage",
+		"elementId": "c5af0629-7772-4370-97f2-0a11d806e711",
+		"declaredName": "power",
+		"owningRelationship": {
+			"@id": "db1f057e-4890-4417-8af5-fb9acccd83da"
+		},
+		"ownedRelationship": [
+			{
+				"@id": "ef648feb-688c-40d0-bf7f-8b45326a148f"
+			}
+		]
+	},
+	{
+		"@id": "ef648feb-688c-40d0-bf7f-8b45326a148f",
+		"@type": "FeatureTyping",
+		"elementId": "ef648feb-688c-40d0-bf7f-8b45326a148f",
+		"owningRelatedElement": {
+			"@id": "c5af0629-7772-4370-97f2-0a11d806e711"
+		},
+		"typedFeature": {
+			"@id": "c5af0629-7772-4370-97f2-0a11d806e711"
+		},
+		"type": {
+			"@id": "14c0aa22-5489-59b5-b438-ded26e83ba31"
+		},
+		"general": {
+			"@id": "14c0aa22-5489-59b5-b438-ded26e83ba31"
+		},
+		"specific": {
+			"@id": "c5af0629-7772-4370-97f2-0a11d806e711"
+		}
+	},
+	{
+		"@id": "484724bc-a60e-4fa5-9303-e627a52e0e9b",
+		"@type": "OwningMembership",
+		"elementId": "484724bc-a60e-4fa5-9303-e627a52e0e9b",
+		"owningRelatedElement": {
+			"@id": "9820ca43-f039-42a6-902c-ce3c203a1ae1"
+		},
+		"ownedRelatedElement": [
+			{
+				"@id": "9f0f98fd-d4bb-451b-baf4-243d0d448b7a"
+			}
+		],
+		"visibility": "public",
+		"memberElement": {
+			"@id": "9f0f98fd-d4bb-451b-baf4-243d0d448b7a"
+		}
+	},
+	{
+		"@id": "9f0f98fd-d4bb-451b-baf4-243d0d448b7a",
+		"@type": "PartUsage",
+		"elementId": "9f0f98fd-d4bb-451b-baf4-243d0d448b7a",
+		"declaredName": "car",
+		"owningRelationship": {
+			"@id": "484724bc-a60e-4fa5-9303-e627a52e0e9b"
+		},
+		"ownedRelationship": [
+			{
+				"@id": "aace849f-f6b3-4b5e-9c1e-aa9efe6c7490"
+			}
+		]
+	},
+	{
+		"@id": "aace849f-f6b3-4b5e-9c1e-aa9efe6c7490",
+		"@type": "FeatureTyping",
+		"elementId": "aace849f-f6b3-4b5e-9c1e-aa9efe6c7490",
+		"owningRelatedElement": {
+			"@id": "9f0f98fd-d4bb-451b-baf4-243d0d448b7a"
+		},
+		"typedFeature": {
+			"@id": "9f0f98fd-d4bb-451b-baf4-243d0d448b7a"
+		},
+		"type": {
+			"@id": "8ada7d86-472d-4574-b0af-400cca146d8e"
+		},
+		"general": {
+			"@id": "8ada7d86-472d-4574-b0af-400cca146d8e"
+		},
+		"specific": {
+			"@id": "9f0f98fd-d4bb-451b-baf4-243d0d448b7a"
+		}
+	}
+]

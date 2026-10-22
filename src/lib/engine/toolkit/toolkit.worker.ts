@@ -11,6 +11,7 @@
  */
 import type { Method, SourceFile } from '../protocol';
 import type { DiagramView, EditRequest } from '../types';
+import type { InterchangeExportOptions } from '#lib/exchange/types.ts';
 import type { Toolkit } from './api';
 import { AnalysisSender } from './delta';
 import { ToolkitHost } from './host';
@@ -87,7 +88,7 @@ async function boot(i: ToolkitInit): Promise<ToolkitHost> {
 		}
 	}
 	library ??= new tk.PreparedLibrary(bundle, null);
-	const host = new ToolkitHost(tk, library, early, memoryMiB);
+	const host = new ToolkitHost(tk, library, early, memoryMiB, bundle);
 	latest = host;
 	post({
 		type: 'ready',
@@ -180,7 +181,10 @@ const handlers: { [M in Method]: Handler } = {
 	evaluate: (host, files: SourceFile[], ids: string[]) => host.evaluate(files, ids),
 	tradeStudies: (host, files: SourceFile[]) => host.tradeStudies(files),
 	compareModels: (host, base: SourceFile[], current: SourceFile[]) =>
-		host.compareModels(base, current)
+		host.compareModels(base, current),
+	exportInterchange: (host, files: SourceFile[], options: InterchangeExportOptions) =>
+		host.exportInterchange(files, options),
+	importInterchange: (host, json: string) => host.importInterchange(json)
 };
 
 /** A trap or a failed memory grow leaves the instance unusable: the page restarts the worker. */

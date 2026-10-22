@@ -30,7 +30,13 @@ export function loadHost(): Promise<ToolkitHost> {
 		const bundle = gunzipSync(
 			readFileSync(join(TOOLKIT, 'stdlib/sysml-library.json.gz'))
 		).toString();
-		return new ToolkitHost(tk, new tk.PreparedLibrary(bundle, null), undefined, toolkitMemoryMiB);
+		return new ToolkitHost(
+			tk,
+			new tk.PreparedLibrary(bundle, null),
+			undefined,
+			toolkitMemoryMiB,
+			bundle
+		);
 	})();
 	return host;
 }

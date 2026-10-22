@@ -30,6 +30,7 @@ describe('the help', () => {
 			'Make a report',
 			'Import from Excel',
 			'Save to GitHub',
+			'Exchange models with other tools',
 			'Install it on my phone',
 			'Switch projects'
 		]);
@@ -53,6 +54,8 @@ describe('the help', () => {
 		expect(searchHelp('budget')[0]?.id).toBe('check-budget');
 		expect(searchHelp('github').map((t) => t.id)).toContain('save-github');
 		expect(searchHelp('kpar').map((t) => t.id)).toContain('keep-copy');
+		expect(searchHelp('json')[0]?.id).toBe('exchange-models');
+		expect(searchHelp('syson').map((t) => t.id)).toContain('exchange-models');
 		expect(searchHelp('state machine')[0]?.id).toBe('concept-state-machine');
 		expect(searchHelp('xyzzy')).toEqual([]);
 		expect(searchHelp('')).toHaveLength(ALL_TOPICS.length);

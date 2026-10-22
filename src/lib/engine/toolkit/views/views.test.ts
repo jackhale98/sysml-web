@@ -325,6 +325,20 @@ describe('view usages: expose, filter and inherited tables', () => {
 		expect(render(one(src), 'plantPorts').rows).toEqual([['Pump', 'inlet']]);
 	});
 
+	it('expose a name written from the global scope (`$::`), as lifted JSON spells it', () => {
+		const src = `package Lib {
+			metadata def TableRendering;
+			view def Ports { @TableRendering { rows = "kind:port"; columns = "owner; element"; } }
+		}
+		package Arch {
+			port def P;
+			part def Pump { port inlet : P; }
+			part plant { part pump : Pump; }
+			view plantPorts : Lib::Ports { expose $::Arch::plant::**; }
+		}`;
+		expect(render(one(src), 'plantPorts').rows).toEqual([['Pump', 'inlet']]);
+	});
+
 	it('walk a usage’s body and type from package roots, and narrow by path', () => {
 		const src = `package Arch {
 			metadata def TableRendering;

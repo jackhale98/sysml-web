@@ -23,6 +23,11 @@ import type {
 	ViewInfo
 } from './types';
 import type { ModelComparison } from '#lib/review/types.ts';
+import type {
+	InterchangeExport,
+	InterchangeExportOptions,
+	InterchangeImport
+} from '#lib/exchange/types.ts';
 
 export interface SourceFile {
 	path: string;
@@ -73,6 +78,10 @@ export interface EngineApi {
 	tradeStudies(files: SourceFile[]): TradeStudy[];
 	/** What changed from `base` to `current`, element by element (`#lib/review/semantic.ts`). */
 	compareModels(base: SourceFile[], current: SourceFile[]): ModelComparison;
+	/** The project as SysML v2 JSON (KerML 10.4 element JSON). */
+	exportInterchange(files: SourceFile[], options: InterchangeExportOptions): InterchangeExport;
+	/** SysML v2 JSON as project files, and what didn't carry over. */
+	importInterchange(json: string): InterchangeImport;
 }
 
 export type Method = keyof EngineApi;

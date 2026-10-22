@@ -602,6 +602,30 @@ the toolkit refuses (another build) is deleted and the library loads from
 source. The service worker caches the toolkit's other files on first use, but
 never the snapshots (`src/lib/offline/caching.ts`).
 
+## Interchange
+
+`exportInterchange(files, options)` and `importInterchange(json)`
+(`toolkit/interchange.ts`) write the project as SysML v2 JSON (KerML 10.4
+element JSON) and read such a file as project text; the Systems Modeling API
+client (`src/lib/exchange/`) builds on both. The toolkit serializes
+(`toCompactJson`, `toFullJson`, `canonicalizeCompact`) and lifts JSON to
+text (`fromInterchangeJsonWithPreparedLibrary`, `units()`, `warnings()`,
+`minimizeQualifications()`); the app adds the standard library under its
+standard ids (in a second, short-lived worker: `startSpareEngine`), the
+redefined properties KerML 10.4.5 asks for, file names, mending two printer
+slips, and the report of what didn't carry over.
+
+What round-trips and what doesn't, the API's paths and what a server must
+allow (CORS) are in `docs/interchange.md`. In short: the demo goes to JSON
+and back with no problems and the same 6,291 elements (by qualified name and
+element by element); comments, layout and ids don't survive the trip
+through JSON; values the text can't hold, unknown element types and
+unresolved references are reported, not carried. Export of the demo takes
+0.2–0.4 s in Node (the full form with derived properties 1.6–4 s), the
+import about 2 s; with the standard library about 6 s in the browser (a
+54 MB file, 97,826 elements) and 140 MB of WebAssembly memory, in its own
+worker.
+
 ## When the toolkit fails
 
 A toolkit defect traps the WebAssembly instance (`RuntimeError: unreachable`);
@@ -778,3 +802,48 @@ Found while making the guided forms (sysml-toolkit 0.10.10):
   (P::a, P::b)` with `a` and `b` declared in package `P`) is undecided, while
   the same parts nested in a part give the sum; another case of request 6.
 
+Found while making model exchange (sysml-toolkit 0.10.10; `docs/interchange.md`):
+
+- **The printer writes a decision's `else` branch as `transition then X;`**,
+  which an action body doesn't allow. `package P { action def A { attribute
+  x : ScalarValues::Boolean; first start; then decide; if x then b; else c;
+  action b; action c; } }` → `toCompactJson` → `fromInterchangeJson…` →
+  `units()` has `transition then c;`, and checking it gives "a transition
+  usage is not allowed in an action body". The app mends it to `else c;`.
+- **The printer writes a `message` as a `flow`.** `package Q { part def T;
+  occurrence def S { part a; part b; message m of T from a to b; } }` lifts
+  to `flow m  of : T  from a to b;`, which fails
+  `validateFlowEndSubsetting` ("A flow end must identify a participant's
+  payload feature using dot notation"). The app mends it to `message m of T
+  from a to b;`. (The printer also leaves double spaces around `of :` and
+  `connect`, which the app collapses.)
+- **`canonicalizeCompact` spells redefined properties as null.** KerML
+  10.4.5 says a property redefined under another name is written too, with
+  the redefining value; the canonical form writes `memberElement`,
+  `general`/`specific`, `subsettedFeature`/`subsettingFeature` and
+  `conjugatedPortDefinition` as `null`, which fails the OMG schema
+  (`SysML.json` requires an object). The app fills them in.
+- **Unresolved references serialize as `{"@ref": "Name"}`** in the compact
+  form, which is not KerML 10.4 (a reference is `{"@id"}`) and fails the
+  schema. An option to omit them, or to report them separately, would do;
+  the app leaves them out and lists them.
+- **No way to serialize the standard library with its ids.** Only user
+  units serialize. The app opens the library's sources as user units in a
+  second session (1.5 s, 140 MB) and maps each element to the prepared
+  library's by place. A `toCompactJson` over library units (or the prepared
+  library) would be cheaper and exact by construction.
+- **User-model ids come from the unit name, opaquely.** They are UUIDv5s,
+  but not KerML 9.1's `uuid5(NAMESPACE_URL, base + topLevelName)` /
+  `uuid5(topId, path())`, and a host can't give a base URI per unit. With
+  one, a project could keep its ids through file renames and keep a
+  server's ids after a round trip; the app matches by place instead.
+- **`minimizeQualifications` reverts some sites to `$::…`**: on the lifted
+  demo it respells 1,057 references and reverts 4, the `expose
+  $::DroneArchitecture::drone::**` lines of the saved views (a feature chain
+  `r.$::DroneComponents::Rotor::mass` also stays). The app writes `expose
+  A::…` when the re-checked model is the same, and its view reader accepts
+  `$::`.
+- **`toFullJsonStrict` refuses the demo** ("62442 unavailable properties",
+  e.g. `definition`: "property has an incomplete derivation"), so the app's
+  "derived properties" export uses `toFullJson(false)` (valid against the
+  schema, 12,340 elements, 1.6–4 s on the demo).

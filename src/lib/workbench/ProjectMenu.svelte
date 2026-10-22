@@ -11,6 +11,7 @@
 		CloudUpload,
 		Download,
 		ExternalLink,
+		FileJson,
 		FolderOpen,
 		FolderUp,
 		GitBranch,
@@ -21,6 +22,7 @@
 		MonitorDown,
 		Plus,
 		RotateCcw,
+		Server,
 		Settings as SettingsIcon,
 		Upload,
 		WifiOff
@@ -56,6 +58,8 @@
 		onopensettings,
 		onopensourcecontrol,
 		onimportrequirements,
+		onexportjson,
+		onapiserver,
 		onreview,
 		onhelp
 	}: {
@@ -66,6 +70,10 @@
 		onopensourcecontrol?: () => void;
 		/** Shows "Import requirements…" when the host can open the import dialog. */
 		onimportrequirements?: () => void;
+		/** Shows "Download as SysML v2 JSON…" when the host can open it. */
+		onexportjson?: () => void;
+		/** Shows "Connect to a SysML v2 API server…" when the host can open it. */
+		onapiserver?: () => void;
 		/** Shows "Review changes" when the host can open the review. */
 		onreview?: () => void;
 		/** Opens the help; without it, "Help" goes to the help page. */
@@ -375,6 +383,32 @@
 				<button type="button" role="menuitem" onclick={exportKpar}>
 					<Download size={15} /> Download as .kpar
 				</button>
+				{#if onexportjson}
+					<button
+						type="button"
+						role="menuitem"
+						onclick={() => {
+							open = false;
+							onexportjson();
+						}}
+					>
+						<FileJson size={15} /> Download as SysML v2 JSON…
+					</button>
+				{/if}
+				{#if onapiserver}
+					<button
+						type="button"
+						role="menuitem"
+						disabled={offline}
+						onclick={() => {
+							open = false;
+							onapiserver();
+						}}
+					>
+						<Server size={15} /> Connect to a SysML v2 API server…
+						{#if offline}<small>offline</small>{/if}
+					</button>
+				{/if}
 				{#if onimportrequirements}
 					<button
 						type="button"

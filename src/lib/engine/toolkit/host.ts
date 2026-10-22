@@ -9,6 +9,11 @@
  * incremental path).
  */
 import { compareSnapshots } from '#lib/review/semantic.ts';
+import type {
+	InterchangeExport,
+	InterchangeExportOptions,
+	InterchangeImport
+} from '#lib/exchange/types.ts';
 import type { ModelComparison, ModelSnapshot } from '#lib/review/types.ts';
 import type { SourceFile } from '../protocol';
 import type {
@@ -54,6 +59,7 @@ import { extractMachines } from './machines';
 import { detailsOf, extractModel, findElement, type ExtractedModel, type UnitInfo } from './model';
 import { TextIndexCache } from './offsets';
 import { RepairMap } from './repair';
+import { exportModel, importModel } from './interchange';
 import { buildSnapshot } from './snapshot';
 import * as views from './views';
 
@@ -114,15 +120,19 @@ export class ToolkitHost {
 
 	/** The instance's WebAssembly memory in MiB (0 when unknown). */
 	private readonly memoryMiB: () => number;
+	/** The standard library's sources (JSON `[{name, text}]`), for exporting it. */
+	private readonly librarySources: string | undefined;
 
 	constructor(
 		tk: Toolkit,
 		library: TkLibrary,
 		syntax = new SyntaxServices(tk),
-		memoryMiB: () => number = () => 0
+		memoryMiB: () => number = () => 0,
+		librarySources?: string
 	) {
 		this.tk = tk;
 		this.library = library;
+		this.librarySources = librarySources;
 		this.language = new LanguageServices(tk, library);
 		this.syntax = syntax;
 		this.memoryMiB = memoryMiB;
@@ -396,6 +406,31 @@ export class ToolkitHost {
 				diff: Math.round(performance.now() - started - baseMs - currentMs)
 			}
 		};
+	}
+
+	/**
+	 * The project as SysML v2 JSON (`interchange.ts`), from the analysed
+	 * session: its ids are the ones the semantic diff compares by.
+	 */
+	exportInterchange(
+		files: SourceFile[],
+		options: InterchangeExportOptions = {}
+	): InterchangeExport {
+		const built = this.build(files);
+		if (!built.session)
+			throw new Error('The model could not be read, so there is nothing to export.');
+		return exportModel(this.tk, built.session, {
+			...options,
+			files: files.map((f) => f.path),
+			broken: built.analyses.filter((a) => a.model.syntax_errors.length).map((a) => a.model.file),
+			librarySources: this.librarySources,
+			prepared: options.library ? this.library : undefined
+		});
+	}
+
+	/** SysML v2 JSON as project files, with what didn't carry over (`interchange.ts`). */
+	importInterchange(json: string): InterchangeImport {
+		return importModel(this.tk, this.library, json);
 	}
 
 	/** The snapshot of an analysed build, made on first ask. */

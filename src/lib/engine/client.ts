@@ -39,6 +39,8 @@ export function toolkitEngine(toolkit: ToolkitClient): Engine {
 		evaluate: (...params) => toolkit.call('evaluate', ...params),
 		tradeStudies: (...params) => toolkit.call('tradeStudies', ...params),
 		compareModels: (...params) => toolkit.call('compareModels', ...params),
+		exportInterchange: (...params) => toolkit.call('exportInterchange', ...params),
+		importInterchange: (...params) => toolkit.call('importInterchange', ...params),
 		terminate: () => toolkit.terminate()
 	};
 }

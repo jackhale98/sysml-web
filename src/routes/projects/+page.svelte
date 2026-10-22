@@ -50,6 +50,7 @@
 		type StoredProject
 	} from '#lib/project/store.ts';
 	import type { ProjectFile } from '#lib/project/workspace.svelte.ts';
+	import type { InterchangeImport } from '#lib/exchange/types.ts';
 	import { pendingLabel } from '#lib/project/pending.ts';
 	import InstallCard from '#lib/offline/InstallCard.svelte';
 	import { forgetProject, lastProject, launchTarget, LAUNCH_PARAM } from '#lib/offline/launch.ts';
@@ -182,11 +183,54 @@
 		);
 	}
 
+	/** A SysML v2 JSON file waiting to be opened, with what came across. */
+	let imported = $state<{
+		result: InterchangeImport;
+		source: string;
+		name: string;
+	} | null>(null);
+	let importedOpen = $state(false);
+
+	/** A `.json` file, or one whose content starts as JSON does (an archive starts with `PK`). */
+	async function isJson(file: File): Promise<boolean> {
+		if (/\.json$/i.test(file.name)) return true;
+		if (/\.(kpar|zip)$/i.test(file.name)) return false;
+		const start = new TextDecoder().decode(await file.slice(0, 64).arrayBuffer()).trimStart();
+		return start.startsWith('[') || start.startsWith('{');
+	}
+
+	/** SysML v2 JSON (KerML 10.4 elements): the engine writes it as SysML text. */
+	async function importJson(file: File) {
+		busy = 'Reading the model…';
+		error = null;
+		try {
+			const result = await getEngine().importInterchange(await file.text());
+			imported = { result, source: file.name, name: file.name.replace(/\.json$/i, '') };
+			importedOpen = true;
+		} catch (e) {
+			const message = (e instanceof Error ? e.message : String(e)).replace(/^\w*Error: /, '');
+			error = `${file.name} could not be imported: ${message}`;
+		} finally {
+			busy = null;
+		}
+	}
+
+	async function openImported() {
+		if (!imported) return;
+		// Plain data: the browser's storage can't keep reactive state.
+		const { result, name } = $state.snapshot(imported);
+		await keep({ info: { name: name.trim() }, files: result.files, origin: 'archive' }, 'Opening…');
+	}
+
 	async function importArchive(event: Event) {
 		const input = event.currentTarget as HTMLInputElement;
 		const file = input.files?.[0];
 		input.value = '';
 		if (!file) return;
+		if (await isJson(file)) {
+			await importJson(file);
+			return;
+		}
 		busy = 'Reading the archive…';
 		try {
 			const { readProjectArchive } = await import('#lib/interchange/kpar.ts');
@@ -369,10 +413,17 @@
 
 			<div class="card">
 				<h2><FileArchive size={18} aria-hidden="true" /> Import</h2>
-				<p>A <code>.kpar</code> from any SysML v2 tool, or a <code>.zip</code> of a repository.</p>
+				<p>
+					A <code>.kpar</code> or SysML v2 JSON (<code>.json</code>) from any SysML v2 tool, or a
+					<code>.zip</code> of a repository.
+				</p>
 				<label class="file-button">
 					<FileArchive size={16} aria-hidden="true" /> Choose a file…
-					<input type="file" accept=".kpar,.zip,application/zip" onchange={importArchive} />
+					<input
+						type="file"
+						accept=".kpar,.zip,.json,application/zip,application/json"
+						onchange={importArchive}
+					/>
 				</label>
 			</div>
 
@@ -435,6 +486,20 @@
 </div>
 
 <OpenRepository bind:open={githubOpen} run={openFromGitHub} />
+
+<!-- Loaded when a JSON file is imported, to keep the first load small. -->
+{#if imported}
+	{#await import('#lib/exchange/ImportReport.svelte') then { default: ImportReport }}
+		<ImportReport
+			bind:open={importedOpen}
+			bind:name={imported.name}
+			result={imported.result}
+			source={imported.source}
+			busy={!!busy}
+			onopen={openImported}
+		/>
+	{/await}
+{/if}
 <Settings bind:open={settingsOpen} />
 
 <style>

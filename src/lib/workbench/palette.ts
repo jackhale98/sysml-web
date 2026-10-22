@@ -56,6 +56,8 @@ export type PaletteAction =
 	| { type: 'show-problems' }
 	| { type: 'switch-theme' }
 	| { type: 'import-requirements' }
+	| { type: 'export-json' }
+	| { type: 'api-server' }
 	/** Open a guided form (`#lib/create`). */
 	| { type: 'create'; request: CreateRequest }
 	/** Make a file, or rename, move or delete one (`files/FileHost.svelte`). */
@@ -496,6 +498,18 @@ export function commandItems(themeChoice: string): PaletteItem[] {
 			'Import requirements…',
 			{ type: 'import-requirements' },
 			{ aliases: 'excel xlsx csv spreadsheet paste upload' }
+		),
+		command(
+			'export-json',
+			'Download as SysML v2 JSON…',
+			{ type: 'export-json' },
+			{ aliases: 'export json interchange kerml omg standard file other tools save download' }
+		),
+		command(
+			'api-server',
+			'Connect to a SysML v2 API server…',
+			{ type: 'api-server' },
+			{ aliases: 'rest api syson pilot server open save push pull commit systems modeling' }
 		),
 		command(
 			'help',
