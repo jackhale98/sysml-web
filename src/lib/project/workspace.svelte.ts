@@ -71,6 +71,15 @@ export function isLibraryFile(path: string): boolean {
 }
 
 const ANALYSIS_DELAY_MS = 250;
+/**
+ * A model whose analysis takes longer than this (a large one: 10k lines and
+ * more on a laptop; not the demo on a phone) waits for a longer pause in
+ * typing before it is analysed, and before its checks run: the engine does
+ * one thing at a time, so completion asked for while typing would otherwise
+ * wait for an analysis to finish.
+ */
+const SLOW_ANALYSIS_MS = 2000;
+const SLOW_DELAY_MS = 1000;
 const UNDO_LIMIT = 50;
 
 interface UndoEntry {
@@ -175,33 +184,97 @@ export class Workspace {
 		}
 	}
 
-	/** Analyse every model file together, so references resolve across files. */
-	private async analyse(throwing = false) {
+	/** The analysis the engine is working on, and whether the text changed since it started. */
+	private inFlight: Promise<void> | null = null;
+	private queued = false;
+
+	/**
+	 * Analyse every model file together, so references resolve across files.
+	 * One analysis at a time: text that changes meanwhile is analysed once
+	 * this one is done (on a large model an analysis takes seconds, and the
+	 * engine would otherwise queue one per pause in typing).
+	 */
+	private async analyse(throwing = false): Promise<void> {
+		if (this.inFlight) {
+			if (!throwing) {
+				this.queued = true;
+				return;
+			}
+			await this.inFlight.catch(() => undefined);
+			return this.analyse(throwing);
+		}
+		const run = this.analyseNow(throwing);
+		this.inFlight = run;
+		try {
+			await run;
+		} finally {
+			this.inFlight = null;
+			if (this.queued) {
+				this.queued = false;
+				void this.analyse();
+			}
+		}
+	}
+
+	/** How long the latest analysis took (ms). */
+	private analysisMs = 0;
+
+	private analysisDelay(): number {
+		return this.analysisMs > SLOW_ANALYSIS_MS ? SLOW_DELAY_MS : ANALYSIS_DELAY_MS;
+	}
+
+	private async analyseNow(throwing: boolean) {
 		const engine = this.engine;
 		if (!engine) return;
 		const files = this.sourceFiles();
+		const unchanged = () => !this.queued && files.every((f) => this.files[f.path] === f.text);
 		try {
+			const started = performance.now();
 			const results = await engine.analyzeProject(files);
+			this.analysisMs = performance.now() - started;
 			// Drop the result if any file changed while the engine was working.
 			if (files.some((f) => this.files[f.path] !== f.text)) return;
 			this.analyses = Object.fromEntries(files.map((f, i) => [f.path, results[i]!]));
 			this.analysedTexts = Object.fromEntries(files.map((f) => [f.path, f.text]));
+			// For measurements (tests/perf): when each analysis reached the page.
+			performance.mark('sysml:analysed');
 			if (this.engineError) {
 				this.engineError = null;
 				if (this.state.phase === 'error') this.state = { phase: 'ready', millis: 0 };
 			}
+			// Newer text is waiting: its analysis brings views, machines and checks.
+			if (!unchanged()) return;
 			const views = await engine.listViews(files);
 			const machines = await engine.stateMachines(files);
 			if (files.every((f) => this.files[f.path] === f.text)) {
 				this.views = views;
 				this.machines = machines;
 			}
-			// Checks are extra: the model is usable without them.
-			const checks = await engine.checks(files).catch(() => null);
-			if (files.every((f) => this.files[f.path] === f.text)) this.checks = checks;
+			void this.check(files, performance.now() - started);
 		} catch (error) {
 			if (throwing) throw error;
 			this.failed(error);
+		}
+	}
+
+	/**
+	 * Checks are extra: the model is usable without them, so they follow the
+	 * analysis rather than hold it up. They cost about as much as an analysis,
+	 * and the engine does one thing at a time, so on a model that takes a
+	 * while to analyse they wait for a pause in typing first.
+	 */
+	private async check(files: ProjectFile[], analysedIn: number) {
+		const engine = this.engine;
+		if (!engine) return;
+		const unchanged = () => !this.queued && files.every((f) => this.files[f.path] === f.text);
+		if (analysedIn > SLOW_ANALYSIS_MS) {
+			await new Promise((resolve) => setTimeout(resolve, SLOW_DELAY_MS));
+			if (!unchanged() || this.inFlight) return;
+		}
+		const checks = await engine.checks(files).catch(() => null);
+		if (files.every((f) => this.files[f.path] === f.text)) {
+			this.checks = checks;
+			performance.mark('sysml:checked');
 		}
 	}
 
@@ -228,7 +301,7 @@ export class Workspace {
 		this.dirty.add(path);
 		if (!isModelFile(path)) return;
 		clearTimeout(this.timer);
-		this.timer = setTimeout(() => void this.analyse(), ANALYSIS_DELAY_MS);
+		this.timer = setTimeout(() => void this.analyse(), this.analysisDelay());
 	}
 
 	/** Editors register while open so engine edits go through their history. */
@@ -350,7 +423,7 @@ export class Workspace {
 		this.files = rest;
 		this.dirty.delete(path);
 		clearTimeout(this.timer);
-		this.timer = setTimeout(() => void this.analyse(), ANALYSIS_DELAY_MS);
+		this.timer = setTimeout(() => void this.analyse(), this.analysisDelay());
 	}
 
 	/** Replace a file's text with one minimal change, through its editor when open. */

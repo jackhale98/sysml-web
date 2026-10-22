@@ -127,8 +127,19 @@
 	}
 
 	function isOpen(node: TreeNode, depth: number): boolean {
-		return needle ? true : (expanded[node.element.key] ?? depth < 1);
+		return needle ? true : (expanded[node.element.key] ?? (depth < 1 && openRoots));
 	}
+
+	/**
+	 * Large models: top-level packages start closed when there are many, and a
+	 * long list shows its first entries with a button for the rest, so the
+	 * tree never puts tens of thousands of rows on the page at once.
+	 */
+	const OPEN_ROOTS = 30;
+	const PAGE = 200;
+	const openRoots = $derived(userRoots.length <= OPEN_ROOTS);
+	/** How many entries each list shows, by its owner's key ('' for the top level). */
+	let shownCount = $state<Record<string, number>>({});
 
 	const folders = $derived.by(() => {
 		const byFolder: Record<string, string[]> = {};
@@ -155,9 +166,11 @@
 	</li>
 {/snippet}
 
-{#snippet tree(nodes: TreeNode[], depth: number)}
+{#snippet tree(nodes: TreeNode[], depth: number, owner: string)}
+	{@const listed = nodes.filter(matches)}
+	{@const limit = shownCount[owner] ?? PAGE}
 	<ul role={depth === 0 ? 'tree' : 'group'} aria-label={depth === 0 ? 'Model' : undefined}>
-		{#each nodes.filter(matches) as node (node.element.key)}
+		{#each listed.length > limit ? listed.slice(0, limit) : listed as node (node.element.key)}
 			{@const open = isOpen(node, depth)}
 			{@const hasChildren = node.children.length > 0}
 			<li
@@ -195,10 +208,25 @@
 					</button>
 				</div>
 				{#if hasChildren && open}
-					{@render tree(node.children, depth + 1)}
+					{@render tree(node.children, depth + 1, node.element.key)}
 				{/if}
 			</li>
 		{/each}
+		{#if listed.length > limit}
+			{@const rest = listed.length - limit}
+			<li role="treeitem" aria-selected="false">
+				<div class="row" style:padding-left="{0.375 + depth * 0.875}rem">
+					<span class="twisty" aria-hidden="true"></span>
+					<button
+						type="button"
+						class="item more"
+						onclick={() => (shownCount[owner] = limit + PAGE * 5)}
+					>
+						{rest <= PAGE * 5 ? `Show ${rest} more` : `Show ${PAGE * 5} more of ${rest}`}
+					</button>
+				</div>
+			</li>
+		{/if}
 	</ul>
 {/snippet}
 
@@ -405,12 +433,12 @@
 			{/if}
 			<section aria-labelledby="model-heading">
 				<h2 id="model-heading">Model</h2>
-				{@render tree(userRoots, 0)}
+				{@render tree(userRoots, 0, '')}
 			</section>
 			{#if libraryRoots.length}
 				<details class="libraries" bind:open={librariesOpen}>
 					<summary>Project libraries</summary>
-					{#if librariesOpen}{@render tree(libraryRoots, 0)}{/if}
+					{#if librariesOpen}{@render tree(libraryRoots, 0, 'libraries/')}{/if}
 				</details>
 			{/if}
 			<details class="libraries" bind:open={standardOpen}>
