@@ -276,7 +276,11 @@ test('On a phone, New view is a full-screen form that fits', async ({ page }) =>
 	await page.setViewportSize({ width: 390, height: 844 });
 	await newProject(page, 'Rover');
 	await page.getByRole('button', { name: /Switch view/ }).click();
-	await page.getByRole('button', { name: 'New view' }).click();
+	// In the list of views (the overview's next steps have a "New view" too).
+	await page
+		.getByRole('dialog')
+		.getByRole('button', { name: /^New view/ })
+		.click();
 	const form = dialog(page, 'New view');
 	await expect(form).toBeVisible();
 	const box = (await form.boundingBox())!;

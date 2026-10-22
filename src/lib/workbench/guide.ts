@@ -11,7 +11,7 @@ import { leaving } from '#lib/project/leaving.svelte.ts';
 import type { ProjectSession } from '#lib/project/session.svelte.ts';
 import { isLibraryFile, type Workspace } from '#lib/project/workspace.svelte.ts';
 import { toasts } from '#lib/ui/toasts.svelte.ts';
-import { canOwnMembers } from './templates.ts';
+import { canOwnMembers, type AddKind } from './templates.ts';
 import type { WorkbenchUi } from './ui.svelte.ts';
 import { viewTitle } from './views.ts';
 
@@ -99,7 +99,7 @@ function requirementOwner(workspace: Workspace): ModelElement | undefined {
 	return (first && packageOf(workspace, first)) ?? own(workspace).find((e) => e.kind === 'package');
 }
 
-function openAdd(ui: WorkbenchUi, kind: 'part' | 'requirement', owner: ModelElement | undefined) {
+function openAdd(ui: WorkbenchUi, kind: AddKind, owner: ModelElement | undefined) {
 	ui.addKind = kind;
 	ui.addOwner = owner?.key ?? null;
 	ui.addSheet = true;
@@ -168,11 +168,25 @@ export async function runGuideAction(action: GuideAction, context: GuideContext)
 			ui.create = { kind: 'view', viewKind: 'budget', target: topPart(workspace)?.key };
 			return;
 		case 'state-machine':
-			ui.create = { kind: 'view', viewKind: 'states' };
+		case 'action-flow': {
+			// With nothing to draw yet, start by adding a state or action definition.
+			const kind = action === 'state-machine' ? 'state' : 'action';
+			const any = own(workspace).some((e) => e.kind === kind && e.isDefinition);
+			if (any) ui.create = { kind: 'view', viewKind: kind === 'state' ? 'states' : 'actions' };
+			else {
+				openAdd(
+					ui,
+					`${kind} def`,
+					own(workspace).find((e) => e.kind === 'package')
+				);
+				toasts.show(
+					kind === 'state'
+						? 'Name the state machine, then right-click it in a diagram to draw its states.'
+						: 'Name the process, then right-click it in a diagram to draw its steps.'
+				);
+			}
 			return;
-		case 'action-flow':
-			ui.create = { kind: 'view', viewKind: 'actions' };
-			return;
+		}
 		case 'report':
 			ui.create = { kind: 'view', viewKind: 'specification' };
 			return;

@@ -154,7 +154,7 @@
 				Select an element in the text, a diagram or the explorer to see what it is and change it.
 			</p>
 			<button type="button" class="help-link" onclick={() => ui.showHelp('definition-usage')}>
-				New to SysML? The ideas in plain words
+				New here? The ideas in plain words
 			</button>
 		</div>
 	{:else}

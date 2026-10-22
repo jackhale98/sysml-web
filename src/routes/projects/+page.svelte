@@ -5,6 +5,7 @@
 	import { resolve } from '$app/paths';
 	import {
 		ArrowRight,
+		CircleQuestionMark,
 		FileArchive,
 		FilePlus,
 		Flashlight,
@@ -247,6 +248,9 @@
 	<header class="top">
 		<a class="brand" href={resolve('/')}><Logo size={26} /> <Wordmark height={19} /></a>
 		<span class="tools">
+			<a class="icon-button" href={resolve('/help')} aria-label="Help" title="Help">
+				<CircleQuestionMark size={17} />
+			</a>
 			<button
 				type="button"
 				class="icon-button"
