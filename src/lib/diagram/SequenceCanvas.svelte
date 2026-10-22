@@ -95,6 +95,11 @@
 	const selected = $derived(ui.selection?.key ?? null);
 	/** The selection a click on the empty canvas dismissed the highlight for (it stays selected). */
 	let dismissed = $state<string | null>(null);
+	// Choosing an element again (here or anywhere) shows its highlight again.
+	$effect(() => {
+		void ui.selection?.nonce;
+		dismissed = null;
+	});
 	const lit = $derived(selected && selected !== dismissed ? selected : null);
 	const litLifeline = $derived(layout?.lifelines.find((l) => keyOf(l.node) === lit) ?? null);
 	const litMessage = $derived(layout?.messages.find((m) => keyOf(m.edge) === lit) ?? null);
@@ -360,7 +365,7 @@
 		e.stopPropagation();
 	}
 
-	/** Lifeline heads stay at the top while the messages scroll under them. */
+	/** Lifeline heads stay at the top while the messages scroll under them (drawn over them). */
 	const headsY = $derived(Math.max(view.y, 6 - SEQUENCE.headTop * view.k));
 	const stuck = $derived(view.y < 6 - SEQUENCE.headTop * view.k);
 
@@ -413,6 +418,45 @@
 	{/if}
 
 	{#if layout}
+		<div
+			class="heads"
+			class:stuck
+			style:width="{layout.width}px"
+			style:transform="translate({view.x}px, {headsY}px) scale({view.k})"
+		>
+			<ul aria-label="Lifelines">
+				{#each layout.lifelines as l (l.node.id)}
+					{@const Icon = iconOf(l.keyword.replace(/^ref\s+/, '').replace(/ /g, '_'))}
+					{@const state = lifelineState(l)}
+					<li>
+						<button
+							type="button"
+							class="head {state ?? ''}"
+							style:--fam="var(--kind-{l.family})"
+							style:left="{l.head.x}px"
+							style:top="{l.head.y}px"
+							style:width="{l.head.width}px"
+							style:height="{l.head.height}px"
+							aria-current={state === 'selected' ? 'true' : undefined}
+							title={docOf(l)}
+							onclick={() => select(l.node)}
+							onfocus={() => reveal({ ...l.head, y: 0 })}
+						>
+							<span class="visually-hidden">Lifeline</span>
+							<span class="keyword">
+								<Icon size={12} strokeWidth={2.25} aria-hidden="true" />«{l.keyword}»
+							</span>
+							<span class="title">
+								<span class="name">{l.name}</span>{#if l.type}<span class="type"
+										>{` : ${l.type}`}</span
+									>{/if}
+							</span>
+						</button>
+					</li>
+				{/each}
+			</ul>
+		</div>
+
 		<div
 			class="world"
 			style:width="{layout.width}px"
@@ -501,7 +545,7 @@
 							style:width="{m.label.width}px"
 							style:height="{m.label.height}px"
 							aria-label={messageName(m)}
-							aria-pressed={state === 'selected'}
+							aria-current={state === 'selected' ? 'true' : undefined}
 							title={messageTitle(m)}
 							onclick={() => select(m.edge)}
 							onfocus={() => reveal(m.label)}
@@ -514,45 +558,6 @@
 					</li>
 				{/each}
 			</ol>
-		</div>
-
-		<div
-			class="heads"
-			class:stuck
-			style:width="{layout.width}px"
-			style:transform="translate({view.x}px, {headsY}px) scale({view.k})"
-		>
-			<ul aria-label="Lifelines">
-				{#each layout.lifelines as l (l.node.id)}
-					{@const Icon = iconOf(l.keyword.replace(/^ref\s+/, '').replace(/ /g, '_'))}
-					{@const state = lifelineState(l)}
-					<li>
-						<button
-							type="button"
-							class="head {state ?? ''}"
-							style:--fam="var(--kind-{l.family})"
-							style:left="{l.head.x}px"
-							style:top="{l.head.y}px"
-							style:width="{l.head.width}px"
-							style:height="{l.head.height}px"
-							aria-pressed={state === 'selected'}
-							title={docOf(l)}
-							onclick={() => select(l.node)}
-							onfocus={() => reveal({ ...l.head, y: 0 })}
-						>
-							<span class="visually-hidden">Lifeline</span>
-							<span class="keyword">
-								<Icon size={12} strokeWidth={2.25} aria-hidden="true" />«{l.keyword}»
-							</span>
-							<span class="title">
-								<span class="name">{l.name}</span>{#if l.type}<span class="type"
-										>{` : ${l.type}`}</span
-									>{/if}
-							</span>
-						</button>
-					</li>
-				{/each}
-			</ul>
 		</div>
 	{/if}
 

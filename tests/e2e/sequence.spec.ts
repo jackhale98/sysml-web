@@ -66,7 +66,7 @@ test('lifelines and messages select their elements, and show what they connect',
 	const report = diagram.getByRole('button', { name: /^Message 3:/ });
 	await report.click();
 	await expect(inspector.getByRole('heading', { level: 2 })).toContainText('preflightReport');
-	await expect(report).toHaveAttribute('aria-pressed', 'true');
+	await expect(report).toHaveAttribute('aria-current', 'true');
 	// The two lifelines it joins are highlighted.
 	await expect(diagram.locator('.heads .head.linked')).toHaveCount(2);
 
@@ -75,6 +75,10 @@ test('lifelines and messages select their elements, and show what they connect',
 	await expect(inspector.getByRole('heading', { level: 2 })).toContainText('recipient');
 	await expect(diagram.locator('.message.linked')).toHaveCount(1);
 	await expect(diagram.locator('.message.linked')).toContainText('handOver');
+	// A click on the empty canvas clears the highlight; the element stays selected.
+	await diagram.click({ position: { x: 200, y: 12 } });
+	await expect(diagram.locator('.message.linked')).toHaveCount(0);
+	await expect(inspector.getByRole('heading', { level: 2 })).toContainText('recipient');
 
 	// The keyboard reaches every message.
 	await diagram.getByRole('button', { name: /^Message 1:/ }).focus();
