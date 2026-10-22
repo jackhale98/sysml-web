@@ -27,6 +27,7 @@
 	import type { WorkbenchUi } from './ui.svelte.ts';
 	import { renameElement, setField, setTableColumns } from './actions.ts';
 	import CellEditor from './CellEditor.svelte';
+	import TradeMatrix from './TradeMatrix.svelte';
 	import { viewTitle } from './views.ts';
 
 	/**
@@ -69,7 +70,9 @@
 			title,
 			project: workspace.info?.name ?? 'Project',
 			doc: info?.doc,
-			header: (table?.columns ?? []).map((c, i) => (isPivot && i > 0 ? c : heading(c))),
+			header: (table?.columns ?? []).map((c, i) =>
+				(isPivot && i > 0) || table?.trade?.alternatives.some((a) => a.name === c) ? c : heading(c)
+			),
 			rows: rows.map((r) => r.cells)
 		};
 	}
@@ -511,19 +514,21 @@
 		</div>
 		{#if info?.doc}<p class="doc">{info.doc}</p>{/if}
 		<div class="tools">
-			<label class="search">
-				<Search size={14} />
-				<span class="visually-hidden">Search {title}</span>
-				<input type="search" placeholder="Search" bind:value={query} />
-			</label>
-			{#if table}
+			{#if !table?.trade}
+				<label class="search">
+					<Search size={14} />
+					<span class="visually-hidden">Search {title}</span>
+					<input type="search" placeholder="Search" bind:value={query} />
+				</label>
+			{/if}
+			{#if table && !table.trade}
 				<span class="count" aria-live="polite">
 					{rows.length === table.rows.length
 						? `${table.rows.length} rows`
 						: `${rows.length} of ${table.rows.length} rows`}
 				</span>
 			{/if}
-			{#if table?.availableFields?.length && info && !info.builtin && !isPivot}
+			{#if table?.availableFields?.length && info && !info.builtin && !isPivot && !table.trade}
 				<div class="columns-menu">
 					<button
 						type="button"
@@ -613,6 +618,8 @@
 		<div class="skeleton" aria-hidden="true">
 			{#each [0, 1, 2, 3, 4, 5, 6, 7] as i (i)}<div></div>{/each}
 		</div>
+	{:else if table.trade}
+		<TradeMatrix trade={table.trade} {workspace} {ui} {name} />
 	{:else if table.rows.length === 0}
 		<p class="state">No rows. Nothing in the model matches this view yet.</p>
 	{:else if ui.phone}

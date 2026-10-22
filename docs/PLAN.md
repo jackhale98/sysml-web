@@ -16,8 +16,9 @@ Open-MBEE sysml-toolkit engine (decision #16, migration done).**
   generated specification and ICD reports; spreadsheet import and table
   export; projects in the browser, folders, `.kpar`/zip; GitHub source
   control; state machine emulator; mass and power budgets and constraint
-  checks (does the design meet its requirements?); diagram export (SVG,
-  PNG, clipboard); library browser; settings; offline and
+  checks (does the design meet its requirements?); trade studies compared
+  in a table and summed up in the inspector; diagram export (SVG, PNG,
+  clipboard); library browser; settings; offline and
   installable; touch-first phone layout. Lighthouse ≥ 0.9 performance and
   1.0 accessibility on mobile and desktop, enforced in CI.
 - Semantic diff and review mode: "Review changes" compares the model with
@@ -31,8 +32,10 @@ Open-MBEE sysml-toolkit engine (decision #16, migration done).**
   Source control shows the summary before saving and suggests it as the
   commit message and the proposal's description (`docs/engine.md`,
   "Comparing versions").
-- Not yet started: Sequence view, FMEA and hazard views, Systems Modeling
-  API client, conformance dashboard.
+- Sequence view: lifelines and messages in time order, drawn from the
+  model on its own pannable canvas, exportable like the other diagrams.
+- Not yet started: FMEA and hazard views, Systems Modeling API client,
+  conformance dashboard.
 
 ### Engine migration (decision #16)
 
@@ -340,7 +343,7 @@ not standardised until SysML v2.1.
 | Grid View | Phase 3 | requirements table, trace/allocation/DSM matrices, `@TableRendering` views |
 | Action Flow View | Phase 5 | start/done, decide/merge diamonds, fork/join bars, successions, flows, pins, send/accept, swimlanes via allocation |
 | State Transition View | Phase 5 | states, regions, `trigger [guard] / effect`, entry/do/exit compartments |
-| Sequence View | Phase 5 | lifelines, messages, event occurrences |
+| Sequence View | Phase 5 (read; done) | lifelines, messages with payloads in time order, event occurrences, self messages |
 | Geometry View | Later (stretch) | no known tool implements it; 3D via three.js once the rest is solid |
 
 Rendering: Svelte Flow for interaction (selection, drag, connect handles,
@@ -566,6 +569,7 @@ SysML libraries so they travel with the model to other tools.
 | Test plans | verification cases with objectives and `verify` | verification matrix, coverage |
 | FMEA and hazard logs | `RiskAnalysis` / `HazardAnalysis` libraries | FMEA and risk-matrix Grid views (`@TableRendering`), RPN calc |
 | Budgets (mass, power) | attributes with units, calcs, constraints | ✅ mass and power budget tables (`budget:<attribute>`), constraint checks of every `satisfy` claim and `assert` (`ConstraintChecks`), violations in Problems, computed values in the inspector |
+| Trade studies (decision matrices in spreadsheets) | an `analysis` typed by `TradeStudies::TradeStudy`: alternatives (variants), an evaluation `calc`, a `MaximizeObjective`/`MinimizeObjective` | ✅ trade study table (`trade`, `TradeStudyTable`): criteria by alternative, weights, the selected alternative and the one the design uses; summary in the inspector |
 | Design reviews | git branches, commits | ✅ semantic diff and review mode: what changed, element by element and in plain language, the checks and budgets it changes, marks in diagrams and tables; against the last saved version, a branch, an earlier version or a pull request |
 
 On-ramps for existing material (later phases): import a requirements
@@ -788,10 +792,17 @@ Engine gaps found while authoring the demo (inputs to Phase 1):
 **Phase 5 — Behaviour**
 - Action Flow, State Transition and Sequence views (read, then visual
   editing); state/action simulation; roll-ups and trade studies.
+  *Done:* the Sequence view (read): `view … : SequenceView` draws an
+  interaction's lifelines and its messages in time order (`docs/engine.md`,
+  "Diagrams"); the demo's `DeliverySequence::ParcelDelivery`.
   *Done:* roll-ups and constraint checks — budgets over the parts tree
   and a checks view from the toolkit's `verify`, violations as problems,
   evaluated values in the inspector (`docs/engine.md`, "Values and
-  constraint checks"). Trade studies not started.
+  constraint checks"). Trade studies — every analysis typed by
+  `TradeStudies::TradeStudy` evaluated: each alternative's criteria and
+  score, the ranking, the alternative the objective selects and the one the
+  design uses, as a `@TableRendering` table (`rows = "trade"`) and in the
+  inspector (`docs/engine.md`, "Trade studies").
 
 **Phase 6 — Verification, risk and on-ramps**
 - Verification cases and matrix; FMEA and hazard views over the risk

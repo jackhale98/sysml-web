@@ -6,7 +6,7 @@
 <script lang="ts">
 	import { Check, Copy, Download, FileCode, Image } from '@lucide/svelte';
 	import { toasts } from '#lib/ui/toasts.svelte.ts';
-	import type { ExportDiagram } from './export/svg.ts';
+	import type { Exportable } from './export/render.ts';
 
 	/**
 	 * Export a diagram as a picture: SVG for documents, PNG for slides, or
@@ -22,7 +22,7 @@
 		/** The view's name, for the file name (`drone-interconnection.svg`). */
 		title: string;
 		/** The whole diagram as it is drawn, read when exporting. */
-		diagram: () => Promise<ExportDiagram>;
+		diagram: () => Promise<Exportable>;
 		/** Offer the phone's share sheet instead of a download. */
 		share?: boolean;
 		disabled?: boolean;

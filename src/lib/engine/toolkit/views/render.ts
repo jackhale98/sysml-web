@@ -89,6 +89,19 @@ export function renderView(ctx: ViewContext, name: string): RenderedTable {
 
 	rows = applyScope(ctx, view, rows, rowsSpec, warnings);
 
+	// A trade study table compares the alternatives of one study: the first it exposes.
+	const study = rows.find((r) => r.trade)?.trade;
+	if (study) {
+		const others = new Set(
+			rows.flatMap((r) => (r.trade && r.trade !== study ? [r.trade.name] : []))
+		);
+		if (others.size)
+			warnings.push(
+				`this view shows one trade study, \`${study.name}\`; expose only the study to show (also exposed: ${[...others].map((n) => `\`${n}\``).join(', ')})`
+			);
+		rows = rows.filter((r) => !r.trade || r.trade === study);
+	}
+
 	const where = spec.get('where');
 	if (where !== undefined) {
 		const condition = parse(where);
@@ -110,7 +123,7 @@ export function renderView(ctx: ViewContext, name: string): RenderedTable {
 
 	const columnSpec = spec.get('columns');
 	if (columnSpec === undefined) throw new Error('missing `columns` in @TableRendering');
-	const columns = columnSpec
+	let columns = columnSpec
 		.split(';')
 		.map((c) => c.trim())
 		.filter(Boolean)
@@ -118,6 +131,13 @@ export function renderView(ctx: ViewContext, name: string): RenderedTable {
 			const eq = c.indexOf('=');
 			return eq < 0 ? [c, null] : [c.slice(0, eq).trim(), c.slice(eq + 1).trim()];
 		});
+	// A column that stands for a group of fields (`alternatives`) becomes one column per field.
+	const groups = rows.find((r) => r.groups)?.groups ?? {};
+	columns = columns.flatMap(([column, expr]): [string, string | null][] =>
+		expr === null && groups[column]
+			? groups[column].map((f): [string, null] => [f, null])
+			: [[column, expr]]
+	);
 	const compiled = columns.map(([, expr]) => (expr === null ? null : parse(expr)));
 
 	let table = rows.map((r) => ({
@@ -168,7 +188,8 @@ export function renderView(ctx: ViewContext, name: string): RenderedTable {
 		availableFields: probe.fields,
 		...(columnKinds.some((k) => k) ? { columnKinds } : {}),
 		...(described ? { rowInfo: table.map((t) => t.info ?? {}) } : {}),
-		...(rowsSpec.trim() === 'checks' ? { opensText: true } : {})
+		...(rowsSpec.trim() === 'checks' ? { opensText: true } : {}),
+		...(study ? { trade: study } : {})
 	};
 }
 

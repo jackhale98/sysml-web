@@ -67,6 +67,12 @@ steps at the same time, and `decide`/`merge` for a choice (drop the parcel only 
 the drop zone is clear).
 Diagram: **`DroneViews::deliveryFlightFlow`** (Action Flow View).
 
+Who tells whom what, and when: `DeliverySequence::ParcelDelivery` is the same delivery
+as an interaction between the operator, the ground station, the drone and the recipient.
+Each `message` says what it carries (`of FlightPlan`), who sends it and who receives it,
+and `then` puts it after the one before.
+Diagram: **`DroneViews::deliverySequence`** (Sequence View).
+
 ## 8. Who does what: `FunctionAllocation`
 
 `DeliveryDrone` performs the delivery flight (`perform`). `allocate` then assigns each
@@ -125,3 +131,17 @@ requirements with their attributes, what satisfies and verifies each one, and
 the gaps; `DroneViews::droneInterfaceControl` describes the connections, interfaces
 and ports between the drone's parts. Print them, save them as PDF, or download
 them as HTML or Markdown to send round. Report: **`DroneViews::droneSpecification`**.
+
+## 15. Choosing between designs: `BatteryTrade::batteryTradeStudy`
+
+Is today's battery the right one? A trade study compares alternatives and picks one by
+an objective. The alternatives are the battery the design flies (`drone.battery`) and
+three candidate packs, the variants of `BatteryTrade::batteryOptions`. The evaluation
+function works out what each pack gives the drone (its take-off mass, hover power,
+endurance, margin to the 4 kg limit and price) and `BatteryTrade::BatteryScore`
+weighs them: endurance 50 %, mass margin 20 %, price 30 %. The objective,
+`MaximizeObjective`, selects the semi-solid-state pack (0.59), well ahead of today's
+(0.39), though it costs almost three times as much; the three-cell pack would put the
+drone over 4 kg and scores nothing. Raise the semi-solid-state pack's `price` to
+`2500.0` and today's battery comes out on top; Undo puts it back.
+Table: **`DroneViews::batteryTrade`**.

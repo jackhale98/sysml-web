@@ -130,7 +130,14 @@ export interface Highlights {
 }
 
 export type DiagramView =
-	'general' | 'interconnection' | 'requirements' | 'states' | 'packages' | 'trace' | 'actions';
+	| 'general'
+	| 'interconnection'
+	| 'requirements'
+	| 'states'
+	| 'packages'
+	| 'trace'
+	| 'actions'
+	| 'sequence';
 
 /** A `view def` or `view` usage in the project or the bundled libraries. */
 export interface ViewInfo {
@@ -172,6 +179,8 @@ export interface RenderedTable {
 	rowInfo?: RowInfo[];
 	/** Opening a row shows where it is written in the text (rather than selecting its element). */
 	opensText?: boolean;
+	/** For a trade study table (`rows = "trade"`): the study, evaluated. */
+	trade?: TradeStudy;
 }
 
 /**
@@ -278,6 +287,73 @@ export type Evaluated =
 	| { kind: 'text'; text: string }
 	| { kind: 'none' }
 	| { kind: 'undecided'; reason: string };
+
+// ---- Trade studies ---------------------------------------------------------------
+
+/**
+ * A trade study (an analysis typed by `TradeStudies::TradeStudy`),
+ * evaluated: each alternative's criteria and score, the alternative its
+ * objective selects, and the one the design uses today.
+ */
+export interface TradeStudy {
+	name: string;
+	qualifiedName: string;
+	elementId: string;
+	file: string;
+	/** 1-based line of its declaration. */
+	line: number;
+	/** What the objective asks for: the highest score, the lowest, or unknown (another objective). */
+	objective: 'maximize' | 'minimize' | null;
+	alternatives: TradeAlternative[];
+	/** The evaluation function's attributes, in declaration order. */
+	criteria: TradeCriterion[];
+	/** The alternative the objective selects; null on a tie, with scores missing, or without an objective. */
+	selected: number | null;
+	/** The alternatives with the best score (several on a tie). */
+	best: number[];
+	/** The alternative the design uses today (a part of the design, or bound to by one). */
+	current: number | null;
+	/** Why nothing is selected, in plain words. */
+	note: string | null;
+	/** What the app worked out because the engine doesn't yet (internal, not shown). */
+	byApp?: string;
+}
+
+export interface TradeAlternative {
+	/** As the study's subject writes it (`drone.battery`, `batteryOptions::lithiumPolymer`). */
+	label: string;
+	/** For headings: the last name of the label (`lithiumPolymer`), unless two would read alike. */
+	name: string;
+	qualifiedName: string;
+	elementId: string | null;
+	file: string | null;
+	line: number;
+	doc: string | null;
+	/** The evaluation function's result for it. */
+	score: Evaluated;
+	/** 1 for the best score; equal scores share a rank. */
+	rank: number | null;
+}
+
+export interface TradeCriterion {
+	name: string;
+	elementId: string | null;
+	file: string;
+	line: number;
+	doc: string | null;
+	/** Each alternative's value, in the order of `alternatives`. */
+	values: Evaluated[];
+	/** The values as shown, in one unit (empty when unknown). */
+	shown: string[];
+	/** The weight the score gives it (0.5 for half), when the score is a weighted sum. */
+	weight: number | null;
+	/** Each alternative's score on this criterion before weighting, when the score has one. */
+	scores: (number | null)[] | null;
+	/** Whether a higher or a lower value is better, by the objective; null when the score doesn't read it directly. */
+	better: 'higher' | 'lower' | null;
+	/** The alternatives with the best value (empty when all are equal or `better` is unknown). */
+	best: number[];
+}
 
 /** Editor language services (all offsets are UTF-16 into the given file). */
 export interface Completion {
@@ -554,6 +630,21 @@ export interface DiagramEdge {
 	target: string;
 	label: string | null;
 	kind: EdgeKind;
+	/** Where the element the edge draws is declared (a sequence view's messages). */
+	element?: { file: string; start_byte: number };
+	/** Sequence views: the message an edge draws (edges come in time order). */
+	message?: SequenceMessage;
+}
+
+/** A message of a sequence view: `message name of Payload from a.sent to b.received`. */
+export interface SequenceMessage {
+	name: string | null;
+	/** The payload's type (or the payload as written when untyped). */
+	payload: string | null;
+	doc: string | null;
+	/** The event occurrences at its ends, when it is sent and received through them. */
+	sourceEvent?: string;
+	targetEvent?: string;
 }
 
 export interface DiagramGraph {

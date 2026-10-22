@@ -52,6 +52,11 @@ package DroneViews {
         doc /* Does the design meet its requirements? Each requirement's constraint, checked against the design's values. */
     }
 
+    view batteryTrade : TradeStudyTable {
+        doc /* Which battery to fly: today's pack against three candidates, on endurance, mass margin and price. */
+        expose BatteryTrade::batteryTradeStudy;
+    }
+
     // Diagrams.
 
     view serviceContext : InterconnectionView {
@@ -87,6 +92,11 @@ package DroneViews {
     view deliveryFlightFlow : ActionFlowView {
         doc /* The steps of one delivery flight, with the fork, join, decision and merge. */
         expose DeliveryMission::DeliveryFlight;
+    }
+
+    view deliverySequence : SequenceView {
+        doc /* Who tells whom what during one delivery, in time order from top to bottom. */
+        expose DeliverySequence::ParcelDelivery;
     }
 
     view flightModeStates : StateTransitionView {

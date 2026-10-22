@@ -66,6 +66,19 @@ package Reporting {
      *                           requirement stated in words only). The
      *                           "requirements" rows have the worst verdict
      *                           of their claims as `check`.
+     *   "trade"                 a trade study (an analysis typed by
+     *                           TradeStudies::TradeStudy) compared: one
+     *                           row per attribute of its evaluation
+     *                           function (criterion, weight when the
+     *                           score is a weighted sum, better =
+     *                           higher or lower), then its score and
+     *                           rank; the column `alternatives` stands
+     *                           for one column per alternative of its
+     *                           subject. The alternative its objective
+     *                           selects (MaximizeObjective: the highest
+     *                           score) and the one the design uses are
+     *                           marked. A view shows the first study it
+     *                           exposes.
      *   "uncertainty"           evaluated uncertainty analyses (case,
      *                           critical, target limits, worst-case
      *                           range, margin, cp, cpk, result)

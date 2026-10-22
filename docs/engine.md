@@ -229,13 +229,37 @@ its resolver recorded, reparses, and refuses an edit that doesn't parse
   source. A change trigger's label (`accept when …`) is read from the text.
 - **requirements**, **trace**, **packages** (`trace.ts`) — from the records
   and the satisfy/verify ends the adapter resolved (`ExtractedModel.traces`).
+- **sequence** (`sequence.ts`) — from the records. The toolkit's sequence
+  emitter only writes PlantUML (`toGraph` has no `sequence` view) and labels
+  a message by its name alone, so the builder reads the model the way that
+  emitter does: messages are the flow-family usages under the scope
+  (`message m of T from a.sent to b.received`), each end lands on the part
+  before an event occurrence (`producer.publishSent`) or on the deepest
+  part, item or occurrence it names, and a message without ends takes them
+  from events that name it (`event m.sourceEvent;`). Ends are resolved by
+  name from where the message is written (enclosing namespaces, members,
+  what their types define): the toolkit's own resolved ends
+  (`sourceFeature`) cost the whole-model derivation pass and are empty for
+  an end written as a plain part. Order: `then` and `first a then b`
+  between events on a lifeline and between messages; a message precedes
+  another when any of its events precedes any of the other's;
+  declaration order breaks ties. (The event `then event m.targetEvent;`
+  declares has no source extent, so no record; its succession stands in
+  for it.)
+  Lifelines are the interaction's parts, items and occurrences plus every
+  part a message reaches, in declaration order. Edges are the messages in
+  time order, with their element and `SequenceMessage` (name, payload,
+  doc, events). The page draws it with its own canvas
+  (`diagram/SequenceCanvas.svelte`, laid out by `sequenceLayout.ts`), not
+  Svelte Flow and ELK.
 
 Node ids are names as written, because `layout/diagrams.json` keys positions
 by them: a definition `Battery`, a usage its path `drone.battery`, a state or
 action its path in the machine, `__initial__`/`__final__`, unnamed control
 nodes `fork#1`, `decide#1`; a clash takes the qualified name. Each node also
 carries `element` (file and declaration byte), which the canvas uses to find
-the element instead of matching names. A general view is opened with the
+the element instead of matching names (a sequence view's messages, drawn as
+edges, carry it too). A general view is opened with the
 view usage's qualified name as scope (`workbench/views.ts`), so its layout key
 is `general:Views::name`.
 
@@ -320,6 +344,76 @@ ask and cached with it):
 - **Cost on the demo in Node**: the evaluation session ~25–30 ms, `verify`
   ~15–30 ms (once per analysis, on first ask); `evaluate` of all 171
   attributes 3 ms; a budget table 2 ms after that. All in the worker.
+
+## Trade studies
+
+`EngineApi.tradeStudies(files)` and the `trade` row provider are answered
+by `toolkit/trade.ts` (`TradeStudies`, made once per analysis by the view
+context, `ViewContext.tradeStudies()`), over the evaluation session
+(`Evaluation.session`). A trade study is an analysis of the project that
+conforms to the standard library's `TradeStudies::TradeStudy` (the
+toolkit's `conforms`).
+
+- **The study's parts**, from the model adapter's records: the subject
+  (its value lists the alternatives), the objective (`MaximizeObjective` or
+  `MinimizeObjective`, by the toolkit's `conforms`; anything else selects
+  nothing, and the study says so), and the evaluation function (`calc :>>
+  evaluationFunction`): its `in` parameter is the alternative, its
+  attributes are the criteria, its result the score.
+- **Alternatives**: the toolkit's evaluation of the subject when it gives
+  the elements; otherwise each reference of the list as written, resolved
+  where the study is written (`drone.battery` is `drone`'s `battery`;
+  `batteryOptions::lithiumPolymer` a variant). `all X` is not supported (the
+  toolkit doesn't evaluate extents) and the study says so.
+- **Values.** Each criterion and the score are evaluated for each
+  alternative with `sim/expr.ts`. Names are the calculation's parameter
+  (bound to the alternative) and attributes, then features of the element
+  an expression belongs to, then names resolved where it is written
+  (`session.resolve` from the innermost namespace out, imports included).
+  The toolkit decides what it can: every value an element binds
+  (`evaluate`, through `Evaluation.valueAt`), every calculation of the
+  model invoked with the values worked out (`query("Calc(177.6 [SI::W*SI::h], …)")`,
+  which also does the unit algebra), and the score outright when it
+  evaluates `study.evaluationFunction(alternative)` (alternatives nested in
+  a part or a variation, request 6 below). The app combines the rest.
+  Values and verdicts the app works out are marked in `TradeStudy.byApp`
+  (internal, not shown).
+- **Inherited values are worked out for the alternative.** `evaluate` on a
+  feature an alternative inherits uses the definition's values
+  (`lithiumPolymer::usableEnergy` is the definition's 216 W·h × 0.85, not
+  the variant's 222 W·h × 0.8; request 9), so an inherited expression is
+  evaluated with the alternative's features; an inherited literal, and a
+  value the alternative binds itself, come from the toolkit.
+- **Weights and directions.** When the score is a weighted sum
+  (`0.5 * enduranceScore + …`), written in the result or in the
+  calculation it invokes (an `if … ? 0.0 else` around it is seen through),
+  each term's weight goes to the criterion it reads, with its score before
+  weighting. For each criterion the score reads, the score is evaluated
+  again with the criterion nudged by 0.1 %: the way it moves says whether a
+  higher or a lower value is better (for a `MinimizeObjective`, lower
+  scores are better), and the best value is marked. Values the score
+  doesn't read directly (`hoverPower`) are shown without a verdict.
+- **Selection.** The toolkit doesn't evaluate `TradeStudy::selectedAlternative`
+  nor `TradeStudyObjective::best` (request 7), so the app ranks the scores
+  by the objective's kind and selects the best; a tie selects nothing and
+  says so. `trade.test.ts` fails when the toolkit evaluates
+  `selectedAlternative`, so the selection can be taken from it.
+- **The design's choice**: an alternative that is a part of the design (owned
+  by a part usage that isn't a variation, `drone.battery`), or one a part of
+  the design is bound to (`ref part engine : Engine = engineChoice::v6`).
+- **The table.** `rows = "trade"` makes a row per criterion (fields
+  `criterion`, `weight`, `better`, one per alternative), then `score` and
+  `rank`; the column `alternatives` stands for one column per alternative
+  (a row provider's column group, `Row.groups`). A view shows one study, the
+  first it exposes (a warning names the others). The rendered table carries
+  the study (`RenderedTable.trade`), which `TradeMatrix.svelte` shows as the
+  comparison; CSV/XLSX export the rows as they are.
+- **The demo** (`analysis/BatteryTrade.sysml`): today's battery against
+  three variants of `batteryOptions`; `Battery`'s datasheet values are
+  `default`s so a variant can give its own (a bound value can't be
+  overridden). A variation is not part of the bill of materials.
+- **Cost on the demo in Node**: about 60 ms for the study the first time in
+  an analysis (the first `query` warms the toolkit up), then cached.
 
 ## Comparing versions (semantic diff)
 
@@ -465,3 +559,65 @@ Found while making the drone demo's budgets and checks (sysml-toolkit
 5. **`verify` bindings for satisfied constraints** are empty; the values a
    verdict rests on are worth reporting either way (the app evaluates them
    itself).
+
+Found while making the demo's trade study (sysml-toolkit 0.10.10):
+
+6. **A part declared directly in a package has no values from elsewhere.**
+   With `part def E { attribute cost : Real; }`, `part e4 : E { :>> cost =
+   3000.0; }` in package `P`, and `calc def C { in e : E; return : Real =
+   e.cost; }`: `query("P::C(P::e4)")` and `e4.cost` read from another
+   element are indeterminate, while the same part nested in another part or
+   a variation (`P::catalog::e4`, `P::choice::e4`) gives 3000. The
+   specification's trade-study examples declare their alternatives this way
+   (`part engine4cyl : Engine;`), and the demo's `drone` is one, so a study
+   can't read `drone.takeOffMass`. The app evaluates these chains itself
+   (`trade.ts`). Possibly a design decision (a package-level usage has no
+   single owner to evaluate it in): a question for the maintainers.
+7. **`TradeStudy::selectedAlternative` and `TradeStudyObjective::best` are not
+   evaluated**: `studyAlternatives->selectOne { in ref a;
+   tradeStudyObjective(selectedAlternative = a) }` invokes a requirement as a
+   predicate with an argument, and `alternatives->maximize { in x; eval(x) }`
+   calls a calculation passed as a parameter (`in calc eval =
+   evaluationFunction`). Both give the feature itself. `maximize` and
+   `selectOne` over a list with a calculation of the model named in the body
+   work. The app selects by the objective's kind meanwhile.
+8. **No way to evaluate a calculation's attribute for given arguments.**
+   `query("S.evaluationFunction(a)")` gives the result; the attributes it is
+   worked out from (the trade study's criteria) can only be read with the
+   parameters unbound. An `evaluate` with bindings (a feature and values for
+   the parameters of the calculation that owns it) would let the toolkit
+   decide every criterion.
+9. **An inherited feature is evaluated with the definition's values.**
+   `variant part p : Battery { :>> capacity = 222 [W*h]; }` with `Battery`'s
+   `usableEnergy = capacity * usableFraction`: `evaluate` on
+   `…::p::usableEnergy` (it resolves to `Battery::usableEnergy`) gives the
+   default 216 W·h × 0.85, not p's 222 W·h × 0.8. Passed to a calculation
+   (`C(p)`), p's own value is used. `evaluate` has no receiver; one (or
+   handles for inherited features in their usage) would fix it.
+10. **A variant doesn't get the variation's type**: in `variation part o :
+    Pack { variant part v { :>> mass = 1300 [g]; } }`, `o::v::usable` (from
+    `Pack`) doesn't resolve and `C(o::v)` fails with "unresolved reference";
+    `variant part v : Pack` works. The specification's 10b example redefines
+    the variation's features in untyped variants. The demo types its
+    variants.
+11. **`all X` extents are not evaluated** ("unsupported for evaluation: `all`
+    extents"); the 10b example binds a study's subject to `all engineChoice`.
+    The app asks for the alternatives to be listed.
+
+Found while making the Sequence view (sysml-toolkit 0.10.10):
+
+- **A structured sequence graph.** `toGraph({view: 'sequence'})` fails ("no
+  structured-graph emitter for view: sequence"); only `toPlantuml` draws
+  it, with participant links (`linkTemplate`) but none for messages, and
+  a named message's payload left out of its label. A graph with lifelines,
+  messages (element ids, payload type, the events at their ends) and the
+  order it already computes would replace `diagrams/sequence.ts`.
+- **Message ends written as plain parts.** For `message m of T from
+  operator to groundStation` (ends that are parts, not events),
+  `sourceFeature`/`targetFeature` are empty and the ends have no reference
+  subsetting, though the PlantUML emitter resolves them.
+- **`then event m.targetEvent;`** in a lifeline (the form the
+  specification's Interaction Example-2 uses): the event occurrence it
+  declares has no `memberExtent`, so the model adapter, which keeps the
+  elements written in the text, has no record of it; `event
+  m.sourceEvent;` without `then` has one.

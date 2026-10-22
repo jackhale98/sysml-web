@@ -1,5 +1,5 @@
 /**
- * The seven diagram views on the demo, from the toolkit (`ToolkitHost.diagram`):
+ * The diagram views on the demo (the sequence view: `sequence.test.ts`), from the toolkit (`ToolkitHost.diagram`):
  * nodes and edges, inherited ports, flows and bindings, typing edges,
  * transitions, decision branches, «derive» links, and view usages drawn with
  * their filters.
@@ -188,7 +188,7 @@ describe('general view', () => {
 
 	it('draws the view usages of a package with what they expose', () => {
 		const tk = toolkit('general', 'DroneViews');
-		expect(tk.nodes).toHaveLength(18);
+		expect(tk.nodes).toHaveLength(20);
 		expect(node(tk, 'componentCatalogue')).toMatchObject({
 			label: 'componentCatalogue : GeneralView',
 			stereotype: '<<view>>',
@@ -207,7 +207,7 @@ describe('general view', () => {
 			.filter((d) => d.kind !== 'package')
 			.map((d) => d.name)
 			.sort();
-		expect(definitions).toHaveLength(94);
+		expect(definitions).toHaveLength(98);
 		expect(ids(tk)).toEqual(definitions);
 		expect(edges(tk, 'specialization')).toEqual([
 			'Airframe -specialization-> Component',
@@ -486,8 +486,10 @@ describe('package view', () => {
 		expect(ids(tk)).toEqual(names);
 		// A frame for each package that has definitions of its own.
 		expect(tk.subgraphs.map((s) => s.id).sort()).toEqual([
+			'BatteryTrade',
 			'DeliveryContext',
 			'DeliveryMission',
+			'DeliverySequence',
 			'DroneArchitecture',
 			'DroneComponents',
 			'DroneInterfaces',
