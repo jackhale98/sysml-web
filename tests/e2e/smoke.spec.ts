@@ -418,6 +418,17 @@ test.describe('on a phone', () => {
 		await expect.poll(() => doc.evaluate((el) => el.scrollTop)).toBeGreaterThan(1000);
 	});
 
+	test('on a phone, search shows matches as you type', async ({ page }) => {
+		await openDemo(page);
+		await page.getByRole('button', { name: /Search the model/ }).click();
+		await page.getByRole('combobox', { name: /Search elements/ }).pressSequentially('parcel');
+		const first = page.getByRole('listbox', { name: 'Results' }).getByRole('option').first();
+		await expect(first).toBeInViewport();
+		await expect(first).toContainText(/parcel/i);
+		const box = await page.getByRole('listbox', { name: 'Results' }).boundingBox();
+		expect(box?.height ?? 0).toBeGreaterThan(100);
+	});
+
 	test('on a phone, filtering the model shows matching elements at once', async ({ page }) => {
 		await openDemo(page);
 		await page

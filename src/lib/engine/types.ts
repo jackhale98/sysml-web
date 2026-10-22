@@ -54,6 +54,8 @@ export interface TraceLink {
 	span: Span;
 	/** The resolved requirement's element id (toolkit only). */
 	requirement_id?: string;
+	/** The resolved element that satisfies or verifies it (toolkit only). */
+	by_id?: string;
 }
 
 /** A `connect a to b` (connection or interface usage), ends as written. */
