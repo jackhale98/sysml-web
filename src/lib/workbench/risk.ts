@@ -30,9 +30,12 @@ const LEVEL_TONE: Record<string, 'bad' | 'warn' | 'ok'> = {
 	negligible: 'ok'
 };
 
+/** The risk tables' level columns: the action priority (now and before), a hazard's severity. */
+const LEVEL_COLUMNS = new Set(['actionPriority', 'priorityBefore', 'severity']);
+
 /** The tone of a level cell (`actionPriority`, a hazard's `severity`), or null when it isn't one. */
 export function levelTone(column: string, value: string): 'bad' | 'warn' | 'ok' | null {
-	if (!/priority$|^severity$/i.test(column)) return null;
+	if (!LEVEL_COLUMNS.has(column)) return null;
 	return LEVEL_TONE[value.toLowerCase()] ?? null;
 }
 

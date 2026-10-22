@@ -34,8 +34,13 @@ Open-MBEE sysml-toolkit engine (decision #16, migration done).**
   "Comparing versions").
 - Sequence view: lifelines and messages in time order, drawn from the
   model on its own pannable canvas, exportable like the other diagrams.
-- Not yet started: FMEA and hazard views, Systems Modeling API client,
-  conformance dashboard.
+- Risk analysis: design, process and use FMEA worksheets, a risk matrix and
+  a hazard log, made with guided forms (New FMEA, Add a line, New hazard)
+  over the `RiskAnalysis` and `HazardAnalysis` libraries, which a project
+  gets with its first FMEA or hazard; the action priority (AIAG-VDA) and
+  RPN are the library's calcs, and a rating out of scale or a severity
+  that disagrees with its hazard is flagged (`docs/risk-analysis.md`).
+- Not yet started: Systems Modeling API client, conformance dashboard.
 
 ### Engine migration (decision #16)
 

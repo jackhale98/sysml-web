@@ -553,7 +553,7 @@
 	{:else if kind === 'status' && value}
 		<span class="chip {STATUS_TONE[value.toLowerCase()] ?? 'plain'}">{value}</span>
 	{:else if kind === 'level'}
-		<span class="chip {levelTone('priority', value)}">{value}</span>
+		<span class="chip {levelTone('actionPriority', value)}">{value}</span>
 	{:else if kind === 'elements'}
 		<TraceRefs {value} {workspace} {ui} gap="None yet" find={(n) => elementNamed(workspace, n)} />
 	{:else if (kind === 'verdict' || kind === 'verdictIcon') && isVerdict(value)}

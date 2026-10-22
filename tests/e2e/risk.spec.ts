@@ -79,11 +79,16 @@ test('a design FMEA on a new Small system project: the libraries come with it, l
 	await expect(form.getByText('How the steps of a process can go wrong')).toBeVisible();
 	await form.getByText('Design FMEA', { exact: false }).first().click();
 	await form.getByRole('button', { name: 'Next' }).click();
-	await form.getByRole('checkbox', { name: /flashlight/ }).first().check();
+	await form
+		.getByRole('checkbox', { name: /flashlight/ })
+		.first()
+		.check();
 	await form.getByRole('button', { name: 'Next' }).click();
 	await expect(form.getByRole('textbox', { name: 'Name' })).toHaveValue('Flashlight design FMEA');
 	await form.getByText('See the SysML').click();
-	await expect(form.locator('pre')).toContainText('view flashlightDesignFMEA : DesignFmeaWorksheet');
+	await expect(form.locator('pre')).toContainText(
+		'view flashlightDesignFMEA : DesignFmeaWorksheet'
+	);
 	await expectAccessible(page);
 	await form.getByRole('button', { name: 'Create' }).click();
 
@@ -119,7 +124,9 @@ test('a design FMEA on a new Small system project: the libraries come with it, l
 	await expectAccessible(page);
 
 	await views(page).getByRole('button', { name: 'Flashlight design FMEA', exact: true }).click();
-	await row.getByRole('button', { name: /Remove the line “Cells leak” of flashlight::battery/ }).click();
+	await row
+		.getByRole('button', { name: /Remove the line “Cells leak” of flashlight::battery/ })
+		.click();
 	await expect(row).toBeHidden({ timeout: 15_000 });
 	await toasts(page).getByRole('button', { name: 'Undo' }).last().click();
 	await expect(row).toBeVisible({ timeout: 15_000 });
@@ -133,7 +140,9 @@ test('a hazard with its harm and control: the hazard log links the control to wh
 	await command(page, 'hazard', /New hazard/);
 	const form = dialog(page, 'New hazard');
 	await form.getByRole('textbox', { name: 'Hazard' }).fill('Hot battery');
-	await form.getByRole('textbox', { name: 'Description', exact: true }).fill('The cells heat up when shorted.');
+	await form
+		.getByRole('textbox', { name: 'Description', exact: true })
+		.fill('The cells heat up when shorted.');
 	await form.getByRole('textbox', { name: 'Situation' }).fill('Held in the hand');
 	await form.getByRole('button', { name: 'Next' }).click();
 	await form.getByRole('textbox', { name: 'Harm' }).fill('Burned hand');
@@ -160,7 +169,10 @@ test('a hazard with its harm and control: the hazard log links the control to wh
 	await row.getByRole('button', { name: /say what implements/ }).click();
 	const inspector = page.getByRole('complementary', { name: 'Inspector' });
 	await expect(inspector.getByText('Thermal fuse').first()).toBeVisible();
-	await inspector.getByRole('button', { name: /battery/ }).first().click();
+	await inspector
+		.getByRole('button', { name: /battery/ })
+		.first()
+		.click();
 	await expect(row).toContainText('battery', { timeout: 15_000 });
 });
 
@@ -187,9 +199,15 @@ test('the demo’s worksheet keeps its figures in view beside the details, and f
 	const input = row.getByRole('textbox', { name: /Severity/ });
 	await input.fill('14');
 	await input.press('Enter');
-	const cell = sheet.locator('tbody tr').filter({ hasText: 'Thermal runaway' }).locator('td.problem');
+	const cell = sheet
+		.locator('tbody tr')
+		.filter({ hasText: 'Thermal runaway' })
+		.locator('td.problem');
 	await expect(cell).toContainText('14', { timeout: 15_000 });
-	await expect(cell.locator('.flag')).toHaveAttribute('title', 'Severity is 14, outside the scale of 1 to 10.');
+	await expect(cell.locator('.flag')).toHaveAttribute(
+		'title',
+		'Severity is 14, outside the scale of 1 to 10.'
+	);
 	const problems = page.getByRole('button', { name: /^Problems:/ });
 	// Out of scale, and not the battery fire's worst harm (critical, 8).
 	await expect(problems).toHaveAccessibleName('Problems: 0 errors, 2 warnings');
@@ -236,9 +254,7 @@ test.describe('on a phone', () => {
 		await form.getByRole('button', { name: 'Next' }).click();
 		await form.getByRole('checkbox', { name: /DeliverParcel/ }).check();
 		await form.getByRole('button', { name: 'Next' }).click();
-		await expect(form.getByRole('textbox', { name: 'Name' })).toHaveValue(
-			'DeliverParcel use FMEA'
-		);
+		await expect(form.getByRole('textbox', { name: 'Name' })).toHaveValue('DeliverParcel use FMEA');
 		await fits(page, 'the new FMEA form');
 		await expectAccessible(page);
 		await form.getByRole('button', { name: 'Create' }).click();
