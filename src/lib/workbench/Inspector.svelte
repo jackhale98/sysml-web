@@ -6,6 +6,7 @@
 	import PropertyForm from './PropertyForm.svelte';
 	import TradeSummary from './TradeSummary.svelte';
 	import TraceAdd from './TraceAdd.svelte';
+	import RelatedElements from './RelatedElements.svelte';
 	import TransitionDetails from '#lib/diagram/TransitionDetails.svelte';
 	import {
 		BookOpen,
@@ -361,7 +362,9 @@
 			</section>
 		{/if}
 
-		{#if satisfies.length}
+		{#if engine}
+			<RelatedElements {element} {workspace} {ui} {engine} requirement={!!requirement} />
+		{:else if satisfies.length}
 			<section>
 				<h3>Satisfies</h3>
 				<ul class="links">

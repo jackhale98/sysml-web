@@ -222,6 +222,47 @@ test('duplicate copies an element beside it, selects the copy, and undoes in one
 	await expectAccessible(page);
 });
 
+test('the inspector lists related elements both ways, each one a link to it', async ({ page }) => {
+	await openDemo(page);
+	await page.keyboard.press('Control+k');
+	const palette = page.getByRole('dialog', { name: 'Command palette' });
+	await palette.getByRole('combobox').fill('battery');
+	await palette
+		.getByRole('option')
+		.filter({ hasText: /^\s*battery\s+part\b/ })
+		.filter({ hasText: 'DroneArchitecture' })
+		.first()
+		.click();
+	const inspector = page.getByRole('complementary', { name: 'Inspector' });
+	const related = inspector.getByRole('region', { name: 'Related elements' });
+	await expect(related.getByRole('group', { name: /^Defined by/ })).toContainText('Battery');
+	await expect(related.getByRole('group', { name: /^Satisfies/ })).toContainText(
+		'Battery protection'
+	);
+	await expect(related.getByRole('group', { name: /^Connected to/ })).toContainText(
+		'powerDistribution by batteryPower'
+	);
+	await expect(related.getByRole('button', { name: 'DroneArchitecture' })).toBeVisible();
+	await expectAccessible(page);
+	await related
+		.getByRole('group', { name: /^Defined by/ })
+		.getByRole('button', { name: /Battery/ })
+		.click();
+	await expect(inspector.getByRole('heading', { level: 2 })).toHaveText('Battery');
+	// The definition: what specializes it is not repeated, what it is used as is listed.
+	await expect(related.getByRole('group', { name: /^Specializes/ })).toContainText('Component');
+	await expect(related.getByRole('group', { name: /^Used as/ })).toContainText('battery');
+	// Long lists show a few, then all.
+	await related
+		.getByRole('group', { name: /^Specializes/ })
+		.getByRole('button', { name: /Component/ })
+		.click();
+	const specialized = related.getByRole('group', { name: /^Specialized by/ });
+	await expect(specialized.getByRole('listitem')).toHaveCount(5);
+	await specialized.getByRole('button', { name: /^Show all/ }).click();
+	expect(await specialized.getByRole('listitem').count()).toBeGreaterThan(5);
+});
+
 test.describe('on a phone', () => {
 	test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 
@@ -249,6 +290,26 @@ test.describe('on a phone', () => {
 		await expect(diagram.locator('.svelte-flow__node').first()).toBeVisible({ timeout: 15_000 });
 		return diagram;
 	}
+
+	test('related elements in the details are thumb-sized links', async ({ page }) => {
+		await openDemo(page);
+		const catalogue = await openPhoneView(page, 'Component catalogue');
+		await node(catalogue, 'Battery').tap();
+		await page
+			.getByRole('navigation', { name: 'Sections' })
+			.getByRole('button', { name: 'Details' })
+			.tap();
+		const inspector = page.getByRole('complementary', { name: 'Inspector' });
+		const related = inspector.getByRole('region', { name: 'Related elements' });
+		const component = related
+			.getByRole('group', { name: /^Specializes/ })
+			.getByRole('button', { name: /Component/ });
+		await component.scrollIntoViewIfNeeded();
+		expect((await component.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+		await expectAccessible(page);
+		await component.tap();
+		await expect(inspector.getByRole('heading', { level: 2 })).toHaveText('Component');
+	});
 
 	test('the node’s actions are a sheet: remove, show again, duplicate and add connected by touch', async ({
 		page
