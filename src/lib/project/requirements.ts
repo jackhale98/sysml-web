@@ -30,8 +30,8 @@ export interface RequirementRow {
 /** Collect every requirement usage across the analysed files. */
 export function collectRequirements(analyses: Iterable<Analysis>): RequirementRow[] {
 	const all = [...analyses];
-	const satisfactions = all.flatMap((a) => a.model.satisfactions);
-	const verifications = all.flatMap((a) => a.model.verifications);
+	const satisfactions = new LinkIndex(all.flatMap((a) => a.model.satisfactions));
+	const verifications = new LinkIndex(all.flatMap((a) => a.model.verifications));
 	const rows: RequirementRow[] = [];
 
 	for (const { model } of all) {
@@ -60,8 +60,8 @@ export function collectRequirements(analyses: Iterable<Analysis>): RequirementRo
 				issues: annotations
 					.filter((a) => typeName(a) === 'Issue')
 					.map((a) => field(a, 'text', stringValue) ?? ''),
-				satisfiedBy: linksTo(usage, satisfactions),
-				verifiedBy: linksTo(usage, verifications),
+				satisfiedBy: satisfactions.to(usage),
+				verifiedBy: verifications.to(usage),
 				file: model.file,
 				span: usage.span
 			});
@@ -112,15 +112,40 @@ function referencesTo(usage: Usage): Set<string> {
 	return names;
 }
 
-function linksTo(usage: Usage, links: TraceLink[]): string[] {
-	const names = referencesTo(usage);
-	const targets = links
-		.filter((link) => {
-			// A resolved link names its requirement by id; an unresolved one only by name.
-			if (link.requirement_id && usage.id) return link.requirement_id === usage.id;
+/**
+ * Trace links by the requirement they name, so each requirement finds its
+ * own without a pass over every link of the project (that was quadratic).
+ */
+class LinkIndex {
+	private readonly byId = new Map<string, number[]>();
+	private readonly byName = new Map<string, number[]>();
+
+	constructor(private readonly links: TraceLink[]) {
+		const add = (map: Map<string, number[]>, key: string, index: number) => {
+			const list = map.get(key);
+			if (list) list.push(index);
+			else map.set(key, [index]);
+		};
+		links.forEach((link, index) => {
+			if (link.requirement_id) add(this.byId, link.requirement_id, index);
 			const segments = link.requirement.split('::');
-			return names.has(link.requirement) || names.has(segments[segments.length - 1] ?? '');
-		})
-		.map((link) => displayReference(link.by));
-	return [...new Set(targets)];
+			const last = segments[segments.length - 1] ?? '';
+			add(this.byName, link.requirement, index);
+			if (last !== link.requirement) add(this.byName, last, index);
+		});
+	}
+
+	/** What the links to this requirement name as satisfying or verifying it, in link order. */
+	to(usage: Usage): string[] {
+		const found = new Set<number>();
+		// A resolved link names its requirement by id; an unresolved one only by name.
+		if (usage.id) for (const index of this.byId.get(usage.id) ?? []) found.add(index);
+		for (const name of referencesTo(usage))
+			for (const index of this.byName.get(name) ?? [])
+				if (!(this.links[index]!.requirement_id && usage.id)) found.add(index);
+		const targets = [...found]
+			.sort((a, b) => a - b)
+			.map((index) => displayReference(this.links[index]!.by));
+		return [...new Set(targets)];
+	}
 }
