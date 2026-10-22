@@ -115,6 +115,14 @@
 		});
 	});
 
+	/**
+	 * Rows on the page: a large table (thousands of requirements) shows a page
+	 * at a time, with a button for more; search, sort and export see them all.
+	 */
+	const ROW_PAGE = 300;
+	let rowLimit = $state(ROW_PAGE);
+	const shown = $derived(rows.length > rowLimit ? rows.slice(0, rowLimit) : rows);
+
 	function sortBy(column: number) {
 		if (sortColumn === column) {
 			if (descending) sortColumn = null;
@@ -125,12 +133,24 @@
 		}
 	}
 
+	/** The model's elements by file (rows look theirs up; a scan per row was quadratic). */
+	const elementsByFile = $derived.by(() => {
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- rebuilt whole, never mutated
+		const byFile = new Map<string, ModelElement[]>();
+		for (const e of workspace.elements) {
+			const list = byFile.get(e.file);
+			if (list) list.push(e);
+			else byFile.set(e.file, [e]);
+		}
+		return byFile;
+	});
+
 	/** The model element behind a row, matched by file and name or line. */
 	function elementFor(index: number): ModelElement | undefined {
 		const source = table?.sources[index];
 		if (!source) return undefined;
 		const simple = source.element.split('::').pop()?.replace(/^'|'$/g, '') ?? '';
-		const inFile = workspace.elements.filter((e) => e.file === source.file);
+		const inFile = elementsByFile.get(source.file) ?? [];
 		return (
 			inFile.find((e) => e.label === simple) ??
 			inFile.find((e) => e.span.start_row === source.line || e.span.start_row + 1 === source.line)
@@ -164,6 +184,8 @@
 	/** Scroll a row into view and highlight it, clearing a search that hides it. */
 	async function reveal(index: number) {
 		if (!rows.some((r) => r.index === index)) query = '';
+		const at = rows.findIndex((r) => r.index === index);
+		if (at >= rowLimit) rowLimit = at + ROW_PAGE;
 		await tick();
 		const target = document.querySelector<HTMLElement>(
 			`[data-table="${CSS.escape(name)}"] [data-row="${index}"]`
@@ -581,7 +603,7 @@
 		{@const subtitled = !isPivot && table.columns.length > 2 && !table.editable?.[1]}
 		<div class="scroll cards-scroll" data-table={name}>
 			<ul class="cards" aria-label="{title} rows">
-				{#each rows as row (row.index)}
+				{#each shown as row (row.index)}
 					{@const selectable = !isPivot && !!table.sources[row.index]}
 					{@const kind0 = cellKind(table.columns[0] ?? '', row.cells[0] ?? '', 0)}
 					<li
@@ -673,6 +695,7 @@
 					</li>
 				{/each}
 			</ul>
+			{@render more()}
 		</div>
 	{:else}
 		<div class="scroll" data-table={name}>
@@ -705,7 +728,7 @@
 					</tr>
 				</thead>
 				<tbody>
-					{#each rows as row (row.index)}
+					{#each shown as row, r (row.index)}
 						{@const selectable = !isPivot && !!table.sources[row.index]}
 						{@const info = infoOf(row.index)}
 						<!-- The first cell's button is the keyboard way to open a row. -->
@@ -715,11 +738,11 @@
 							class:rollup={info.role === 'rollup'}
 							class:own={info.role === 'attribute'}
 							class:first-own={info.role === 'attribute' &&
-								infoOf(rows[rows.indexOf(row) - 1]?.index ?? -1).role !== 'attribute'}
+								infoOf(shown[r - 1]?.index ?? -1).role !== 'attribute'}
 							class:checks={table.opensText}
-							class:selected={selectable &&
-								elementFor(row.index)?.key === ui.selection?.key &&
-								!!ui.selection}
+							class:selected={!!ui.selection &&
+								selectable &&
+								elementFor(row.index)?.key === ui.selection.key}
 							onclick={() => selectable && openRow(row.index)}
 						>
 							{#each row.cells as value, c (c)}
@@ -771,9 +794,21 @@
 					{/each}
 				</tbody>
 			</table>
+			{@render more()}
 		</div>
 	{/if}
 </section>
+
+{#snippet more()}
+	{#if rows.length > shown.length}
+		<p class="more">
+			<button type="button" onclick={() => (rowLimit += ROW_PAGE * 10)}>
+				Show {Math.min(rows.length - shown.length, ROW_PAGE * 10)} more rows
+			</button>
+			<span>{shown.length} of {rows.length} shown</span>
+		</p>
+	{/if}
+{/snippet}
 
 <style>
 	/* A row search jumped to: a brief glow that fades. */
@@ -990,6 +1025,23 @@
 	.state {
 		padding: var(--space-5);
 		color: var(--text-2);
+	}
+	.more {
+		display: flex;
+		align-items: center;
+		gap: var(--space-3);
+		padding: var(--space-3) var(--space-5);
+		color: var(--text-2);
+		font-size: var(--text-sm);
+	}
+	.more button {
+		min-height: 2rem;
+		padding: 0 var(--space-3);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-sm);
+		background: var(--surface);
+		color: var(--text);
+		cursor: pointer;
 	}
 	.skeleton {
 		display: grid;

@@ -99,6 +99,9 @@
 		return root?.element ?? null;
 	});
 
+	/** The problems listed (a broken large model can have thousands: the first 500, errors first). */
+	const PROBLEMS_LISTED = 500;
+	const listedProblems = $derived(workspace.problems.filter((p) => p.severity !== 'note'));
 	const errors = $derived(workspace.problems.filter((p) => p.severity === 'error').length);
 	const warnings = $derived(workspace.problems.filter((p) => p.severity === 'warning').length);
 
@@ -562,7 +565,7 @@
 				<span>{errors} errors · {warnings} warnings</span>
 			</header>
 			<ul>
-				{#each workspace.problems.filter((p) => p.severity !== 'note') as p, i (i)}
+				{#each listedProblems.slice(0, PROBLEMS_LISTED) as p, i (i)}
 					<li>
 						<button type="button" class={p.severity} onclick={() => openProblem(p)}>
 							{#if p.severity === 'error'}<CircleAlert
@@ -577,6 +580,9 @@
 				{:else}
 					<li class="none">No problems. The model is consistent.</li>
 				{/each}
+				{#if listedProblems.length > PROBLEMS_LISTED}
+					<li class="none">{listedProblems.length - PROBLEMS_LISTED} more not listed.</li>
+				{/if}
 			</ul>
 		</section>
 
