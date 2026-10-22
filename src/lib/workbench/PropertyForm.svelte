@@ -182,7 +182,11 @@
 		{#if typed}
 			<div class="field">
 				<label class="label" for="{uid}-type"
-					>Type <small>({kind === 'attribute' ? 'a value type' : `a ${kind} def`})</small></label
+					>Type <small
+						>({kind === 'attribute'
+							? 'a value type'
+							: `${/^[aeio]/.test(kind) ? 'an' : 'a'} ${kind} def`})</small
+					></label
 				>
 				<TypePicker
 					id="{uid}-type"
@@ -318,12 +322,12 @@
 		{/if}
 
 		<label>
-			<span>Description</span>
+			<span>Documentation <small>(its doc comment)</small></span>
 			<textarea
 				rows="3"
 				value={details.doc ?? ''}
 				placeholder="What is this, in plain words?"
-				onblur={(e) => commit('doc', e.currentTarget.value, details?.doc, 'the description')}
+				onblur={(e) => commit('doc', e.currentTarget.value, details?.doc, 'the documentation')}
 			></textarea>
 		</label>
 	</div>

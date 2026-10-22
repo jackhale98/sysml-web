@@ -2,6 +2,7 @@
 	import type { Engine } from '#lib/engine/client.ts';
 	import type { Evaluated } from '#lib/engine/types.ts';
 	import { valueText } from '#lib/project/checks.ts';
+	import FeatureValues from './FeatureValues.svelte';
 	import PropertyForm from './PropertyForm.svelte';
 	import { BookOpen, CircleAlert, Code, FileCode, Link2, Plus, Trash2 } from '@lucide/svelte';
 	import { conceptFor } from '#lib/learn/concepts.ts';
@@ -36,8 +37,11 @@
 				if (inner) return inner;
 			}
 		};
-		return find(workspace.tree)?.children.map((c) => c.element) ?? [];
+		const all = find(workspace.tree)?.children.map((c) => c.element) ?? [];
+		// A usage's attributes are under Values, with their values.
+		return engine && !element.isDefinition ? all.filter((c) => c.kind !== 'attribute') : all;
 	});
+	let valueCount = $state(0);
 	/** Requirements this element satisfies (matched by name in `satisfy … by`). */
 	const satisfies = $derived(
 		element && !element.isDefinition
@@ -186,6 +190,15 @@
 			</dl>
 			{#if !engine && element.doc}<p class="doc">{element.doc}</p>{/if}
 		</section>
+
+		{#if engine && !element.isDefinition}
+			<section aria-labelledby="values-heading" hidden={!valueCount}>
+				<h3 id="values-heading">Values</h3>
+				{#key element.key}
+					<FeatureValues {element} {workspace} {engine} {ui} oncount={(n) => (valueCount = n)} />
+				{/key}
+			</section>
+		{/if}
 
 		{#if requirement}
 			<section>

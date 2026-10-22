@@ -133,6 +133,7 @@ const handlers: { [M in Method]: Handler } = {
 	analyzeProject: (host, files: SourceFile[]) => host.analyzeProject(files),
 	elementDetails: (host, files: SourceFile[], path: string, line: number, element: string | null) =>
 		host.elementDetails(files, path, line, element),
+	featureValues: (host, files: SourceFile[], id: string) => host.featureValues(files, id),
 	stateMachines: (host, files: SourceFile[]) => host.stateMachines(files),
 	highlight: (host, source: string) => host.highlight(source),
 	format: (host, source: string) => host.format(source),
