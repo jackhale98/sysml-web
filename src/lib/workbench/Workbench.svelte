@@ -177,6 +177,74 @@
 	const showText = $derived(layout !== 'diagram' || !filePackage);
 	const showDiagram = $derived(layout !== 'text' && !!filePackage);
 
+	// ── The text and diagram side by side: a divider sets how much each gets ──
+	const SPLIT_KEY = 'fairtide:split';
+	/** The text's share of the split, in percent (the diagram has the rest). */
+	let splitShare = $state(readSplit());
+	/** Side by side on wide screens; text above the diagram below 1100 px. */
+	let splitStacked = $state(false);
+	let splitBox = $state<HTMLDivElement>();
+	let splitDragging = $state(false);
+
+	function readSplit(): number {
+		try {
+			const stored = Number(localStorage.getItem(SPLIT_KEY));
+			return stored >= 20 && stored <= 80 ? stored : 50;
+		} catch {
+			return 50;
+		}
+	}
+	function setSplit(share: number) {
+		splitShare = Math.round(Math.min(80, Math.max(20, share)));
+		try {
+			localStorage.setItem(SPLIT_KEY, String(splitShare));
+		} catch {
+			// Private mode: the position lasts for this visit.
+		}
+	}
+	$effect(() => {
+		const query = matchMedia('(max-width: 1100px)');
+		splitStacked = query.matches;
+		const change = () => (splitStacked = query.matches);
+		query.addEventListener('change', change);
+		return () => query.removeEventListener('change', change);
+	});
+	function dragSplit(event: PointerEvent) {
+		if (event.button !== 0 || !splitBox) return;
+		event.preventDefault();
+		const handle = event.currentTarget as HTMLElement;
+		handle.setPointerCapture(event.pointerId);
+		splitDragging = true;
+		const box = splitBox.getBoundingClientRect();
+		const move = (e: PointerEvent) =>
+			setSplit(
+				splitStacked
+					? ((e.clientY - box.top) / box.height) * 100
+					: ((e.clientX - box.left) / box.width) * 100
+			);
+		const end = () => {
+			splitDragging = false;
+			handle.removeEventListener('pointermove', move);
+			handle.removeEventListener('pointerup', end);
+			handle.removeEventListener('pointercancel', end);
+		};
+		handle.addEventListener('pointermove', move);
+		handle.addEventListener('pointerup', end);
+		handle.addEventListener('pointercancel', end);
+	}
+	function splitKey(event: KeyboardEvent) {
+		const back = splitStacked ? 'ArrowUp' : 'ArrowLeft';
+		const forward = splitStacked ? 'ArrowDown' : 'ArrowRight';
+		const step = event.shiftKey ? 10 : 5;
+		if (event.key === back) setSplit(splitShare - step);
+		else if (event.key === forward) setSplit(splitShare + step);
+		else if (event.key === 'Home') setSplit(20);
+		else if (event.key === 'End') setSplit(80);
+		else if (event.key === 'Enter') setSplit(50);
+		else return;
+		event.preventDefault();
+	}
+
 	// ── The phone's app shell ─────────────────────────────────────────────────
 	// The page itself never scrolls or pans: only the panes inside it do.
 	$effect(() => {
@@ -579,7 +647,13 @@
 						<DocumentView path={tab.path} {workspace} {ui} />
 					{/key}
 				{:else}
-					<div class="split" class:single={!showText || !showDiagram}>
+					<div
+						class="split"
+						class:single={!showText || !showDiagram}
+						class:dragging={splitDragging}
+						style:--split="{splitShare}%"
+						bind:this={splitBox}
+					>
 						{#key tab.path}
 							<div class="text" class:hidden={!showText}>
 								{#await loadTextEditor()}
@@ -589,6 +663,24 @@
 								{/await}
 							</div>
 						{/key}
+						{#if showText && showDiagram && !phone}
+							<!-- Drag, or use the arrow keys, to share the space; Enter halves it again. -->
+							<!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
+							<div
+								class="divider"
+								role="separator"
+								tabindex="0"
+								aria-label="Resize the text and the diagram"
+								aria-orientation={splitStacked ? 'horizontal' : 'vertical'}
+								aria-valuenow={splitShare}
+								aria-valuemin={20}
+								aria-valuemax={80}
+								title="Drag to resize; double-click to share it evenly"
+								onpointerdown={dragSplit}
+								onkeydown={splitKey}
+								ondblclick={() => setSplit(50)}
+							></div>
+						{/if}
 						{#if showDiagram && filePackage}
 							<div class="diagram">
 								{#key filePackage.key}
@@ -1063,11 +1155,48 @@
 	}
 	.split {
 		display: grid;
-		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+		grid-template-columns: minmax(0, var(--split, 50%)) 0 minmax(0, 1fr);
 		height: 100%;
 	}
 	.split.single {
 		grid-template-columns: minmax(0, 1fr);
+	}
+	/* A zero-width column with a wider grip over the border between the two. */
+	.divider {
+		position: relative;
+		z-index: 6;
+		width: 0;
+		cursor: col-resize;
+		touch-action: none;
+	}
+	.divider::before {
+		content: '';
+		position: absolute;
+		inset: 0 -5px;
+	}
+	.divider::after {
+		content: '';
+		position: absolute;
+		inset: 0 -1px;
+		background: transparent;
+		transition: background var(--duration) var(--ease);
+	}
+	.divider:hover::after,
+	.divider:focus-visible::after,
+	.dragging .divider::after {
+		background: var(--accent);
+	}
+	.divider:focus-visible {
+		outline: none;
+	}
+	/* While dragging, the editor and the canvas don't take the pointer or select text. */
+	.dragging {
+		cursor: col-resize;
+		user-select: none;
+	}
+	.dragging .text,
+	.dragging .diagram {
+		pointer-events: none;
 	}
 	.split .text {
 		min-width: 0;
@@ -1180,7 +1309,21 @@
 		}
 		.split {
 			grid-template-columns: minmax(0, 1fr);
-			grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+			grid-template-rows: minmax(0, var(--split, 50%)) 0 minmax(0, 1fr);
+		}
+		.divider {
+			width: auto;
+			height: 0;
+			cursor: row-resize;
+		}
+		.divider::before {
+			inset: -5px 0;
+		}
+		.divider::after {
+			inset: -1px 0;
+		}
+		.dragging {
+			cursor: row-resize;
 		}
 		/* One thing on show fills the height, rather than half of it. */
 		.split.single {

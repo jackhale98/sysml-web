@@ -109,3 +109,49 @@ test('deleting a specialization drawn from the supertype down removes its text',
 		{ timeout: 10_000 }
 	);
 });
+
+test('the divider between the text and the diagram resizes them, and stays put', async ({
+	page
+}) => {
+	await page.setViewportSize({ width: 1440, height: 900 });
+	await openDemo(page);
+	await page.getByRole('tab', { name: 'Files' }).click();
+	await page
+		.getByRole('navigation', { name: 'Explorer' })
+		.getByRole('button', { name: /^DroneArchitecture\.sysml/ })
+		.click();
+	const divider = page.getByRole('separator', { name: 'Resize the text and the diagram' });
+	await expect(divider).toHaveAttribute('aria-valuenow', '50');
+	const text = page.locator('.split .text');
+	const before = (await text.boundingBox())!.width;
+
+	// By keyboard: two steps toward the diagram.
+	await divider.focus();
+	await page.keyboard.press('ArrowRight');
+	await page.keyboard.press('ArrowRight');
+	await expect(divider).toHaveAttribute('aria-valuenow', '60');
+	await expect.poll(async () => (await text.boundingBox())!.width).toBeGreaterThan(before);
+
+	// By dragging: most of the way left (it stops at a fifth).
+	const box = (await divider.boundingBox())!;
+	await page.mouse.move(box.x + box.width / 2, box.y + 200);
+	await page.mouse.down();
+	await page.mouse.move(box.x - 600, box.y + 200, { steps: 5 });
+	await page.mouse.up();
+	await expect(divider).toHaveAttribute('aria-valuenow', '20');
+
+	// Remembered on this device.
+	await page.reload();
+	await expect(page.getByRole('status').filter({ hasText: 'Model ready' })).toBeVisible({
+		timeout: 30_000
+	});
+	await page.getByRole('tab', { name: 'Files' }).click();
+	await page
+		.getByRole('navigation', { name: 'Explorer' })
+		.getByRole('button', { name: /^DroneArchitecture\.sysml/ })
+		.click();
+	await expect(
+		page.getByRole('separator', { name: 'Resize the text and the diagram' })
+	).toHaveAttribute('aria-valuenow', '20');
+	await expectAccessible(page);
+});
