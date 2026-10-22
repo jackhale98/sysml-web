@@ -29,6 +29,9 @@
 	import ColumnChooser from './ColumnChooser.svelte';
 	import CellEditor from './CellEditor.svelte';
 	import TradeMatrix from './TradeMatrix.svelte';
+	import TraceGrid from './TraceGrid.svelte';
+	import TraceRefs from './TraceRefs.svelte';
+	import { matrixExport } from './traceGrid.ts';
 	import { viewTitle } from './views.ts';
 
 	/**
@@ -55,7 +58,9 @@
 		workspace.views.find((v) => v.name === name || v.qualifiedName === name)
 	);
 	const title = $derived(viewTitle(info?.name ?? name));
-	const isPivot = $derived(!!table && table.sources.length === 0 && table.rows.length > 0);
+	const isPivot = $derived(
+		!!table && (!!table.matrix || (table.sources.length === 0 && table.rows.length > 0))
+	);
 	/** Rows are a tree (a budget): indented by depth, in the tree's order (not sortable). */
 	const isTree = $derived(!!table?.columnKinds?.includes('tree'));
 	/** Rows are requirements (the requirements table and views like it): offer importing more. */
@@ -67,6 +72,12 @@
 
 	/** The table as shown (searched and sorted), for exporting. */
 	function exportData(): ExportTable {
+		if (table?.matrix)
+			return matrixExport(
+				table.matrix,
+				rows.map((r) => r.index),
+				{ title, project: workspace.info?.name ?? 'Project', doc: info?.doc }
+			);
 		return {
 			title,
 			project: workspace.info?.name ?? 'Project',
@@ -348,7 +359,8 @@
 		| 'percent'
 		| 'verdict'
 		| 'verdictIcon'
-		| 'tree';
+		| 'tree'
+		| 'trace';
 	function cellKind(column: string, value: string, index?: number): CellKind {
 		const c = column.toLowerCase();
 		if (isPivot) return 'mark';
@@ -370,6 +382,7 @@
 		if (c === 'id' || c === 'shortname') return 'id';
 		if ((c === 'satisfied' || c === 'verified') && (value === '0' || value === '1')) return 'flag';
 		if (c === 'status' || c === 'state') return 'status';
+		if (c === 'satisfiedby' || c === 'verifiedby') return 'trace';
 		if (/by$|^connectedto$|^via$/.test(c)) return 'list';
 		if (value !== '' && !Number.isNaN(Number(value))) return 'number';
 		if (c === 'text' || c === 'description' || c === 'doc' || value.length > 80) return 'long';
@@ -415,6 +428,8 @@
 		<!-- `0.23 kg (5.8 %)`: the part in brackets moves under the value when the table is narrow. -->
 		{@const at = value.lastIndexOf(' (')}
 		{value.slice(0, at)}<span class="aside">{value.slice(at)}</span>
+	{:else if kind === 'trace'}
+		<TraceRefs {value} {workspace} {ui} />
 	{:else if kind === 'list' && value}
 		{#each value.split(/,\s*/) as item, i (i)}<span class="ref">{item}</span>{/each}
 	{:else if (kind === 'long' || kind === 'text') && value.includes('`')}
@@ -569,6 +584,15 @@
 		</div>
 	{:else if table.trade}
 		<TradeMatrix trade={table.trade} {workspace} {ui} {name} />
+	{:else if table.matrix}
+		<TraceGrid
+			matrix={table.matrix}
+			visible={rows.map((r) => r.index)}
+			{workspace}
+			{ui}
+			{name}
+			{flash}
+		/>
 	{:else if table.rows.length === 0}
 		<p class="state">No rows. Nothing in the model matches this view yet.</p>
 	{:else if ui.phone}
@@ -642,7 +666,7 @@
 								{@const note = infoOf(row.index).notes?.[c]}
 								{@const inLine =
 									isTree && ['quantity', 'each', 'total', 'share', 'extended'].includes(column)}
-								{#if c > 0 && !inLine && !(subtitled && c === 1) && (canEdit || note || (value !== '' && !(isPivot && value === '0')))}
+								{#if c > 0 && !inLine && !(subtitled && c === 1) && (canEdit || note || kind === 'trace' || (value !== '' && !(isPivot && value === '0')))}
 									<div class="pair {kind}">
 										<dt>{isPivot ? column : heading(column)}</dt>
 										<dd>

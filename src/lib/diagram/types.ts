@@ -23,6 +23,10 @@ export interface SysmlEdgeData extends Record<string, unknown> {
 	label: string | null;
 	/** Drawn from the model's target to its source (the general end first, see `UPWARD`). */
 	reversed?: boolean;
+	/** The transition or succession the edge draws, where it is written. */
+	element?: { file: string; start_byte: number; end_byte?: number };
+	/** Its label opens a form to change it (a transition, a decision branch). */
+	editable?: boolean;
 	/** ELK's route, valid while the two nodes stay at `from` and `to` (their positions when it was made). */
 	route?: Route & { from: XY; to: XY };
 }

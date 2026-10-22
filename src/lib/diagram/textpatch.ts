@@ -16,7 +16,7 @@ const INLINE_MAX = 100;
  * Index just after a comment or quoted name/string starting at `i`, or `i`
  * when none starts there.
  */
-function skipTrivia(text: string, i: number): number {
+export function skipTrivia(text: string, i: number): number {
 	const c = text[i];
 	if (c === '/' && text[i + 1] === '*') {
 		const end = text.indexOf('*/', i + 2);
@@ -238,5 +238,60 @@ export function insertLineAfter(text: string, at: number, line: string): Patched
 		text: text.slice(0, lineEnd) + insert + text.slice(lineEnd),
 		from: lineEnd + insert.length - line.length,
 		to: lineEnd + insert.length
+	};
+}
+
+/**
+ * The text between `open` and `close` (a body's braces) as its own members
+ * see it: comments, quoted names and strings, and the contents of nested
+ * bodies are blanked with spaces (their braces kept), so a pattern matched
+ * on it only finds the body's direct statements. Same length as the slice,
+ * so an index into it plus `open + 1` is an index into `text`.
+ */
+export function directText(text: string, open: number, close: number): string {
+	let out = '';
+	let depth = 0;
+	for (let i = open + 1; i < close;) {
+		const next = skipTrivia(text, i);
+		if (next !== i) {
+			out += text.slice(i, next).replace(/[^\n]/g, ' ');
+			i = next;
+			continue;
+		}
+		const c = text[i]!;
+		if (c === '{') {
+			if (depth === 0) out += c;
+			else out += ' ';
+			depth++;
+		} else if (c === '}') {
+			depth--;
+			out += depth === 0 ? c : ' ';
+		} else out += depth > 0 && c !== '\n' ? ' ' : c;
+		i++;
+	}
+	return out;
+}
+
+/** The body `{ … }` of the declaration at [from, to), as the indices of its braces. */
+export function bodyOf(
+	text: string,
+	from: number,
+	to: number
+): { open: number; close: number } | null {
+	const head = headerEnd(text, from, to);
+	if (!head || head.char !== '{') return null;
+	const close = matchBrace(text, head.index);
+	return close < 0 ? null : { open: head.index, close };
+}
+
+/** Add `line` on a new line before the line containing `at`, with that line's indentation. */
+export function insertLineBefore(text: string, at: number, line: string): Patched {
+	const start = lineStart(text, at);
+	const indent = indentOf(text, at);
+	const insert = `${indent}${line}\n`;
+	return {
+		text: text.slice(0, start) + insert + text.slice(start),
+		from: start + indent.length,
+		to: start + indent.length + line.length
 	};
 }

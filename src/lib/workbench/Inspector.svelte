@@ -5,6 +5,7 @@
 	import FeatureValues from './FeatureValues.svelte';
 	import PropertyForm from './PropertyForm.svelte';
 	import TradeSummary from './TradeSummary.svelte';
+	import TransitionDetails from '#lib/diagram/TransitionDetails.svelte';
 	import {
 		BookOpen,
 		CircleAlert,
@@ -227,6 +228,10 @@
 
 		{#if engine && element.kind === 'analysis'}
 			<TradeSummary {element} {workspace} {ui} {engine} />
+		{/if}
+
+		{#if engine && element.kind === 'transition'}
+			<TransitionDetails {element} {workspace} {engine} />
 		{/if}
 
 		{#if engine && !element.isDefinition}

@@ -22,13 +22,13 @@ import {
 	parseExpr
 } from '#lib/sim/expr.ts';
 import type { Value } from '#lib/sim/expr.ts';
-import type { ColumnEdit, RenderedTable, RowInfo } from '../../types';
+import type { ColumnEdit, RenderedTable, RowInfo, TraceMatrix } from '../../types';
 import { fieldKinds } from './budget';
 import type { ElementRecord } from '../model';
 import { findView, listViews, tableSpec, viewChain, viewClauses } from './catalog';
 import type { ViewContext } from './context';
 import { ColumnEdits, type Probe } from './edits';
-import { provideRows, type Row } from './rows';
+import { provideRows, requirementRows, type Row } from './rows';
 import {
 	compareCells,
 	formatNumber,
@@ -112,6 +112,26 @@ export function renderView(ctx: ViewContext, name: string): RenderedTable {
 	if (pivot !== undefined) {
 		const parts = pivot.split(';').map((s) => s.trim());
 		if (parts.length !== 2) throw new Error('pivot expects `rowField; colField`');
+		// Satisfy or verify links by requirement: a traceability matrix, with every
+		// requirement in scope as a row, so the ones nothing satisfies show as gaps.
+		const relation = /^relation:\s*(satisfy|verify)$/.exec(rowsSpec.trim())?.[1];
+		if (relation && parts[0] === 'requirement' && parts[1] === 'by') {
+			const requirements = applyScope(ctx, view, requirementRows(ctx), 'requirements', warnings);
+			const table = traceMatrix(
+				ctx,
+				shown,
+				relation as 'satisfy' | 'verify',
+				rows,
+				requirements,
+				spec.get('sortBy')
+			);
+			return {
+				...table,
+				warnings,
+				editable: table.columns.map(() => null),
+				availableFields: probe.fields
+			};
+		}
 		const table = pivotTable(shown, rows, parts[0]!, parts[1]!, spec.get('sortBy'));
 		return {
 			...table,
@@ -544,5 +564,122 @@ function pivotTable(
 			})
 		]),
 		sources: []
+	};
+}
+
+/**
+ * A traceability matrix: a row per requirement in scope (and per requirement
+ * a link in scope names), a column per element that satisfies or verifies
+ * one, `1` where a link is (the count, when there are more). Rows ascend when
+ * `sortBy` names the requirement, else descend, as a pivot's do; columns are
+ * in the order written names sort, so `drone`, `drone.battery`, … stay together.
+ */
+function traceMatrix(
+	ctx: ViewContext,
+	view: string,
+	relation: 'satisfy' | 'verify',
+	links: Row[],
+	requirements: Row[],
+	sort: string | undefined
+): Pick<RenderedTable, 'view' | 'columns' | 'rows' | 'sources'> & { matrix: TraceMatrix } {
+	interface Entry {
+		label: string;
+		id: string;
+		title: string;
+		elementId: string | null;
+		source: RenderedTable['sources'][number];
+	}
+	const entries = new Map<string, Entry>();
+	const entryOf = (record: ElementRecord): Entry => {
+		const id = record.shortName ?? '';
+		const title = record.name ?? '';
+		return {
+			label: id ? `${id} ${title}` : title,
+			id,
+			title,
+			elementId: record.id,
+			source: {
+				element: record.qualifiedName ?? '',
+				file: record.path,
+				line: record.span.start_row
+			}
+		};
+	};
+	for (const r of requirements) {
+		const record = ctx.byId.get(r.anchors[0] ?? '');
+		if (record && !entries.has(record.id)) entries.set(record.id, entryOf(record));
+	}
+	const columns = new Map<string, TraceMatrix['elements'][number]>();
+	const found: { requirement: string; by: string; link: NonNullable<Row['link']> }[] = [];
+	for (const r of links) {
+		const link = r.link;
+		if (!link || !link.by) continue;
+		const record = link.requirement_id ? ctx.byId.get(link.requirement_id) : undefined;
+		const key = record?.id ?? `?${r.fields.get('requirement') ?? link.requirement}`;
+		if (!entries.has(key)) {
+			const title = r.fields.get('title') ?? '';
+			entries.set(
+				key,
+				record
+					? entryOf(record)
+					: {
+							label: r.fields.get('requirement') ?? title,
+							id: '',
+							title,
+							elementId: null,
+							source: { element: '', file: link.path, line: link.span.start_row }
+						}
+			);
+		}
+		const by = link.by;
+		const column = columns.get(by);
+		const target = link.by_id ? ctx.byId.get(link.by_id) : undefined;
+		if (!column || (!column.elementId && target)) {
+			const path = splitPath(by);
+			columns.set(by, {
+				written: by,
+				name: target?.name ?? path[path.length - 1] ?? by,
+				path: path.slice(0, -1),
+				qualifiedName: target?.qualifiedName ?? '',
+				elementId: target?.id ?? null,
+				kind: target?.kind ?? null
+			});
+		}
+		found.push({ requirement: key, by, link });
+	}
+	const rowKeys = [...entries.keys()];
+	const label = (key: string) => entries.get(key)!.label;
+	if (sort?.trim() === 'requirement') rowKeys.sort((a, b) => compareCells(label(a), label(b)));
+	else rowKeys.sort((a, b) => compareCells(label(b), label(a)));
+	const colKeys = [...columns.keys()].sort(compareCells);
+	const rowAt = new Map(rowKeys.map((k, i) => [k, i]));
+	const colAt = new Map(colKeys.map((k, i) => [k, i]));
+	const counts = rowKeys.map(() => colKeys.map(() => 0));
+	const marks: TraceMatrix['links'] = [];
+	for (const { requirement, by, link } of found) {
+		const row = rowAt.get(requirement)!;
+		const column = colAt.get(by)!;
+		counts[row]![column]! += 1;
+		marks.push({
+			row,
+			column,
+			file: link.path,
+			line: link.span.start_row,
+			start: link.span.start_byte,
+			end: link.span.end_byte
+		});
+	}
+	const ordered = rowKeys.map((k) => entries.get(k)!);
+	return {
+		view,
+		columns: ['requirement', ...colKeys],
+		rows: ordered.map((e, i) => [e.label, ...counts[i]!.map((n) => (n ? String(n) : ''))]),
+		sources: ordered.map((e) => e.source),
+		matrix: {
+			relation,
+			requirements: ordered.map(({ id, title, elementId }) => ({ id, title, elementId })),
+			elements: colKeys.map((k) => columns.get(k)!),
+			links: marks
+		}
 	};
 }

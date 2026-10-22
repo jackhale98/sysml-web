@@ -43,6 +43,8 @@ export interface Row {
 	groups?: Record<string, string[]>;
 	/** For a `trade` row: the trade study it belongs to. */
 	trade?: TradeStudy;
+	/** For a `relation:satisfy` or `relation:verify` row: the link. */
+	link?: Link;
 }
 
 const row = (fields: [string, string][], anchors: string[], element = ''): Row => ({
@@ -320,7 +322,7 @@ function traceLinkRows(ctx: ViewContext, links: Link[]): Row[] {
 			const requirement = link.requirement_id ? ctx.byId.get(link.requirement_id) : undefined;
 			const title = requirement?.name ?? splitPath(link.requirement).pop() ?? '';
 			const id = requirement?.shortName ?? '';
-			return row(
+			const out = row(
 				[
 					['requirement', id ? `${id} ${title}` : title],
 					['id', id],
@@ -333,6 +335,8 @@ function traceLinkRows(ctx: ViewContext, links: Link[]): Row[] {
 				[link.record?.id, link.requirement_id].filter((x): x is string => !!x),
 				requirement?.qualifiedName ?? ''
 			);
+			out.link = link;
+			return out;
 		});
 }
 
@@ -403,7 +407,7 @@ const isRequirementDef = (r: ElementRecord) => r.metaclass === 'RequirementDefin
  * requirement, and satisfying a usage counts for its definition and that
  * definition's supertypes.
  */
-function requirementRows(ctx: ViewContext): Row[] {
+export function requirementRows(ctx: ViewContext): Row[] {
 	const byOf = (links: Link[]) => {
 		const map = new Map<string, string[]>();
 		for (const link of links) {
