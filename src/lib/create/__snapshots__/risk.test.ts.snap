@@ -1,0 +1,134 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`on a new Small system project > a first design FMEA brings the risk libraries, and its worksheet opens empty 1`] = `
+"// risk/FlashlightDesignFMEA.sysml
+package FlashlightDesignFMEA {
+    doc /* Design FMEA of flashlight: how the parts of a design can fail, and what each failure does. One @Fmea line per failure mode. */
+
+    private import RiskAnalysis::*;
+    private import FlashlightDesign::flashlight;
+}
+
+private import RiskAnalysis::DesignFmeaWorksheet;
+
+// in FlashlightViews
+
+view flashlightDesignFMEA : DesignFmeaWorksheet {
+    doc /* The design FMEA of flashlight, highest risk first. */
+    expose FlashlightDesignFMEA::*;
+}"
+`;
+
+exports[`on a new Small system project > a first design FMEA brings the risk libraries, and its worksheet opens empty 2`] = `
+"// in FlashlightDesignFMEA
+
+@Fmea about flashlight::battery {
+    failureMode = "Cells leak";
+    effect = "Corroded contacts; the light fails";
+    cause = "Left in for years";
+    category = RiskCategory::design;
+    severity = 7; likelihood = 4; detection = 8;
+}"
+`;
+
+exports[`on a new Small system project > a hazard with its harms and controls makes the hazard log; a disagreeing line is flagged 1`] = `
+"// risk/Hazards.sysml
+package RoverHazards {
+    doc /* The hazards of Rover: what can cause harm, the harms it can cause and how severe they are, and the risk controls on each (ISO 14971). */
+
+    private import HazardAnalysis::*;
+
+    occurrence 'Hot battery' : Hazard {
+        :>> description = "The battery heats up when shorted.";
+    }
+
+    occurrence 'Held in the hand' : HazardousSituation {
+        :>> description = "The user holds the light.";
+    }
+
+    occurrence 'Burned hand' : Harm {
+        :>> description = "A burn to the hand.";
+        :>> severity = SeverityScale::serious;
+    }
+
+    occurrence 'Dropped light' : Harm {
+        :>> severity = SeverityScale::negligible;
+    }
+
+    connection : Causation connect 'Hot battery' to 'Held in the hand';
+    connection : Causation connect 'Held in the hand' to 'Burned hand';
+    connection : Causation connect 'Held in the hand' to 'Dropped light';
+
+    requirement <'RC-001'> 'Thermal fuse' : RiskControl {
+        doc /* The battery holder shall cut the current above 60 °C. */
+        :>> hierarchy = ControlHierarchy::protectiveMeasure;
+        ref :>> hazard = 'Hot battery';
+    }
+}
+
+private import HazardAnalysis::HazardLog;
+
+// in FlashlightViews
+
+view hazardLog : HazardLog {
+    doc /* Each hazard with the harms it can cause, how severe they are, and the controls on it. */
+}"
+`;
+
+exports[`on a new Small system project > a hazard with its harms and controls makes the hazard log; a disagreeing line is flagged 2`] = `
+"private import RiskAnalysis::RiskMatrix;
+
+// in FlashlightViews
+
+view batteryFMEAMatrix : RiskMatrix {
+    doc /* The lines of Battery FMEA by severity and likelihood. */
+    expose BatteryFMEA::*;
+}"
+`;
+
+exports[`the generators > write a sheet, its view, a line and a hazard as the demo writes them 1`] = `
+"package PumpDesignFmea {
+    doc /* Design FMEA of pump: how the parts of a design can fail, and what each failure does. One @Fmea line per failure mode. */
+
+    private import RiskAnalysis::*;
+    private import Pump::pump;
+}
+"
+`;
+
+exports[`the generators > write a sheet, its view, a line and a hazard as the demo writes them 2`] = `
+"view pumpDesignFmea : DesignFmeaWorksheet {
+    doc /* The pump. */
+    expose PumpDesignFmea::*;
+}"
+`;
+
+exports[`the generators > write a sheet, its view, a line and a hazard as the demo writes them 3`] = `
+"@Fmea about pump::seal {
+    failureMode = "Seal wears out";
+    effect = "Water leaks \\"slowly\\"";
+    category = RiskCategory::'use';
+    severity = 6; likelihood = 4; detection = 7;
+    hazard = 'Hot water leak';
+}"
+`;
+
+exports[`the generators > write a sheet, its view, a line and a hazard as the demo writes them 4`] = `
+"occurrence 'Hot water leak' : Hazard {
+    :>> description = "Hot water escapes from the pump.";
+}
+occurrence 'Someone nearby' : HazardousSituation {
+    :>> description = "A person stands next to it.";
+}
+occurrence Scald : Harm {
+    :>> severity = SeverityScale::serious;
+}
+connection : Causation connect 'Hot water leak' to 'Someone nearby';
+connection : Causation connect 'Someone nearby' to Scald;
+connection : Causation connect 'Someone nearby' to slip;
+requirement <'RC-001'> 'Seal check' : RiskControl {
+    doc /* The pump shall stop when its seal leaks. */
+    :>> hierarchy = ControlHierarchy::protectiveMeasure;
+    ref :>> hazard = 'Hot water leak';
+}"
+`;

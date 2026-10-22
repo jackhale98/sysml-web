@@ -26,6 +26,8 @@ describe('the help', () => {
 			'Link a requirement to the design',
 			'Check a budget',
 			'Compare options',
+			'Analyse what can fail (FMEA)',
+			'Log hazards and their controls',
 			'Draw a state machine',
 			'Make a report',
 			'Import from Excel',
@@ -57,6 +59,8 @@ describe('the help', () => {
 		expect(searchHelp('json')[0]?.id).toBe('exchange-models');
 		expect(searchHelp('syson').map((t) => t.id)).toContain('exchange-models');
 		expect(searchHelp('state machine')[0]?.id).toBe('concept-state-machine');
+		expect(searchHelp('fmea')[0]?.id).toBe('fmea');
+		expect(searchHelp('hazard')[0]?.id).toBe('hazards');
 		expect(searchHelp('xyzzy')).toEqual([]);
 		expect(searchHelp('')).toHaveLength(ALL_TOPICS.length);
 	});

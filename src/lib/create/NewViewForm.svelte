@@ -18,9 +18,11 @@
 		Network,
 		Plug,
 		Scale,
+		ShieldAlert,
 		ShieldCheck,
 		Sigma,
 		ToggleRight,
+		TriangleAlert,
 		Workflow
 	} from '@lucide/svelte';
 	import { untrack } from 'svelte';
@@ -273,6 +275,22 @@
 							<span class="glyph"><Scale size={18} aria-hidden="true" /></span>
 							<strong>Trade study</strong>
 							<small>Compare alternatives on weighted criteria and rank them.</small>
+						</button>
+						<button type="button" class="card trade" onclick={() => (ui.create = { kind: 'fmea' })}>
+							<span class="glyph"><ShieldAlert size={18} aria-hidden="true" /></span>
+							<strong>FMEA worksheet</strong>
+							<small
+								>What can fail, what follows, and how serious, likely and detectable it is.</small
+							>
+						</button>
+						<button
+							type="button"
+							class="card trade"
+							onclick={() => (ui.create = { kind: 'hazard' })}
+						>
+							<span class="glyph"><TriangleAlert size={18} aria-hidden="true" /></span>
+							<strong>Hazard log</strong>
+							<small>Hazards, the harms they can cause and the risk controls on them.</small>
 						</button>
 					{/if}
 				</div>

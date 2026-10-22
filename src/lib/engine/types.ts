@@ -166,6 +166,8 @@ export interface ViewInfo {
 export interface RenderedTable {
 	view: string;
 	columns: string[];
+	/** Per column, as the view writes it (`rpn = Rpn(severity, likelihood, detection)`), to save a choice of columns. */
+	columnSpecs?: string[];
 	rows: string[][];
 	warnings: string[];
 	/**
@@ -173,7 +175,14 @@ export interface RenderedTable {
 	 * and (`byte`) where in its file the row's subject is written, when that
 	 * is a statement rather than an element (a `satisfy`, a constraint).
 	 */
-	sources: { element: string; file: string; line: number; byte?: number }[];
+	sources: {
+		element: string;
+		file: string;
+		line: number;
+		byte?: number;
+		/** For a row of a metadata annotation (`@Fmea about x { … }`): the annotation's element id. */
+		annotation?: string;
+	}[];
 	/** Per column: how its cells can be edited, or null when derived. */
 	editable?: (ColumnEdit | null)[];
 	/** Fields the view's row provider offers, for choosing columns. */
@@ -193,6 +202,18 @@ export interface RenderedTable {
 	 * `1` where a link is), for export and search.
 	 */
 	matrix?: TraceMatrix;
+	/**
+	 * For rows of metadata annotations (`rows = "@Fmea"`): the metadata def
+	 * (qualified), and the package new annotations go in (the one the view
+	 * exposes, else the one most rows are written in).
+	 */
+	annotations?: { metadata: string; package: string | null };
+	/**
+	 * For a pivot whose two fields are bounded scales (FMEA ratings): a grid
+	 * of counts with every value of each scale, `rows` down and `columns`
+	 * across (the risk matrix).
+	 */
+	counts?: { rows: string; columns: string };
 }
 
 /**
@@ -253,6 +274,8 @@ export interface RowInfo {
 	role?: 'rollup' | 'total' | 'attribute';
 	/** Why a cell is empty or undecided, by column index. */
 	notes?: Record<number, string>;
+	/** What is wrong with a cell's value, by column index (a rating outside its scale). */
+	problems?: Record<number, string>;
 }
 
 // ---- Constraint checks and evaluated values ----------------------------------
@@ -310,6 +333,8 @@ export interface Check {
 	constraintAt?: { file: string; span: Span };
 	/** Set when the verdict rests on a value the app added up (`evaluation.ts`). Internal, not shown. */
 	byApp?: string;
+	/** How the problems list words it when violated, when the check says it best itself. */
+	problem?: string;
 }
 
 export interface CheckReport {

@@ -5,7 +5,8 @@
  */
 import type { Engine } from '#lib/engine/client.ts';
 import type { ElementFeatures, FeatureInfo } from '#lib/engine/types.ts';
-import type { ModelElement } from '#lib/project/elements.ts';
+import type { ModelElement, TreeNode } from '#lib/project/elements.ts';
+import { packageName as projectPackageName } from '#lib/project/sources.ts';
 import { isLibraryFile, type Workspace } from '#lib/project/workspace.svelte.ts';
 import { viewTitle } from '#lib/workbench/views.ts';
 import {
@@ -18,10 +19,27 @@ import {
 	viewsPackage,
 	type Write
 } from './apply';
-import { comparisons, requireConstraints, requirementText, satisfyText, type Limit } from './limit';
-import { enclosingPackage, qualifiedName } from './model';
+import { fmeaLineText, fmeaPackageText, listWords, packageViewText, type FmeaKind } from './fmea';
+import { hazardMembers, hazardPackageText, type HazardSpec } from './hazard';
+import {
+	comparisons,
+	nextRequirementId,
+	requireConstraints,
+	requirementText,
+	satisfyText,
+	type Limit
+} from './limit';
+import { enclosingPackage, flatten, pathTo, qualifiedName } from './model';
+import { missingRiskLibraries } from './riskLibraries';
 import { rollupExpression, rollupMember, rollupPlan, type RollupPlan } from './rollup';
-import { References, camelName, name as sysmlName, pascalName, uniqueName } from './sysml';
+import {
+	References,
+	camelName,
+	docComment,
+	name as sysmlName,
+	pascalName,
+	uniqueName
+} from './sysml';
 import { tradeStudyText, tradeViewText, type CriterionSpec, type TradeSpec } from './trade';
 import { viewText, type Target, type ViewKind } from './view';
 
@@ -388,5 +406,253 @@ export function planTrade(
 		preview: previewOf(merge({ files: [{ path, text }] }, view)),
 		label: `Created the trade study ${viewTitle(base)}`,
 		open: { name: viewName, title: viewTitle(viewName) }
+	};
+}
+
+// --- Risk: FMEA and hazards ------------------------------------------------------------
+
+/**
+ * The libraries a first FMEA or hazard needs, as a write: the risk
+ * libraries, and the view libraries they use, when the project lacks them.
+ */
+export async function riskLibrariesWrite(workspace: Workspace, engine: Engine): Promise<Write> {
+	const view = await missingLibraries(workspace, engine);
+	const files = [...view, ...missingRiskLibraries(workspace)];
+	return files.length ? { files } : {};
+}
+
+/** An element a form chose, as the tree gives it. */
+export interface Chosen {
+	qualifiedName: string;
+	label: string;
+}
+
+/**
+ * What a package imports to refer to an element, and how it spells it
+ * then: the element's outermost owner that is not a package is imported
+ * (`DroneArchitecture::drone`), the rest is its path (`drone::battery`).
+ */
+export function spellFrom(
+	tree: readonly TreeNode[],
+	refs: References,
+	qualified: string
+): string | null {
+	const node = flatten(tree).find((n) => n.qualifiedName === qualified);
+	if (!node) return null;
+	const path = pathTo(tree, node.node.element.key);
+	const head = path.findIndex((n) => n.element.kind !== 'package');
+	if (head < 0) return refs.name(qualified);
+	const imported = path
+		.slice(0, head + 1)
+		.map((n) => n.element.name)
+		.join('::');
+	const rest = path.slice(head + 1).map((n) => n.element.name);
+	return [refs.name(imported), ...rest].join('::');
+}
+
+export interface FmeaInput {
+	kind: FmeaKind;
+	title: string;
+	/** The parts, process or tasks it covers. */
+	covers: Chosen[];
+}
+
+export function planFmea(
+	workspace: Workspace,
+	input: FmeaInput,
+	libraries: Write = {}
+): Plan & { name: string; packageName: string } {
+	const packageName = uniqueName(pascalName(input.title, 'Fmea'), takenNames(workspace));
+	const refs = new References(packageName);
+	refs.library('RiskAnalysis::*');
+	for (const c of input.covers) spellFrom(workspace.tree, refs, c.qualifiedName);
+	const text = fmeaPackageText({
+		kind: input.kind,
+		packageName,
+		covers: input.covers.map((c) => c.label),
+		imports: refs.imports
+	});
+	const path = freePath(workspace, `risk/${packageName}.sysml`);
+	const name = uniqueName(camelName(input.title, 'fmea'), viewNames(workspace));
+	const covers = input.covers.length ? ` of ${listWords(input.covers.map((c) => c.label))}` : '';
+	const view = viewWrite(workspace, (spell) => [
+		packageViewText(
+			name,
+			spell(`RiskAnalysis::${input.kind.worksheet}`),
+			packageName,
+			`The ${input.kind.suffix}${covers}, highest risk first.`
+		)
+	]);
+	const write = merge(libraries, { files: [{ path, text }] }, view);
+	return {
+		write,
+		name,
+		packageName,
+		preview: previewOf(merge({ files: [{ path, text }] }, view)),
+		label: `Created the ${input.kind.suffix} ${viewTitle(name)}`,
+		open: { name, title: viewTitle(name) }
+	};
+}
+
+export interface FmeaLineInput {
+	/** The package that holds the sheet's lines. */
+	pkg: ModelElement;
+	kind: FmeaKind;
+	element: Chosen;
+	failureMode: string;
+	effect: string;
+	cause: string;
+	severity: number;
+	likelihood: number;
+	detection: number;
+	hazard?: Chosen | null;
+	preventionControls?: string;
+	detectionControls?: string;
+}
+
+export function planFmeaLine(workspace: Workspace, input: FmeaLineInput): Plan {
+	const refs = new References(qualifiedName(workspace.tree, input.pkg.key));
+	refs.library('RiskAnalysis::*');
+	const about = spellFrom(workspace.tree, refs, input.element.qualifiedName);
+	if (!about) return { write: {}, preview: '', label: '' };
+	const hazard = input.hazard ? spellFrom(workspace.tree, refs, input.hazard.qualifiedName) : null;
+	const text = fmeaLineText({
+		about,
+		failureMode: input.failureMode,
+		effect: input.effect,
+		cause: input.cause,
+		category: input.kind.literal,
+		severity: input.severity,
+		likelihood: input.likelihood,
+		detection: input.detection,
+		hazard,
+		...(input.preventionControls ? { preventionControls: input.preventionControls } : {}),
+		...(input.detectionControls ? { detectionControls: input.detectionControls } : {})
+	});
+	const write: Write = {
+		imports: importsFor(workspace, input.pkg, refs.imports),
+		members: [{ parent: input.pkg, text: `\n${text}` }]
+	};
+	return {
+		write,
+		preview: previewOf(write),
+		label: `Added “${input.failureMode.trim()}” of ${input.element.label} to ${input.pkg.label}`
+	};
+}
+
+/** A risk matrix of a sheet's lines (`RiskAnalysis::RiskMatrix`, exposing its package). */
+export function planRiskMatrix(
+	workspace: Workspace,
+	sheet: { packageName: string; title: string }
+): Plan & { name: string } {
+	const simple = sheet.packageName.split('::').pop()!.replace(/^'|'$/g, '');
+	const name = uniqueName(`${camelName(simple, 'fmea')}Matrix`, viewNames(workspace));
+	const view = viewWrite(workspace, (spell) => [
+		packageViewText(
+			name,
+			spell('RiskAnalysis::RiskMatrix'),
+			sheet.packageName,
+			`The lines of ${sheet.title} by severity and likelihood.`
+		)
+	]);
+	return {
+		write: view,
+		name,
+		preview: previewOf(view),
+		label: `Created the risk matrix ${viewTitle(name)}`,
+		open: { name, title: viewTitle(name) }
+	};
+}
+
+/** The package most of the project's hazards are in (where a new one goes). */
+export function hazardsPackage(workspace: Workspace): ModelElement | null {
+	const counts = new Map<string, number>();
+	for (const e of workspace.elements) {
+		if (isLibraryFile(e.file) || e.isDefinition) continue;
+		if (!/(^|::)(Hazard|Harm)$/.test(e.typeRef ?? '')) continue;
+		const pkg = enclosingPackage(workspace.tree, e.key);
+		if (pkg) counts.set(pkg.key, (counts.get(pkg.key) ?? 0) + 1);
+	}
+	const best = [...counts].sort((a, b) => b[1] - a[1])[0]?.[0];
+	return best ? (workspace.elements.find((e) => e.key === best) ?? null) : null;
+}
+
+/** The project's saved hazard log, if it has one. */
+export function hazardLogView(workspace: Workspace): string | null {
+	const saved = workspace.views.find(
+		(v) =>
+			v.isUsage &&
+			!v.builtin &&
+			!isLibraryFile(v.file) &&
+			(v.definition ?? '').split('::').pop() === 'HazardLog'
+	);
+	return saved?.name ?? null;
+}
+
+/** The next risk control ID: `RC-004` after `RC-003`. */
+export function nextControlId(ids: readonly (string | null)[]): string {
+	const own = ids.filter((id): id is string => !!id && /^RC-?\d+$/.test(id));
+	return own.length ? nextRequirementId(own) : 'RC-001';
+}
+
+export interface HazardInput {
+	spec: HazardSpec;
+	/** Harms of the model the hazard leads to too. */
+	existingHarms: Chosen[];
+}
+
+export function planHazard(
+	workspace: Workspace,
+	input: HazardInput,
+	libraries: Write = {}
+): Plan & { view: string } {
+	const pkg = hazardsPackage(workspace);
+	const pkgName = pkg
+		? qualifiedName(workspace.tree, pkg.key)
+		: uniqueName(
+				`${projectPackageName(workspace.info?.name ?? 'Model').replace(/'/g, '')}Hazards`,
+				takenNames(workspace)
+			);
+	const refs = new References(pkgName);
+	refs.library('HazardAnalysis::*');
+	const existingHarms = input.existingHarms
+		.map((h) => spellFrom(workspace.tree, refs, h.qualifiedName))
+		.filter((s): s is string => !!s);
+	const members = hazardMembers({ ...input.spec, existingHarms });
+	const writes: Write[] = [];
+	if (pkg)
+		writes.push({
+			imports: importsFor(workspace, pkg, refs.imports),
+			members: members.map((text) => ({ parent: pkg, text: `\n${text}` }))
+		});
+	else
+		writes.push({
+			files: [
+				{
+					path: freePath(workspace, 'risk/Hazards.sysml'),
+					text: hazardPackageText(pkgName, workspace.info?.name ?? 'the system', members)
+				}
+			]
+		});
+	let view = hazardLogView(workspace);
+	if (!view) {
+		view = uniqueName('hazardLog', viewNames(workspace));
+		writes.push(
+			viewWrite(workspace, (spell) => [
+				[
+					`view ${view} : ${spell('HazardAnalysis::HazardLog')} {`,
+					`    ${docComment('Each hazard with the harms it can cause, how severe they are, and the controls on it.')}`,
+					'}'
+				].join('\n')
+			])
+		);
+	}
+	const shown = merge(...writes);
+	return {
+		write: merge(libraries, ...writes),
+		view,
+		preview: previewOf(shown),
+		label: `Created the hazard ${input.spec.name.trim()}`,
+		open: { name: view, title: viewTitle(view) }
 	};
 }

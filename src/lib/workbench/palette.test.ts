@@ -192,7 +192,7 @@ describe('search', () => {
 		const lib = element('ISQ', { library: true });
 		expect(labels(sources([lib]), 'isq')).toEqual(['ISQ']);
 		// A single character is too little to dig into the libraries.
-		expect(labels(sources([element('Zed', { library: true })]), 'z')).toEqual([]);
+		expect(labels(sources([element('Zed', { library: true })]), 'z')).not.toContain('Zed');
 		// A command that matches suppresses the library fallback.
 		const withHit = sources([element('Themed', { library: true })]);
 		expect(labels(withHit, 'theme')).toEqual(['Switch theme']);

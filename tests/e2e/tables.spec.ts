@@ -50,16 +50,18 @@ test('an FMEA rating edits the annotation behind it, and the RPN follows', async
 	await views(page).getByRole('button', { name: 'Fmea worksheet' }).click();
 	const table = page.getByRole('region', { name: 'Fmea worksheet view' });
 	const row = table.locator('tbody tr').filter({ hasText: 'Thermal runaway' });
-	await expect(row.locator('td').last()).toHaveText('144');
+	// The worksheet's figures follow the failure mode: severity, likelihood, detection, RPN.
+	const rpn = row.locator('td').nth(5);
+	await expect(rpn).toHaveText('144');
 	await row.getByRole('button', { name: /Edit Severity/ }).click();
 	const input = row.getByRole('textbox', { name: /Severity/ });
 	await input.fill('9');
 	await input.press('Enter');
-	// 9 × 3 × 6, computed by the view's `rpn = severity*likelihood*detection`.
-	await expect(row.locator('td').last()).toHaveText('162', { timeout: 10_000 });
+	// 9 × 3 × 6, computed by the library's `Rpn` calc, which the view's column invokes.
+	await expect(rpn).toHaveText('162', { timeout: 10_000 });
 	await expect(row).toContainText('9');
 	await page.getByRole('button', { name: 'Undo' }).click();
-	await expect(row.locator('td').last()).toHaveText('144', { timeout: 10_000 });
+	await expect(rpn).toHaveText('144', { timeout: 10_000 });
 });
 
 test('a trace matrix made with New view renders from the view library', async ({ page }) => {

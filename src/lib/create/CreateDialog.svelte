@@ -149,7 +149,9 @@
 				{#if preview}
 					<details class="sysml">
 						<summary>See the SysML</summary>
-						<pre aria-label="SysML that will be written">{preview}</pre>
+						<!-- Focusable, so the keyboard can scroll a long preview. -->
+						<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+						<pre aria-label="SysML that will be written" tabindex="0">{preview}</pre>
 					</details>
 				{/if}
 				{@render footer?.(step)}

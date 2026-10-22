@@ -11,7 +11,9 @@ package DroneViews {
     private import StandardViewDefinitions::*;
     private import Views::asTreeDiagram;
     private import Reporting::*;
-    private import RiskAnalysis::FmeaWorksheet;
+    private import RiskAnalysis::DesignFmeaWorksheet;
+    private import RiskAnalysis::RiskMatrix;
+    private import HazardAnalysis::HazardLog;
     private import ModelViews::*;
 
     // Tables. Each is a view typed by a standard table from ModelViews
@@ -111,8 +113,19 @@ package DroneViews {
         doc /* Every requirement down the side, the tests that check it across the top. */
     }
 
-    view fmeaWorksheet : FmeaWorksheet {
+    view fmeaWorksheet : DesignFmeaWorksheet {
         doc /* The design FMEA as a table, highest risk priority first. */
+        expose DroneFmea::*;
+    }
+
+    view riskMatrix : RiskMatrix {
+        doc /* The design FMEA's lines by severity and likelihood. */
+        expose DroneFmea::*;
+    }
+
+    view hazardLog : HazardLog {
+        doc /* Each hazard with the harms it can cause and the controls on it. */
+        expose DroneFmea::*;
     }
 
     // Reports: documents to send for review, built from the views above.

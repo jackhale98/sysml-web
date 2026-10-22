@@ -17,6 +17,12 @@ starting a project (blank, requirements first, or a small example system),
 the ideas in plain words, how to do the common jobs, keyboard shortcuts and
 where your data is kept. It is the same guide as **Help** in the app.
 
+FMEA worksheets, risk matrices and hazard logs are standard SysML with two
+small libraries; [docs/risk-analysis.md](docs/risk-analysis.md) says what
+each definition means and how another tool reads them, and
+[docs/table-rendering.md](docs/table-rendering.md) how any view becomes a
+table.
+
 ## Development
 
 Requires Node 22.17+.

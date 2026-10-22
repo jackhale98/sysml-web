@@ -7,14 +7,23 @@
 	/**
 	 * What satisfies or verifies a requirement, in a table cell: each name a
 	 * link that selects its element, as the inspector's "Satisfied by" does;
-	 * nothing yet says so, as a gap.
+	 * nothing yet says so, as a gap. Other names of elements (a hazard's
+	 * harms and controls) read the same, found by `find`.
 	 */
 	let {
 		value,
 		workspace,
 		ui,
-		gap = 'Not yet'
-	}: { value: string; workspace: Workspace; ui: WorkbenchUi; gap?: string } = $props();
+		gap = 'Not yet',
+		find
+	}: {
+		value: string;
+		workspace: Workspace;
+		ui: WorkbenchUi;
+		gap?: string;
+		/** How a name finds its element, when the names aren't trace links (a hazard's controls). */
+		find?: (name: string) => ModelElement | undefined;
+	} = $props();
 
 	const names = $derived(
 		value
@@ -33,6 +42,7 @@
 	});
 
 	function target(by: string): ModelElement | undefined {
+		if (find) return find(by);
 		const id = linkIds.get(by);
 		const found = id ? workspace.elements.find((e) => e.id === id) : undefined;
 		if (found) return found;
@@ -96,6 +106,12 @@
 	.ref.plain {
 		color: var(--text);
 		cursor: default;
+	}
+	/* A finger's width on a phone. */
+	@media (max-width: 760px) {
+		button.ref {
+			min-height: 2.75rem;
+		}
 	}
 	.gap {
 		display: inline-block;

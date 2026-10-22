@@ -10,7 +10,9 @@
 		Play,
 		Plus,
 		Scale,
-		Table2
+		ShieldAlert,
+		Table2,
+		TriangleAlert
 	} from '@lucide/svelte';
 	import type { LibraryEntry } from '#lib/engine/types.ts';
 	import { libraryIndex } from '#lib/library/library.ts';
@@ -108,6 +110,19 @@
 				<button type="button" class="row" onclick={() => (ui.create = { kind: 'trade' })}>
 					<span class="tile" style:--tone="var(--kind-analysis)"><Scale size={18} /></span>
 					<span class="label">New trade study</span>
+				</button>
+			</li>
+			<li>
+				<button type="button" class="row" onclick={() => (ui.create = { kind: 'fmea' })}>
+					<span class="tile" style:--tone="var(--danger)"><ShieldAlert size={18} /></span>
+					<span class="label">New FMEA</span>
+					<span class="detail">Design, process, use</span>
+				</button>
+			</li>
+			<li>
+				<button type="button" class="row" onclick={() => (ui.create = { kind: 'hazard' })}>
+					<span class="tile" style:--tone="var(--danger)"><TriangleAlert size={18} /></span>
+					<span class="label">New hazard</span>
 				</button>
 			</li>
 		</ul>

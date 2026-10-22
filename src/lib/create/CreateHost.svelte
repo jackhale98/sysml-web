@@ -1,5 +1,8 @@
 <script lang="ts">
-	/** The guided form `ui.create` asks for (`#lib/create`), one at a time. */
+	/**
+	 * The guided form `ui.create` asks for (`#lib/create`), one at a time.
+	 * The risk forms load when first asked for.
+	 */
 	import type { Engine } from '#lib/engine/client.ts';
 	import type { Workspace } from '#lib/project/workspace.svelte.ts';
 	import type { CreateRequest, WorkbenchUi } from '#lib/workbench/ui.svelte.ts';
@@ -64,6 +67,18 @@
 			/>
 		{:else if request.kind === 'trade'}
 			<TradeForm bind:open {workspace} {ui} {engine} alternatives={request.alternatives ?? []} />
+		{:else if request.kind === 'fmea'}
+			{#await import('./FmeaForm.svelte') then { default: FmeaForm }}
+				<FmeaForm bind:open {workspace} {ui} {engine} kindId={request.fmeaKind} />
+			{/await}
+		{:else if request.kind === 'fmeaLine'}
+			{#await import('./FmeaLineForm.svelte') then { default: FmeaLineForm }}
+				<FmeaLineForm bind:open {workspace} {engine} view={request.view} />
+			{/await}
+		{:else if request.kind === 'hazard'}
+			{#await import('./HazardForm.svelte') then { default: HazardForm }}
+				<HazardForm bind:open {workspace} {ui} {engine} />
+			{/await}
 		{/if}
 	{/key}
 {/if}

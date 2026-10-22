@@ -787,11 +787,18 @@ export function viewFilters(text: string): string[] {
 
 /** `connect a.b to c.d` or `connect (a, b)` → its two ends, as written. */
 export function connectionEnds(header: string): [string, string] | null {
-	const squash = (s: string) => s.replace(/\s+/g, '');
-	const pair = /\bconnect\s*\(\s*([^,()]+?)\s*,\s*([^,()]+?)\s*\)/.exec(header);
-	if (pair) return [squash(pair[1]!), squash(pair[2]!)];
-	const to = /\bconnect\s+([\s\S]+?)\s+to\s+([\s\S]+)$/.exec(header);
-	return to ? [squash(to[1]!), squash(to[2]!)] : null;
+	// Quoted names may hold spaces, commas and `to`: they are matched masked, then read as written.
+	const masked = header.replace(/'(?:[^'\\]|\\.)*'/g, (q) => `'${'_'.repeat(q.length - 2)}'`);
+	const squash = (s: string) =>
+		s.replace(/'(?:[^'\\]|\\.)*'|\s+/g, (m) => (m.startsWith("'") ? m : ''));
+	const ends = (m: RegExpExecArray) => {
+		const [a, b] = [m.indices![1]!, m.indices![2]!];
+		return [squash(header.slice(a[0], a[1])), squash(header.slice(b[0], b[1]))] as [string, string];
+	};
+	const pair = /\bconnect\s*\(\s*([^,()]+?)\s*,\s*([^,()]+?)\s*\)/d.exec(masked);
+	if (pair) return ends(pair);
+	const to = /\bconnect\s+([\s\S]+?)\s+to\s+([\s\S]+)$/d.exec(masked);
+	return to ? ends(to) : null;
 }
 
 /** The multiplicity as written (`4`, `0..*`), from a declaration header. */

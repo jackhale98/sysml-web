@@ -1,35 +1,47 @@
 package RiskAnalysis {
     doc
     /*
-     * FMEA and hazard analysis vocabulary for SysML v2.
+     * FMEA (failure mode and effects analysis) for SysML v2. Each way
+     * something can fail is one @Fmea line, attached to the element that
+     * fails, with its effect, its cause and three ratings.
      *
-     * Supports two complementary styles:
+     * One line serves three kinds of FMEA, told apart by its `category`:
+     *   design   (DFMEA) - a part can fail: the line is about a part or a
+     *                      part def;
+     *   process  (PFMEA) - a process step can go wrong: about an action;
+     *   'use'    (uFMEA) - a user can make a use error, or misuse the
+     *                      product in a foreseeable way (IEC 62366): about
+     *                      a user task (an action) or a use case;
+     *   software          - a software item can fail (a design FMEA of
+     *                      software).
+     * DesignFmeaWorksheet, ProcessFmeaWorksheet and UseFmeaWorksheet show
+     * one kind each; FmeaWorksheet shows every line.
      *
-     * 1. Lightweight annotation - attach an @Fmea metadata line item to any
-     *    element (part, action, process step). Ideal for FMEA worksheets.
+     * The ratings follow the AIAG-VDA FMEA handbook (2019), each 1 to 10:
+     *   severity   (S): how bad the effect is - 1 no noticeable effect,
+     *                   10 affects safety or breaks a regulation;
+     *   likelihood (O, "occurrence"): how likely the cause is - 1 extremely
+     *                   unlikely, 10 almost certain;
+     *   detection  (D): how likely the failure is to go unnoticed before it
+     *                   reaches the user - 1 always caught, 10 cannot be
+     *                   detected.
+     * Two figures are calculated from them, never typed in:
+     *   Rpn            - severity x likelihood x detection (1 to 1000);
+     *   ActionPriority - high, medium or low: the AIAG-VDA table, which
+     *                    weighs severity first.
+     * severity, likelihood and detection are the assessment now, with the
+     * controls in place; initialSeverity, initialLikelihood and
+     * initialDetection keep the assessment before risk reduction, so the
+     * reduction shows (FmeaRiskReduction).
      *
-     * 2. Structural analysis - model FailureMode as a first-class
-     *    occurrence wired into HazardAnalysis causal chains
-     *    (FailureMode -> Hazard -> HazardousSituation -> Harm), for
-     *    ISO 14971 / MIL-STD-882E style safety cases.
+     * Hazard analysis (HazardAnalysis) drives severity: a line's `hazard`
+     * names the hazard its failure can lead to, the harms at the end of
+     * that hazard's Causation chain carry a SeverityScale class, and a line
+     * whose severity is not the worst of those harms' values is flagged.
      *
-     * Hazard analysis drives the FMEA: when a failure mode (or @Fmea line,
-     * via its hazard ref) links to a hazard, its severity derives top-down
-     * the harm at the end of that hazard's causal chain - see
-     * HazardAnalysis::SeverityScale for the shared 1-10 anchors. Likelihood
-     * and detection remain bottom-up properties of the failure mode.
-     *
-     * Ratings follow the AIAG/VDA and SAE J1739 ordinal 1-10 scales:
-     *   Severity:   1 = negligible ... 10 = catastrophic, safety hazard
-     *   Likelihood: 1 = very unlikely ... 10 = almost certain (AIAG 'occurrence')
-     *   Detection:  1 = always detected ... 10 = cannot be detected
-     *   RPN = S x L x D (1..1000), computed by the Rpn calc - never stored,
-     *   so it can never disagree with its factors.
-     *
-     * Mitigations link to risks with the standard `satisfy` relationship
-     * and to their proof with `verify`, so generic traceability tooling
-     * answers "which high-RPN risks lack verified mitigations" without
-     * any risk-specific support.
+     * Risk controls are requirements (HazardAnalysis::RiskControl); what
+     * implements one `satisfy`s it and a verification case `verify`s it, so
+     * ordinary traceability shows which risks lack a verified control.
      */
 
     private import ScalarValues::*;
@@ -37,16 +49,16 @@ package RiskAnalysis {
     private import Reporting::*;
 
     attribute def FmeaRating :> Integer {
-        doc /* Ordinal FMEA rating on the AIAG/VDA 1-10 scale. */
+        doc /* A rating on the AIAG-VDA scale of 1 to 10. A value outside it is flagged. */
         assert constraint inRange { that >= 1 and that <= 10 }
     }
 
     calc def Rpn {
         doc
         /*
-         * Risk Priority Number: severity x likelihood x detection,
-         * range 1..1000. Common action thresholds:
-         *   1-50 low, 51-150 medium, 151-400 high, 401+ critical.
+         * Risk priority number: severity x likelihood x detection, from 1
+         * to 1000. Thresholds on it are a company's choice; AIAG-VDA
+         * recommends ActionPriority instead.
          */
         in severity : FmeaRating;
         in likelihood : FmeaRating;
@@ -54,8 +66,54 @@ package RiskAnalysis {
         return : Integer = severity * likelihood * detection;
     }
 
+    enum def ActionPriorityLevel {
+        doc
+        /*
+         * How urgently a line needs action (AIAG-VDA): high - act to lower
+         * the risk, or justify why not; medium - act, or justify; low -
+         * act if it is cheap to.
+         */
+        enum low;
+        enum medium;
+        enum high;
+    }
+
+    calc def ActionPriority {
+        doc
+        /*
+         * The AIAG-VDA action priority table (2019) for design and process
+         * FMEA, as bands of severity, then likelihood, then detection.
+         * Severity 1 is always low.
+         */
+        in severity : FmeaRating;
+        in likelihood : FmeaRating;
+        in detection : FmeaRating;
+        return : ActionPriorityLevel =
+            if severity >= 9 ?
+                (if likelihood >= 6 ? ActionPriorityLevel::high
+                 else if likelihood >= 4 ? (if detection >= 2 ? ActionPriorityLevel::high else ActionPriorityLevel::medium)
+                 else if likelihood >= 2 ? (if detection >= 7 ? ActionPriorityLevel::high
+                                            else if detection >= 5 ? ActionPriorityLevel::medium
+                                            else ActionPriorityLevel::low)
+                 else ActionPriorityLevel::low)
+            else if severity >= 7 ?
+                (if likelihood >= 8 ? ActionPriorityLevel::high
+                 else if likelihood >= 6 ? (if detection >= 2 ? ActionPriorityLevel::high else ActionPriorityLevel::medium)
+                 else if likelihood >= 4 ? (if detection >= 7 ? ActionPriorityLevel::high else ActionPriorityLevel::medium)
+                 else if likelihood >= 2 ? (if detection >= 5 ? ActionPriorityLevel::medium else ActionPriorityLevel::low)
+                 else ActionPriorityLevel::low)
+            else if severity >= 4 ?
+                (if likelihood >= 8 ? (if detection >= 5 ? ActionPriorityLevel::high else ActionPriorityLevel::medium)
+                 else if likelihood >= 6 ? (if detection >= 2 ? ActionPriorityLevel::medium else ActionPriorityLevel::low)
+                 else if likelihood >= 4 ? (if detection >= 7 ? ActionPriorityLevel::medium else ActionPriorityLevel::low)
+                 else ActionPriorityLevel::low)
+            else if severity >= 2 ?
+                (if likelihood >= 8 and detection >= 5 ? ActionPriorityLevel::medium else ActionPriorityLevel::low)
+            else ActionPriorityLevel::low;
+    }
+
     enum def RiskCategory {
-        doc /* FMEA domain per the source of the failure mode. */
+        doc /* The kind of FMEA a line belongs to: what fails (see the package's doc). */
         enum design;
         enum process;
         enum 'use';
@@ -65,15 +123,15 @@ package RiskAnalysis {
     enum def MitigationKind {
         doc
         /*
-         * prevention reduces likelihood; detection improves the ability
-         * to catch the failure before it causes harm.
+         * prevention makes the cause less likely; detection makes the
+         * failure more likely to be caught before it causes harm.
          */
         enum prevention;
         enum detection;
     }
 
     enum def MitigationStatus {
-        doc /* Lifecycle of a mitigation action. */
+        doc /* Where a mitigation action stands. */
         enum proposed;
         enum inProgress;
         enum completed;
@@ -83,41 +141,44 @@ package RiskAnalysis {
     metadata def Fmea {
         doc
         /*
-         * One FMEA worksheet line item, attached to the element whose
-         * failure is being analyzed:
+         * One FMEA worksheet line, attached to the element whose failure
+         * it analyses:
          *
-         *   part battery : Battery {
-         *       @Fmea {
-         *           failureMode = "Thermal runaway";
-         *           cause = "Internal short from dendrite growth";
-         *           effect = "Fire; loss of vehicle";
-         *           severity = 9; likelihood = 3; detection = 4;
-         *       }
+         *   @Fmea about drone::battery {
+         *       failureMode = "Thermal runaway";
+         *       effect = "Fire; loss of the drone";
+         *       cause = "Internal short from dendrite growth";
+         *       category = RiskCategory::design;
+         *       severity = 8; likelihood = 3; detection = 4;
          *   }
          *
-         * RPN is derived via the Rpn calc; `initialSeverity` etc. optionally
-         * record the pre-mitigation assessment so risk reduction is visible.
+         * For a use FMEA, failureMode is the use error and the element the
+         * user task. The ratings are FmeaRatings (1 to 10); Rpn and
+         * ActionPriority are calculated from them.
          */
         attribute failureMode : String;
-        attribute cause : String[0..1];
         attribute effect : String[0..1];
+        attribute cause : String[0..1];
         attribute category : RiskCategory default RiskCategory::design;
         attribute severity : FmeaRating;
         attribute likelihood : FmeaRating;
         attribute detection : FmeaRating;
+        attribute preventionControls : String[0..1] {
+            doc /* What is in place to stop the cause (it justifies the likelihood rating). */
+        }
+        attribute detectionControls : String[0..1] {
+            doc /* What is in place to catch the failure (it justifies the detection rating). */
+        }
         attribute initialSeverity : FmeaRating[0..1];
         attribute initialLikelihood : FmeaRating[0..1];
         attribute initialDetection : FmeaRating[0..1];
         ref hazard : Hazard[0..1] {
             doc
             /*
-             * The HazardAnalysis::Hazard this failure mode can
-             * precipitate - a real model reference, so tools can list
-             * every worksheet line for a hazard by collecting these
-             * refs (no redundant risk list to maintain on the hazard).
-             * When set, conforming tools resolve the hazard's causal
-             * chain to its Harm and flag this line if `severity`
-             * disagrees with the harm's SeverityScale anchor.
+             * The HazardAnalysis::Hazard this failure can lead to - a model
+             * reference, so a hazard's failure modes are found by collecting
+             * these. The worst harm the hazard leads to (through Causation)
+             * sets the severity this line should have.
              */
         }
     }
@@ -125,12 +186,9 @@ package RiskAnalysis {
     occurrence def FailureMode :> RiskEvent {
         doc
         /*
-         * A specific way an element can fail, with its cause, effect,
-         * and FMEA ratings. Use alongside or instead of the @Fmea
-         * annotation when the causal structure itself matters. As a
-         * RiskEvent, a FailureMode connects into HazardAnalysis causal
-         * chains with Causation (failure mode -> hazard); its severity
-         * then derives from the harm at the end of the chain.
+         * A way an element can fail, as an element of its own rather than
+         * an @Fmea line: use it when the failure itself takes part in a
+         * causal chain (Causation from a failure mode to a hazard).
          */
         attribute cause : String[0..1];
         attribute effect : String[0..1];
@@ -142,31 +200,75 @@ package RiskAnalysis {
     action def Mitigation {
         doc
         /*
-         * An action taken to reduce a risk: the work item that implements
-         * a HazardAnalysis::RiskControl obligation. Connect it to the risk
-         * it addresses with `satisfy`, and to the evidence of its
-         * effectiveness with `verify`.
+         * The work that lowers a risk: it implements a
+         * HazardAnalysis::RiskControl. Connect it to the control with
+         * `satisfy`, and to the evidence that it works with `verify`.
          */
         attribute kind : MitigationKind;
         attribute status : MitigationStatus default MitigationStatus::proposed;
         attribute owner : String[0..1];
     }
 
+    // --- Worksheets: views of the @Fmea lines -------------------------------
+    // The figures come right after the failure, so they stay in view on a
+    // narrow screen; the effect and the cause follow.
+
     view def FmeaWorksheet {
-        doc
-        /*
-         * One row per @Fmea annotation, sorted by derived RPN descending.
-         * Render with `sysml view FmeaWorksheet`.
-         */
+        doc /* Every FMEA line, of every kind, highest risk priority number first. */
         @TableRendering {
             rows = "@Fmea";
-            columns = "element; failureMode; cause; category; severity; likelihood; detection; rpn = severity*likelihood*detection";
+            columns = "element; failureMode; severity; likelihood; detection; rpn = Rpn(severity, likelihood, detection); actionPriority = ActionPriority(severity, likelihood, detection); effect; cause; category";
+            sortBy = "-rpn";
+        }
+    }
+
+    view def DesignFmeaWorksheet :> FmeaWorksheet {
+        doc /* A design FMEA: how the parts can fail. */
+        @TableRendering {
+            rows = "@Fmea";
+            columns = "part = element; failureMode; severity; likelihood; detection; rpn = Rpn(severity, likelihood, detection); actionPriority = ActionPriority(severity, likelihood, detection); effect; cause";
+            where = "category == RiskCategory::design or category == RiskCategory::software";
+            sortBy = "-rpn";
+        }
+    }
+
+    view def ProcessFmeaWorksheet :> FmeaWorksheet {
+        doc /* A process FMEA: how the steps of a process can go wrong. */
+        @TableRendering {
+            rows = "@Fmea";
+            columns = "processStep = element; failureMode; severity; likelihood; detection; rpn = Rpn(severity, likelihood, detection); actionPriority = ActionPriority(severity, likelihood, detection); effect; cause";
+            where = "category == RiskCategory::process";
+            sortBy = "-rpn";
+        }
+    }
+
+    view def UseFmeaWorksheet :> FmeaWorksheet {
+        doc /* A use FMEA: the use errors a user can make in each task, and what follows. */
+        @TableRendering {
+            rows = "@Fmea";
+            columns = "task = element; useError = failureMode; severity; likelihood; detection; rpn = Rpn(severity, likelihood, detection); actionPriority = ActionPriority(severity, likelihood, detection); effect; cause";
+            where = "category == RiskCategory::'use'";
+            sortBy = "-rpn";
+        }
+    }
+
+    view def FmeaRiskReduction {
+        doc /* The lines assessed before risk reduction too: their priority then and now. */
+        @TableRendering {
+            rows = "@Fmea";
+            columns = "element; failureMode; rpnBefore = Rpn(initialSeverity, initialLikelihood, initialDetection); rpn = Rpn(severity, likelihood, detection); priorityBefore = ActionPriority(initialSeverity, initialLikelihood, initialDetection); actionPriority = ActionPriority(severity, likelihood, detection)";
+            where = "initialSeverity >= 1";
             sortBy = "-rpn";
         }
     }
 
     view def RiskMatrix {
-        doc /* Severity x likelihood grid of @Fmea line-item counts. */
+        doc
+        /*
+         * How many FMEA lines fall in each cell of severity (down) by
+         * likelihood (across). Every rating of the scale is a row or a
+         * column, so the empty cells show too.
+         */
         @TableRendering {
             rows = "@Fmea";
             pivot = "severity; likelihood";

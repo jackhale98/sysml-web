@@ -71,7 +71,8 @@ describe('table rendering (the earlier engine’s tests)', () => {
 		expect(col(t, 'rpn')).toEqual(['108', '90']);
 		expect(t.rows[0]![1]).toBe('Thermal runaway');
 		// The row is the annotation, written on line 26, about the battery.
-		expect(t.sources[0]).toEqual({ element: 'P::battery', file: 'p.sysml', line: 26 });
+		expect(t.sources[0]).toMatchObject({ element: 'P::battery', file: 'p.sysml', line: 26 });
+		expect(t.sources[0]!.annotation).toMatch(/^[0-9a-f-]{36}$/);
 	});
 
 	it('filters rows with `where`', () => {
@@ -139,7 +140,8 @@ describe('table rendering (the earlier engine’s tests)', () => {
 			}
 		}`;
 		const t = render(one(src), 'SW');
-		expect(t.rows).toEqual([['A', 'RiskCategory::software']]);
+		// An enum value reads as its literal.
+		expect(t.rows).toEqual([['A', 'software']]);
 		expect(t.editable?.[1]).toEqual({
 			field: 'metadata:Line.category',
 			kind: 'enum',
@@ -714,8 +716,10 @@ describe('the demo’s tables', () => {
 		// The earlier engine's 41, the budgets and checks (3 view defs, 3 usages), the
 		// trade study (a view def and a usage), the sequence and saved trace and
 		// verification matrices, less the design gaps (the overview lists them).
-		expect(views).toHaveLength(51);
-		expect(views.filter((v) => v.hasTable)).toHaveLength(35);
+		// The risk library's worksheets for each kind of FMEA, the risk reduction and the
+		// demo's risk matrix and hazard log are six more.
+		expect(views).toHaveLength(57);
+		expect(views.filter((v) => v.hasTable)).toHaveLength(41);
 		expect(views.every((v) => !v.builtin)).toBe(true);
 		expect(views.find((v) => v.name === 'droneBreakdown')).toEqual({
 			name: 'droneBreakdown',
@@ -891,41 +895,126 @@ describe('the demo’s tables', () => {
 		expect(shape(allocations)).toEqual([8, 2]);
 		expect(allocations.rows[0]).toEqual(['drone.deliveryFlight.checkDropZone', 'drone.camera']);
 		const fmea = table('fmeaWorksheet');
-		expect(shape(fmea)).toEqual([6, 8]);
+		// The figures come right after the failure, so they stay in view in a narrow pane.
+		expect(fmea.columns).toEqual([
+			'part',
+			'failureMode',
+			'severity',
+			'likelihood',
+			'detection',
+			'rpn',
+			'actionPriority',
+			'effect',
+			'cause'
+		]);
+		expect(shape(fmea)).toEqual([6, 9]);
 		expect(fmea.rows[0]).toEqual([
 			'drone::battery',
 			'Thermal runaway',
-			'Internal cell short, overcharge or crash damage',
-			'RiskCategory::design',
 			'8',
 			'3',
 			'6',
-			'144'
+			'144',
+			'medium',
+			'Fire in the airframe; loss of the drone; burns to bystanders',
+			'Internal cell short, overcharge or crash damage'
 		]);
+		// RPN and action priority are the library's calcs, `Rpn(…)` and `ActionPriority(…)`.
 		expect(col(fmea, 'rpn')).toEqual(['144', '96', '96', '80', '72', '60']);
+		expect(col(fmea, 'actionPriority')).toEqual([
+			'medium',
+			'medium',
+			'low',
+			'medium',
+			'low',
+			'low'
+		]);
 		// `about drone::rotors::motor` is the motor feature of Rotor, which the rotors inherit.
-		expect(fmea.sources[1]).toEqual({
+		expect(fmea.sources[1]).toMatchObject({
 			element: 'DroneComponents::Rotor::motor',
 			file: 'risk/DesignFmea.sysml',
 			line: 110
 		});
-		expect(fmea.editable?.[3]).toEqual({
+		// New lines go in the package the worksheet exposes.
+		expect(fmea.annotations).toEqual({ metadata: 'RiskAnalysis::Fmea', package: 'DroneFmea' });
+		expect(fmea.columnSpecs?.[0]).toBe('part = element');
+		expect(fmea.editable?.[2]).toEqual({ field: 'metadata:Fmea.severity', kind: 'number' });
+		const all = table('FmeaWorksheet');
+		// The category reads as its literal and is edited with the enum's literals.
+		expect(col(all, 'category')).toEqual([
+			'design',
+			'design',
+			'design',
+			'software',
+			'design',
+			'design'
+		]);
+		expect(all.editable?.[9]).toEqual({
 			field: 'metadata:Fmea.category',
 			kind: 'enum',
 			options: ['design', 'process', 'use', 'software']
 		});
-		expect(fmea.editable?.[4]).toEqual({ field: 'metadata:Fmea.severity', kind: 'number' });
-		expect(table('RiskMatrix').rows).toEqual([
-			['8', '1', '2', '1', ''],
-			['6', '', '', '1', '1']
+		// The risk matrix has every rating, 10 down to 1 by 1 to 10, so empty cells show.
+		const matrix = table('riskMatrix');
+		expect(matrix.counts).toEqual({ rows: 'severity', columns: 'likelihood' });
+		expect(matrix.columns).toEqual(['severity\\likelihood', ...'12345678910'.match(/10|\d/g)!]);
+		expect(matrix.rows.map((r) => r[0])).toEqual([
+			'10',
+			'9',
+			'8',
+			'7',
+			'6',
+			'5',
+			'4',
+			'3',
+			'2',
+			'1'
 		]);
-		const hazards = table('HazardLog');
-		expect(col(hazards, 'element')).toEqual([
+		expect(matrix.rows[2]).toEqual(['8', '', '1', '2', '1', '', '', '', '', '', '']);
+		expect(matrix.rows[4]).toEqual(['6', '', '', '', '1', '1', '', '', '', '', '']);
+		// Each hazard with its harms, the worst severity first, its controls and their links.
+		const hazards = table('hazardLog');
+		expect(hazards.columns).toEqual([
+			'hazard',
+			'description',
+			'harms',
+			'severity',
+			'controls',
+			'satisfiedBy',
+			'verifiedBy'
+		]);
+		expect(hazards.rows.map((r) => [r[0], r[2], r[3], r[4], r[5]])).toEqual([
+			[
+				'batteryFire',
+				'burnInjury',
+				'critical',
+				'RC-001 Battery thermal protection',
+				'batteryManagementSystem'
+			],
+			[
+				'uncontrolledDescent',
+				'impactInjury',
+				'critical',
+				'RC-002 Rotor health monitoring',
+				'rotorHealthMonitor'
+			],
+			[
+				'flyAway',
+				'thirdPartyDamage',
+				'serious',
+				'RC-003 Navigation integrity monitoring',
+				'navigationIntegrityMonitor'
+			]
+		]);
+		expect(hazards.editable?.slice(0, 2)).toEqual([
+			{ field: 'name', kind: 'text' },
+			{ field: 'feature:description', kind: 'text' }
+		]);
+		// A reference to a hazard (a control's `ref :>> hazard`) is not a hazard.
+		expect(col(table('HazardLog'), 'hazard')).toEqual([
 			'batteryFire',
-			'flyAway',
-			'hazard',
-			'hazard',
-			'uncontrolledDescent'
+			'uncontrolledDescent',
+			'flyAway'
 		]);
 	});
 
@@ -982,9 +1071,9 @@ describe('the demo’s tables', () => {
 		const row = (kind: string) => stats.rows.find((r) => r[0] === kind);
 		expect(row('part def')).toEqual(['part def', '19', '0']);
 		expect(row('requirement')).toEqual(['requirement', '0', '20']);
-		expect(row('attribute')).toEqual(['attribute', '0', '196']);
+		expect(row('attribute')).toEqual(['attribute', '0', '198']);
 		// Enum literals count as usages, metadata annotations are anonymous.
-		expect(row('enum')).toEqual(['enum', '0', '33']);
+		expect(row('enum')).toEqual(['enum', '0', '36']);
 		expect(row('metadata')).toBeUndefined();
 	});
 

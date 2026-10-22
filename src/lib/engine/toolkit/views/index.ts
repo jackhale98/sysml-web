@@ -8,3 +8,4 @@ export { missingViewLibraries, viewLibraries } from './libraries';
 export { renderView } from './render';
 export { featureValues } from './edits';
 export { elementFeatures } from './features';
+export { annotationChecks } from './annotationChecks';

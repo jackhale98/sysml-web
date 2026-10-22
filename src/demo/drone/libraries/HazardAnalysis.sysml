@@ -1,26 +1,38 @@
 package HazardAnalysis {
     doc
     /*
-     * Hazard analysis vocabulary for SysML v2, aligned with the OMG RAAML
-     * Core library and the ISO 14971 / MIL-STD-882E process.
+     * Hazard analysis for SysML v2, in the terms of ISO 14971 (and the
+     * OMG RAAML Core library):
+     *   Hazard             - a potential source of harm (battery fire);
+     *   HazardousSituation - when people, property or the environment are
+     *                        exposed to it (the drone falls over a crowd);
+     *   Harm               - the injury or damage that can follow, with its
+     *                        severity (SeverityScale);
+     *   Causation          - a connection from a cause to its effect:
+     *                        hazard -> situation -> harm;
+     *   RiskControl        - a requirement that lowers the risk of a hazard;
+     *                        what implements it `satisfy`s it and a
+     *                        verification case `verify`s it.
+     * The hazard log (HazardLog) lists each hazard with its harms, their
+     * severity and its controls.
      *
-     * Hazard analysis is top-down: identify the harms the system can cause,
-     * the hazards that produce them, and the hazardous situations that
-     * expose people, property, or the environment to those hazards. Its
-     * results DRIVE bottom-up analyses (see RiskAnalysis): a failure mode's
-     * severity derives from the harm it can precipitate, connected through
-     * Causation links, so severity is stated once - on the harm - and
-     * checked everywhere.
+     *   occurrence batteryFire : Hazard { :>> description = "..."; }
+     *   occurrence burns : Harm { :>> severity = SeverityScale::critical; }
+     *   connection : Causation connect batteryFire to burns;
+     *   requirement <'RC-001'> 'Thermal protection' : RiskControl {
+     *       :>> hierarchy = ControlHierarchy::protectiveMeasure;
+     *       ref :>> hazard = batteryFire;
+     *   }
      *
-     * RAAML 1.0 is a UML/SysML v1 profile and cannot be imported into
-     * SysML v2 models; this package re-expresses its Core concepts natively.
-     * Name mapping (RAAML Core -> here):
-     *   Harm                -> Harm
-     *   Hazard              -> Hazard
-     *   Situation           -> HazardousSituation
-     *   causal relationship -> Causation
-     *   ControllingMeasure  -> RiskControl
-     * When OMG publishes RAAML for SysML v2, migration is a rename.
+     * Hazard analysis is top-down and drives the bottom-up FMEA
+     * (RiskAnalysis): an FMEA line names the hazard its failure can lead
+     * to, and its severity comes from the worst harm of that hazard, so
+     * severity is stated once, on the harm, and checked everywhere. Use
+     * errors (IEC 62366) lead to hazards the same way, from a use FMEA.
+     *
+     * RAAML 1.0 is a SysML v1 profile; this package says its Core concepts
+     * in SysML v2 (Situation is HazardousSituation, ControllingMeasure is
+     * RiskControl, the causal relationship is Causation).
      */
 
     private import ScalarValues::*;
@@ -38,16 +50,16 @@ package HazardAnalysis {
     enum def SeverityScale :> Integer {
         doc
         /*
-         * Harm severity classes with canonical anchor values on the FMEA
-         * 1-10 severity scale, so top-down hazard analysis and bottom-up
-         * FMEA share one number line:
+         * How severe a harm is, each class with its value on the FMEA
+         * severity scale (1 to 10), so hazard analysis and FMEA share one
+         * scale:
          *   negligible   (2): inconvenience or temporary discomfort
          *   minor        (4): temporary injury not requiring intervention
          *   serious      (6): injury requiring professional intervention
          *   critical     (8): permanent impairment or major property loss
          *   catastrophic (10): loss of life
-         * An @Fmea line linked to a Harm must use the harm's anchor as its
-         * severity; conforming tools flag disagreement.
+         * An @Fmea line whose hazard leads to harms should have the worst
+         * of their values as its severity; tools flag a line that has not.
          */
         negligible = 2;
         minor = 4;
@@ -115,9 +127,13 @@ package HazardAnalysis {
     enum def ControlHierarchy {
         doc
         /*
-         * ISO 14971 risk-control option hierarchy, in order of
-         * preference. Controls higher in the hierarchy are inherently
-         * more reliable than those below.
+         * The ISO 14971 kinds of risk control, most effective first:
+         *   inherentSafety       - safe by design: the hazard is removed or
+         *                          made smaller;
+         *   protectiveMeasure    - a guard, alarm or monitor in the product
+         *                          (or in how it is made);
+         *   informationForSafety - warnings, instructions and training.
+         * Prefer the first that is possible.
          */
         enum inherentSafety;
         enum protectiveMeasure;
@@ -151,15 +167,16 @@ package HazardAnalysis {
     view def HazardLog {
         doc
         /*
-         * One row per Hazard occurrence. Causal-chain columns
-         * (situations, harms, control status) come with the relation
-         * providers planned for the view engine; today the log lists
-         * each hazard with its description and location.
+         * One row per hazard, with its causal chain and its controls: the
+         * hazardous situations and harms it leads to (through Causation),
+         * the worst harm's severity, the risk controls whose `hazard` names
+         * it, and what implements (`satisfy`) and proves (`verify`) them.
+         * An empty cell is a gap.
          */
         @TableRendering {
-            rows = "type:Hazard";
-            columns = "element; description; file; line";
-            sortBy = "element";
+            rows = "hazards";
+            columns = "hazard = element; description; harms; severity; controls; satisfiedBy; verifiedBy";
+            sortBy = "-severityValue";
         }
     }
 }

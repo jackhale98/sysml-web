@@ -106,6 +106,8 @@ export interface EvaluationSource {
 	/** The units by path. */
 	units: Map<string, UnitInfo>;
 	extracted: ExtractedModel;
+	/** Checks the app makes beside the toolkit's (metadata values, `views/annotationChecks.ts`). */
+	more?: () => Check[];
 }
 
 export class Evaluation {
@@ -412,7 +414,7 @@ export class Evaluation {
 		const session = this.session;
 		const started = performance.now();
 		const raw = JSON.parse(session.verify(null)) as TkVerifyReport;
-		const checks = this.mapReport(raw);
+		const checks = [...this.mapReport(raw), ...(this.source.more?.() ?? [])];
 		this.timings.verifyMs = Math.round(performance.now() - started);
 		const summary = { satisfied: 0, violated: 0, undecided: 0 };
 		for (const c of checks) summary[c.status]++;
