@@ -1608,7 +1608,8 @@
 				actions={addOwner
 					? [
 							{
-								label: view === 'states' ? 'Add a state' : view === 'actions' ? 'Add a step' : 'Add',
+								label:
+									view === 'states' ? 'Add a state' : view === 'actions' ? 'Add a step' : 'Add',
 								primary: true,
 								run: () => {
 									actionError = null;
@@ -1624,8 +1625,7 @@
 				{:else if view === 'actions'}
 					Add the steps, then draw what comes next from each one.
 				{:else}
-					Add a part, a requirement or a package here, or write it in the text: the diagram
-					follows.
+					Add a part, a requirement or a package here, or write it in the text: the diagram follows.
 				{/if}
 			</EmptyState>
 		</div>

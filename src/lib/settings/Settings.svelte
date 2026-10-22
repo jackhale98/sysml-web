@@ -1,11 +1,6 @@
 <script module lang="ts">
 	export type SettingsSection =
-		| 'appearance'
-		| 'editor'
-		| 'projects'
-		| 'accounts'
-		| 'help'
-		| 'about';
+		'appearance' | 'editor' | 'projects' | 'accounts' | 'help' | 'about';
 </script>
 
 <script lang="ts">
@@ -706,10 +701,9 @@
 					<section class="block">
 						<h3><CircleQuestionMark size={18} aria-hidden="true" /> Help</h3>
 						<p class="muted">
-							How Fairtide works, in plain words: projects and their files, what SysML's ideas
-							mean, how to do the common jobs, keyboard shortcuts and where your data is kept.
-							It works offline. Press <kbd>?</kbd> in a project, or type <kbd>?</kbd> in search, to
-							find a topic.
+							How Fairtide works, in plain words: projects and their files, what SysML's ideas mean,
+							how to do the common jobs, keyboard shortcuts and where your data is kept. It works
+							offline. Press <kbd>?</kbd> in a project, or type <kbd>?</kbd> in search, to find a topic.
 						</p>
 						{#if onhelp}
 							<button

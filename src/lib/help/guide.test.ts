@@ -33,7 +33,8 @@ describe('the help', () => {
 			'Switch projects'
 		]);
 		// Every answer can be started from the help.
-		for (const t of HELP.find((s) => s.id === 'how-do-i')!.topics) expect(t.action, t.id).toBeTruthy();
+		for (const t of HELP.find((s) => s.id === 'how-do-i')!.topics)
+			expect(t.action, t.id).toBeTruthy();
 		for (const t of ALL_TOPICS)
 			if (t.action) expect(GUIDE_ACTIONS, t.id).toContain(t.action.action);
 	});

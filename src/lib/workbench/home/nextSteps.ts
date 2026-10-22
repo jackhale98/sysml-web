@@ -49,7 +49,14 @@ export function countModel(m: Measured): Counts {
 
 export type StepId = 'requirement' | 'part' | 'link' | 'view' | 'numbers' | 'keep';
 
-export const STEP_ORDER: readonly StepId[] = ['requirement', 'part', 'link', 'view', 'numbers', 'keep'];
+export const STEP_ORDER: readonly StepId[] = [
+	'requirement',
+	'part',
+	'link',
+	'view',
+	'numbers',
+	'keep'
+];
 
 /** Which steps are done: the model has more than it started with, or a copy is kept. */
 export function doneSteps(

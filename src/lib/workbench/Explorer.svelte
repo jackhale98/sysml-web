@@ -481,8 +481,8 @@
 						title="Nothing in the model yet"
 						actions={[{ label: 'How to start', run: () => ui.showHelp('text-diagrams-tables') }]}
 					>
-						Write <code>package Name {'{ }'}</code> in a <code>.sysml</code> file under Files, and add parts
-						and requirements inside it.
+						Write <code>package Name {'{ }'}</code> in a <code>.sysml</code> file under Files, and add
+						parts and requirements inside it.
 					</EmptyState>
 				{/if}
 			</section>

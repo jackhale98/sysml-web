@@ -654,7 +654,12 @@
 				title="Nothing to show yet"
 				actions={[
 					...(info && !info.builtin
-						? [{ label: 'Show what it covers', run: () => ui.open({ kind: 'file', path: info.file }) }]
+						? [
+								{
+									label: 'Show what it covers',
+									run: () => ui.open({ kind: 'file', path: info.file })
+								}
+							]
 						: []),
 					{ label: 'About views', run: () => ui.showHelp('concept-view') }
 				]}

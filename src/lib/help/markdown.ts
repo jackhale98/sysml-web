@@ -46,7 +46,12 @@ export function userGuideMarkdown(): string {
 		out.push(`## ${section.title}`, '', section.intro, '');
 		for (const t of section.topics) out.push(topic(t), '');
 	}
-	return out.join('\n').replace(/\n{3,}/g, '\n\n').trimEnd() + '\n';
+	return (
+		out
+			.join('\n')
+			.replace(/\n{3,}/g, '\n\n')
+			.trimEnd() + '\n'
+	);
 }
 
 /** GitHub's heading anchors: lower case, punctuation dropped, spaces as dashes. */

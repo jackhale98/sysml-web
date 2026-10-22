@@ -38,7 +38,6 @@
 </script>
 
 <!-- The backdrop click is a pointer shortcut; Escape closes the dialog for everyone else. -->
-<!-- svelte-ignore a11y_click_events_have_key_events -->
 <dialog
 	bind:this={dialog}
 	class="help"
@@ -62,7 +61,7 @@
 			</button>
 		</header>
 		<div class="body">
-			<HelpGuide topic={ui.helpTopic} onaction={run} headingLevel={3} />
+			<HelpGuide topic={ui.helpTopic} onaction={run} headingLevel={3} focusSearch={!ui.phone} />
 		</div>
 	{/if}
 </dialog>

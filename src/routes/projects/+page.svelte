@@ -617,10 +617,16 @@
 		background: var(--accent-weak);
 		box-shadow: inset 0 0 0 1px var(--accent);
 	}
+	/* The radio covers the card, so a tap anywhere on it chooses it. */
 	.template input {
 		position: absolute;
+		inset: 0;
+		z-index: 1;
+		width: 100%;
+		height: 100%;
+		margin: 0;
 		opacity: 0;
-		pointer-events: none;
+		cursor: pointer;
 	}
 	.template:focus-within {
 		outline: 2px solid var(--focus);

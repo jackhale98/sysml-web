@@ -48,7 +48,9 @@ function concept(key: string): Block {
 	throw new Error(`No concept ${key}`);
 }
 
-const exampleOf = (key: string) => ({ code: CONCEPTS[key]?.example ?? RELATIONSHIPS[key]!.example });
+const exampleOf = (key: string) => ({
+	code: CONCEPTS[key]?.example ?? RELATIONSHIPS[key]!.example
+});
 
 export const HELP: HelpSection[] = [
 	{

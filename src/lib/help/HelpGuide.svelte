@@ -13,7 +13,8 @@
 		topic = null,
 		onaction,
 		canRun = () => !!onaction,
-		headingLevel = 2
+		headingLevel = 2,
+		focusSearch = false
 	}: {
 		/** A topic to show first (scrolled to). */
 		topic?: string | null;
@@ -22,6 +23,8 @@
 		canRun?: (action: GuideAction) => boolean;
 		/** The level of the section headings (topics are one below). */
 		headingLevel?: 2 | 3;
+		/** Start in the search box (in a dialog, where focus goes first). */
+		focusSearch?: boolean;
 	} = $props();
 
 	const uid = $props.id();
@@ -111,10 +114,12 @@
 	<label class="search">
 		<Search size={16} aria-hidden="true" />
 		<span class="visually-hidden">Search the help</span>
+		<!-- svelte-ignore a11y_autofocus -->
 		<input
 			type="search"
+			autofocus={focusSearch}
 			bind:value={query}
-			placeholder="Search the help: “budget”, “port”, “GitHub”…"
+			placeholder="Search the help"
 			enterkeyhint="search"
 		/>
 	</label>

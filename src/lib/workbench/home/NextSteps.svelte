@@ -26,8 +26,7 @@
 		ui,
 		engine,
 		session
-	}: { workspace: Workspace; ui: WorkbenchUi; engine: Engine; session: ProjectSession } =
-		$props();
+	}: { workspace: Workspace; ui: WorkbenchUi; engine: Engine; session: ProjectSession } = $props();
 
 	const record = $derived(session.record);
 	const projectId = $derived(record?.origin === 'new' ? record.id : null);
@@ -65,6 +64,8 @@
 	);
 	const doneCount = $derived(done ? STEP_ORDER.filter((s) => done[s]).length : 0);
 	const shown = $derived(!!projectId && !!done && !remembered.dismissed);
+	/** The first step not done yet: its button stands out, and on a phone only it is explained. */
+	const current = $derived(done ? STEP_ORDER.find((s) => !done[s]) : undefined);
 
 	const requirementsFirst = $derived(record?.template === 'requirements');
 
@@ -176,12 +177,13 @@
 		<ol class="steps">
 			{#each steps as step (step.id)}
 				{@const ticked = done[step.id]}
-				<li class:ticked data-step={step.id}>
+				<li class:ticked class:current={current === step.id} data-step={step.id}>
 					<span class="mark" aria-hidden="true">
 						{#if ticked}<CircleCheck size={20} />{:else}<Circle size={20} />{/if}
 					</span>
 					<span class="text">
-						<strong>{step.title}<span class="visually-hidden">{ticked ? ', done' : ''}</span></strong
+						<strong
+							>{step.title}<span class="visually-hidden">{ticked ? ', done' : ''}</span></strong
 						>
 						<span class="hint">{step.hint}</span>
 					</span>
@@ -191,7 +193,7 @@
 								<button
 									type="button"
 									class="action"
-									class:primary={a.primary}
+									class:primary={a.primary && current === step.id}
 									onclick={() => run(a.action)}>{a.label}</button
 								>
 							{/each}
@@ -286,10 +288,10 @@
 		list-style: none;
 	}
 	li {
-		display: grid;
-		grid-template-columns: auto minmax(0, 1fr);
+		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
-		gap: var(--space-1) var(--space-3);
+		gap: var(--space-2) var(--space-3);
 		padding: var(--space-2) 0;
 		border-top: 1px solid var(--border);
 	}
@@ -298,14 +300,19 @@
 	}
 	.mark {
 		display: grid;
+		flex: none;
 		place-items: center;
 		color: var(--text-3);
 	}
 	.ticked .mark {
 		color: var(--ok);
 	}
+	.current .mark {
+		color: var(--accent);
+	}
 	.text {
 		display: grid;
+		flex: 1 1 11rem;
 		gap: 1px;
 		min-width: 0;
 	}
@@ -324,20 +331,17 @@
 	.ticked .hint {
 		display: none;
 	}
+	/* Narrow: one line a step, and only the next step explained. */
+	@container (max-width: 40rem) {
+		li:not(.current) .hint {
+			display: none;
+		}
+	}
 	.actions {
 		display: flex;
 		flex-wrap: wrap;
 		gap: var(--space-2);
-		grid-column: 2;
-	}
-	@container (min-width: 40rem) {
-		li {
-			grid-template-columns: auto minmax(0, 1fr) auto;
-		}
-		.actions {
-			grid-column: 3;
-			justify-content: flex-end;
-		}
+		margin-left: auto;
 	}
 	.action {
 		min-height: 2.75rem;
