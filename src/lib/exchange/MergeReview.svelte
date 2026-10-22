@@ -28,7 +28,10 @@
 	const uid = $props.id();
 	const plan = $derived(save.plan);
 	const undecided = $derived(plan.conflicts.filter((c) => !choices[c.id]).length);
-	const rewritten = $derived((woven ?? save.preview)?.rewritten ?? []);
+	/** The text the merge writes: as chosen (after a first try), else with every conflict kept as mine. */
+	const written = $derived(woven ?? save.preview);
+	const rewritten = $derived(written?.rewritten ?? []);
+	const differences = $derived(written?.differences ?? []);
 
 	function all(side: Side) {
 		choices = Object.fromEntries(plan.conflicts.map((c) => [c.id, side]));
@@ -143,7 +146,7 @@
 		{/if}
 	</section>
 
-	{#if woven?.differences.length}
+	{#if differences.length}
 		<div class="xc-note warn" role="alert" data-testid="merge-differences">
 			<TriangleAlert size={16} aria-hidden="true" />
 			<div>
@@ -152,30 +155,36 @@
 					text as it then is, so the server’s version of these is replaced:
 				</p>
 				<ul>
-					{#each woven.differences.slice(0, 8) as d, i (i)}<li>{d}</li>{/each}
-					{#if woven.differences.length > 8}<li>and {woven.differences.length - 8} more</li>{/if}
+					{#each differences.slice(0, 8) as d, i (i)}<li>{d}</li>{/each}
+					{#if differences.length > 8}<li>and {differences.length - 8} more</li>{/if}
 				</ul>
 			</div>
 		</div>
 	{/if}
 
-	<div class="xc-note" data-testid="merge-limits">
-		<TriangleAlert size={16} aria-hidden="true" />
-		<div>
-			<p>
-				The server holds the model, not your text, so the merge is made element by element. Your
-				files stay as you wrote them, except where their changes go in: a new element is added where
-				it belongs, and an element they changed is written again as the formatter writes it. Notes
-				written with <code>//</code>, blank lines and layout inside it don’t come through.
-			</p>
-			{#if rewritten.length}
-				<p>Written again{woven ? '' : ' (with the choices above, maybe more)'}:</p>
-				<ul data-testid="merge-rewritten">
-					{#each rewritten as r, i (i)}<li>{lost(r)}</li>{/each}
-				</ul>
-			{/if}
+	{#if plan.incoming.length || plan.conflicts.length}
+		<div class="xc-note" data-testid="merge-limits">
+			<TriangleAlert size={16} aria-hidden="true" />
+			<div>
+				<p>
+					The server holds the model, not your text, so the merge is made element by element. Your
+					files stay as you wrote them, except where their changes go in: a new element is added
+					where it belongs, and an element they changed is written again as the formatter writes it.
+					Notes written with <code>//</code>, blank lines and layout inside it don’t come through.
+				</p>
+				{#if rewritten.length}
+					<p>
+						{woven
+							? 'Written again:'
+							: 'Their changes write these again (keeping theirs above may add more):'}
+					</p>
+					<ul data-testid="merge-rewritten">
+						{#each rewritten as r, i (i)}<li>{lost(r)}</li>{/each}
+					</ul>
+				{/if}
+			</div>
 		</div>
-	</div>
+	{/if}
 
 	{#if undecided}
 		<p class="xc-muted" role="status">
