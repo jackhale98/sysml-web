@@ -15,6 +15,8 @@
 	import type { Workspace } from '#lib/project/workspace.svelte.ts';
 	import { iconOf } from '#lib/ui/kinds.ts';
 	import type { WorkbenchUi } from '#lib/workbench/ui.svelte.ts';
+	import DiagramExport from './DiagramExport.svelte';
+	import type { IconShape } from './export/svg.ts';
 	import {
 		SEQUENCE,
 		estimate,
@@ -123,6 +125,27 @@
 		if (element) ui.select(element.key, 'diagram');
 	}
 
+	/** The drawing as a standalone SVG (the export code loads on first use). */
+	async function exportSequence() {
+		const { sequenceSvg } = await import('./export/sequence.ts');
+		const drawn = layout;
+		if (!drawn) throw new Error('the diagram is not drawn yet');
+		// The kind icons, as the heads show them (Lucide draws plain SVG).
+		const icons = [...(viewport?.querySelectorAll('.heads .head') ?? [])].map((head) => {
+			const svg = head.querySelector('.keyword svg');
+			return svg
+				? [...svg.children].map((child): IconShape => [
+						child.tagName.toLowerCase(),
+						Object.fromEntries([...child.attributes].map((a) => [a.name, a.value]))
+					])
+				: undefined;
+		});
+		return {
+			build: (options: Parameters<typeof sequenceSvg>[1]) =>
+				sequenceSvg(drawn, { ...options, icons })
+		};
+	}
+
 	function showInText() {
 		if (!selectedElement) return;
 		ui.open({ kind: 'file', path: selectedElement.file });
@@ -178,8 +201,13 @@
 	$effect(() => {
 		if (!width || !height || !layout) return;
 		const size = { width: layout.width, height: layout.height };
-		if (!untrack(() => userMoved)) view = readableView(size, { width, height }, minScale);
+		if (!untrack(() => userMoved)) view = below(readableView(size, area(), minScale));
 	});
+
+	/** The toolbar's band at the top: the drawing starts below it, and the heads stick there. */
+	const TOP = 52;
+	const area = () => ({ width, height: Math.max(1, height - TOP) });
+	const below = (v: View): View => ({ ...v, y: v.y + TOP });
 
 	function glide() {
 		if (reducedMotion()) return;
@@ -191,7 +219,7 @@
 	function fit() {
 		if (!layout) return;
 		glide();
-		view = fitView(layout, { width, height });
+		view = below(fitView(layout, area()));
 		userMoved = true;
 	}
 
@@ -211,7 +239,7 @@
 	function reveal(box: { x: number; y: number; width: number; height: number }) {
 		if (!width || !layout) return;
 		const m = 16;
-		const headRoom = 6 + SEQUENCE.headHeight * view.k + 8;
+		const headRoom = TOP + SEQUENCE.headHeight * view.k + 8;
 		const left = view.x + box.x * view.k;
 		const right = left + box.width * view.k;
 		const top = view.y + box.y * view.k;
@@ -254,7 +282,7 @@
 
 	function onpointerdown(e: PointerEvent) {
 		if (e.pointerType === 'mouse' && e.button !== 0) return;
-		if ((e.target as HTMLElement).closest('.zoom')) return;
+		if ((e.target as HTMLElement).closest('.zoom, .toolbar')) return;
 		const p = local(e);
 		pointers.set(e.pointerId, p);
 		if (pointers.size === 1) drag = { x: p.x, y: p.y, vx: view.x, vy: view.y, moved: false };
@@ -366,8 +394,8 @@
 	}
 
 	/** Lifeline heads stay at the top while the messages scroll under them (drawn over them). */
-	const headsY = $derived(Math.max(view.y, 6 - SEQUENCE.headTop * view.k));
-	const stuck = $derived(view.y < 6 - SEQUENCE.headTop * view.k);
+	const headsY = $derived(Math.max(view.y, TOP - SEQUENCE.headTop * view.k));
+	const stuck = $derived(view.y < TOP - SEQUENCE.headTop * view.k);
 
 	function messageName(m: MessageArrow) {
 		const what = [m.name, m.payload ? `of ${m.payload}` : null].filter(Boolean).join(' ');
@@ -561,18 +589,26 @@
 		</div>
 	{/if}
 
-	<div class="zoom" role="toolbar" aria-label="Diagram tools">
+	<div class="toolbar" role="toolbar" aria-label="Diagram tools">
 		<button
 			type="button"
 			onclick={showInText}
 			disabled={!selectedElement}
-			aria-label="Show in text"
 			title={selectedElement
 				? `Show ${selectedElement.label} in the text`
 				: 'Select a lifeline or message, then show it in the text'}
 		>
-			<FileCode size={15} aria-hidden="true" />
+			<FileCode size={14} aria-hidden="true" /> <span>Show in text</span>
 		</button>
+		<DiagramExport
+			title={label.replace(/ diagram$/, '')}
+			diagram={exportSequence}
+			share={ui.phone}
+			disabled={!layout?.lifelines.length}
+		/>
+	</div>
+
+	<div class="zoom" role="toolbar" aria-label="Zoom">
 		<button type="button" onclick={() => zoomButton(1.25)} aria-label="Zoom in" title="Zoom in (+)">
 			<Plus size={16} aria-hidden="true" />
 		</button>
@@ -862,6 +898,55 @@
 		fill: var(--text-2);
 		font-family: var(--font-mono);
 		font-size: 12px;
+	}
+
+	/* The same toolbar as the other diagrams have, top right. */
+	.toolbar {
+		position: absolute;
+		top: 10px;
+		right: 10px;
+		z-index: 3;
+		display: flex;
+		gap: 2px;
+		padding: 3px;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-md);
+		box-shadow: var(--shadow-sm);
+	}
+	.toolbar > button {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		height: 2rem;
+		padding: 0 var(--space-3);
+		border: 0;
+		border-radius: var(--radius-sm);
+		background: transparent;
+		color: var(--text);
+		font: inherit;
+		font-weight: 520;
+		cursor: pointer;
+	}
+	.toolbar > button:hover:not(:disabled) {
+		background: var(--surface-hover);
+	}
+	.toolbar > button:disabled {
+		color: var(--text-3);
+		cursor: default;
+	}
+	@container (max-width: 34rem) {
+		.toolbar > button span {
+			position: absolute;
+			width: 1px;
+			height: 1px;
+			overflow: hidden;
+			clip-path: inset(50%);
+			white-space: nowrap;
+		}
+		.toolbar > button {
+			padding: 0 var(--space-2);
+		}
 	}
 
 	/* Bottom left, where Svelte Flow puts its controls in the other diagrams. */

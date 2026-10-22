@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
@@ -94,4 +95,39 @@ test('lifelines and messages select their elements, and show what they connect',
 			.getByRole('list', { name: 'Open editors' })
 			.getByRole('button', { name: 'DeliverySequence.sysml', exact: true })
 	).toHaveAttribute('aria-current', 'true');
+});
+
+test('a sequence diagram exports as a standalone SVG and a PNG', async ({ page }) => {
+	const diagram = await openSequence(page);
+	await diagram.getByRole('button', { name: 'Export' }).click();
+	const menu = page.getByRole('menu', { name: 'Export diagram' });
+	await expect(menu.getByRole('menuitem', { name: 'SVG', exact: true })).toBeFocused();
+
+	const [svgFile] = await Promise.all([
+		page.waitForEvent('download'),
+		menu.getByRole('menuitem', { name: 'SVG', exact: true }).click()
+	]);
+	expect(svgFile.suggestedFilename()).toBe('delivery-sequence.svg');
+	const svg = (await readFile((await svgFile.path())!)).toString('utf8');
+	expect(svg).not.toMatch(/foreignObject|<marker|url\(|var\(--|class=/);
+	const parsed = await page.evaluate((text) => {
+		const doc = new DOMParser().parseFromString(text, 'image/svg+xml');
+		return {
+			error: doc.querySelector('parsererror')?.textContent ?? null,
+			texts: [...doc.querySelectorAll('text')].map((t) => t.textContent)
+		};
+	}, svg);
+	expect(parsed.error).toBeNull();
+	expect(parsed.texts).toContain('sv [ParcelDelivery]');
+	expect(parsed.texts).toContain('handOver');
+	expect(parsed.texts).toContain('recipient');
+
+	await diagram.getByRole('button', { name: 'Export' }).click();
+	const [pngFile] = await Promise.all([
+		page.waitForEvent('download'),
+		menu.getByRole('menuitem', { name: 'PNG', exact: true }).click()
+	]);
+	expect(pngFile.suggestedFilename()).toBe('delivery-sequence.png');
+	const png = await readFile((await pngFile.path())!);
+	expect(png.subarray(1, 4).toString()).toBe('PNG');
 });
