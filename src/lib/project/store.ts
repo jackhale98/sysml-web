@@ -14,6 +14,8 @@ export interface StoredProject {
 	files: ProjectFile[];
 	/** Where the project came from. */
 	origin: 'new' | 'folder' | 'archive' | 'demo' | 'git';
+	/** For `new` projects: the starting point it was made from (`blank`, `flashlight`, …). */
+	template?: string;
 	created: string;
 	updated: string;
 	/** For `folder` projects (Chromium): permission to write the files back. */

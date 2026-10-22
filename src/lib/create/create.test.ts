@@ -8,7 +8,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import type { ToolkitHost } from '#lib/engine/toolkit/host.ts';
 import { loadHost } from '#lib/engine/toolkit/testing.ts';
 import { presentationOf } from '#lib/workbench/views.ts';
-import { starterProject } from '#lib/project/sources.ts';
+import { starterProject } from '#lib/project/templates/blank.ts';
 import type { ProjectFile, Workspace } from '#lib/project/workspace.svelte.ts';
 import { write } from './apply';
 import { qualifiedName } from './model';
