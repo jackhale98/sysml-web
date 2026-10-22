@@ -32,14 +32,13 @@
 	import Logo from '#lib/ui/Logo.svelte';
 	import ThemeToggle from '#lib/ui/ThemeToggle.svelte';
 	import Toaster from '#lib/ui/Toaster.svelte';
-	import { toasts } from '#lib/ui/toasts.svelte.ts';
 	import type { ProjectSession } from '#lib/project/session.svelte.ts';
 	import Explorer from './Explorer.svelte';
 	import ProjectMenu from './ProjectMenu.svelte';
 	import { settings } from '#lib/settings/settings.svelte.ts';
 	import HomeView from './HomeView.svelte';
 	import Inspector from './Inspector.svelte';
-	import { duplicateElement } from './actions.ts';
+	import { duplicateAndSelect } from './actions.ts';
 	import DocumentView from '#lib/markdown/DocumentView.svelte';
 	import ViewTable from './ViewTable.svelte';
 	import { presentationOf } from './views.ts';
@@ -79,11 +78,13 @@
 	let apiServerPrimed = $state(false);
 	let createPrimed = $state(false);
 	let filesPrimed = $state(false);
+	let elementsPrimed = $state(false);
 	let helpPrimed = $state(false);
 	let addPrimed = $state(false);
 	$effect(() => {
 		if (ui.create) createPrimed = true;
 		if (ui.fileRequest) filesPrimed = true;
+		if (ui.elementRequest) elementsPrimed = true;
 		if (ui.helpOpen) helpPrimed = true;
 		if (ui.addSheet) addPrimed = true;
 		if (ui.paletteOpen) palettePrimed = true;
@@ -370,10 +371,7 @@
 			const selected = workspace.elements.find((e) => e.key === ui.selection?.key);
 			if (!selected) return;
 			event.preventDefault();
-			void duplicateElement(workspace, selected).then(({ error, copy }) => {
-				if (error) toasts.show(error, { tone: 'error' });
-				else if (copy) ui.select(copy.key, ui.selection?.source ?? 'inspector');
-			});
+			void duplicateAndSelect(workspace, ui, selected, ui.selection?.source ?? 'inspector');
 		} else if (
 			event.key === '?' &&
 			!event.metaKey &&
@@ -878,6 +876,11 @@
 	{#if filesPrimed}
 		{#await import('./files/FileHost.svelte') then { default: FileHost }}
 			<FileHost {workspace} {ui} />
+		{/await}
+	{/if}
+	{#if elementsPrimed}
+		{#await import('./ElementHost.svelte') then { default: ElementHost }}
+			<ElementHost {workspace} {ui} />
 		{/await}
 	{/if}
 	{#if phone}

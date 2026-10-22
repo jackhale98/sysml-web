@@ -2,6 +2,9 @@
 	import {
 		BookLock,
 		ChevronRight,
+		CopyPlus,
+		Ellipsis,
+		FileCode,
 		FilePlus,
 		FileText,
 		LayoutDashboard,
@@ -10,10 +13,14 @@
 		Play,
 		Plus,
 		Scale,
+		PenLine,
 		Search,
-		Table2
+		Table2,
+		Trash2
 	} from '@lucide/svelte';
-	import type { TreeNode } from '#lib/project/elements.ts';
+	import NodeMenu, { type MenuItem } from '#lib/diagram/NodeMenu.svelte';
+	import { longPress } from '#lib/mobile/press.ts';
+	import type { ModelElement, TreeNode } from '#lib/project/elements.ts';
 	import { isLibraryFile, type Workspace } from '#lib/project/workspace.svelte.ts';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
 	import KindGlyph from '#lib/ui/KindGlyph.svelte';
@@ -24,8 +31,11 @@
 	import { groupViews, presentationOf, viewTitle } from './views.ts';
 	import { reportEntries, reportKindOf } from '#lib/reports/kinds.ts';
 	import FilesPanel from './files/FilesPanel.svelte';
+	import { duplicateAndSelect } from './actions.ts';
 
 	let { workspace, ui }: { workspace: Workspace; ui: WorkbenchUi } = $props();
+
+	const uid = $props.id();
 
 	/** The OMG standard library, listed once it is opened (read in the library worker). */
 	let standardOpen = $state(false);
@@ -144,6 +154,85 @@
 	const openRoots = $derived(userRoots.length <= OPEN_ROOTS);
 	/** How many entries each list shows, by its owner's key ('' for the top level). */
 	let shownCount = $state<Record<string, number>>({});
+
+	// ── An element's menu: ⋯, a right click, a long press, or Shift+F10 ──────────
+	/** The element whose menu is open, and how far below its row's top the menu goes. */
+	let menu = $state.raw<{ element: ModelElement; y: number } | null>(null);
+	/** The menu closed by the press that is now clicking its ⋯: that click doesn't reopen it. */
+	let closed: { key: string; at: number } | null = null;
+	const press = longPress();
+	const triggerId = (key: string) => `${uid}-more-${encodeURIComponent(key)}`;
+	const labelId = (key: string) => `${uid}-label-${encodeURIComponent(key)}`;
+
+	function openMenu(element: ModelElement, from: Element) {
+		press.cancel();
+		const row = from.closest('.row') as HTMLElement | null;
+		menu = { element, y: (row?.offsetHeight ?? 30) + 2 };
+	}
+
+	function closeMenu(restoreFocus: boolean) {
+		// Closed by a press elsewhere: maybe on its ⋯, whose click comes next.
+		if (menu && !restoreFocus) closed = { key: menu.element.key, at: performance.now() };
+		const key = menu?.element.key;
+		menu = null;
+		if (restoreFocus && key)
+			document.getElementById(triggerId(key))?.focus({ preventScroll: true });
+	}
+
+	function toggleMenu(element: ModelElement, button: HTMLElement) {
+		const justClosed = closed?.key === element.key && performance.now() - closed.at < 400;
+		if (menu?.element.key === element.key) closeMenu(false);
+		else if (!justClosed) openMenu(element, button);
+	}
+
+	/** Duplicate, rename, show in text and delete: the actions the inspector and diagrams have. */
+	function menuItems(element: ModelElement): MenuItem[] {
+		const editable = !isLibraryFile(element.file);
+		// Back to the ⋯ button first, so focus returns there after a dialog.
+		const then = (run: () => void) => () => {
+			if (!ui.phone) document.getElementById(triggerId(element.key))?.focus();
+			run();
+		};
+		const items: MenuItem[] = [];
+		if (editable)
+			items.push(
+				{
+					label: 'Duplicate',
+					icon: CopyPlus,
+					run: then(() => void duplicateAndSelect(workspace, ui, element, 'explorer'))
+				},
+				{
+					label: 'Rename…',
+					icon: PenLine,
+					shortcut: 'F2',
+					run: then(() => (ui.elementRequest = { kind: 'rename', key: element.key }))
+				}
+			);
+		items.push({
+			label: 'Show in text',
+			icon: FileCode,
+			run: then(() => ui.showInText(element, 'explorer'))
+		});
+		if (editable)
+			items.push({
+				label: 'Delete from model…',
+				detail: 'Takes it out of the text',
+				icon: Trash2,
+				danger: true,
+				run: then(() => (ui.elementRequest = { kind: 'delete', key: element.key }))
+			});
+		return items;
+	}
+
+	function itemKeys(event: KeyboardEvent, element: ModelElement) {
+		if (event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey)) {
+			event.preventDefault();
+			openMenu(element, event.currentTarget as HTMLElement);
+		} else if (event.key === 'F2' && !isLibraryFile(element.file)) {
+			event.preventDefault();
+			ui.elementRequest = { kind: 'rename', key: element.key };
+		}
+	}
 </script>
 
 {#snippet tree(nodes: TreeNode[], depth: number, owner: string)}
@@ -176,16 +265,55 @@
 						type="button"
 						class="item"
 						class:selected={ui.selection?.key === node.element.key}
-						onclick={() => ui.select(node.element.key, 'explorer')}
+						onclick={(e) => {
+							if (press.fired()) e.preventDefault();
+							else ui.select(node.element.key, 'explorer');
+						}}
 						ondblclick={() => ui.open({ kind: 'file', path: node.element.file })}
+						oncontextmenu={(e) => {
+							e.preventDefault();
+							openMenu(node.element, e.currentTarget);
+						}}
+						onpointerdown={(e) => {
+							const from = e.currentTarget;
+							press.start(e, () => openMenu(node.element, from));
+						}}
+						onpointermove={press.move}
+						onpointerup={press.cancel}
+						onpointercancel={press.cancel}
+						onpointerleave={press.cancel}
+						onkeydown={(e) => itemKeys(e, node.element)}
 						title="{node.element.isDefinition
 							? `${node.element.kind} def`
 							: node.element.kind} {node.element.label}"
 					>
 						<KindGlyph kind={node.element.kind} isDefinition={node.element.isDefinition} />
 						{#if node.element.shortName}<span class="id">{node.element.shortName}</span>{/if}
-						<span class="label">{node.element.label}</span>
+						<span class="label" id={labelId(node.element.key)}>{node.element.label}</span>
 					</button>
+					<!-- "More actions", described by the element's name: the name alone finds the row. -->
+					<button
+						type="button"
+						class="more"
+						id={triggerId(node.element.key)}
+						aria-label="More actions"
+						aria-describedby={labelId(node.element.key)}
+						aria-haspopup="menu"
+						aria-expanded={menu?.element.key === node.element.key}
+						onclick={(e) => toggleMenu(node.element, e.currentTarget)}
+					>
+						<Ellipsis size={15} aria-hidden="true" />
+					</button>
+					{#if menu?.element.key === node.element.key && !ui.phone}
+						<NodeMenu
+							title={node.element.label}
+							items={menuItems(node.element)}
+							x={0}
+							y={menu.y}
+							alignRight
+							onclose={closeMenu}
+						/>
+					{/if}
 				</div>
 				{#if hasChildren && open}
 					{@render tree(node.children, depth + 1, node.element.key)}
@@ -510,6 +638,17 @@
 	{/if}
 </nav>
 
+{#if menu && ui.phone}
+	<NodeMenu
+		title={menu.element.label}
+		items={menuItems(menu.element)}
+		x={0}
+		y={0}
+		sheet
+		onclose={closeMenu}
+	/>
+{/if}
+
 <style>
 	.explorer {
 		display: flex;
@@ -574,8 +713,34 @@
 		padding: 0;
 	}
 	.row {
+		position: relative;
 		display: flex;
 		align-items: center;
+	}
+	/* An element's ⋯: on show when its row is pointed at, focused or selected (always on touch). */
+	.more {
+		display: grid;
+		flex: none;
+		place-items: center;
+		width: 1.75rem;
+		height: 1.75rem;
+		border: 0;
+		border-radius: var(--radius-sm);
+		background: transparent;
+		color: var(--text-2);
+		cursor: pointer;
+		opacity: 0;
+	}
+	.row:hover .more,
+	.row:focus-within .more,
+	.item.selected + .more,
+	.more[aria-expanded='true'] {
+		opacity: 1;
+	}
+	.more:hover,
+	.more[aria-expanded='true'] {
+		background: var(--surface-2);
+		color: var(--text);
 	}
 	.twisty {
 		display: grid;
@@ -606,6 +771,8 @@
 		color: var(--text-2);
 		text-align: left;
 		cursor: pointer;
+		-webkit-touch-callout: none;
+		user-select: none;
 	}
 	.item:hover {
 		background: var(--surface-hover);
@@ -711,6 +878,11 @@
 		.mini {
 			min-height: 2.75rem;
 		}
+		.more {
+			width: 2.75rem;
+			height: 2.75rem;
+			opacity: 1;
+		}
 	}
 	.head {
 		display: contents;
@@ -760,5 +932,10 @@
 	.phone .twisty {
 		width: 2rem;
 		min-height: 2.75rem;
+	}
+	.phone .more {
+		width: 2.75rem;
+		height: 2.75rem;
+		opacity: 1;
 	}
 </style>

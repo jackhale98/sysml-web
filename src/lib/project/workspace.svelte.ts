@@ -19,7 +19,13 @@ import type {
 	ViewInfo
 } from '#lib/engine/types.ts';
 import { checkProblems } from './checks';
-import { buildTree, collectElements, type ModelElement, type TreeNode } from './elements';
+import {
+	buildTree,
+	byteToUtf16,
+	collectElements,
+	type ModelElement,
+	type TreeNode
+} from './elements';
 import { collectRequirements, type RequirementRow } from './requirements';
 
 export interface ProjectFile {
@@ -561,41 +567,43 @@ export class Workspace {
 	/**
 	 * What would stop resolving without this file: the warnings of removing
 	 * each of its top-level elements (the check an element's delete makes),
-	 * worked out without changing anything.
+	 * worked out without changing anything. The file's elements all go
+	 * together, so only references from elements that stay count: each is
+	 * removed from the file with the others blanked out (lines kept).
 	 */
 	async whatBreaksWithout(path: string): Promise<string[]> {
 		const engine = this.engine;
-		const source = this.files[path];
-		if (!engine || source === undefined || !isModelFile(path)) return [];
+		if (!engine || this.files[path] === undefined || !isModelFile(path)) return [];
 		// The file's elements as they are now (it may have just been renamed or typed in).
 		if (!this.settled) await this.analyse(true);
-		if (this.files[path] === undefined) return [];
-		// Last first, so the lines of the ones still to remove stay where they are.
-		const roots = this.tree
-			.map((n) => n.element)
-			.filter((e) => e.file === path)
-			.sort((a, b) => b.span.start_byte - a.span.start_byte);
-		let files = this.sourceFiles();
+		const source = this.files[path];
+		if (source === undefined) return [];
+		const roots = this.tree.map((n) => n.element).filter((e) => e.file === path);
+		const range = (e: ModelElement) =>
+			[byteToUtf16(source, e.span.start_byte), byteToUtf16(source, e.span.end_byte)] as const;
+		const files = this.sourceFiles();
 		const warnings: string[] = [];
 		for (const element of roots) {
-			const text = files.find((f) => f.path === path)?.text ?? '';
-			let result: EditResult;
+			let text = source;
+			for (const other of roots) {
+				if (other === element) continue;
+				const [from, to] = range(other);
+				text = text.slice(0, from) + text.slice(from, to).replace(/[^\n]/g, ' ') + text.slice(to);
+			}
 			try {
-				result = await engine.edit({
+				const result = await engine.edit({
 					op: 'remove',
 					path,
 					source: text,
 					name: element.name,
 					line: element.span.start_row,
 					...(element.id ? { id: element.id } : {}),
-					files
+					files: files.map((f) => (f.path === path ? { path, text } : f))
 				});
+				if (result.warning) warnings.push(result.warning);
 			} catch {
-				continue; // Not one the engine can remove: it says nothing about it, then.
+				// Not one the engine can remove: it says nothing about it, then.
 			}
-			if (result.warning) warnings.push(result.warning);
-			const next = applyChanges(text, result.changes);
-			files = files.map((f) => (f.path === path ? { path, text: next } : f));
 		}
 		return warnings;
 	}

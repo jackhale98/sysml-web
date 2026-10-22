@@ -15,6 +15,7 @@ import {
 	planUnexpose,
 	planViewAs,
 	viewAsChoices,
+	wiredNeighbours,
 	withoutHidden
 } from './viewEdits.ts';
 
@@ -244,6 +245,24 @@ describe('connected elements', () => {
 		// Each comes with the name the engine adds it to a diagram by.
 		const requirement = list.find((n) => n.element.label === 'Battery protection')!;
 		expect(requirement.qualified).toBe("SystemRequirements::'Battery protection'");
+	});
+});
+
+describe('connected elements on an interconnection view', () => {
+	it('are the parts beside it wired to it that the diagram hides', () => {
+		const battery = find('DroneArchitecture::drone::battery');
+		const board = find('DroneArchitecture::drone::powerDistribution');
+		const related = host.related(demoFiles(), battery.id!);
+		const hidden = [
+			{ key: board.key },
+			{ key: find('DroneArchitecture::drone::radio').key },
+			{ key: null }
+		];
+		const list = wiredNeighbours(related, ctx.elements, new Set([battery.key]), hidden);
+		// Its power goes to the board; the radio is hidden too, but not wired to it; what it
+		// satisfies and its type are not parts of this diagram.
+		expect(list.map((n) => [n.element.key, n.direction])).toEqual([[board.key, 'out']]);
+		expect(wiredNeighbours(related, ctx.elements, new Set([battery.key]), [])).toEqual([]);
 	});
 });
 

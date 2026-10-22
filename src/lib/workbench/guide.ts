@@ -150,7 +150,7 @@ export async function runGuideAction(action: GuideAction, context: GuideContext)
 			openAdd(ui, 'part', partOwner(workspace));
 			return;
 		case 'link': {
-			// The requirement's details, where "Add what satisfies it" picks the part.
+			// The requirement's details, with "Add what satisfies it" open to pick the part.
 			const rows = workspace.requirements;
 			const gap = rows.find((r) => r.satisfiedBy.length === 0) ?? rows[0];
 			const requirement = gap && workspace.elements.find((e) => e.key === gap.key);
@@ -159,9 +159,9 @@ export async function runGuideAction(action: GuideAction, context: GuideContext)
 				return;
 			}
 			ui.select(requirement.key, 'explorer');
+			ui.satisfyRequest = requirement.key;
 			if (ui.phone) ui.showDetails('full');
 			else ui.inspectorOpen = true;
-			toasts.show('Under “Satisfied by”, choose Add what satisfies it, and pick the part.');
 			return;
 		}
 		case 'connect-ports': {

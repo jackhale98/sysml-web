@@ -26,6 +26,7 @@
 		x,
 		y,
 		sheet = false,
+		alignRight = false,
 		onclose
 	}: {
 		title: string;
@@ -34,6 +35,8 @@
 		x: number;
 		y: number;
 		sheet?: boolean;
+		/** `x` is from the right edge (a menu that opens from a button at the end of a row). */
+		alignRight?: boolean;
 		onclose: (restoreFocus: boolean) => void;
 	} = $props();
 
@@ -120,7 +123,9 @@
 		role="menu"
 		tabindex="-1"
 		aria-label={title}
-		style:left="{x}px"
+		class:from-right={alignRight}
+		style:left={alignRight ? undefined : `${x}px`}
+		style:right={alignRight ? `${x}px` : undefined}
 		style:top="{y}px"
 		bind:this={menu}
 		{@attach focusFirst}
@@ -144,6 +149,9 @@
 		box-shadow: var(--shadow-lg);
 		animation: appear var(--duration) var(--ease);
 		transform-origin: top left;
+	}
+	.menu.from-right {
+		transform-origin: top right;
 	}
 	.title {
 		margin: 0;

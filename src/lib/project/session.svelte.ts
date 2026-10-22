@@ -69,14 +69,21 @@ export class ProjectSession {
 		if (stored) {
 			this.record = stored;
 			if (stored.origin === 'folder') {
-				// Files changed here but not written back are not what the folder holds.
+				// Files changed here but not written back are not what the folder holds:
+				// the folder's text of those is kept beside them.
 				const unsaved = stored.unsavedToFolder ?? [];
-				this.folderTexts = Object.fromEntries(
-					stored.files.filter((f) => !unsaved.includes(f.path)).map((f) => [f.path, f.text])
-				);
-				// Deleted or renamed here, still in the folder: its text there isn't kept.
-				const kept = stored.files.map((f) => f.path);
-				for (const path of unsaved) if (!kept.includes(path)) this.folderTexts[path] = '';
+				this.folderTexts = {
+					...Object.fromEntries(
+						stored.files.filter((f) => !unsaved.includes(f.path)).map((f) => [f.path, f.text])
+					),
+					...stored.folderTexts
+				};
+				if (!stored.folderTexts) {
+					// Kept before the folder's texts were: a file deleted or renamed here is
+					// still in the folder, its text there unknown.
+					const kept = stored.files.map((f) => f.path);
+					for (const path of unsaved) if (!kept.includes(path)) this.folderTexts[path] = '';
+				}
 				this.unsavedToFolder = unsaved;
 			}
 			this.opened = stored.files;
@@ -123,6 +130,15 @@ export class ProjectSession {
 		);
 	}
 
+	/** The folder's text of each file not written to it yet that it has. */
+	private unsavedFolderTexts(): Record<string, string> {
+		return Object.fromEntries(
+			this.unsavedToFolder
+				.filter((p) => p in this.folderTexts)
+				.map((p) => [p, this.folderTexts[p]!])
+		);
+	}
+
 	private files(): ProjectFile[] {
 		return Object.entries(this.workspace.files).map(([path, text]) => ({ path, text }));
 	}
@@ -144,7 +160,9 @@ export class ProjectSession {
 				info,
 				files: this.files(),
 				// Remembered, so a reload still knows what isn't in the folder yet.
-				...(this.record.origin === 'folder' ? { unsavedToFolder: this.unsavedToFolder } : {})
+				...(this.record.origin === 'folder'
+					? { unsavedToFolder: this.unsavedToFolder, folderTexts: this.unsavedFolderTexts() }
+					: {})
 			};
 			await saveProject(this.record);
 			this.saveState = 'saved';

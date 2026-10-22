@@ -196,6 +196,26 @@ export function neighbours(
 	return found;
 }
 
+/**
+ * An interconnection view's neighbours of a part: the parts beside it that a
+ * connection, flow or binding joins it to and this diagram hides (`hidden`,
+ * its nodes taken off it). It draws one element's parts and how they are
+ * wired, so all of them are on it unless hidden; an element from elsewhere
+ * has no place in it (a general view shows those).
+ */
+export function wiredNeighbours(
+	related: RelatedElement[],
+	elements: ModelElement[],
+	drawn: ReadonlySet<string>,
+	hidden: readonly { key: string | null }[]
+): NeighbourElement[] {
+	const off = new Set(hidden.flatMap((h) => (h.key ? [h.key] : [])));
+	const wired = related.filter((r) => WIRES.has(r.kind));
+	return neighbours(wired, elements, drawn).filter((n) => off.has(n.element.key));
+}
+
+const WIRES: ReadonlySet<RelatedElement['kind']> = new Set(['connects', 'flows', 'binds']);
+
 /** The neighbours to add for a choice of direction, each element once. */
 export function chooseNeighbours(
 	list: NeighbourElement[],
