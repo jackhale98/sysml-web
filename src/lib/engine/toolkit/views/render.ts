@@ -23,14 +23,15 @@ import {
 	parseExpr
 } from '#lib/sim/expr.ts';
 import type { Scope, Value } from '#lib/sim/expr.ts';
-import type { ColumnEdit, RenderedTable, RowInfo, TraceMatrix } from '../../types';
+import type { ColumnEdit, Levels, RenderedTable, RowInfo, TraceMatrix } from '../../types';
 import { fieldKinds } from './budget';
-import { fieldDomain, metadataDefinition, type Domain } from './domains';
+import { fieldDomain, fieldType, metadataDefinition, typeDomain, type Domain } from './domains';
 import type { ElementRecord } from '../model';
 import { findView, listViews, tableSpec, viewChain, viewClauses } from './catalog';
 import type { ViewContext } from './context';
 import { ColumnEdits, type Probe } from './edits';
 import { provideRows, requirementRows, type Row } from './rows';
+import { riskFieldLevels } from './riskLines';
 import {
 	compareCells,
 	formatNumber,
@@ -142,12 +143,21 @@ export function renderView(ctx: ViewContext, name: string): RenderedTable {
 		const domains = [rowField, colField].map((f) => fieldDomain(ctx, rowsSpec.trim(), f));
 		const table = pivotTable(shown, rows, rowField, colField, spec.get('sortBy'), domains);
 		const scales = domains.every((d) => d?.numeric);
+		const level = spec.get('cellLevel');
 		return {
 			...table,
 			warnings,
 			editable: table.columns.map(() => null),
 			availableFields: probe.fields,
-			...(scales ? { counts: { rows: rowField, columns: colField } } : {}),
+			...(scales
+				? {
+						counts: {
+							rows: rowField,
+							columns: colField,
+							...(level ? cellLevels(ctx, table, rowField, colField, level) : {})
+						}
+					}
+				: {}),
 			...(annotations ? { annotations } : {})
 		};
 	}
@@ -189,21 +199,43 @@ export function renderView(ctx: ViewContext, name: string): RenderedTable {
 		info: rowInfoOf(r, columns)
 	}));
 
-	// By a column, else by a field of the rows the table doesn't show.
+	const columnLevels = columns.map(([column, expr]) =>
+		levelsOf(ctx, rowsSpec.trim(), column, expr)
+	);
+
+	// By a column, else by a field of the rows the table doesn't show; `;` separates further keys
+	// (`-actionPriority; -rpn`). Levels (an enum's literals) sort in the order declared.
 	const sortBy = spec.get('sortBy');
 	if (sortBy !== undefined) {
-		const descending = sortBy.startsWith('-');
-		const key = descending ? sortBy.slice(1).trim() : sortBy;
-		const index = columns.findIndex(([c]) => c === key);
-		const field = index < 0 && rows.some((r) => r.fields.has(key));
-		if (index >= 0 || field) {
-			const at = (t: (typeof table)[number]) =>
-				index >= 0 ? t.cells[index]! : (t.row.fields.get(key) ?? '');
-			table = table.toSorted((a, b) => {
-				const order = compareCells(at(a), at(b));
-				return descending ? -order : order;
+		const keys = sortBy
+			.split(';')
+			.map((k) => k.trim())
+			.filter(Boolean)
+			.flatMap((written) => {
+				const descending = written.startsWith('-');
+				const key = descending ? written.slice(1).trim() : written;
+				const index = columns.findIndex(([c]) => c === key);
+				const field = index < 0 && rows.some((r) => r.fields.has(key));
+				if (index < 0 && !field) {
+					warnings.push(`sortBy column \`${key}\` is not in the column list`);
+					return [];
+				}
+				const levels =
+					(index >= 0 ? columnLevels[index] : levelsOf(ctx, rowsSpec.trim(), key, null)) ?? null;
+				const at = (t: (typeof table)[number]) =>
+					index >= 0 ? t.cells[index]! : (t.row.fields.get(key) ?? '');
+				return [{ at, descending, levels }];
 			});
-		} else warnings.push(`sortBy column \`${key}\` is not in the column list`);
+		if (keys.length)
+			table = table.toSorted((a, b) => {
+				for (const { at, descending, levels } of keys) {
+					const order = levels
+						? levels.values.indexOf(at(a)) - levels.values.indexOf(at(b))
+						: compareCells(at(a), at(b));
+					if (order) return descending ? -order : order;
+				}
+				return 0;
+			});
 	}
 
 	const edits = new ColumnEdits(ctx);
@@ -226,6 +258,7 @@ export function renderView(ctx: ViewContext, name: string): RenderedTable {
 		editable,
 		availableFields: probe.fields,
 		...(columnKinds.some((k) => k) ? { columnKinds } : {}),
+		...(columnLevels.some((l) => l) ? { columnLevels } : {}),
 		...(described ? { rowInfo: table.map((t) => t.info ?? {}) } : {}),
 		...(rowsSpec.trim() === 'checks' ? { opensText: true } : {}),
 		...(study ? { trade: study } : {}),
@@ -572,6 +605,60 @@ function holds(ctx: ViewContext, expr: Compiled, r: Row): boolean {
 		if (error instanceof EvalError) return false;
 		throw error;
 	}
+}
+
+/**
+ * The levels a column's values are drawn from, in order: a field declared
+ * with an enum (`category`), a field an FMEA line gets from its controls
+ * (`controlStatus`), or a calc that returns an enum (`ActionPriority(…)`).
+ */
+function levelsOf(
+	ctx: ViewContext,
+	rowsSpec: string,
+	column: string,
+	expr: string | null
+): Levels | null {
+	const field = expr === null ? column : isPlainIdentifier(expr) ? expr : null;
+	if (field !== null) {
+		const type = fieldType(ctx, rowsSpec, field);
+		const domain = type ? typeDomain(ctx, type) : null;
+		if (domain && !domain.numeric)
+			return { enum: ctx.byId.get(type!)?.name ?? '', values: domain.values };
+		return rowsSpec.startsWith('@') ? riskFieldLevels(ctx, field) : null;
+	}
+	const call = /^([\p{L}_][\p{L}\p{N}_:']*)\s*\(/u.exec(expr ?? '')?.[1];
+	return call && expr!.trim().endsWith(')') ? ctx.calcs.returnLevels(call) : null;
+}
+
+/**
+ * A pivot's `cellLevel`: an expression of the row and column values
+ * (`Acceptability(severity, likelihood)`) evaluated for every cell, so each
+ * cell has the level the model gives it (the risk matrix's zones).
+ */
+function cellLevels(
+	ctx: ViewContext,
+	table: Pick<RenderedTable, 'columns' | 'rows'>,
+	rowField: string,
+	colField: string,
+	source: string
+): { levels: string[][]; levelValues?: string[] } | Record<string, never> {
+	const expr = parse(source);
+	if (!expr) return {};
+	const columns = table.columns.slice(1);
+	const levels = table.rows.map((r) =>
+		columns.map((c) =>
+			cellValue(ctx, expr, {
+				fields: new Map([
+					[rowField, r[0] ?? ''],
+					[colField, c]
+				]),
+				anchors: [],
+				element: ''
+			})
+		)
+	);
+	const values = levelsOf(ctx, '', '', source);
+	return { levels, ...(values ? { levelValues: values.values } : {}) };
 }
 
 // --- pivot -----------------------------------------------------------------------

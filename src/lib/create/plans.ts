@@ -8,6 +8,7 @@ import type { ElementFeatures, FeatureInfo } from '#lib/engine/types.ts';
 import type { ModelElement, TreeNode } from '#lib/project/elements.ts';
 import { packageName as projectPackageName } from '#lib/project/sources.ts';
 import { isLibraryFile, type Workspace } from '#lib/project/workspace.svelte.ts';
+import type { WriteStep } from '#lib/workbench/actions.ts';
 import { viewTitle } from '#lib/workbench/views.ts';
 import {
 	freePath,
@@ -20,7 +21,13 @@ import {
 	type Write
 } from './apply';
 import { fmeaLineText, fmeaPackageText, listWords, packageViewText, type FmeaKind } from './fmea';
-import { hazardMembers, hazardPackageText, type HazardSpec } from './hazard';
+import {
+	controlText,
+	hazardMembers,
+	hazardPackageText,
+	type ControlSpec,
+	type HazardSpec
+} from './hazard';
 import {
 	comparisons,
 	nextRequirementId,
@@ -30,6 +37,7 @@ import {
 	type Limit
 } from './limit';
 import { enclosingPackage, flatten, pathTo, qualifiedName } from './model';
+import { mitigationText, referenceValue, withLineField, type MitigationSpec } from './riskControls';
 import { missingRiskLibraries } from './riskLibraries';
 import { rollupExpression, rollupMember, rollupPlan, type RollupPlan } from './rollup';
 import {
@@ -38,7 +46,9 @@ import {
 	docComment,
 	name as sysmlName,
 	pascalName,
-	uniqueName
+	stringLiteral,
+	uniqueName,
+	withImports
 } from './sysml';
 import { tradeStudyText, tradeViewText, type CriterionSpec, type TradeSpec } from './trade';
 import { viewText, type Target, type ViewKind } from './view';
@@ -654,5 +664,136 @@ export function planHazard(
 		preview: previewOf(shown),
 		label: `Created the hazard ${input.spec.name.trim()}`,
 		open: { name: view, title: viewTitle(view) }
+	};
+}
+
+// --- Risk: a line's controls, a saved review, the risk policy ------------------------------
+
+/** An element a form links, with its short name (a control's `RC-001`) when it has one. */
+export interface Linked extends Chosen {
+	shortName?: string | null;
+}
+
+export interface LineLinksInput {
+	/** Where the line's `@Fmea` is written (its first line, 1-based). */
+	file: string;
+	line: number;
+	/** The package it is in: what it imports, and where new controls and mitigations go. */
+	pkg: ModelElement;
+	/** Every risk control and mitigation the line should name, after the change. */
+	controls: Linked[];
+	mitigations: Linked[];
+	/** A new risk control on the line's hazard (written as `hazard` is in the line). */
+	newControl?: ControlSpec & { hazard: string | null };
+	newMitigation?: MitigationSpec;
+	label: string;
+}
+
+/** The plan as one patch of the line's file, for `applySteps`. */
+export interface PatchPlan {
+	steps: WriteStep[];
+	preview: string;
+	label: string;
+}
+
+/**
+ * Link an FMEA line to its risk controls and mitigations: its
+ * `riskControls` and `mitigations` set to the names (a control by its ID,
+ * `'RC-001'`), the imports its package needs for them, and a new control or
+ * mitigation in its package. One patch of the file, so it is one step.
+ */
+export function planLineLinks(workspace: Workspace, input: LineLinksInput): PatchPlan | string {
+	const before = workspace.text(input.file);
+	if (before === undefined) return `${input.file} is not in the project.`;
+	const pkgName = qualifiedName(workspace.tree, input.pkg.key);
+	const refs = new References(pkgName);
+	const spellLinked = (l: Linked) => {
+		const at = l.qualifiedName.lastIndexOf('::');
+		const owner = at < 0 ? '' : l.qualifiedName.slice(0, at);
+		if (l.shortName)
+			return refs.name(owner ? `${owner}::${sysmlName(l.shortName)}` : sysmlName(l.shortName));
+		return spellFrom(workspace.tree, refs, l.qualifiedName) ?? refs.name(l.qualifiedName);
+	};
+	const controls = input.controls.map(spellLinked);
+	const mitigations = input.mitigations.map(spellLinked);
+	const members: string[] = [];
+	if (input.newControl) {
+		controls.push(sysmlName(input.newControl.id.trim()));
+		const lines = controlText(input.newControl, input.newControl.hazard ?? '').split('\n');
+		members.push(
+			(input.newControl.hazard ? lines : lines.filter((l) => !l.includes('ref :>> hazard'))).join(
+				'\n'
+			)
+		);
+		refs.library('HazardAnalysis::*');
+	}
+	if (input.newMitigation) {
+		mitigations.push(sysmlName(input.newMitigation.name.trim()));
+		members.push(mitigationText(input.newMitigation));
+		refs.library('RiskAnalysis::*');
+	}
+	let after = withLineField(before, input.line, 'riskControls', controls);
+	if (after === null) return 'This line could not be found in the text.';
+	after = withLineField(after, input.line, 'mitigations', mitigations)!;
+	let to = (input.pkg.span.to ?? before.length) + (after.length - before.length);
+	if (members.length) {
+		const close = after.lastIndexOf('}', to - 1);
+		const lineStart = after.lastIndexOf('\n', close - 1) + 1;
+		const indent = `${/^[ \t]*/.exec(after.slice(after.lastIndexOf('\n', (input.pkg.span.from ?? 0) - 1) + 1))![0]}    `;
+		const text = members.map((m) => `\n${m.replace(/^(?=.)/gm, indent)}\n`).join('');
+		const inline = after.slice(lineStart, close).trim() !== '';
+		const at = inline ? close : lineStart;
+		after = after.slice(0, at) + text + (inline ? '\n' : '') + after.slice(at);
+		to += text.length + (inline ? 1 : 0);
+	}
+	after = withImports(
+		after,
+		{ qualifiedName: pkgName, from: input.pkg.span.from ?? 0, to },
+		refs.imports
+	);
+	const added = [
+		...members,
+		...(controls.length ? [`riskControls = ${referenceValue(controls)};`] : []),
+		...(mitigations.length ? [`mitigations = ${referenceValue(mitigations)};`] : [])
+	];
+	return {
+		steps: [{ kind: 'patch', path: input.file, before, after }],
+		preview: added.join('\n\n'),
+		label: input.label
+	};
+}
+
+export interface SavedReviewInput {
+	title: string;
+	/** The view def it is typed by (qualified). */
+	definition: string;
+	/** What the view it comes from exposes, as written there. */
+	exposes: string[];
+	/** The condition: the view's own, and the filters'. */
+	where: string;
+	doc: string;
+}
+
+/** A filtered review saved as a view: a usage of the worksheet's view def with a `where`. */
+export function planSavedReview(
+	workspace: Workspace,
+	input: SavedReviewInput
+): Plan & { name: string } {
+	const name = uniqueName(viewNameOf(input.title), viewNames(workspace));
+	const view = viewWrite(workspace, (spell) => [
+		[
+			`view ${sysmlName(name)} : ${spell(input.definition)} {`,
+			`    ${docComment(input.doc)}`,
+			...input.exposes.map((e) => `    expose ${e};`),
+			`    @${spell('Reporting::TableRendering')} { where = ${stringLiteral(input.where)}; }`,
+			'}'
+		].join('\n')
+	]);
+	return {
+		write: view,
+		name,
+		preview: previewOf(view),
+		label: `Saved the view ${viewTitle(name)}`,
+		open: { name, title: viewTitle(name) }
 	};
 }

@@ -19,6 +19,8 @@ import type {
 	RelatedElement,
 	OutlineItem,
 	RenderedTable,
+	RiskPolicy,
+	FmeaLineInfo,
 	StateMachine,
 	TradeStudy,
 	ViewInfo
@@ -58,6 +60,10 @@ export interface EngineApi {
 	renderView(files: SourceFile[], name: string): RenderedTable;
 	/** The view libraries the engine bundles (`Reporting`, `ModelViews`). */
 	viewLibraries(): SourceFile[];
+	/** The risk policy the project's risk library states: zones, RPN bands, what worksheets lead with. */
+	riskPolicy(files: SourceFile[]): RiskPolicy;
+	/** The FMEA lines about an element (by its id), with their figures and controls. */
+	fmeaLines(files: SourceFile[], id: string): FmeaLineInfo[];
 	elementDetails(
 		files: SourceFile[],
 		path: string,

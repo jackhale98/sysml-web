@@ -116,7 +116,12 @@ export function viewChain(ctx: ViewContext, view: ElementRecord): ElementRecord[
 	return chain;
 }
 
-/** `@TableRendering` values that apply: inherited ones, overridden field by field by the view's own. */
+/**
+ * `@TableRendering` values that apply: inherited ones, overridden field by
+ * field by the view's own. `where` conditions accumulate instead, as
+ * `filter`s do: a view's own `where` narrows the rows of the def it is
+ * typed by (`(category == …) and (severity >= 9)`).
+ */
 export function tableSpec(ctx: ViewContext, view: ElementRecord): Map<string, string> | null {
 	let spec: Map<string, string> | null = null;
 	for (const record of viewChain(ctx, view).reverse()) {
@@ -125,7 +130,14 @@ export function tableSpec(ctx: ViewContext, view: ElementRecord): Map<string, st
 			.find((a) => unquoteName(simpleName(a.metadata_type)) === 'TableRendering');
 		if (!own) continue;
 		spec ??= new Map();
-		for (const [key, value] of own.values) spec.set(key, unescape(unquote(value)));
+		for (const [key, written] of own.values) {
+			const value = unescape(unquote(written));
+			const inherited = key === 'where' ? spec.get('where') : undefined;
+			spec.set(
+				key,
+				inherited && value.trim() && inherited !== value ? `(${inherited}) and (${value})` : value
+			);
+		}
 	}
 	return spec;
 }

@@ -228,6 +228,9 @@ describe('on a new Small system project', { timeout: 60_000 }, () => {
 				'8',
 				'224',
 				'high',
+				'high',
+				'reduce',
+				'',
 				'Corroded contacts; the light fails',
 				'Left in for years'
 			]
@@ -332,7 +335,7 @@ describe('on a new Small system project', { timeout: 60_000 }, () => {
 		await analysed(workspace, () => write(workspace, matrix.label, matrix.write));
 		expect(problemsOf(workspace)).toEqual([]);
 		const grid = await render(workspace, matrix.name);
-		expect(grid.counts).toEqual({ rows: 'severity', columns: 'likelihood' });
+		expect(grid.counts).toMatchObject({ rows: 'severity', columns: 'likelihood' });
 		expect(grid.rows.find((r) => r[0] === '4')?.[2]).toBe('1');
 		expect(grid.rows).toHaveLength(10);
 	});

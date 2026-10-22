@@ -1,0 +1,58 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`the risk policy form’s SysML > a painted grid is a calc the toolkit evaluates to the same zones, in every cell 1`] = `
+"    calc def Acceptability {
+        doc
+        /*
+         * The risk policy: how acceptable a risk is, by its severity and
+         * its likelihood (the zones of the risk matrix). It is the
+         * organisation's choice; change it here or with the app's Risk
+         * policy form. In plain words:
+         *   severity 10: unacceptable at likelihood 4 to 10, reduce at 2 to 3, acceptable at 1;
+         *   severity 8 to 9: unacceptable at likelihood 5 to 10, reduce at 2 to 4, acceptable at 1;
+         *   severity 7: unacceptable at likelihood 6 to 10, reduce at 2 to 5, acceptable at 1;
+         *   severity 6: unacceptable at likelihood 7 to 10, reduce at 2 to 6, acceptable at 1;
+         *   severity 5: unacceptable at likelihood 8 to 10, reduce at 3 to 7, acceptable at 1 to 2;
+         *   severity 4: unacceptable at likelihood 10, reduce at 3 to 9, acceptable at 1 to 2;
+         *   severity 3: reduce at likelihood 4 to 10, acceptable at 1 to 3;
+         *   severity 2: reduce at likelihood 6 to 10, acceptable at 1 to 5;
+         *   severity 1: unacceptable at likelihood 10, acceptable at 1 to 9.
+         */
+        in severity : FmeaRating;
+        in likelihood : FmeaRating;
+        return : RiskAcceptability =
+            if severity >= 10 ?
+                (if likelihood >= 4 ? RiskAcceptability::unacceptable
+                 else if likelihood >= 2 ? RiskAcceptability::reduce
+                 else RiskAcceptability::acceptable)
+            else if severity >= 8 ?
+                (if likelihood >= 5 ? RiskAcceptability::unacceptable
+                 else if likelihood >= 2 ? RiskAcceptability::reduce
+                 else RiskAcceptability::acceptable)
+            else if severity >= 7 ?
+                (if likelihood >= 6 ? RiskAcceptability::unacceptable
+                 else if likelihood >= 2 ? RiskAcceptability::reduce
+                 else RiskAcceptability::acceptable)
+            else if severity >= 6 ?
+                (if likelihood >= 7 ? RiskAcceptability::unacceptable
+                 else if likelihood >= 2 ? RiskAcceptability::reduce
+                 else RiskAcceptability::acceptable)
+            else if severity >= 5 ?
+                (if likelihood >= 8 ? RiskAcceptability::unacceptable
+                 else if likelihood >= 3 ? RiskAcceptability::reduce
+                 else RiskAcceptability::acceptable)
+            else if severity >= 4 ?
+                (if likelihood >= 10 ? RiskAcceptability::unacceptable
+                 else if likelihood >= 3 ? RiskAcceptability::reduce
+                 else RiskAcceptability::acceptable)
+            else if severity >= 3 ?
+                (if likelihood >= 4 ? RiskAcceptability::reduce
+                 else RiskAcceptability::acceptable)
+            else if severity >= 2 ?
+                (if likelihood >= 6 ? RiskAcceptability::reduce
+                 else RiskAcceptability::acceptable)
+            else
+                (if likelihood >= 10 ? RiskAcceptability::unacceptable
+                 else RiskAcceptability::acceptable);
+    }"
+`;

@@ -213,7 +213,30 @@ export interface RenderedTable {
 	 * of counts with every value of each scale, `rows` down and `columns`
 	 * across (the risk matrix).
 	 */
-	counts?: { rows: string; columns: string };
+	counts?: {
+		rows: string;
+		columns: string;
+		/**
+		 * With a `cellLevel` (the risk matrix's `Acceptability(severity,
+		 * likelihood)`): each cell's level, parallel to `rows` without their
+		 * first cell, and the levels in order, lowest first.
+		 */
+		levels?: string[][];
+		levelValues?: string[];
+	};
+	/**
+	 * Per column whose values are an enum's literals (a field declared with
+	 * an enum, a calc that returns one): the literals in the order declared,
+	 * lowest first, for sorting and filtering by level.
+	 */
+	columnLevels?: (Levels | null)[];
+}
+
+/** Values in an order: an enum's literals as declared, lowest first. */
+export interface Levels {
+	/** The enum def's name (`ActionPriorityLevel`), or '' for levels the app names (a control status). */
+	enum: string;
+	values: string[];
 }
 
 /**
@@ -276,6 +299,75 @@ export interface RowInfo {
 	notes?: Record<number, string>;
 	/** What is wrong with a cell's value, by column index (a rating outside its scale). */
 	problems?: Record<number, string>;
+	/** For an FMEA line: the risk controls it names, with their traceability. */
+	controls?: LineControl[];
+	/** For an FMEA line: its mitigations, with their status. */
+	mitigations?: LineMitigation[];
+}
+
+/** A risk control an FMEA line names (`riskControls`), with what satisfies and verifies it. */
+export interface LineControl {
+	/** `RC-001 Battery thermal protection`. */
+	label: string;
+	/** The requirement's qualified name. */
+	element: string;
+	satisfiedBy: string[];
+	verifiedBy: string[];
+}
+
+/** A mitigation of an FMEA line: one it names, or one that implements one of its controls. */
+export interface LineMitigation {
+	name: string;
+	/** Its qualified name. */
+	element: string;
+	/** Its status literal (`inProgress`), or ''. */
+	status: string;
+	/** Whether the line names it (else it implements one of the line's controls). */
+	named: boolean;
+}
+
+/** One FMEA line about an element, for its details. */
+export interface FmeaLineInfo {
+	/** Where its `@Fmea` annotation is written. */
+	file: string;
+	line: number;
+	failureMode: string;
+	category: string;
+	severity: string;
+	likelihood: string;
+	detection: string;
+	/** The ratings before risk reduction, when the line has them. */
+	before: { severity: string; likelihood: string; detection: string } | null;
+	/** Calculated by the library's calcs ('' when it lacks one). */
+	rpn: string;
+	rpnBand: string;
+	actionPriority: string;
+	acceptability: string;
+	acceptabilityBefore: string;
+	/** The hazard it can lead to, as written. */
+	hazard: string;
+	controls: LineControl[];
+	mitigations: LineMitigation[];
+	/** Why the line needs review, in plain words, or null. */
+	review: string | null;
+}
+
+/**
+ * The project's risk policy, as its risk library states it: the zone the
+ * `Acceptability` calc gives each severity and likelihood, the thresholds
+ * of `RpnBand`, and which figure the worksheets lead with.
+ */
+export interface RiskPolicy {
+	/** `zones[severity - 1][likelihood - 1]`, or null when the library has no `Acceptability`. */
+	zones: string[][] | null;
+	/** The zones in order, lowest first. */
+	zoneLevels: string[];
+	/** The thresholds: each `<level>From` attribute of `RpnBand`, in order. */
+	bands: { name: string; level: string; value: number }[];
+	/** The bands in order, lowest first. */
+	bandLevels: string[];
+	/** What `FmeaWorksheet` sorts by first, or null when the library has none. */
+	lead: 'rpn' | 'actionPriority' | null;
 }
 
 // ---- Constraint checks and evaluated values ----------------------------------

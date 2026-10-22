@@ -717,9 +717,10 @@ describe('the demo’s tables', () => {
 		// trade study (a view def and a usage), the sequence and saved trace and
 		// verification matrices, less the design gaps (the overview lists them).
 		// The risk library's worksheets for each kind of FMEA, the risk reduction and the
-		// demo's risk matrix and hazard log are six more.
-		expect(views).toHaveLength(57);
-		expect(views.filter((v) => v.hasTable)).toHaveLength(41);
+		// demo's risk matrix and hazard log are six more; its saved review and risk
+		// reduction two more.
+		expect(views).toHaveLength(59);
+		expect(views.filter((v) => v.hasTable)).toHaveLength(43);
 		expect(views.every((v) => !v.builtin)).toBe(true);
 		expect(views.find((v) => v.name === 'droneBreakdown')).toEqual({
 			name: 'droneBreakdown',
@@ -903,11 +904,14 @@ describe('the demo’s tables', () => {
 			'likelihood',
 			'detection',
 			'rpn',
+			'rpnBand',
 			'actionPriority',
+			'acceptability',
+			'riskControls',
 			'effect',
 			'cause'
 		]);
-		expect(shape(fmea)).toEqual([6, 9]);
+		expect(shape(fmea)).toEqual([6, 12]);
 		expect(fmea.rows[0]).toEqual([
 			'drone::battery',
 			'Thermal runaway',
@@ -916,6 +920,9 @@ describe('the demo’s tables', () => {
 			'6',
 			'144',
 			'medium',
+			'medium',
+			'reduce',
+			'RC-001 Battery thermal protection',
 			'Fire in the airframe; loss of the drone; burns to bystanders',
 			'Internal cell short, overcharge or crash damage'
 		]);
@@ -933,7 +940,7 @@ describe('the demo’s tables', () => {
 		expect(fmea.sources[1]).toMatchObject({
 			element: 'DroneComponents::Rotor::motor',
 			file: 'risk/DesignFmea.sysml',
-			line: 110
+			line: 115
 		});
 		// New lines go in the package the worksheet exposes.
 		expect(fmea.annotations).toEqual({ metadata: 'RiskAnalysis::Fmea', package: 'DroneFmea' });
@@ -949,14 +956,14 @@ describe('the demo’s tables', () => {
 			'design',
 			'design'
 		]);
-		expect(all.editable?.[9]).toEqual({
+		expect(all.editable?.[all.columns.indexOf('category')]).toEqual({
 			field: 'metadata:Fmea.category',
 			kind: 'enum',
 			options: ['design', 'process', 'use', 'software']
 		});
 		// The risk matrix has every rating, 10 down to 1 by 1 to 10, so empty cells show.
 		const matrix = table('riskMatrix');
-		expect(matrix.counts).toEqual({ rows: 'severity', columns: 'likelihood' });
+		expect(matrix.counts).toMatchObject({ rows: 'severity', columns: 'likelihood' });
 		expect(matrix.columns).toEqual(['severity\\likelihood', ...'12345678910'.match(/10|\d/g)!]);
 		expect(matrix.rows.map((r) => r[0])).toEqual([
 			'10',
@@ -1071,9 +1078,9 @@ describe('the demo’s tables', () => {
 		const row = (kind: string) => stats.rows.find((r) => r[0] === kind);
 		expect(row('part def')).toEqual(['part def', '19', '0']);
 		expect(row('requirement')).toEqual(['requirement', '0', '20']);
-		expect(row('attribute')).toEqual(['attribute', '0', '198']);
+		expect(row('attribute')).toEqual(['attribute', '0', '202']);
 		// Enum literals count as usages, metadata annotations are anonymous.
-		expect(row('enum')).toEqual(['enum', '0', '36']);
+		expect(row('enum')).toEqual(['enum', '0', '43']);
 		expect(row('metadata')).toBeUndefined();
 	});
 

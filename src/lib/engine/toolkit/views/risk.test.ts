@@ -199,7 +199,15 @@ ${Array.from({ length: 10 }, (_, o) => `    part p${o + 1} { @Fmea { failureMode
 
 	it('a risk matrix has every rating, and shows a rating outside the scale', () => {
 		const matrix = host.renderView(project(PUMP), 'matrix');
-		expect(matrix.counts).toEqual({ rows: 'severity', columns: 'likelihood' });
+		expect(matrix.counts).toMatchObject({ rows: 'severity', columns: 'likelihood' });
+		// Each cell has the zone the risk policy gives it; a rating outside the scale has none.
+		expect(matrix.counts?.levelValues).toEqual(['acceptable', 'reduce', 'unacceptable']);
+		expect(matrix.counts?.levels?.[0]).toEqual(Array(10).fill(''));
+		expect(matrix.counts?.levels?.[1]).toEqual([
+			'acceptable',
+			...Array(2).fill('reduce'),
+			...Array(7).fill('unacceptable')
+		]);
 		expect(matrix.rows.map((r) => r[0])).toEqual([
 			'14',
 			'10',

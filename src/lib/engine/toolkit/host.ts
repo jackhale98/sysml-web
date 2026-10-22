@@ -41,6 +41,8 @@ import type {
 	Hover,
 	OutlineItem,
 	RenderedTable,
+	RiskPolicy,
+	FmeaLineInfo,
 	StateMachine,
 	TradeStudy,
 	ViewInfo
@@ -322,6 +324,16 @@ export class ToolkitHost {
 	/** A view rendered as a table by its `@TableRendering`. */
 	renderView(files: SourceFile[], name: string): RenderedTable {
 		return views.renderView(this.viewContext(files), name);
+	}
+
+	/** The project's risk policy, as its risk library states it (`views/riskLines.ts`). */
+	riskPolicy(files: SourceFile[]): RiskPolicy {
+		return views.riskPolicy(this.viewContext(files));
+	}
+
+	/** The FMEA lines about an element (by its id), for its details. */
+	fmeaLines(files: SourceFile[], id: string): FmeaLineInfo[] {
+		return views.fmeaLines(this.viewContext(files), id);
 	}
 
 	/** A usage's attribute values, for the inspector. */

@@ -22,9 +22,10 @@ import {
 	type Scope
 } from '#lib/sim/expr.ts';
 import type { Value } from '#lib/sim/expr.ts';
+import type { Levels } from '../../types';
 import type { ElementRecord } from '../model';
 import type { ViewContext } from './context';
-import { holds, typeInvariants, type Invariant } from './domains';
+import { holds, typeDomain, typeInvariants, type Invariant } from './domains';
 import { splitPath } from './text';
 
 interface Calc {
@@ -78,6 +79,24 @@ export class ModelCalcs {
 			call: (n, a) => this.call(n, a, depth + 1)
 		};
 		return evaluate(calc.result, scope);
+	}
+
+	/** The calc def named `name`, if the model has one. */
+	record(name: string): ElementRecord | undefined {
+		return this.find(name);
+	}
+
+	/** The enum a calc returns and its literals, in order (`ActionPriority`: low, medium, high), or null. */
+	returnLevels(name: string): Levels | null {
+		const record = this.find(name);
+		const result = record
+			? this.ctx.ownedBy(record.id).find((m) => m.kind === 'return')
+			: undefined;
+		const type = result?.typeIds[0];
+		const domain = type ? typeDomain(this.ctx, type) : null;
+		return domain && !domain.numeric
+			? { enum: this.ctx.byId.get(type!)?.name ?? '', values: domain.values }
+			: null;
 	}
 
 	/** A scope's `call`: the model's calcs. */

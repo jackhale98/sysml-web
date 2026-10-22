@@ -188,7 +188,7 @@ describe('general view', () => {
 
 	it('draws the view usages of a package with what they expose', () => {
 		const tk = toolkit('general', 'DroneViews');
-		expect(tk.nodes).toHaveLength(23);
+		expect(tk.nodes).toHaveLength(25);
 		expect(node(tk, 'componentCatalogue')).toMatchObject({
 			label: 'componentCatalogue : GeneralView',
 			stereotype: '<<view>>',
@@ -207,7 +207,7 @@ describe('general view', () => {
 			.filter((d) => d.kind !== 'package')
 			.map((d) => d.name)
 			.sort();
-		expect(definitions).toHaveLength(104);
+		expect(definitions).toHaveLength(108);
 		expect(ids(tk)).toEqual(definitions);
 		expect(edges(tk, 'specialization')).toEqual([
 			'Airframe -specialization-> Component',

@@ -7,8 +7,11 @@ package DroneFmea {
      *   2. Risk controls: requirements saying what the design must do about each hazard.
      *   3. Mitigations: the work that implements a control (`satisfy`); a verification
      *      case proves it (`verify`, see DroneVerification).
-     *   4. One @Fmea line per failure mode, attached to the component that fails.
-     * The risk priority number (RPN = severity x likelihood x detection) is computed, never typed in.
+     *   4. One @Fmea line per failure mode, attached to the component that fails, naming the
+     *      risk controls that address it (`riskControls`) and the mitigations that lower it.
+     * The risk priority number (RPN = severity x likelihood x detection), its band, the action
+     * priority and the acceptability under the risk policy (libraries/RiskAnalysis.sysml) are
+     * computed, never typed in.
      */
 
     private import DroneArchitecture::drone;
@@ -103,8 +106,10 @@ package DroneFmea {
         effect = "Fire in the airframe; loss of the drone; burns to bystanders";
         category = RiskCategory::design;
         severity = 8; likelihood = 3; detection = 6;
-        initialSeverity = 8; initialLikelihood = 5; initialDetection = 8;
+        initialSeverity = 8; initialLikelihood = 6; initialDetection = 8;
         hazard = batteryFire;
+        riskControls = 'RC-001';
+        mitigations = batteryManagementSystem;
     }
 
     @Fmea about drone::rotors::motor {
@@ -114,6 +119,8 @@ package DroneFmea {
         category = RiskCategory::design;
         severity = 8; likelihood = 4; detection = 3;
         hazard = uncontrolledDescent;
+        riskControls = 'RC-002';
+        mitigations = rotorHealthMonitor;
     }
 
     @Fmea about drone::rotors::propeller {
@@ -123,6 +130,7 @@ package DroneFmea {
         category = RiskCategory::design;
         severity = 8; likelihood = 3; detection = 4;
         hazard = uncontrolledDescent;
+        riskControls = 'RC-002';
     }
 
     @Fmea about drone::flightController {
@@ -132,6 +140,7 @@ package DroneFmea {
         category = RiskCategory::software;
         severity = 8; likelihood = 2; detection = 5;
         hazard = uncontrolledDescent;
+        riskControls = 'RC-002';
     }
 
     @Fmea about drone::gnss {
@@ -141,6 +150,8 @@ package DroneFmea {
         category = RiskCategory::design;
         severity = 6; likelihood = 4; detection = 3;
         hazard = flyAway;
+        riskControls = 'RC-003';
+        mitigations = navigationIntegrityMonitor;
     }
 
     @Fmea about drone::radio {
@@ -150,5 +161,6 @@ package DroneFmea {
         category = RiskCategory::design;
         severity = 6; likelihood = 5; detection = 2;
         hazard = flyAway;
+        riskControls = 'RC-003';
     }
 }

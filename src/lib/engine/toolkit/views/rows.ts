@@ -8,11 +8,12 @@
  */
 import type { ElementRecord } from '../model';
 import { connectionEnds, isReference, multiplicityOf } from '../model';
-import type { TradeStudy } from '../../types';
+import type { LineControl, LineMitigation, TradeStudy } from '../../types';
 import { valueProblems } from './assertions';
 import { budgetRows, checkRows } from './budget';
 import { declaredFeature, metadataDefinition } from './domains';
 import { hazardRows, severityProblem } from './hazards';
+import { isFmeaLine, lineRisk, riskFields, riskProblems } from './riskLines';
 import type { Annotation, Link, ViewContext } from './context';
 import { tradeRows } from './trade';
 import {
@@ -41,6 +42,9 @@ export interface Row {
 		notes?: Record<string, string>;
 		/** What is wrong with a value, by field (a rating outside its scale). */
 		problems?: Record<string, string>;
+		/** For an FMEA line: its risk controls and mitigations. */
+		controls?: LineControl[];
+		mitigations?: LineMitigation[];
 	};
 	/** For an `@Metadata` row: the annotation. */
 	annotation?: Annotation;
@@ -135,10 +139,20 @@ function metadataRows(ctx: ViewContext, meta: string): Row[] {
 		for (const [k, v] of a.values) r.fields.set(k, displayValue(v));
 		for (const [k, v] of defaults) if (!r.fields.has(k)) r.fields.set(k, v);
 		r.annotation = a;
+		const fmea = isFmeaLine(a);
+		// An FMEA line's controls and mitigations, by name, with their traceability.
+		if (fmea) for (const [k, v] of riskFields(ctx, a)) r.fields.set(k, v);
 		const problems: Record<string, string> = {};
-		for (const p of [...valueProblems(ctx, a), severityProblem(ctx, a)])
+		for (const p of [...valueProblems(ctx, a), severityProblem(ctx, a), ...riskProblems(ctx, a)])
 			if (p && !problems[p.field]) problems[p.field] = p.message;
-		if (Object.keys(problems).length) r.info = { problems };
+		const info: NonNullable<Row['info']> = {};
+		if (Object.keys(problems).length) info.problems = problems;
+		if (fmea) {
+			const { controls, mitigations } = lineRisk(ctx, a);
+			if (controls.length) info.controls = controls;
+			if (mitigations.length) info.mitigations = mitigations;
+		}
+		if (Object.keys(info).length) r.info = info;
 		rows.push(r);
 	}
 	return rows;
