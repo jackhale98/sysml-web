@@ -7,7 +7,7 @@
 	import { elementAt, utf16ToByte, type ModelElement } from '#lib/project/elements.ts';
 	import type { Workspace } from '#lib/project/workspace.svelte.ts';
 	import { toasts } from '#lib/ui/toasts.svelte.ts';
-	import { parentOf } from './actions.ts';
+	import { parentOf, withImported } from './actions.ts';
 	import TypePicker from './TypePicker.svelte';
 	import type { WorkbenchUi } from './ui.svelte.ts';
 
@@ -142,16 +142,24 @@
 		const source = workspace.text(element.file);
 		if (source === undefined) return;
 		const before = workspace.undoStack.length;
-		const result = await workspace.transact(label, () =>
-			workspace.edit(element.file, {
-				op: 'setDeclaration',
-				path: element.file,
-				source,
-				...address(element),
-				set
-			})
+		let imported: string[] = [];
+		const result = await workspace.transact(
+			() => withImported(label, imported),
+			async () => {
+				const error = await workspace.edit(element.file, {
+					op: 'setDeclaration',
+					path: element.file,
+					source,
+					...address(element),
+					set
+				});
+				// A unit the package can't resolve (`[kg]` without SI) is imported with it.
+				if (!error && set.value?.includes('['))
+					imported = await workspace.importUnits(element.file, source);
+				return error;
+			}
 		);
-		if (result || workspace.undoStack.length > before) done(result, label);
+		if (result || workspace.undoStack.length > before) done(result, withImported(label, imported));
 	}
 
 	function commit(

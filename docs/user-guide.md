@@ -74,6 +74,8 @@ Select anything (in a diagram, a table, the text or the explorer) and the **deta
 
 Its **Related elements** say what it refers to (its type, what it specializes, satisfies or is connected to), what refers to it, and where it is. Choose one to go to it: a quick answer to “what uses this?”.
 
+Give a value with its unit, such as `2 [kg]`, here or in a table. If the package doesn’t know that unit yet, its import (`private import SI::*;`) is added with the value, and one **Undo** takes both back.
+
 **Problems** (bottom of the screen, or in **More** on a phone) lists anything the model gets wrong, such as a name that refers to nothing. Click one to go to it.
 
 In the app: **Show problems**.

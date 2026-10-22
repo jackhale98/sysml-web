@@ -199,6 +199,11 @@ its resolver recorded, reparses, and refuses an edit that doesn't parse
   and changing a type whose features are referred to, are made anyway
   (outside the toolkit); `EditResult.warning` says what no longer resolves
   and the toast shows it next to Undo.
+- **Units.** A value written from the inspector or a table cell with a
+  unit its file can't resolve (`[kg]` without `import SI::*`) brings the
+  import the toolkit's quick fix names, made whole (`SI::kg` →
+  `private import SI::*;`, as the starter projects write it), in the same
+  transaction (`Workspace.importUnits`).
 - **Addressing.** Requests name elements by id (`ModelElement.id`, from the
   analysis) when known, else by name as written (simple or qualified) and
   the 1-based declaration line — what table rows carry.

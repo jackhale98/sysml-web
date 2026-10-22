@@ -17,12 +17,13 @@ import { elementText, formatName, type AddKind } from './templates';
  */
 export async function undoable(
 	workspace: Workspace,
-	label: string,
+	given: string | (() => string),
 	run: () => Promise<string | null>
 ): Promise<string | null> {
 	const before = workspace.undoStack.length;
-	const error = await workspace.transact(label, run);
+	const error = await workspace.transact(given, run);
 	if (!error && workspace.undoStack.length > before) {
+		const label = typeof given === 'function' ? given() : given;
 		// A deletion that leaves references unresolved says so (they show in Problems).
 		const warning = workspace.warnings.join(' ');
 		toasts.show(warning ? `${label}. ${warning}` : label, {
@@ -164,18 +165,36 @@ export async function setField(
 ): Promise<string | null> {
 	const text = workspace.text(source.file);
 	if (text === undefined) return `${source.file} is not in the project.`;
-	return undoable(workspace, label, () =>
-		workspace.edit(source.file, {
-			op: 'setField',
-			path: source.file,
-			source: text,
-			element: source.element,
-			line: source.line,
-			...(source.id ? { id: source.id } : {}),
-			field,
-			value
-		})
+	let imported: string[] = [];
+	return undoable(
+		workspace,
+		() => withImported(label, imported),
+		async () => {
+			const error = await workspace.edit(source.file, {
+				op: 'setField',
+				path: source.file,
+				source: text,
+				element: source.element,
+				line: source.line,
+				...(source.id ? { id: source.id } : {}),
+				field,
+				value
+			});
+			if (error) return error;
+			if (value.includes('[')) imported = await workspace.importUnits(source.file, text);
+			return null;
+		}
 	);
+}
+
+/** How libraries of units read in a toast. */
+const UNIT_LIBRARIES: Record<string, string> = { SI: 'SI', USCustomaryUnits: 'US customary' };
+
+/** "Set mass to 3 [kg], and imported the SI units it uses". */
+export function withImported(label: string, libraries: string[]): string {
+	if (!libraries.length) return label;
+	const names = libraries.map((l) => UNIT_LIBRARIES[l] ?? l).join(' and ');
+	return `${label}, and imported the ${names} units it uses`;
 }
 
 /** Choose and order a table view's columns (its @TableRendering). */

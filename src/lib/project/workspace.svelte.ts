@@ -369,7 +369,10 @@ export class Workspace {
 	 * remembered so `undo` can put them back; the engine's warnings about it
 	 * are in `warnings` afterwards. A transaction inside another is part of it.
 	 */
-	async transact(label: string, run: () => Promise<string | null>): Promise<string | null> {
+	async transact(
+		label: string | (() => string),
+		run: () => Promise<string | null>
+	): Promise<string | null> {
 		if (this.depth > 0) return run();
 		const before = { ...this.files };
 		this.warnings = [];
@@ -390,7 +393,7 @@ export class Workspace {
 			this.undoStack = [
 				...this.undoStack.slice(-(UNDO_LIMIT - 1)),
 				{
-					label,
+					label: typeof label === 'function' ? label() : label,
 					before: Object.fromEntries(kept.map((p) => [p, before[p]!])),
 					...(created.length ? { created } : {}),
 					...(moved.length ? { moved } : {})
@@ -462,6 +465,72 @@ export class Workspace {
 			this.removeFile(path);
 			return null;
 		});
+	}
+
+	/**
+	 * After a value with a unit is written (`3 [kg]`), import the units it
+	 * needs where its file can't resolve them: the library the quick fix
+	 * names, imported whole (`private import SI::*;`, as the starter projects
+	 * do), in the package the quick fix puts it. Part of the caller's
+	 * transaction, so the value and its import are undone together. `before`
+	 * is the file's text before the value was written; gives back the
+	 * libraries imported (`SI`).
+	 */
+	async importUnits(path: string, before: string): Promise<string[]> {
+		const engine = this.engine;
+		const after = this.files[path];
+		if (!engine || after === undefined || after === before) return [];
+		// The written value: what differs between the texts.
+		let from = 0;
+		while (from < before.length && before[from] === after[from]) from++;
+		let end = 0;
+		while (
+			end < before.length - from &&
+			end < after.length - from &&
+			before[before.length - 1 - end] === after[after.length - 1 - end]
+		)
+			end++;
+		// Whole lines: `[g]` changed to `[kg]` differs in one letter.
+		from = after.lastIndexOf('\n', from - 1) + 1;
+		const lineEnd = after.indexOf('\n', after.length - end);
+		const to = lineEnd < 0 ? after.length : lineEnd;
+		const written = after.slice(from, to);
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- local, not state
+		const units = new Set(
+			[...written.matchAll(/\[([^\]]*)\]/g)].flatMap((m) =>
+				[...m[1]!.matchAll(/(?<![\w:'])[A-Za-z_°µμ%][\w°µμ]*(?!\s*::)/g)].map((u) => u[0])
+			)
+		);
+		if (!units.size) return [];
+		let actions;
+		try {
+			actions = await engine.codeActions(this.sourceFiles(), path, from, to);
+		} catch {
+			return [];
+		}
+		const libraries: string[] = [];
+		const changes: { path: string; from: number; to: number; insert: string }[] = [];
+		for (const action of actions) {
+			const fix = /^Add import (\w+)::(.+)$/.exec(action.title);
+			if (!fix || !units.has(fix[2]!.replace(/^'|'$/g, '')) || libraries.includes(fix[1]!))
+				continue;
+			const library = fix[1]!;
+			const insert = action.changes.filter((c) => c.path === path);
+			if (insert.length !== 1 || !/import\s/.test(insert[0]!.insert)) continue;
+			// The whole library rather than one unit, unless the file already has it.
+			if (new RegExp(`\\bimport\\s+${library}::\\*\\s*;`).test(after)) continue;
+			libraries.push(library);
+			changes.push({
+				...insert[0]!,
+				insert: insert[0]!.insert.replace(/import\s+\w+::[^;]+;/, `import ${library}::*;`)
+			});
+		}
+		if (!changes.length) return [];
+		const plain = changes.map((c) => ({ from: c.from, to: c.to, insert: c.insert }));
+		const editor = this.editors.get(path);
+		if (editor) editor.apply(plain);
+		else this.setText(path, applyChanges(after, plain));
+		return libraries;
 	}
 
 	/**

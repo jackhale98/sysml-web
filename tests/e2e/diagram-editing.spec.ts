@@ -263,6 +263,37 @@ test('the inspector lists related elements both ways, each one a link to it', as
 	expect(await specialized.getByRole('listitem').count()).toBeGreaterThan(5);
 });
 
+test('a value with a unit its package doesn’t import brings the import with it, undone together', async ({
+	page
+}) => {
+	await openDemo(page);
+	await page.keyboard.press('Control+k');
+	const palette = page.getByRole('dialog', { name: 'Command palette' });
+	await palette.getByRole('combobox').fill('cruiseAltitude');
+	await palette
+		.getByRole('option')
+		.filter({ hasText: /^\s*cruiseAltitude\b/ })
+		.first()
+		.click();
+	const inspector = page.getByRole('complementary', { name: 'Inspector' });
+	const value = inspector.getByRole('textbox', { name: /^Value/ });
+	await value.fill('120 [m]');
+	await value.press('Tab');
+	await expect(toasts(page)).toContainText('and imported the SI units it uses');
+	await page.getByRole('tab', { name: 'Files' }).click();
+	await page
+		.getByRole('navigation', { name: 'Explorer' })
+		.getByRole('button', { name: /^DroneInterfaces\.sysml/ })
+		.click();
+	const text = page.locator('.cm-content');
+	await expect(text).toContainText('private import SI::*;');
+	await expect(page.getByRole('button', { name: /^Problems: 0 errors, 0 warnings/ })).toBeVisible({
+		timeout: 15_000
+	});
+	await toasts(page).getByRole('button', { name: 'Undo' }).last().click();
+	await expect(text).not.toContainText('private import SI::*;');
+});
+
 test.describe('on a phone', () => {
 	test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 
