@@ -119,7 +119,7 @@ const pinned: [string, Request][] = [
 	],
 	[
 		'makes a value a default',
-		{ op: 'setDeclaration', path: C, element: 'capacity', line: 0, set: { valueKind: 'default' } }
+		{ op: 'setDeclaration', path: C, element: 'maxPower', line: 0, set: { valueKind: 'default' } }
 	],
 	[
 		'changes a one-line doc comment',
@@ -485,15 +485,15 @@ describe('addressing', () => {
 	});
 
 	it('picks the element declared on the given line among same-named ones', () => {
-		// Several components declare `powerIn`; line 46 is the distribution board's.
+		// Several components declare `powerIn`; line 47 is the distribution board's.
 		const { text } = ours({
 			op: 'setDeclaration',
 			path: C,
 			element: 'powerIn',
-			line: 46,
+			line: 47,
 			set: { direction: 'in' }
 		});
-		expect(text.split('\n')[45]).toBe('        in port powerIn : ~PowerPort;');
+		expect(text.split('\n')[46]).toBe('        in port powerIn : ~PowerPort;');
 	});
 });
 

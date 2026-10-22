@@ -5,10 +5,11 @@
  * Built once per toolkit session, on the first table or view list asked of
  * it.
  */
-import type { MetadataAnnotation, TraceLink } from '../../types';
+import type { MetadataAnnotation, TraceLink, TradeStudy } from '../../types';
 import type { TkSession } from '../api';
 import type { Evaluation } from '../evaluation';
 import type { ElementRecord, ExtractedModel } from '../model';
+import { TradeStudies } from '../trade';
 import { unquoteName } from './text';
 
 export interface Annotation extends MetadataAnnotation {
@@ -87,6 +88,16 @@ export class ViewContext {
 	/** Values and verdicts (null without a model). */
 	get evaluation(): Evaluation | null {
 		return this.evaluationOf();
+	}
+
+	private trades: TradeStudy[] | undefined;
+
+	/** The project's trade studies, evaluated (`trade.ts`), once. */
+	tradeStudies(): TradeStudy[] {
+		if (this.trades) return this.trades;
+		const evaluation = this.evaluation;
+		this.trades = evaluation ? new TradeStudies(this, evaluation).all() : [];
+		return this.trades;
 	}
 
 	isContent(record: ElementRecord): boolean {

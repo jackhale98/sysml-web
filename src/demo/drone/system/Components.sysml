@@ -31,11 +31,12 @@ package DroneComponents {
 
     part def Battery :> Component {
         doc /* Six-cell lithium-ion pack with a built-in battery management system. */
-        attribute :>> mass = 1100 [g];
-        attribute nominalVoltage :> voltage = 21.6 [V];
-        attribute capacity :> energy = 216 [W*h];
-        attribute usableFraction : Real = 0.85 { doc /* Share of the capacity used in flight; the rest is the landing reserve. */ }
+        attribute :>> mass default 1100 [g];  // defaults: another pack can have its own (see BatteryTrade)
+        attribute nominalVoltage :> voltage default 21.6 [V];
+        attribute capacity :> energy default 216 [W*h];
+        attribute usableFraction : Real default 0.85 { doc /* Share of the capacity used in flight; the rest is the landing reserve. */ }
         attribute usableEnergy :> energy = capacity * usableFraction;
+        attribute price : Real default 420.0 { doc /* Purchase price per pack, in euros. */ }
         port powerOut : PowerPort;
     }
 

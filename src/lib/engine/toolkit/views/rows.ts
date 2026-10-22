@@ -8,8 +8,10 @@
  */
 import type { ElementRecord } from '../model';
 import { connectionEnds, isReference, multiplicityOf } from '../model';
+import type { TradeStudy } from '../../types';
 import { budgetRows, checkRows } from './budget';
 import type { Annotation, Link, ViewContext } from './context';
+import { tradeRows } from './trade';
 import {
 	collapseWhitespace,
 	displayValue,
@@ -37,6 +39,10 @@ export interface Row {
 	};
 	/** Where the row's subject is written, when it is a statement (a `satisfy`, a constraint). */
 	byte?: number;
+	/** Fields a column stands for several of (`alternatives`: one per alternative), by column name. */
+	groups?: Record<string, string[]>;
+	/** For a `trade` row: the trade study it belongs to. */
+	trade?: TradeStudy;
 }
 
 const row = (fields: [string, string][], anchors: string[], element = ''): Row => ({
@@ -71,6 +77,8 @@ export function provideRows(ctx: ViewContext, spec: string, warnings: string[]):
 			return kindCountRows(ctx);
 		case 'checks':
 			return checkRows(ctx);
+		case 'trade':
+			return tradeRows(ctx);
 		case 'uncertainty':
 			warnings.push(
 				'uncertainty analyses are not evaluated by this engine yet; the table is empty'
@@ -78,7 +86,7 @@ export function provideRows(ctx: ViewContext, spec: string, warnings: string[]):
 			return [];
 		default:
 			throw new Error(
-				`unknown row provider \`${spec}\` (expected @Metadata, type:, kind:, relation:, composition, budget:, requirements, trace, checks, kindcounts, or uncertainty)`
+				`unknown row provider \`${spec}\` (expected @Metadata, type:, kind:, relation:, composition, budget:, requirements, trace, checks, trade, kindcounts, or uncertainty)`
 			);
 	}
 }
@@ -619,10 +627,14 @@ export function compositionRows(ctx: ViewContext, root: string | null): Row[] {
 /**
  * Part and item usages a definition or usage is made of: its own, then
  * inherited ones it doesn't redefine. References (`ref part`) are left
- * out: what they refer to is counted where it is owned.
+ * out: what they refer to is counted where it is owned. So are variations
+ * (`variation part`): they list choices (a trade study's alternatives), not
+ * parts anything is made of.
  */
 function compositionChildren(ctx: ViewContext, node: ElementRecord): ElementRecord[] {
-	const out = ctx.membersOf(node.id).filter((r) => isContentUsage(r) && !isReference(r));
+	const out = ctx
+		.membersOf(node.id)
+		.filter((r) => isContentUsage(r) && !isReference(r) && !isVariation(r));
 	const names = new Set(out.map((c) => c.name));
 	const replaced = new Set(out.flatMap((c) => (c.rootId ? [c.rootId] : [])));
 	const from = node.isDefinition
@@ -668,3 +680,7 @@ function attributeValues(
 	if (typeId) for (const t of [typeId, ...ctx.supers(typeId)]) take(t);
 	return out;
 }
+
+/** `variation part x …`: the choices a design can make, each a `variant`. */
+const isVariation = (r: ElementRecord) =>
+	/^\s*(?:(?:abstract|derived|readonly|individual)\s+)*variation\b/.test(r.header);

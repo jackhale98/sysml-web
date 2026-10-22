@@ -17,6 +17,7 @@ import type {
 	OutlineItem,
 	RenderedTable,
 	StateMachine,
+	TradeStudy,
 	ViewInfo
 } from './types';
 
@@ -61,6 +62,8 @@ export interface EngineApi {
 	checks(files: SourceFile[]): CheckReport;
 	/** Elements' bound values, evaluated, by element id (cached per analysis). */
 	evaluate(files: SourceFile[], ids: string[]): Record<string, Evaluated>;
+	/** Every trade study of the project, evaluated (cached per analysis). */
+	tradeStudies(files: SourceFile[]): TradeStudy[];
 }
 
 export type Method = keyof EngineApi;

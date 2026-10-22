@@ -30,6 +30,7 @@ export function toolkitEngine(toolkit: ToolkitClient): Engine {
 		edit: (...params) => toolkit.call('edit', ...params),
 		checks: (...params) => toolkit.call('checks', ...params),
 		evaluate: (...params) => toolkit.call('evaluate', ...params),
+		tradeStudies: (...params) => toolkit.call('tradeStudies', ...params),
 		terminate: () => toolkit.terminate()
 	};
 }

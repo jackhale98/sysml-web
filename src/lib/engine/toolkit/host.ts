@@ -29,6 +29,7 @@ import type {
 	OutlineItem,
 	RenderedTable,
 	StateMachine,
+	TradeStudy,
 	ViewInfo
 } from '../types';
 import type {
@@ -310,6 +311,11 @@ export class ToolkitHost {
 	/** Elements' bound values, evaluated, by element id; cached per analysis. */
 	evaluate(files: SourceFile[], ids: string[]): Record<string, Evaluated> {
 		return this.evaluationOf(this.build(files))?.evaluate(ids) ?? {};
+	}
+
+	/** The project's trade studies, evaluated (`trade.ts`); cached per analysis. */
+	tradeStudies(files: SourceFile[]): TradeStudy[] {
+		return this.viewContext(files).tradeStudies();
 	}
 
 	private evaluationOf(built: Built): Evaluation | null {

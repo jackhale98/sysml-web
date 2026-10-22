@@ -3,7 +3,7 @@ library package ModelViews {
     /*
      * Standard tables over any SysML v2 model: requirements, coverage gaps,
      * traceability, interfaces, the bill of materials, budgets (mass and
-     * power) and constraint checks.
+     * power), constraint checks and trade studies.
      *
      * Each table is an ordinary `view def` whose @TableRendering (from the
      * Reporting library) says which rows to collect and which columns to
@@ -111,6 +111,23 @@ library package ModelViews {
             columns = "status; id; requirement; by; margin; detail";
             where = "checkable == 1";
             sortBy = "-status";
+        }
+    }
+
+    view def TradeStudyTable {
+        doc
+        /*
+         * A trade study's alternatives side by side: what each gives on every
+         * criterion, its score and its rank, with the alternative the study's
+         * objective selects marked. Expose the trade study to show:
+         *
+         *   view batteryTrade : TradeStudyTable {
+         *       expose BatteryTrade::batteryTradeStudy;
+         *   }
+         */
+        @TableRendering {
+            rows = "trade";
+            columns = "criterion; weight; alternatives";
         }
     }
 
