@@ -816,6 +816,18 @@ Engine gaps found while authoring the demo (inputs to Phase 1):
 **Phase 8 — Polish**
 - Performance at 100k lines, offline/PWA, accessibility audit, user guide,
   self-hosting docs, CLI/LSP migration onto the shared engine.
+- Performance status (`docs/performance.md`): measured on generated
+  projects of 10k–100k lines and the official examples, in Node and in
+  Chromium (also with 4× CPU throttling), `npm run bench`; guarded by a
+  10k-line unit test and e2e test. Fixed: quadratic lookups (explorer tree
+  22 s → 0.1 s at 100k), a 100k-element cap that dropped the end of large
+  models, out-of-memory at 100k (stale language-server and evaluation
+  sessions freed), queued analyses, checks holding up "Model ready", all
+  analyses re-sent per keystroke, unbounded explorer/table/problems DOM, and
+  diagrams too large to lay out. 100k lines opens in about 30 s and
+  re-analyses in about 16 s per edit, all of it the toolkit's (linear in the
+  project, not the edit; 2 GiB memory ceiling, ~1.8 GiB used) — upstream
+  requests 12–15 in `docs/engine.md`.
 
 ---
 

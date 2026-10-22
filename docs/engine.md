@@ -325,7 +325,8 @@ ask and cached with it):
   (2770 g reads 2.77 kg, 1652.4 s reads 27.54 min), four significant
   digits. Shared by the worker and the page.
 - **Where they show.** The workspace asks for the checks after each
-  analysis; a violated check is a warning (`code: 'check'`) at its claim in
+  analysis (once "Model ready" shows; on a model whose analysis takes more
+  than 2 s, after a pause in typing — `docs/performance.md`); a violated check is a warning (`code: 'check'`) at its claim in
   Problems and the editor, which jumps to the claim's range
   (`WorkbenchUi.revealText`); undecided ones are not problems. The
   `checks` and `budget:<attribute>` row providers (`toolkit/views/budget.ts`)
@@ -488,7 +489,10 @@ outline and quick fixes come from the toolkit's in-wasm language server
 - One server sees the project and the standard library
   (`LspServer.withPreparedLibrary`). Each call brings it up to date: the
   workspace is re-seeded when a file that isn't open changes, and the file
-  being edited is opened in it (later texts arrive as `didChange`). URIs are
+  being edited is opened in it (later texts arrive as `didChange`). When the
+  host analyses texts the server doesn't have, the server's navigation
+  sessions are dropped (`invalidateSessions`): they are rebuilt on the next
+  hover anyway, and their memory is wanted for the analysis. URIs are
   `file:///project/<path>`; the library's are `sysmlv2-lib:/<path>`, which
   go to definition opens in the library browser.
 - Rename, formatting and code actions answer with whole new documents or
@@ -621,3 +625,41 @@ Found while making the Sequence view (sysml-toolkit 0.10.10):
   declares has no `memberExtent`, so the model adapter, which keeps the
   elements written in the text, has no record of it; `event
   m.sourceEvent;` without `then` has one.
+
+Found while measuring large models (`docs/performance.md`, generated
+projects of 10k–100k lines, sysml-toolkit 0.10.10):
+
+12. **Re-analysis costs the whole project, not the edit.** After a
+    one-character edit in a doc comment of a 100k-line project (605 files),
+    building the session, `check()` and the adapter's first reads (`rows`,
+    which pay for the session's lazy work, and the tree graph) take about as
+    long as opening it (tens of seconds in Node; 2.4 s at 10k lines).
+    `Session.fromSourcesSettled` saved nothing measurable over a fresh build
+    (20k lines: 380–550 ms either way). A session that re-resolves only the
+    changed unit and what depends on it would make keystroke-to-problems
+    independent of the project's size.
+13. **The language server re-resolves the workspace after any change.** The
+    first hover, definition or references after an edit rebuilds its
+    navigation session: 0.5 s at 20k lines, 3 s at 50k, 13 s at 100k, during
+    which the worker can do nothing else, and each rebuild grew the instance
+    by 70–300 MB. Sharing the analysed `Session` with the server (or
+    rebuilding only the changed unit) would make hover instant. The app now
+    drops the stale navigation sessions (`invalidateSessions`) when it
+    analyses new text, which keeps the instance about 150 MB smaller at 30k
+    lines.
+14. **The instance can't grow past 2 GiB** (the module declares a maximum of
+    32768 pages), and a session takes about 7 KB per line (340 MB at 50k
+    lines) besides the library. At 100k lines an analysed session, the
+    checks' evaluation session and the language server's navigation session
+    didn't fit: `RuntimeError: unreachable` (a failed `memory.grow`). The
+    app frees the evaluation session after the checks once the instance
+    passes 1 GiB; 100k lines then peaks at about 1.8 GiB. A 4 GiB maximum
+    (wasm32's limit) and less memory per element would leave room for
+    larger models; a way to return memory (or to reuse a freed session's
+    pages for the next one without growing) would keep long editing
+    sessions from creeping up.
+15. **One worker does everything.** Highlighting, completion and hover wait
+    while an analysis or the checks run (seconds on a large model). Not a
+    toolkit defect, but an engine that could analyse in the background
+    (yielding, or a session shareable across workers) would let the editor's
+    requests through.
