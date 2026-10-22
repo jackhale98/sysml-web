@@ -674,3 +674,43 @@ export function planNewVerification(
 		? step
 		: { label: `${name.trim()} now verifies ${requirement.label}`, statement, steps: [step] };
 }
+
+/**
+ * Take a `satisfy … by …;` or `verify …;` out of the model: the statement
+ * that links `requirement` to `by` (as the requirement's trace lists it,
+ * `drone.flightController` or `enduranceFlightTest`).
+ */
+export function planLinkRemoval(
+	kind: 'satisfy' | 'verify',
+	requirement: ModelElement,
+	by: string,
+	ctx: ModelContext
+): Plan | string {
+	const links = ctx.analyses.flatMap((a) =>
+		(kind === 'satisfy' ? a.model.satisfactions : a.model.verifications).map((l) => ({
+			...l,
+			file: a.model.file
+		}))
+	);
+	const leaf = (path: string) => simpleName(path.split('.').pop() ?? path);
+	const ofRequirement = links.filter(
+		(l) => simpleName(l.requirement) === simpleName(requirement.name)
+	);
+	const link =
+		ofRequirement.find((l) => l.by === by) ?? ofRequirement.find((l) => leaf(l.by) === leaf(by));
+	if (!link) return `The ${kind} statement linking ${by} to ${requirement.label} was not found.`;
+	const text = ctx.textOf(link.file);
+	if (text === undefined) return `${link.file} is not in the project.`;
+	const from = byteToUtf16(text, link.span.start_byte);
+	const to = byteToUtf16(text, link.span.end_byte);
+	return {
+		label:
+			kind === 'satisfy'
+				? `${by} no longer satisfies ${requirement.label}`
+				: `${by} no longer verifies ${requirement.label}`,
+		statement: text.slice(from, to),
+		steps: [
+			{ kind: 'patch', path: link.file, before: text, after: removeStatement(text, from, to) }
+		]
+	};
+}

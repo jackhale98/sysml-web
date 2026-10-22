@@ -84,11 +84,16 @@ const UNDO_LIMIT = 50;
 
 interface UndoEntry {
 	label: string;
-	/** Text of each changed file before the edit. */
+	/** Text before the edit of each file it changed or removed; undo puts each back. */
 	before: Record<string, string>;
 	/** Files the edit created; undo removes them. */
 	created?: string[];
+	/** Files the edit renamed or moved, [from, to]; undo moves them back. */
+	moved?: [string, string][];
 }
+
+/** A file went to another path (`to`), or out of the project (`to` null). */
+export type FileMoveListener = (from: string, to: string | null) => void;
 
 export class Workspace {
 	info = $state.raw<ProjectInfo | null>(null);
@@ -359,28 +364,153 @@ export class Workspace {
 	}
 
 	/**
-	 * Run a model edit (one or several engine edits) as one undoable step.
-	 * Files it changed are remembered so `undo` can put them back; the
-	 * engine's warnings about it are in `warnings` afterwards.
+	 * Run a model edit (one or several engine edits, or file changes) as one
+	 * undoable step. Files it changed, created, removed or renamed are
+	 * remembered so `undo` can put them back; the engine's warnings about it
+	 * are in `warnings` afterwards. A transaction inside another is part of it.
 	 */
 	async transact(label: string, run: () => Promise<string | null>): Promise<string | null> {
+		if (this.depth > 0) return run();
 		const before = { ...this.files };
 		this.warnings = [];
-		const error = await run();
+		this.moves = [];
+		this.depth++;
+		let error: string | null;
+		try {
+			error = await run();
+		} finally {
+			this.depth--;
+		}
 		const changed = Object.keys(this.files).filter((p) => this.files[p] !== before[p]);
-		if (changed.length) {
+		const removed = Object.keys(before).filter((p) => !(p in this.files));
+		if (changed.length || removed.length) {
 			const created = changed.filter((p) => !(p in before));
-			const kept = changed.filter((p) => p in before);
+			const kept = [...changed.filter((p) => p in before), ...removed];
+			const moved = this.moves.filter(([from, to]) => from in before && to in this.files);
 			this.undoStack = [
 				...this.undoStack.slice(-(UNDO_LIMIT - 1)),
 				{
 					label,
 					before: Object.fromEntries(kept.map((p) => [p, before[p]!])),
-					...(created.length ? { created } : {})
+					...(created.length ? { created } : {}),
+					...(moved.length ? { moved } : {})
 				}
 			];
 		}
+		this.moves = [];
 		return error;
+	}
+
+	/** How deep in `transact` calls the current change is. */
+	private depth = 0;
+	/** Renames made in the current transaction, [from, to]. */
+	private moves: [string, string][] = [];
+	// Bookkeeping, deliberately not reactive.
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity
+	private moveListeners = new Set<FileMoveListener>();
+
+	/**
+	 * Hear when a file is renamed or moved, or leaves the project (deleted,
+	 * or its creation undone), so open tabs can follow. Returns the unsubscribe.
+	 */
+	onFileMoved(listener: FileMoveListener): () => void {
+		this.moveListeners.add(listener);
+		return () => this.moveListeners.delete(listener);
+	}
+
+	private moved(from: string, to: string | null) {
+		for (const listener of this.moveListeners) listener(from, to);
+	}
+
+	/** Add a file to the project, as one undoable step. */
+	createFile(path: string, text: string, label = `Created ${path}`): Promise<string | null> {
+		return this.transact(label, async () => {
+			if (path in this.files) return `${path} exists already.`;
+			this.setText(path, text);
+			return null;
+		});
+	}
+
+	/**
+	 * Give a file another path (a move is a rename into another folder), as
+	 * one undoable step. Only the path changes: SysML finds packages by name,
+	 * so references to what the file holds stay as they are.
+	 */
+	renameFile(from: string, to: string, label = `Renamed ${from} to ${to}`): Promise<string | null> {
+		return this.transact(label, async () => {
+			const text = this.files[from];
+			if (text === undefined) return `${from} is not in the project.`;
+			if (from === to) return null;
+			if (to in this.files) return `${to} exists already.`;
+			const files: Record<string, string> = {};
+			// Keep the order of the other files; the renamed one takes its new name in place.
+			for (const [path, t] of Object.entries(this.files)) files[path === from ? to : path] = t;
+			this.files = files;
+			this.dirty.delete(from);
+			this.dirty.add(to);
+			this.moves.push([from, to]);
+			this.moved(from, to);
+			this.reanalyse(from, to);
+			return null;
+		});
+	}
+
+	/** Take a file out of the project, as one undoable step. */
+	deleteFile(path: string, label = `Deleted ${path}`): Promise<string | null> {
+		return this.transact(label, async () => {
+			if (!(path in this.files)) return `${path} is not in the project.`;
+			this.removeFile(path);
+			return null;
+		});
+	}
+
+	/**
+	 * What would stop resolving without this file: the warnings of removing
+	 * each of its top-level elements (the check an element's delete makes),
+	 * worked out without changing anything.
+	 */
+	async whatBreaksWithout(path: string): Promise<string[]> {
+		const engine = this.engine;
+		const source = this.files[path];
+		if (!engine || source === undefined || !isModelFile(path)) return [];
+		// The file's elements as they are now (it may have just been renamed or typed in).
+		if (!this.settled) await this.analyse(true);
+		if (this.files[path] === undefined) return [];
+		// Last first, so the lines of the ones still to remove stay where they are.
+		const roots = this.tree
+			.map((n) => n.element)
+			.filter((e) => e.file === path)
+			.sort((a, b) => b.span.start_byte - a.span.start_byte);
+		let files = this.sourceFiles();
+		const warnings: string[] = [];
+		for (const element of roots) {
+			const text = files.find((f) => f.path === path)?.text ?? '';
+			let result: EditResult;
+			try {
+				result = await engine.edit({
+					op: 'remove',
+					path,
+					source: text,
+					name: element.name,
+					line: element.span.start_row,
+					...(element.id ? { id: element.id } : {}),
+					files
+				});
+			} catch {
+				continue; // Not one the engine can remove: it says nothing about it, then.
+			}
+			if (result.warning) warnings.push(result.warning);
+			const next = applyChanges(text, result.changes);
+			files = files.map((f) => (f.path === path ? { path, text: next } : f));
+		}
+		return warnings;
+	}
+
+	/** Analyse again soon, after files came or went. */
+	private reanalyse(...paths: string[]) {
+		if (!paths.some(isModelFile)) return;
+		clearTimeout(this.timer);
+		this.timer = setTimeout(() => void this.analyse(), this.analysisDelay());
 	}
 
 	/**
@@ -410,20 +540,27 @@ export class Workspace {
 		const entry = this.undoStack.at(-1);
 		if (!entry) return null;
 		this.undoStack = this.undoStack.slice(0, -1);
-		for (const [path, text] of Object.entries(entry.before)) this.replaceText(path, text);
-		for (const path of entry.created ?? []) this.removeFile(path);
+		for (const path of entry.created ?? []) this.removeFile(path, false);
+		for (const [path, text] of Object.entries(entry.before)) {
+			if (path in this.files) this.replaceText(path, text);
+			else this.setText(path, text);
+		}
+		// Open tabs of a renamed file go back with it; of a created one, they close.
+		const back = (entry.moved ?? []).map(([, to]) => to);
+		for (const [from, to] of entry.moved ?? []) this.moved(to, from);
+		for (const path of entry.created ?? []) if (!back.includes(path)) this.moved(path, null);
 		return entry.label;
 	}
 
-	/** Take a file out of the project (undoing the edit that created it). */
-	private removeFile(path: string) {
+	/** Take a file out of the project (a delete, or undoing the edit that created it). */
+	private removeFile(path: string, tell = true) {
 		if (!(path in this.files)) return;
 		const rest = { ...this.files };
 		delete rest[path];
 		this.files = rest;
 		this.dirty.delete(path);
-		clearTimeout(this.timer);
-		this.timer = setTimeout(() => void this.analyse(), this.analysisDelay());
+		if (tell) this.moved(path, null);
+		this.reanalyse(path);
 	}
 
 	/** Replace a file's text with one minimal change, through its editor when open. */

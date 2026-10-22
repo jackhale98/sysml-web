@@ -524,7 +524,7 @@
 			</div>
 			{#if info && !info.builtin}
 				<button type="button" class="source" onclick={showSource}>
-					<FileCode size={14} /> <span class="text">Show SysML</span>
+					<FileCode size={14} /> <span class="button-label">Show SysML</span>
 				</button>
 			{:else if info?.builtin}
 				<button
@@ -533,7 +533,7 @@
 					title="Copy the standard views into this project as SysML you can change"
 					onclick={addToModel}
 				>
-					<FilePlus size={14} /> <span class="text">Add to my model</span>
+					<FilePlus size={14} /> <span class="button-label">Add to my model</span>
 				</button>
 			{/if}
 		</div>
@@ -561,7 +561,7 @@
 						aria-expanded={columnsOpen}
 						onclick={() => (columnsOpen ? (columnsOpen = false) : openColumns())}
 					>
-						<Columns3 size={14} /> <span class="text">Columns</span>
+						<Columns3 size={14} /> <span class="button-label">Columns</span>
 					</button>
 					{#if columnsOpen && !ui.phone}
 						<div class="columns-panel" role="dialog" aria-label="Choose columns">
@@ -592,7 +592,7 @@
 							title="Add requirements from an Excel or CSV file, or cells pasted from a spreadsheet"
 							onclick={() => (ui.importOpen = true)}
 						>
-							<Upload size={14} /> <span class="text">Import</span>
+							<Upload size={14} /> <span class="button-label">Import</span>
 						</button>
 					{/if}
 				</div>
@@ -1472,7 +1472,7 @@
 			background: var(--bg);
 		}
 		/* Icon buttons, with their words for screen readers. */
-		.text {
+		.button-label {
 			position: absolute;
 			width: 1px;
 			height: 1px;

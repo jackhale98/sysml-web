@@ -5,7 +5,7 @@
 import type { ModelElement, TreeNode } from '#lib/project/elements.ts';
 import { keywordOf } from '#lib/ui/kinds.ts';
 import type { ViewInfo } from '#lib/engine/types.ts';
-import type { CreateRequest, FileLayout, Tab } from './ui.svelte.ts';
+import type { CreateRequest, FileLayout, FileRequest, Tab } from './ui.svelte.ts';
 import { viewTitle } from './views.ts';
 
 /** A half-open `[start, end)` range of UTF-16 offsets into a string. */
@@ -60,6 +60,8 @@ export type PaletteAction =
 	| { type: 'api-server' }
 	/** Open a guided form (`#lib/create`). */
 	| { type: 'create'; request: CreateRequest }
+	/** Make a file, or rename, move or delete one (`files/FileHost.svelte`). */
+	| { type: 'file'; request: FileRequest }
 	/** Open the help, at a topic or at the start. */
 	| { type: 'help'; topic: string | null };
 
@@ -486,6 +488,12 @@ export function commandItems(themeChoice: string): PaletteItem[] {
 			{ aliases: 'create compare alternatives options choose decision matrix weighted score' }
 		),
 		command(
+			'new-file',
+			'New file…',
+			{ type: 'file', request: { kind: 'new' } },
+			{ aliases: 'create add sysml file package folder' }
+		),
+		command(
 			'import-requirements',
 			'Import requirements…',
 			{ type: 'import-requirements' },
@@ -513,6 +521,29 @@ export function commandItems(themeChoice: string): PaletteItem[] {
 				aliases: 'guide how do i learn explain shortcuts keyboard'
 			}
 		)
+	];
+}
+
+/** Rename, move and delete the file on show (none when no file is). */
+export function openFileItems(path: string | null): PaletteItem[] {
+	if (!path) return [];
+	const name = baseName(path);
+	const item = (
+		kind: 'rename' | 'move' | 'delete',
+		label: string,
+		aliases: string
+	): PaletteItem => ({
+		id: `command:${kind}-file`,
+		group: 'commands',
+		label,
+		detail: name,
+		aliases,
+		action: { type: 'file', request: { kind, path } }
+	});
+	return [
+		item('rename', 'Rename file', 'file name path'),
+		item('move', 'Move file', 'file folder directory path'),
+		item('delete', 'Delete file', 'file remove trash')
 	];
 }
 

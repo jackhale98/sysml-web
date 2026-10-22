@@ -76,7 +76,7 @@
 			open = !open;
 		}}
 	>
-		<Download size={14} /> <span class="text">Export</span>
+		<Download size={14} /> <span class="button-label">Export</span>
 	</button>
 	{#if open}
 		<div
@@ -164,7 +164,7 @@
 			height: 2.75rem;
 			padding: 0;
 		}
-		.text {
+		.button-label {
 			position: absolute;
 			width: 1px;
 			height: 1px;
