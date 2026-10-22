@@ -25,7 +25,7 @@ import {
 import type { Scope, Value } from '#lib/sim/expr.ts';
 import type { ColumnEdit, RenderedTable, RowInfo, TraceMatrix } from '../../types';
 import { fieldKinds } from './budget';
-import { fieldDomain, type Domain } from './domains';
+import { fieldDomain, metadataDefinition, type Domain } from './domains';
 import type { ElementRecord } from '../model';
 import { findView, listViews, tableSpec, viewChain, viewClauses } from './catalog';
 import type { ViewContext } from './context';
@@ -264,10 +264,8 @@ function annotationsOf(
 	meta: string,
 	rows: Row[]
 ): RenderedTable['annotations'] {
-	const metadata =
-		ctx.annotations.find(
-			(a) => unquoteName(simpleName(a.metadata_type)) === unquoteName(simpleName(meta))
-		)?.metadata_qualified_type ?? meta;
+	const def = metadataDefinition(ctx, meta);
+	const metadata = (def ? ctx.byId.get(def)?.qualifiedName : null) ?? meta;
 	const packageOf = (id: string | null | undefined): ElementRecord | undefined => {
 		for (let at = id ? ctx.byId.get(id) : undefined; at;) {
 			if (/Package$/.test(at.metaclass)) return at;

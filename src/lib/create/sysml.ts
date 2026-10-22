@@ -14,6 +14,16 @@ export function docComment(text: string): string {
 	return `doc /* ${clean} */`;
 }
 
+/** A SysML string literal: `"…"`, with quotes and backslashes escaped, line breaks as `\n`. */
+export function stringLiteral(text: string): string {
+	return `"${text
+		.replace(/\\/g, '\\\\')
+		.replace(/"/g, '\\"')
+		.replace(/\r/g, '')
+		.replace(/\n/g, '\\n')
+		.replace(/\t/g, '\\t')}"`;
+}
+
 /** The words of a name, lower case: `takeOffMass` → `take off mass`, `'Max mass'` → `max mass`. */
 export function words(raw: string): string {
 	return raw

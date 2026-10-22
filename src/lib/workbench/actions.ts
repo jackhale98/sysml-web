@@ -214,6 +214,29 @@ export function withImported(label: string, libraries: string[]): string {
 }
 
 /** Choose and order a table view's columns (its @TableRendering). */
+/**
+ * Remove a table row's metadata annotation (an FMEA line, `@Fmea about x
+ * { … }`) by its element id, as one undoable step.
+ */
+export async function removeAnnotation(
+	workspace: Workspace,
+	source: { file: string; line: number; annotation: string },
+	label: string
+): Promise<string | null> {
+	const text = workspace.text(source.file);
+	if (text === undefined) return `${source.file} is not in the project.`;
+	return undoable(workspace, label, () =>
+		workspace.edit(source.file, {
+			op: 'remove',
+			path: source.file,
+			source: text,
+			name: '',
+			line: source.line,
+			id: source.annotation
+		})
+	);
+}
+
 export async function setTableColumns(
 	workspace: Workspace,
 	file: string,

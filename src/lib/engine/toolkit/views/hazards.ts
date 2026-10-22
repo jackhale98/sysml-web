@@ -146,11 +146,11 @@ export function severityProblem(ctx: ViewContext, a: Annotation): ValueProblem |
 	if (!hazard) return null;
 	const worst = harmsOf(ctx, hazard.id).find((h) => h.severity);
 	if (!worst?.severity || worst.severity.value === severity) return null;
-	const harmName = worst.harm.written ?? worst.harm.name ?? 'a harm';
+	const harmName = worst.harm.name ?? 'a harm';
 	return {
 		field: 'severity',
 		value: written!,
-		message: `Severity is ${severity}, but its hazard ${hazard.written ?? hazard.name} can lead to ${harmName}, which is ${worst.severity.literal} (${worst.severity.value}).`,
+		message: `Severity is ${severity}, but its hazard ${hazard.name} can lead to ${harmName}, which is ${worst.severity.literal} (${worst.severity.value}).`,
 		rule: `severity = ${worst.severity.value}`,
 		ruleName: null,
 		at: a.record ? ctx.ownedBy(a.record.id).find((r) => r.name === 'severity') : undefined,
@@ -192,7 +192,7 @@ export function hazardRows(ctx: ViewContext): Row[] {
 				out.push(l.by);
 		return out;
 	};
-	const label = (r: ElementRecord) => r.written ?? r.name ?? '';
+	const label = (r: ElementRecord) => r.name ?? r.written ?? '';
 	const rows: Row[] = [];
 	for (const h of ctx.records) {
 		if (!ctx.isContent(h) || h.isDefinition || !h.name || isReference(h) || !is(h.id, HAZARD))
