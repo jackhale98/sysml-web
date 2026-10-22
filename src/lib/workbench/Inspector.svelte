@@ -5,6 +5,7 @@
 	import FeatureValues from './FeatureValues.svelte';
 	import PropertyForm from './PropertyForm.svelte';
 	import TradeSummary from './TradeSummary.svelte';
+	import TraceAdd from './TraceAdd.svelte';
 	import TransitionDetails from '#lib/diagram/TransitionDetails.svelte';
 	import {
 		BookOpen,
@@ -272,9 +273,16 @@
 						{#each requirement.satisfiedBy as by (by)}<li>{@render traced(by)}</li>{/each}
 					</ul>
 				{:else}
-					<p class="gap">
-						Nothing in the design satisfies this yet. Add <code>satisfy</code> to link a part.
-					</p>
+					<p class="gap">Nothing in the design satisfies this yet.</p>
+				{/if}
+				{#if engine}
+					<TraceAdd
+						requirement={element}
+						kind="satisfy"
+						linked={requirement.satisfiedBy.map(traceTarget)}
+						{workspace}
+						{engine}
+					/>
 				{/if}
 				<h4>Verified by</h4>
 				{#if requirement.verifiedBy.length}
@@ -282,7 +290,16 @@
 						{#each requirement.verifiedBy as by (by)}<li>{@render traced(by)}</li>{/each}
 					</ul>
 				{:else}
-					<p class="gap">No verification case covers this yet.</p>
+					<p class="gap">No test verifies this yet.</p>
+				{/if}
+				{#if engine}
+					<TraceAdd
+						requirement={element}
+						kind="verify"
+						linked={requirement.verifiedBy.map(traceTarget)}
+						{workspace}
+						{engine}
+					/>
 				{/if}
 			</section>
 		{/if}

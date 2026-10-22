@@ -653,3 +653,24 @@ export function describeHost(option: RelationOption, ctx: ModelContext): string 
 		}
 	}
 }
+
+/**
+ * A new verification case that verifies `requirement`, written beside the
+ * project's other verification cases (else in the requirement's package):
+ * `verification enduranceTest { objective { verify 'Flight endurance'; } }`.
+ */
+export function planNewVerification(
+	requirement: ModelElement,
+	name: string,
+	ctx: ModelContext
+): Plan | string {
+	if (!name.trim()) return 'Give the test a name.';
+	const host = hostOf(/^\s*verification\s/m, ctx, requirement);
+	if (!host) return 'There is no package to write the test in.';
+	const req = referenceFrom(requirement, host, ctx.owners, ctx.textOf);
+	const statement = `verification ${formatName(name.trim())} {\n    objective { verify ${req}; }\n}`;
+	const step = memberStep(host, statement, ctx);
+	return typeof step === 'string'
+		? step
+		: { label: `${name.trim()} now verifies ${requirement.label}`, statement, steps: [step] };
+}

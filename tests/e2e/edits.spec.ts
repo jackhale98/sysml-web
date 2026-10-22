@@ -225,3 +225,39 @@ test('a requirement links to what satisfies and verifies it', async ({ page }) =
 	await again.getByRole('button', { name: 'drone', exact: true }).click();
 	await expect(again.getByRole('heading', { level: 2 })).toHaveText(/\bdrone$/);
 });
+
+test('a requirement gets what satisfies it and a new test from the inspector', async ({ page }) => {
+	await openDemo(page);
+	const requirement = await select(page, 'Parcel delivery');
+	await expect(requirement).toContainText('Nothing in the design satisfies this yet.');
+	await requirement.getByRole('button', { name: 'Add what satisfies it' }).click();
+	const find = requirement.getByRole('searchbox', { name: 'Find what satisfies Parcel delivery' });
+	await find.fill('drone');
+	await requirement
+		.getByRole('list', { name: 'Can satisfy it' })
+		.getByRole('button', { name: /^drone\b/ })
+		.first()
+		.click();
+	await expect(toasts(page)).toContainText('drone now satisfies Parcel delivery');
+	await expect(requirement.getByRole('button', { name: 'drone', exact: true })).toBeVisible({
+		timeout: 15_000
+	});
+
+	// A test that doesn't exist yet: typed, then made.
+	await requirement.getByRole('button', { name: 'Add a test that verifies it' }).click();
+	await requirement
+		.getByRole('searchbox', { name: 'Find or name a test for Parcel delivery' })
+		.fill('deliveryDemo');
+	await requirement.getByRole('button', { name: 'New test “deliveryDemo”' }).click();
+	await expect(toasts(page)).toContainText('deliveryDemo now verifies Parcel delivery');
+	await expect(requirement.getByRole('button', { name: 'deliveryDemo', exact: true })).toBeVisible({
+		timeout: 15_000
+	});
+	await expect(page.getByRole('button', { name: /^Problems/ })).not.toContainText(/[1-9] error/);
+	await expectAccessible(page);
+
+	await toasts(page).getByRole('button', { name: 'Undo' }).last().click();
+	await expect(requirement.getByRole('button', { name: 'deliveryDemo', exact: true })).toBeHidden({
+		timeout: 15_000
+	});
+});
