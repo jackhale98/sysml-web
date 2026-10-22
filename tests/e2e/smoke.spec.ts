@@ -403,6 +403,32 @@ test.describe('on a phone', () => {
 		await expect(sheet).toHaveAttribute('data-snap', 'half');
 	});
 
+	test('on a phone, the tour keeps its place when you come back to it', async ({ page }) => {
+		await openDemo(page);
+		await page.getByRole('button', { name: /Start the tour/ }).click();
+		const doc = page.locator('article.document');
+		await expect(doc).toBeVisible();
+		await doc.evaluate((el) => el.scrollTo({ top: 1200 }));
+		await expect.poll(() => doc.evaluate((el) => el.scrollTop)).toBeGreaterThan(1000);
+		const sections = page.getByRole('navigation', { name: 'Sections' });
+		await sections.getByRole('button', { name: 'Model' }).click();
+		await sections.getByRole('button', { name: 'Home' }).click();
+		await page.getByRole('button', { name: /Continue the tour/ }).click();
+		await expect(doc).toBeVisible();
+		await expect.poll(() => doc.evaluate((el) => el.scrollTop)).toBeGreaterThan(1000);
+	});
+
+	test('on a phone, search shows matches as you type', async ({ page }) => {
+		await openDemo(page);
+		await page.getByRole('button', { name: /Search the model/ }).click();
+		await page.getByRole('combobox', { name: /Search elements/ }).pressSequentially('parcel');
+		const first = page.getByRole('listbox', { name: 'Results' }).getByRole('option').first();
+		await expect(first).toBeInViewport();
+		await expect(first).toContainText(/parcel/i);
+		const box = await page.getByRole('listbox', { name: 'Results' }).boundingBox();
+		expect(box?.height ?? 0).toBeGreaterThan(100);
+	});
+
 	test('on a phone, filtering the model shows matching elements at once', async ({ page }) => {
 		await openDemo(page);
 		await page
