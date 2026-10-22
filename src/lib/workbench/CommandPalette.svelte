@@ -12,6 +12,7 @@
 		machineItems,
 		modelViewItems,
 		newViewItems,
+		openFileItems,
 		search,
 		segments,
 		tableRowItems,
@@ -48,6 +49,7 @@
 		commands: [
 			...machineItems(workspace.machines),
 			...commandItems(theme.choice),
+			...openFileItems(ui.activeTab?.kind === 'file' ? ui.activeTab.path : null),
 			...newViewItems(VIEW_KINDS)
 		],
 		...(ui.table
@@ -143,6 +145,9 @@
 				break;
 			case 'create':
 				ui.create = action.request;
+				break;
+			case 'file':
+				ui.fileRequest = action.request;
 				break;
 		}
 	}

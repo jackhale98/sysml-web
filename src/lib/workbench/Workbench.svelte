@@ -74,8 +74,10 @@
 	let settingsPrimed = $state(false);
 	let importPrimed = $state(false);
 	let createPrimed = $state(false);
+	let filesPrimed = $state(false);
 	$effect(() => {
 		if (ui.create) createPrimed = true;
+		if (ui.fileRequest) filesPrimed = true;
 		if (ui.paletteOpen) palettePrimed = true;
 		if (ui.sourceControlOpen) sourceControlPrimed = true;
 		if (ui.settingsOpen) settingsPrimed = true;
@@ -85,6 +87,9 @@
 	const loadLibraryFile = () => import('./LibraryFile.svelte').then((m) => m.default);
 	const loadReport = () => import('#lib/reports/ReportView.svelte').then((m) => m.default);
 	const loadReview = () => import('#lib/review/ReviewView.svelte').then((m) => m.default);
+
+	// Tabs follow a file that is renamed or moved, and close when it goes.
+	$effect(() => workspace.onFileMoved((from, to) => ui.followFile(from, to)));
 
 	// Review mode lasts while its tab is open, and ends with the page.
 	$effect(() => {
@@ -703,6 +708,11 @@
 	{#if createPrimed}
 		{#await import('#lib/create/CreateHost.svelte') then { default: CreateHost }}
 			<CreateHost {workspace} {ui} {engine} />
+		{/await}
+	{/if}
+	{#if filesPrimed}
+		{#await import('./files/FileHost.svelte') then { default: FileHost }}
+			<FileHost {workspace} {ui} />
 		{/await}
 	{/if}
 	{#if phone}

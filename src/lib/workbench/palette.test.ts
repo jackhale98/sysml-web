@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
 	commandItems,
+	openFileItems,
 	fileItems,
 	fuzzyMatch,
 	matchItem,
@@ -201,6 +202,20 @@ describe('search', () => {
 		expect(labels(sources(), 'diagram only')[0]).toBe('Show diagram only');
 		expect(labels(sources(), 'dark')).toContain('Switch theme');
 		expect(search(sources(), 'problems')[0]?.item.action).toEqual({ type: 'show-problems' });
+	});
+
+	it('offers a new file, and renaming, moving and deleting the file on show', () => {
+		expect(search(sources(), 'new file')[0]?.item.action).toEqual({
+			type: 'file',
+			request: { kind: 'new' }
+		});
+		expect(openFileItems(null)).toEqual([]);
+		const withFile = { ...sources(), commands: openFileItems('structure/Power.sysml') };
+		expect(labels(withFile, 'file').sort()).toEqual(['Delete file', 'Move file', 'Rename file']);
+		expect(search(withFile, 'delete file')[0]?.item).toMatchObject({
+			detail: 'Power.sysml',
+			action: { type: 'file', request: { kind: 'delete', path: 'structure/Power.sysml' } }
+		});
 	});
 
 	it('returns nothing when nothing matches', () => {

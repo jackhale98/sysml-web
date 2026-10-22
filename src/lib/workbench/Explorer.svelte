@@ -2,9 +2,8 @@
 	import {
 		BookLock,
 		ChevronRight,
-		FileCode,
+		FilePlus,
 		FileText,
-		Folder,
 		LayoutDashboard,
 		ListChecks,
 		Network,
@@ -23,6 +22,7 @@
 	import { elementItems, modelViewItems, rank, type PaletteItem } from './palette.ts';
 	import { groupViews, presentationOf, viewTitle } from './views.ts';
 	import { reportEntries, reportKindOf } from '#lib/reports/kinds.ts';
+	import FilesPanel from './files/FilesPanel.svelte';
 
 	let { workspace, ui }: { workspace: Workspace; ui: WorkbenchUi } = $props();
 
@@ -84,6 +84,10 @@
 		newOpen = false;
 		ui.create = request;
 	}
+	function newFile() {
+		newOpen = false;
+		ui.fileRequest = { kind: 'new' };
+	}
 	/** The standard reports the project hasn't saved (saved ones are under Documents). */
 	const reports = $derived(reportEntries(workspace.views, isLibraryFile).filter((r) => !r.saved));
 	let packagesOpen = $state(false);
@@ -139,31 +143,7 @@
 	const openRoots = $derived(userRoots.length <= OPEN_ROOTS);
 	/** How many entries each list shows, by its owner's key ('' for the top level). */
 	let shownCount = $state<Record<string, number>>({});
-
-	const folders = $derived.by(() => {
-		const byFolder: Record<string, string[]> = {};
-		for (const path of workspace.modelPaths) {
-			const folder = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
-			(byFolder[folder] ??= []).push(path);
-		}
-		return Object.entries(byFolder);
-	});
 </script>
-
-{#snippet fileItem(folder: string, path: string)}
-	<li>
-		<button
-			type="button"
-			class="item"
-			style:padding-left={folder ? '1.5rem' : undefined}
-			onclick={() => ui.open({ kind: 'file', path })}
-		>
-			<FileCode size={14} />
-			<span class="label">{path.slice(folder ? folder.length + 1 : 0)}</span>
-			{#if workspace.dirty.has(path)}<span class="dot" title="Edited"></span>{/if}
-		</button>
-	</li>
-{/snippet}
 
 {#snippet tree(nodes: TreeNode[], depth: number, owner: string)}
 	{@const listed = nodes.filter(matches)}
@@ -464,6 +444,11 @@
 										<Scale size={14} /> <span class="label">Trade study…</span>
 									</button>
 								</li>
+								<li>
+									<button type="button" class="item" onclick={newFile}>
+										<FilePlus size={14} /> <span class="label">File…</span>
+									</button>
+								</li>
 							</ul>
 						{/if}
 					</div>
@@ -505,32 +490,7 @@
 			</details>
 		{/if}
 	{:else}
-		<ul class="flat files">
-			{#each folders as [folder, paths] (folder)}
-				{#if folder && isLibraryFile(`${folder}/`)}
-					<!-- Libraries the model builds on: out of the way until wanted. -->
-					<li>
-						<details class="library-folder">
-							<summary class="folder"
-								><ChevronRight size={14} class="chevron" /><Folder size={14} /> {folder}</summary
-							>
-							<ul class="flat">
-								{#each paths as path (path)}
-									{@render fileItem(folder, path)}
-								{/each}
-							</ul>
-						</details>
-					</li>
-				{:else}
-					{#if folder}
-						<li class="folder"><Folder size={14} /> {folder}</li>
-					{/if}
-					{#each paths as path (path)}
-						{@render fileItem(folder, path)}
-					{/each}
-				{/if}
-			{/each}
-		</ul>
+		<FilesPanel {workspace} {ui} />
 	{/if}
 </nav>
 
@@ -733,33 +693,6 @@
 		margin: var(--space-1) var(--space-2);
 		color: var(--text-3);
 		font-size: var(--text-xs);
-	}
-	.library-folder > summary {
-		cursor: pointer;
-		list-style: none;
-	}
-	.library-folder > summary::-webkit-details-marker {
-		display: none;
-	}
-	.library-folder > summary :global(.chevron) {
-		margin-left: -2px;
-		transition: transform 0.15s;
-	}
-	.library-folder[open] > summary :global(.chevron) {
-		transform: rotate(90deg);
-	}
-	.folder {
-		display: flex;
-		align-items: center;
-		gap: var(--space-2);
-		padding: var(--space-2) var(--space-2) var(--space-1);
-		color: var(--text-3);
-	}
-	.dot {
-		width: 0.45rem;
-		height: 0.45rem;
-		border-radius: 50%;
-		background: var(--warn);
 	}
 	@media (pointer: coarse) {
 		.item,

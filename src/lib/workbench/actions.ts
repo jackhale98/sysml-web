@@ -13,7 +13,7 @@ import { elementText, formatName, type AddKind } from './templates';
  * Run an edit as one undoable step and confirm it with a toast that offers
  * Undo, so every gesture is safe to try.
  */
-async function undoable(
+export async function undoable(
 	workspace: Workspace,
 	label: string,
 	run: () => Promise<string | null>

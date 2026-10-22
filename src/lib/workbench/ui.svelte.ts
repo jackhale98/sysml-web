@@ -27,6 +27,13 @@ export type CreateRequest =
 	| { kind: 'limit'; element: string; attribute?: string }
 	| { kind: 'trade'; alternatives?: string[] };
 
+/**
+ * A file form to open (`files/FileHost.svelte`): a new file (optionally in a
+ * folder), or renaming, moving or deleting one of the project's files.
+ */
+export type FileRequest =
+	{ kind: 'new'; folder?: string } | { kind: 'rename' | 'move' | 'delete'; path: string };
+
 export type SelectionSource = 'text' | 'diagram' | 'explorer' | 'inspector' | 'table';
 
 export interface Selection {
@@ -107,6 +114,8 @@ export class WorkbenchUi {
 	importOpen = $state(false);
 	/** The guided form on show, if any (mounted by the host). */
 	create = $state.raw<CreateRequest | null>(null);
+	/** The file form on show, if any (mounted by the host). */
+	fileRequest = $state.raw<FileRequest | null>(null);
 
 	// ── Phone layout ──────────────────────────────────────────────────────────
 	#pane = $state<MobilePane>('home');
@@ -185,6 +194,44 @@ export class WorkbenchUi {
 	showText(path: string) {
 		this.fileLayouts[path] = 'text';
 		this.open({ kind: 'file', path });
+	}
+
+	/**
+	 * A file was renamed or moved (`to`), or left the project (`to` null):
+	 * its tabs follow it or close, and what is remembered about it follows.
+	 */
+	followFile(from: string, to: string | null) {
+		if (this.tabs.some((t) => t.kind === 'file' && t.path === from)) {
+			// As closing a tab does: one before the tab on show moves it down, and
+			// closing the tab on show shows the one before it.
+			let active = this.active;
+			const next: Tab[] = [];
+			this.tabs.forEach((t, i) => {
+				if (t.kind !== 'file' || t.path !== from) next.push(t);
+				else if (to) next.push({ ...t, path: to });
+				else if (i <= this.active) active--;
+			});
+			if (!next.length) next.push({ kind: 'home' });
+			this.tabs = next;
+			this.active = Math.max(0, Math.min(active, next.length - 1));
+		}
+		this.followSelection(from, to);
+	}
+
+	private followSelection(from: string, to: string | null) {
+		const layout = this.fileLayouts[from];
+		if (layout) {
+			const rest = { ...this.fileLayouts };
+			delete rest[from];
+			this.fileLayouts = to ? { ...rest, [to]: layout } : rest;
+		}
+		if (this.textRequest?.path === from)
+			this.textRequest = to ? { ...this.textRequest, path: to } : null;
+		// Element keys are `file@byte`: the text is the same, so the selection carries over.
+		if (this.selection?.key.startsWith(`${from}@`))
+			this.selection = to
+				? { ...this.selection, key: to + this.selection.key.slice(from.length) }
+				: null;
 	}
 
 	close(index: number) {

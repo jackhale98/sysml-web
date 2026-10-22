@@ -73,6 +73,9 @@ export class ProjectSession {
 				this.folderTexts = Object.fromEntries(
 					stored.files.filter((f) => !unsaved.includes(f.path)).map((f) => [f.path, f.text])
 				);
+				// Deleted or renamed here, still in the folder: its text there isn't kept.
+				const kept = stored.files.map((f) => f.path);
+				for (const path of unsaved) if (!kept.includes(path)) this.folderTexts[path] = '';
 				this.unsavedToFolder = unsaved;
 			}
 			this.opened = stored.files;
@@ -100,10 +103,23 @@ export class ProjectSession {
 		if (!this.record) return;
 		clearTimeout(this.timer);
 		this.timer = setTimeout(() => void this.save(), AUTOSAVE_MS);
-		if (this.record.origin === 'folder') {
-			const files = this.workspace.files;
-			this.unsavedToFolder = Object.keys(files).filter((p) => files[p] !== this.folderTexts[p]);
-		}
+		if (this.record.origin === 'folder') this.unsavedToFolder = this.notInFolder();
+	}
+
+	/** Files changed or added here and not written to the folder, and files to take out of it. */
+	private notInFolder(): string[] {
+		const files = this.workspace.files;
+		return [
+			...Object.keys(files).filter((p) => files[p] !== this.folderTexts[p]),
+			...this.removedFromFolder()
+		];
+	}
+
+	/** Files the folder still has that were deleted or renamed here (its info is always written). */
+	private removedFromFolder(): string[] {
+		return Object.keys(this.folderTexts).filter(
+			(p) => !(p in this.workspace.files) && p !== '.project.json'
+		);
 	}
 
 	private files(): ProjectFile[] {
@@ -143,18 +159,24 @@ export class ProjectSession {
 		const folder = this.record?.folder;
 		if (!folder) return 'This project was not opened from a folder.';
 		const changed = this.files().filter((f) => this.folderTexts[f.path] !== f.text);
+		const removed = this.removedFromFolder();
 		try {
-			await writeToFolder(folder, [
-				...changed,
-				{
-					path: '.project.json',
-					text: JSON.stringify(this.workspace.info ?? this.record!.info, null, '\t') + '\n'
-				}
-			]);
+			await writeToFolder(
+				folder,
+				[
+					...changed,
+					{
+						path: '.project.json',
+						text: JSON.stringify(this.workspace.info ?? this.record!.info, null, '\t') + '\n'
+					}
+				],
+				removed
+			);
 		} catch (error) {
 			return error instanceof Error ? error.message : String(error);
 		}
 		for (const f of changed) this.folderTexts[f.path] = f.text;
+		for (const path of removed) delete this.folderTexts[path];
 		this.unsavedToFolder = [];
 		await this.save();
 		return null;

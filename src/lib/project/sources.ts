@@ -133,6 +133,7 @@ interface DirectoryHandle {
 	values(): AsyncIterable<DirectoryHandle | FileHandle>;
 	getDirectoryHandle(name: string, options?: { create?: boolean }): Promise<DirectoryHandle>;
 	getFileHandle(name: string, options?: { create?: boolean }): Promise<FileHandle>;
+	removeEntry(name: string, options?: { recursive?: boolean }): Promise<void>;
 	queryPermission?(options: { mode: 'read' | 'readwrite' }): Promise<PermissionState>;
 	requestPermission?(options: { mode: 'read' | 'readwrite' }): Promise<PermissionState>;
 }
@@ -179,16 +180,27 @@ async function readDirectory(dir: DirectoryHandle, prefix: string, out: ProjectF
 	}
 }
 
-/** Write the given files back into the folder, creating sub-folders as needed. */
+/**
+ * Write the given files back into the folder, creating sub-folders as
+ * needed, and take out the files at `removed` (deleted, or renamed away
+ * from). A folder left empty by a removal goes too.
+ */
 export async function writeToFolder(
 	folder: FileSystemDirectoryHandle,
-	files: ProjectFile[]
+	files: ProjectFile[],
+	removed: string[] = []
 ): Promise<void> {
 	const root = folder as unknown as DirectoryHandle;
 	const allowed =
 		(await root.queryPermission?.({ mode: 'readwrite' })) === 'granted' ||
 		(await root.requestPermission?.({ mode: 'readwrite' })) === 'granted';
 	if (!allowed) throw new Error('Permission to save into the folder was not granted.');
+	// A rename that only changes case (power → Power) is the same file on most disks:
+	// take the old name out first, so writing the new one doesn't get removed after.
+	const written = new Set(files.map((f) => f.path.toLowerCase()));
+	const first = removed.filter((p) => written.has(p.toLowerCase()));
+	const after = removed.filter((p) => !written.has(p.toLowerCase()));
+	for (const path of first) await removeFromFolder(root, path);
 	for (const file of files) {
 		const parts = file.path.split('/');
 		let dir = root;
@@ -199,6 +211,28 @@ export async function writeToFolder(
 		).createWritable();
 		await writable.write(file.text);
 		await writable.close();
+	}
+	for (const path of after) await removeFromFolder(root, path);
+}
+
+/** Remove one file, and the folders it leaves empty; a file already gone is fine. */
+async function removeFromFolder(root: DirectoryHandle, path: string): Promise<void> {
+	const parts = path.split('/');
+	const dirs = [root];
+	try {
+		for (const part of parts.slice(0, -1)) dirs.push(await dirs.at(-1)!.getDirectoryHandle(part));
+		await dirs.at(-1)!.removeEntry(parts.at(-1)!);
+	} catch (error) {
+		if (error instanceof DOMException && error.name === 'NotFoundError') return;
+		throw error;
+	}
+	// Empty folders go with their last file; one with anything else in it stays.
+	for (let i = dirs.length - 1; i > 0; i--) {
+		try {
+			await dirs[i - 1]!.removeEntry(parts[i - 1]!);
+		} catch {
+			return;
+		}
 	}
 }
 
