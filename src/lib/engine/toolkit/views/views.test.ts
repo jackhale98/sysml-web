@@ -622,9 +622,9 @@ describe('the demo’s tables', () => {
 
 	it('lists the views the earlier engine listed', () => {
 		const views = host.listViews(demo);
-		// The earlier engine's 41, the budgets and checks (3 view defs, 3 usages) and the
-		// trade study (a view def and a usage).
-		expect(views).toHaveLength(49);
+		// The earlier engine's 41, the budgets and checks (3 view defs, 3 usages), the
+		// trade study (a view def and a usage) and the sequence.
+		expect(views).toHaveLength(50);
 		expect(views.filter((v) => v.hasTable)).toHaveLength(34);
 		expect(views.every((v) => !v.builtin)).toBe(true);
 		expect(views.find((v) => v.name === 'droneBreakdown')).toEqual({

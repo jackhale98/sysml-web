@@ -130,7 +130,14 @@ export interface Highlights {
 }
 
 export type DiagramView =
-	'general' | 'interconnection' | 'requirements' | 'states' | 'packages' | 'trace' | 'actions';
+	| 'general'
+	| 'interconnection'
+	| 'requirements'
+	| 'states'
+	| 'packages'
+	| 'trace'
+	| 'actions'
+	| 'sequence';
 
 /** A `view def` or `view` usage in the project or the bundled libraries. */
 export interface ViewInfo {
@@ -623,6 +630,21 @@ export interface DiagramEdge {
 	target: string;
 	label: string | null;
 	kind: EdgeKind;
+	/** Where the element the edge draws is declared (a sequence view's messages). */
+	element?: { file: string; start_byte: number };
+	/** Sequence views: the message an edge draws (edges come in time order). */
+	message?: SequenceMessage;
+}
+
+/** A message of a sequence view: `message name of Payload from a.sent to b.received`. */
+export interface SequenceMessage {
+	name: string | null;
+	/** The payload's type (or the payload as written when untyped). */
+	payload: string | null;
+	doc: string | null;
+	/** The event occurrences at its ends, when it is sent and received through them. */
+	sourceEvent?: string;
+	targetEvent?: string;
 }
 
 export interface DiagramGraph {

@@ -14,8 +14,15 @@ import {
 	pngScale,
 	type BuiltSvg,
 	type ExportDiagram,
-	type Measure
+	type Measure,
+	type SvgOptions
 } from './svg.ts';
+
+/**
+ * What can be exported: a diagram drawn from its graph and geometry
+ * (`buildSvg`), or one that draws itself (a sequence diagram).
+ */
+export type Exportable = ExportDiagram | { build: (options: SvgOptions) => BuiltSvg };
 
 export interface ExportOptions {
 	theme: ExportTheme;
@@ -35,17 +42,18 @@ const measure: Measure = (text, font) => {
 	return context.measureText(text).width;
 };
 
-async function build(diagram: ExportDiagram, options: ExportOptions, fontFaces?: string) {
+async function build(diagram: Exportable, options: ExportOptions, fontFaces?: string) {
 	await document.fonts?.ready;
-	return buildSvg(diagram, {
+	const svgOptions: SvgOptions = {
 		theme: options.theme,
 		background: !options.transparent,
 		measure,
 		fontFaces
-	});
+	};
+	return 'build' in diagram ? diagram.build(svgOptions) : buildSvg(diagram, svgOptions);
 }
 
-export async function svgText(diagram: ExportDiagram, options: ExportOptions): Promise<string> {
+export async function svgText(diagram: Exportable, options: ExportOptions): Promise<string> {
 	const { svg } = await build(diagram, options);
 	return `<?xml version="1.0" encoding="UTF-8"?>\n${svg}\n`;
 }
@@ -82,7 +90,7 @@ function dataUrl(blob: Blob): Promise<string> {
 }
 
 export async function pngBlob(
-	diagram: ExportDiagram,
+	diagram: Exportable,
 	options: ExportOptions,
 	wanted = 2
 ): Promise<Blob> {
@@ -109,7 +117,7 @@ export async function pngBlob(
 
 /** Save the diagram as `<title>.svg` (or share it, on phones). */
 export async function saveSvg(
-	diagram: ExportDiagram,
+	diagram: Exportable,
 	title: string,
 	options: ExportOptions,
 	share: boolean
@@ -119,7 +127,7 @@ export async function saveSvg(
 }
 
 export async function savePng(
-	diagram: ExportDiagram,
+	diagram: Exportable,
 	title: string,
 	options: ExportOptions,
 	share: boolean

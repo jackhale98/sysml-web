@@ -32,8 +32,10 @@ Open-MBEE sysml-toolkit engine (decision #16, migration done).**
   Source control shows the summary before saving and suggests it as the
   commit message and the proposal's description (`docs/engine.md`,
   "Comparing versions").
-- Not yet started: Sequence view, FMEA and hazard views, Systems Modeling
-  API client, conformance dashboard.
+- Sequence view: lifelines and messages in time order, drawn from the
+  model on its own pannable canvas, exportable like the other diagrams.
+- Not yet started: FMEA and hazard views, Systems Modeling API client,
+  conformance dashboard.
 
 ### Engine migration (decision #16)
 
@@ -341,7 +343,7 @@ not standardised until SysML v2.1.
 | Grid View | Phase 3 | requirements table, trace/allocation/DSM matrices, `@TableRendering` views |
 | Action Flow View | Phase 5 | start/done, decide/merge diamonds, fork/join bars, successions, flows, pins, send/accept, swimlanes via allocation |
 | State Transition View | Phase 5 | states, regions, `trigger [guard] / effect`, entry/do/exit compartments |
-| Sequence View | Phase 5 | lifelines, messages, event occurrences |
+| Sequence View | Phase 5 (read; done) | lifelines, messages with payloads in time order, event occurrences, self messages |
 | Geometry View | Later (stretch) | no known tool implements it; 3D via three.js once the rest is solid |
 
 Rendering: Svelte Flow for interaction (selection, drag, connect handles,
@@ -790,6 +792,9 @@ Engine gaps found while authoring the demo (inputs to Phase 1):
 **Phase 5 — Behaviour**
 - Action Flow, State Transition and Sequence views (read, then visual
   editing); state/action simulation; roll-ups and trade studies.
+  *Done:* the Sequence view (read): `view … : SequenceView` draws an
+  interaction's lifelines and its messages in time order (`docs/engine.md`,
+  "Diagrams"); the demo's `DeliverySequence::ParcelDelivery`.
   *Done:* roll-ups and constraint checks — budgets over the parts tree
   and a checks view from the toolkit's `verify`, violations as problems,
   evaluated values in the inspector (`docs/engine.md`, "Values and

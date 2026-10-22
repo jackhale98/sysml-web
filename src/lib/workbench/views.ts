@@ -35,6 +35,8 @@ export function presentationOf(view: ViewInfo): Presentation {
 			return { kind: 'diagram', view: 'states', scope };
 		case 'ActionFlowView':
 			return { kind: 'diagram', view: 'actions', scope };
+		case 'SequenceView':
+			return { kind: 'diagram', view: 'sequence', scope };
 		default:
 			return { kind: 'none' };
 	}

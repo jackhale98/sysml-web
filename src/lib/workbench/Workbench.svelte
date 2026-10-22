@@ -26,7 +26,7 @@
 		X
 	} from '@lucide/svelte';
 	import type { Engine } from '#lib/engine/client.ts';
-	import type { Diagnostic } from '#lib/engine/types.ts';
+	import type { Diagnostic, DiagramView } from '#lib/engine/types.ts';
 	import { elementAt } from '#lib/project/elements.ts';
 	import type { Workspace } from '#lib/project/workspace.svelte.ts';
 	import OfflineBadge from '#lib/offline/OfflineBadge.svelte';
@@ -65,7 +65,10 @@
 	// The editor and diagram bring CodeMirror, Svelte Flow and ELK; load them
 	// only when a file or diagram is first opened.
 	const loadTextEditor = () => import('./TextEditor.svelte').then((m) => m.default);
-	const loadDiagram = () => import('#lib/diagram/DiagramCanvas.svelte').then((m) => m.default);
+	const loadCanvas = () => import('#lib/diagram/DiagramCanvas.svelte').then((m) => m.default);
+	// A sequence diagram is drawn by its own canvas, without Svelte Flow and ELK.
+	const loadSequence = () => import('#lib/diagram/SequenceCanvas.svelte').then((m) => m.default);
+	const loadDiagram = (view?: DiagramView) => (view === 'sequence' ? loadSequence() : loadCanvas());
 	// Dialogs mount on first use and then stay, so they keep their state.
 	let palettePrimed = $state(false);
 	let sourceControlPrimed = $state(false);
@@ -479,7 +482,7 @@
 						{/key}
 					{:else if presentation.kind === 'diagram'}
 						{#key tabId(tab)}
-							{#await loadDiagram()}
+							{#await loadDiagram(presentation.view)}
 								<p class="empty">Loading the diagram…</p>
 							{:then DiagramCanvas}
 								<DiagramCanvas
@@ -499,7 +502,7 @@
 					{/if}
 				{:else if tab.kind === 'diagram'}
 					{#key tabId(tab)}
-						{#await loadDiagram()}
+						{#await loadDiagram(tab.view)}
 							<p class="empty">Loading the diagram…</p>
 						{:then DiagramCanvas}
 							<DiagramCanvas
