@@ -115,7 +115,9 @@ describe('startToolkit', () => {
 				return w as unknown as Worker;
 			}
 		});
-		await expect(client.call('version')).rejects.toThrow(/stopped working \(out of memory\)/);
+		await expect(client.call('version')).rejects.toThrow(
+			/stopped reading the model \(out of memory\)/
+		);
 		expect(workers).toHaveLength(2);
 		expect(onFailure).toHaveBeenCalledTimes(1);
 		await expect(client.call('version')).rejects.toThrow(/Reload the page/);
