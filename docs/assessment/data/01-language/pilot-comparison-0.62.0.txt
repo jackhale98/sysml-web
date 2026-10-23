@@ -1,0 +1,24 @@
+| Files | Count | Both accept | Both reject | Only pilot rejects | Only toolkit rejects | Pilot errors | Toolkit errors |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| sysml/src/examples | 95 | 94 | 0 | 0 | 1 | 0 | 17 |
+| sysml/src/training | 100 | 100 | 0 | 0 | 0 | 0 | 0 |
+| sysml/src/validation | 56 | 55 | 0 | 0 | 1 | 0 | 3 |
+| kerml/src/examples | 58 | 45 | 0 | 0 | 13 | 0 | 86 |
+| demo | 22 | 20 | 0 | 2 | 0 | 12 | 0 |
+- sysml/src/examples/Vehicle Example/SysML v2 Spec Annex A SimpleVehicleModel.sysml: only the toolkit rejects (pilot 0, toolkit 17; first: ambiguous reference `vehicle_b` resolves to multiple memberships)
+- sysml/src/validation/13-Model Containment/13a-Model Containment.sysml: only the toolkit rejects (pilot 0, toolkit 3; first: ambiguous reference `vehicle1_c1` resolves to multiple memberships)
+- kerml/src/examples/Association Examples/ProductSelection_N_ary.kerml: only the toolkit rejects (pilot 0, toolkit 6; first: A cross subsetting must chain through an opposite end to a feature [validateCrossSubsettingCrossedFeature])
+- kerml/src/examples/Association Examples/ProductSelection_OwnedEnds.kerml: only the toolkit rejects (pilot 0, toolkit 8; first: An association end must have exactly one non-redundant type [validateAssociationEndTypes])
+- kerml/src/examples/KerML Spec Annex A Examples/A-2-Atoms.kerml: only the toolkit rejects (pilot 0, toolkit 1; first: A feature reference expression must name a feature [validateFeatureReferenceExpressionReferentIsFeature])
+- kerml/src/examples/KerML Spec Annex A Examples/A-3-5-TimingForStructures.kerml: only the toolkit rejects (pilot 0, toolkit 16; first: An association end must have exactly one non-redundant type [validateAssociationEndTypes])
+- kerml/src/examples/KerML Spec Annex A Examples/A-3-6-Sequences.kerml: only the toolkit rejects (pilot 0, toolkit 4; first: An association end must have exactly one non-redundant type [validateAssociationEndTypes])
+- kerml/src/examples/KerML Spec Annex A Examples/A-3-7-DecisionsAndMerges.kerml: only the toolkit rejects (pilot 0, toolkit 4; first: An association end must have exactly one non-redundant type [validateAssociationEndTypes])
+- kerml/src/examples/KerML Spec Annex A Examples/A-3-8-ChangingFeatureValues.kerml: only the toolkit rejects (pilot 0, toolkit 4; first: An association end must have exactly one non-redundant type [validateAssociationEndTypes])
+- kerml/src/examples/Simple Tests/Features.kerml: only the toolkit rejects (pilot 0, toolkit 3; first: A variable feature must be owned by an occurrence type [validateFeatureIsVariable])
+- kerml/src/examples/Simple Tests/Imports.kerml: only the toolkit rejects (pilot 0, toolkit 3; first: ambiguous reference `A` resolves to multiple memberships)
+- kerml/src/examples/Simple Tests/MetadataTest.kerml: only the toolkit rejects (pilot 0, toolkit 2; first: A feature reference expression must name a feature [validateFeatureReferenceExpressionReferentIsFeature])
+- kerml/src/examples/Simple Tests/Types.kerml: only the toolkit rejects (pilot 0, toolkit 20; first: Subclassification::subclassifier must refer to a Classifier [relationship-endpoint-metaclass])
+- kerml/src/examples/Variable Feature Examples/TimeVaryingCarDriver.kerml: only the toolkit rejects (pilot 0, toolkit 5; first: A package-level feature cannot redefine another package-level feature [validateRedefinitionFeaturingTypes])
+- kerml/src/examples/Variable Feature Examples/TimeVaryingFeatures.kerml: only the toolkit rejects (pilot 0, toolkit 10; first: A package-level feature cannot redefine another package-level feature [validateRedefinitionFeaturingTypes])
+- demo/requirements/StakeholderNeeds.sysml: only the pilot rejects (pilot 6, toolkit 0; first: Subject must be first parameter.)
+- demo/system/Satisfaction.sysml: only the pilot rejects (pilot 6, toolkit 0; first: Couldn't resolve reference to Feature 'flightController'.)
