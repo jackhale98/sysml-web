@@ -79,18 +79,21 @@ export const HELP: HelpSection[] = [
 			{
 				id: 'files',
 				title: 'Its files',
-				keywords: 'sysml folder model views libraries tour readme',
+				keywords:
+					'sysml folder model views libraries tour readme layout new file rename move delete',
 				blocks: [
 					'A project is a folder of plain text files, the same as any SysML v2 tool reads:',
 					{
 						list: [
-							'`model/…sysml`: the model itself: requirements, parts, how they connect, what they do.',
+							'`.sysml` files (in `model/`, or in folders such as `requirements/` and `design/`): the model itself: requirements, parts, how they connect, what they do.',
 							'`views/Views.sysml`: the saved views: tables, diagrams, budgets and reports.',
 							'`libraries/`: the definitions the tables and reports use. You rarely need to open these.',
+							'`layout/diagrams.json`: where you put the boxes on each diagram, and what each one hides.',
 							'`TOUR.md`: the project’s tour, in Markdown. Write your own for the next reader.'
 						]
 					},
-					'Open **Files** in the explorer to see them all, or find any file, element or view with search (Ctrl K, or ⌘K on a Mac).'
+					'Open **Files** in the explorer to see them all, or find any file, element or view with search (Ctrl K, or ⌘K on a Mac).',
+					'**New file** (in **Files**, or from search) starts another `.sysml` file. Each file’s **⋯** button (**More actions**) can **Rename…** it, **Move to folder…** or **Delete…** it; before a delete, it says what else uses the file. Undo takes any of them back.'
 				]
 			},
 			{
@@ -221,6 +224,14 @@ export const HELP: HelpSection[] = [
 				keywords: 'diagram table report saved expose',
 				blocks: [
 					'A view is a saved table, diagram or report. It is part of the model, so it is shared and reviewed like the rest. `expose` says which part of the model it shows; the view’s kind says how.',
+					{
+						list: [
+							'**Diagrams**: general, interconnection, state, action flow and sequence diagrams.',
+							'**Tables**: requirements, requirement gaps, bill of materials, interfaces, trace and verification matrices, budgets and design checks, and the tables of trade studies and risk.',
+							'**Documents**: a specification of the requirements, and an interface control document.',
+							'**Matrices**: dependency matrices and N² charts (see **See what depends on what**).'
+						]
+					},
 					concept('view')
 				],
 				action: { action: 'new-view', label: 'New view' }
@@ -445,7 +456,7 @@ export const HELP: HelpSection[] = [
 				title: 'Make a report',
 				keywords: 'document specification icd print export pdf word',
 				blocks: [
-					'**New view** › **Specification** makes a document of the requirements with their trace and gaps; **Interface control document** does the same for interfaces. Print it, or save it as a PDF from the print dialog. Tables export to Excel or CSV from their **Export** menu, and diagrams to SVG or PNG.'
+					'**New view** › **Specification** makes a document of the requirements with their trace and gaps; **Interface control document** does the same for interfaces. **Print / PDF** prints it or saves it as a PDF; it also downloads as one HTML file or as Markdown. Tables export to Excel or CSV from their **Export** menu, and diagrams to SVG or PNG (or copy to the clipboard) from theirs.'
 				],
 				action: { action: 'report', label: 'New report' }
 			},
@@ -467,9 +478,12 @@ export const HELP: HelpSection[] = [
 			{
 				id: 'save-github',
 				title: 'Save to GitHub',
-				keywords: 'git commit push share team branch pull request backup',
+				keywords:
+					'git commit push share team branch pull request backup review changes diff compare get latest',
 				blocks: [
-					'**Save to GitHub…** in the project menu connects the project to a repository and saves your changes there, with a note of what changed. Others can then open it from GitHub, and you can start a branch or propose changes for review. No git know-how needed.'
+					'**Save to GitHub…** in the project menu connects the project to a repository and saves your changes there, with a note of what changed. Others can then open it from GitHub, and you can start a branch or propose changes for review. No git know-how needed.',
+					'Once a project is on GitHub, the project menu also has **Get latest** (bring in what others saved; where you both changed a file, choose whose to keep), **Propose changes…** (a pull request) and **Open on GitHub**. Sign in with GitHub, or connect with an access token; **Settings** › **Accounts** can hold more than one account.',
+					'**Review changes** in the project menu says what changed in the model, in plain words: requirements, design, behaviour, verification and risk, with the checks and budgets the change affects first. Compare with what is not on GitHub yet, a branch, an earlier version or a proposal; diagrams and tables mark what changed. In a project kept only in this browser, **Mark as reviewed** sets the version later changes are compared with.'
 				],
 				action: { action: 'save-github', label: 'Save to GitHub' }
 			},
@@ -487,7 +501,7 @@ export const HELP: HelpSection[] = [
 							'**A SysML v2 API server**, such as the OMG pilot server or SysON (its address ends in `/api/rest`): **Connect to a SysML v2 API server…** in the project menu.'
 						]
 					},
-					'An import says what came across and what didn’t, in a few lines; **Download the full list** gives all of it as a text file. JSON holds no comments, blank lines or layout, so a model that went through JSON reads the way the engine writes SysML, and element ids are not kept in the text (they come from file names here).',
+					'An import says what came across and what didn’t, in a few lines; **Download the full list** gives all of it as a text file. JSON holds no comments, blank lines or layout, so a model that went through JSON reads the way Fairtide writes SysML, and element ids are not kept in the text (they come from file names here).',
 					{
 						steps: [
 							'**Open from server**: choose the project, its branch and a version (the latest, or an earlier commit). It opens as a new project on this device.',
@@ -572,10 +586,10 @@ export const HELP: HelpSection[] = [
 							['F2', 'Rename'],
 							['H', 'Remove from this diagram (it stays in the model)'],
 							['Ctrl D', 'Duplicate, beside it'],
-							['Delete', 'Delete from the model'],
+							['Delete or Backspace', 'Delete from the model'],
 							['Arrow keys', 'Move the selected boxes'],
 							['Shift F10', 'The element’s menu'],
-							['+ / − / 0', 'Zoom in, out, fit (sequence diagrams)']
+							['+ / − / 0', 'Zoom in, out, fit (sequence diagrams and the simulator)']
 						]
 					}
 				]
