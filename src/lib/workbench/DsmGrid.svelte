@@ -557,6 +557,29 @@
 		width: 2.75rem;
 		height: 2.75rem;
 	}
+	/* A narrow name column: a flag goes under the name rather than cutting it short. */
+	.touch .name-line {
+		display: grid;
+		grid-template-columns: auto minmax(0, 1fr) auto;
+		column-gap: var(--space-2);
+		align-items: center;
+	}
+	.touch .name-line > .num {
+		grid-row: 1 / span 2;
+	}
+	.touch .name-line > .flag,
+	.touch .name-line > .reach {
+		grid-row: 2;
+		grid-column: 2;
+		justify-self: start;
+	}
+	.touch .name-line:not(:has(.flag, .reach)) > .name-button {
+		grid-row: 1 / span 2;
+	}
+	.touch .name-line > .impact {
+		grid-row: 1 / span 2;
+		grid-column: 3;
+	}
 
 	/* Modules: a band naming each, and its block outlined on the diagonal. */
 	.band {
