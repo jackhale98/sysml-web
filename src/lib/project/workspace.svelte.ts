@@ -109,7 +109,6 @@ export class Workspace {
 	/** The texts `analyses` were made from, to tell when they describe the files as they are. */
 	analysedTexts = $state.raw<Record<string, string>>({});
 	state = $state.raw<LoadState>({ phase: 'idle' });
-	engineVersion = $state<string | null>(null);
 	/** The project's views (and the standard ones the engine bundles). */
 	views = $state.raw<ViewInfo[]>([]);
 	/** The project's state machines, for the emulator. */
@@ -186,7 +185,8 @@ export class Workspace {
 		this.state = { phase: 'loading', done: 0, total: this.modelPaths.length };
 		const started = performance.now();
 		try {
-			this.engineVersion = await engine.version();
+			// Waits for the engine to have started.
+			await engine.version();
 			await this.analyse(true);
 			if (generation !== this.generation) return;
 			this.state = { phase: 'ready', millis: performance.now() - started };

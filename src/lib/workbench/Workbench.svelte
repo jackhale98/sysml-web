@@ -798,7 +798,7 @@
 			{:else if workspace.state.phase === 'ready'}
 				<span class="ok-dot" aria-hidden="true"></span> Model ready
 			{:else if workspace.state.phase === 'error'}
-				<CircleAlert size={13} /> Engine error
+				<CircleAlert size={13} /> Model can't be read
 			{/if}
 		</span>
 		{#if workspace.state.phase === 'ready'}
@@ -823,9 +823,7 @@
 		</button>
 		<OfflineBadge />
 		<span class="grow"></span>
-		<span class="meta"
-			>SysML v2{workspace.engineVersion ? ` · engine ${workspace.engineVersion}` : ''}</span
-		>
+		<span class="meta">SysML v2</span>
 	</footer>
 
 	<Toaster />

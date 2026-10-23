@@ -108,7 +108,7 @@ export function startToolkit(
 			for (const call of pending.values()) worker.postMessage(call.message);
 			return;
 		}
-		failed = `The SysML engine stopped working (${reason}). Reload the page to try again.`;
+		failed = `Fairtide stopped reading the model (${reason}). Reload the page to try again.`;
 		for (const call of pending.values()) call.reject(new Error(failed));
 		pending.clear();
 		options.onFailure?.(failed);

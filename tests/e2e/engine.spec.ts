@@ -29,7 +29,9 @@ const libraryLoad = (page: Page) =>
 test('the model is analysed by the sysml-toolkit, without false problems', async ({ page }) => {
 	await openDemo(page);
 	const footer = page.locator('footer');
-	await expect(footer).toContainText('engine toolkit 0.10.10');
+	// Which engine runs is in Settings › About, not in the status bar.
+	await expect(footer).toContainText('SysML v2');
+	await expect(footer).not.toContainText('engine');
 	// No false problems (the earlier engine reported 78 findings, most of them false): the two
 	// warnings are the risk review item the demo keeps on purpose.
 	await expect(page.getByRole('button', { name: 'Problems: 0 errors, 2 warnings' })).toBeVisible();
@@ -66,16 +68,16 @@ test('when the toolkit cannot start, it is retried once and then says so', async
 		return route.fulfill({ status: 500, body: 'unavailable' });
 	});
 	await page.goto('/p/demo');
-	await expect(page.getByRole('status').filter({ hasText: 'Engine error' })).toBeVisible({
+	await expect(page.getByRole('status').filter({ hasText: "Model can't be read" })).toBeVisible({
 		timeout: 30_000
 	});
 	expect(attempts).toBe(2);
 	await expect(
-		page.getByText('The SysML engine stopped working. Reload the page to try again.')
+		page.getByText('Fairtide stopped reading the model. Reload the page to try again.')
 	).toBeVisible();
 	await expectAccessible(page);
 	await page.getByRole('button', { name: /^Problems:/ }).click();
 	await expect(page.locator('section.problems-pane')).toContainText(
-		/The SysML engine stopped working \(.+\)\. Reload the page to try again\./
+		/Fairtide stopped reading the model \(.+\)\. Reload the page to try again\./
 	);
 });

@@ -45,7 +45,7 @@ export function getEngine(): Engine {
 		},
 		// Once, plainly; the problems list has the reason.
 		onFailure: () =>
-			toasts.show('The SysML engine stopped working. Reload the page to try again.', {
+			toasts.show('Fairtide stopped reading the model. Reload the page to try again.', {
 				tone: 'error',
 				duration: 0
 			})
