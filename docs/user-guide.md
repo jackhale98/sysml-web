@@ -162,7 +162,7 @@ part def Drone {
 
 ### Requirement
 
-A requirement is a “shall” statement with an ID, like a row of a requirements spreadsheet. Its statement is its `doc` text. When it can be checked by a number, a `require constraint` states the check, with units, and the app checks it against the design.
+A requirement is a “shall” statement with an ID, like a row of a requirements spreadsheet. Its statement is its `doc` text. When it can be checked by a number, a `require constraint` states the check, with units, and the app checks it against the design. The ID (`<'REQ-12'>`) stays the same when the title changes or the requirement moves: Problems warns when two requirements share one, and the editor marks a requirement without one and suggests the next free ID.
 
 > **Requirement usage**: A requirement is a specific 'shall' statement in your model, like 'the drone shall weigh at most 25 kg'.
 >

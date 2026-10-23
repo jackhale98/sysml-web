@@ -19,6 +19,7 @@ import type {
 	ViewInfo
 } from '#lib/engine/types.ts';
 import { checkProblems } from './checks';
+import { requirementIdProblems } from './requirementIds';
 import {
 	buildTree,
 	byteToUtf16,
@@ -151,6 +152,8 @@ export class Workspace {
 				})),
 				...a.diagnostics
 			]),
+			// Requirements sharing an ID, or (as notes) without one.
+			...requirementIdProblems(Object.values(this.analyses)),
 			// A requirement the design doesn't meet; undecided checks are not problems.
 			...checkProblems(this.checks?.checks ?? [])
 		].sort((a, b) => severityRank(a.severity) - severityRank(b.severity))
