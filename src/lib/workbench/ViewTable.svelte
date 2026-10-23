@@ -2025,10 +2025,10 @@
 		td,
 		th button,
 		.th {
-			padding-inline: var(--space-2);
+			padding-inline: 6px;
 		}
 		td.text {
-			min-width: 6.5rem;
+			min-width: 6rem;
 		}
 		td.long {
 			min-width: 9rem;
@@ -2038,7 +2038,7 @@
 			min-width: 8.5rem;
 		}
 		td.controls {
-			min-width: 9rem;
+			min-width: 7.5rem;
 		}
 		th button {
 			height: auto;

@@ -193,11 +193,28 @@ test('the demo’s worksheet keeps its figures in view beside the details, and f
 	await row.getByRole('button', { name: 'drone::battery', exact: true }).click();
 	const inspector = page.getByRole('complementary', { name: 'Inspector' });
 	await expect(inspector.getByRole('textbox', { name: 'Name' })).toHaveValue('battery');
-	const scroller = await sheet.locator('.scroll').boundingBox();
-	for (const name of ['Severity', 'Likelihood', 'Detection', 'RPN', 'Action priority']) {
-		const header = await sheet.getByRole('columnheader', { name, exact: true }).boundingBox();
-		expect(header!.x + header!.width, name).toBeLessThanOrEqual(scroller!.x + scroller!.width + 1);
-	}
+	// The figures and the controls that answer them stay in view, without scrolling sideways.
+	const inView = async (width: number) => {
+		const scroller = await sheet.locator('.scroll').boundingBox();
+		for (const name of [
+			'Severity',
+			'Likelihood',
+			'Detection',
+			'RPN',
+			'Action priority',
+			'Risk controls'
+		]) {
+			const header = await sheet.getByRole('columnheader', { name, exact: true }).boundingBox();
+			expect(header!.x + header!.width, `${name} at ${width}`).toBeLessThanOrEqual(
+				scroller!.x + scroller!.width + 1
+			);
+		}
+	};
+	await inView(1280);
+	await page.setViewportSize({ width: 1440, height: 900 });
+	await expect(inspector.getByRole('textbox', { name: 'Name' })).toHaveValue('battery');
+	await inView(1440);
+	await page.setViewportSize({ width: 1280, height: 800 });
 
 	await row.getByRole('button', { name: /Edit Severity/ }).click();
 	const input = row.getByRole('textbox', { name: /Severity/ });

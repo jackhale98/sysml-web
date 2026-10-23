@@ -928,7 +928,8 @@ describe('the demo’s tables', () => {
 		expect(shape(allocations)).toEqual([8, 2]);
 		expect(allocations.rows[0]).toEqual(['drone.deliveryFlight.checkDropZone', 'drone.camera']);
 		const fmea = table('fmeaWorksheet');
-		// The figures come right after the failure, so they stay in view in a narrow pane.
+		// The figures come right after the failure, then the controls, so they stay in view in
+		// a narrow pane.
 		expect(fmea.columns).toEqual([
 			'part',
 			'failureMode',
@@ -936,10 +937,10 @@ describe('the demo’s tables', () => {
 			'likelihood',
 			'detection',
 			'rpn',
-			'rpnBand',
 			'actionPriority',
-			'acceptability',
 			'riskControls',
+			'rpnBand',
+			'acceptability',
 			'effect',
 			'cause'
 		]);
@@ -952,9 +953,9 @@ describe('the demo’s tables', () => {
 			'6',
 			'144',
 			'medium',
+			'RC-001 Battery thermal protection',
 			'medium',
 			'reduce',
-			'RC-001 Battery thermal protection',
 			'Fire in the airframe; loss of the drone; burns to bystanders',
 			'Internal cell short, overcharge or crash damage'
 		]);
