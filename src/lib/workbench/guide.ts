@@ -28,6 +28,7 @@ export const GUIDE_ACTIONS = [
 	'fmea',
 	'risk-policy',
 	'hazard',
+	'dsm',
 	'state-machine',
 	'action-flow',
 	'report',
@@ -218,6 +219,9 @@ export async function runGuideAction(action: GuideAction, context: GuideContext)
 			return;
 		case 'hazard':
 			ui.create = { kind: 'hazard' };
+			return;
+		case 'dsm':
+			ui.create = { kind: 'dsm' };
 			return;
 		case 'risk-policy':
 			ui.create = { kind: 'riskPolicy' };

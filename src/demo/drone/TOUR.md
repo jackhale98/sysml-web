@@ -181,3 +181,20 @@ weighs them: endurance 50 %, mass margin 20 %, price 30 %. The objective,
 drone over 4 kg and scores nothing. Raise the semi-solid-state pack's `price` to
 `2500.0` and today's battery comes out on top; Undo puts it back.
 Table: **`DroneViews::batteryTrade`**.
+
+## 16. What depends on what: `DroneViews::droneDsm`
+
+A dependency matrix (DSM) lists the drone's parts down the side and across the top.
+The cell in the battery's row and the power distribution board's column says the
+battery is connected to it; the flight controller's row shows the motor commands it
+passes to each rotor. Read across a row for what a part affects, down a column for
+what it depends on. The airframe is flagged: nothing is connected to it. Switch
+**Suggested modules** on and the parts regroup into power and propulsion and the
+avionics; the lightning button beside the battery shows what a change to it may
+reach. The view is `view droneDsm : DependencyMatrix` with `expose
+DroneArchitecture::drone::*`, from `libraries/DependencyMatrices.sysml`; what it
+counts and its order are saved in its text. `DroneViews::droneN2` is the same grid
+as an N² chart, naming the interfaces and items in each cell;
+`DroneViews::deliveryFlightDsm` compares the steps of a delivery flight, and
+`DroneViews::requirementDsm` the requirements derived from each need.
+Matrix: **`DroneViews::droneDsm`**.

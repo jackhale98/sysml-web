@@ -28,6 +28,7 @@ describe('the help', () => {
 			'Compare options',
 			'Analyse what can fail (FMEA)',
 			'Log hazards and their controls',
+			'See what depends on what (DSM)',
 			'Draw a state machine',
 			'Make a report',
 			'Import from Excel',

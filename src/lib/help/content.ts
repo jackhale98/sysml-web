@@ -405,6 +405,26 @@ export const HELP: HelpSection[] = [
 				action: { action: 'hazard', label: 'New hazard' }
 			},
 			{
+				id: 'dsm',
+				title: 'See what depends on what (DSM)',
+				keywords:
+					'dsm design structure matrix dependency n2 n-squared interface chart modules clustering coupling change impact functional requirement derivation',
+				blocks: [
+					'A **dependency matrix** (DSM) lists the same parts down the side and across the top. The cell in a part’s row and another’s column shows how the first leads to the second: a connection, an item passed along a flow, a binding. Read across a row for what a part affects, down a column for what it depends on. An **N² chart** is the same grid with the interfaces and items named in the cells. It is read from the model, so it is always up to date.',
+					{
+						steps: [
+							'**New DSM** (in **Make something new**, **New view** or the search box): choose a part DSM, an N² chart, a functional DSM (the steps of a process) or a requirement DSM (which requirements are derived from which).',
+							'Choose whose parts to compare, such as the drone, and whether to include the parts inside them too.',
+							'Choose what counts as a link and the order, then a name.'
+						]
+					},
+					'On the matrix, **Counts** switches kinds of link on and off: connections, flows, bindings, allocations, uses and satisfies for parts. **Suggested modules** reorders the parts so the ones linked to each other sit together and outlines the groups with more links inside than between them; it is a suggestion from the links alone. Both are saved in the view, and Undo takes them back.',
+					'Point at or select a cell for its links, with **Show in SysML**. Select an empty cell between two parts to **Connect them**. The lightning button beside a part shows what a change to it may affect, directly and through others, with how many. A part with no links, and a connection with no interface definition, are flagged for review.',
+					'On a phone each part is a card that opens to what it is connected with, leads to and comes from, with **What a change affects** and **Add a connection**; **Grid** shows the matrix, scrolling sideways.'
+				],
+				action: { action: 'dsm', label: 'New DSM' }
+			},
+			{
 				id: 'draw-state-machine',
 				title: 'Draw a state machine',
 				keywords: 'state diagram modes transitions',
