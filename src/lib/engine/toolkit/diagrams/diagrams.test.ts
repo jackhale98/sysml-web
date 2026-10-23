@@ -188,7 +188,7 @@ describe('general view', () => {
 
 	it('draws the view usages of a package with what they expose', () => {
 		const tk = toolkit('general', 'DroneViews');
-		expect(tk.nodes).toHaveLength(25);
+		expect(tk.nodes).toHaveLength(29);
 		expect(node(tk, 'componentCatalogue')).toMatchObject({
 			label: 'componentCatalogue : GeneralView',
 			stereotype: '<<view>>',
@@ -207,7 +207,8 @@ describe('general view', () => {
 			.filter((d) => d.kind !== 'package')
 			.map((d) => d.name)
 			.sort();
-		expect(definitions).toHaveLength(108);
+		// With the dependency matrices' library: a metadata def and four view defs.
+		expect(definitions).toHaveLength(113);
 		expect(ids(tk)).toEqual(definitions);
 		expect(edges(tk, 'specialization')).toEqual([
 			'Airframe -specialization-> Component',
@@ -224,6 +225,7 @@ describe('general view', () => {
 			'Harm -specialization-> RiskEvent',
 			'Hazard -specialization-> RiskEvent',
 			'HazardousSituation -specialization-> RiskEvent',
+			'InterfaceN2 -specialization-> DependencyMatrix',
 			'Motor -specialization-> Component',
 			'PayloadRelease -specialization-> Component',
 			'PowerDistributionBoard -specialization-> Component',
@@ -509,6 +511,7 @@ describe('package view', () => {
 			'DeliveryContext',
 			'DeliveryMission',
 			'DeliverySequence',
+			'DependencyMatrices',
 			'DroneArchitecture',
 			'DroneComponents',
 			'DroneInterfaces',

@@ -27,6 +27,7 @@
 	import EmptyState from '#lib/ui/EmptyState.svelte';
 	import KindGlyph from '#lib/ui/KindGlyph.svelte';
 	import SheetDialog from '#lib/ui/SheetDialog.svelte';
+	import { toasts } from '#lib/ui/toasts.svelte.ts';
 	import { applySteps, setViewSetting } from './actions.ts';
 	import DsmGrid from './DsmGrid.svelte';
 	import DsmList from './DsmList.svelte';
@@ -147,8 +148,7 @@
 		if (error) toastError(error);
 	}
 
-	async function toastError(message: string) {
-		const { toasts } = await import('#lib/ui/toasts.svelte.ts');
+	function toastError(message: string) {
 		toasts.show(message, { tone: 'error' });
 	}
 
