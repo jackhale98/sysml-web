@@ -7,17 +7,17 @@
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import { MockApiServer } from '../../src/lib/exchange/api-mock';
 import type { ElementJson } from '../../src/lib/exchange/elements';
+import { analyze } from './axe';
 
 const GARAGE = join(import.meta.dirname, '../../src/lib/exchange/fixtures/garage.json');
 const SERVER = 'https://sysml.example.test';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 async function expectAccessible(page: Page) {
-	const results = await new AxeBuilder({ page }).analyze();
+	const results = await analyze(page);
 	const violations = results.violations.map(
 		(v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`
 	);

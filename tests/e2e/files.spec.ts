@@ -6,13 +6,13 @@
  * In a project opened from a folder, a file deleted and not yet saved to the
  * folder is still a deleted file after a reload.
  */
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
+import { analyze } from './axe';
 
 test.describe.configure({ timeout: 120_000 });
 
 async function expectAccessible(page: Page, where: string) {
-	const results = await new AxeBuilder({ page }).analyze();
+	const results = await analyze(page);
 	expect(
 		results.violations.map((v) => `${v.id}: ${v.nodes[0]?.target}`),
 		`accessibility of ${where}`

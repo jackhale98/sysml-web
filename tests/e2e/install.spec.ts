@@ -7,8 +7,8 @@
  * INSTALL_SHOTS=<dir> also saves light and dark screenshots of the guide,
  * the switch dialog and the accounts list there.
  */
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page, type Route } from '@playwright/test';
+import { analyze } from './axe';
 
 const IPHONE_SAFARI =
 	'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1';
@@ -16,7 +16,7 @@ const IPHONE_SAFARI =
 test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 
 async function expectAccessible(page: Page) {
-	const results = await new AxeBuilder({ page }).analyze();
+	const results = await analyze(page);
 	expect(
 		results.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(', ')}`)
 	).toEqual([]);
