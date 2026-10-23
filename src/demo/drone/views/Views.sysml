@@ -16,6 +16,7 @@ package DroneViews {
     private import RiskAnalysis::RiskMatrix;
     private import HazardAnalysis::HazardLog;
     private import ModelViews::*;
+    private import DependencyMatrices::*;
 
     // Tables. Each is a view typed by a standard table from ModelViews
     // (libraries/ModelViews.sysml): change `expose` to pick what it lists,
@@ -112,6 +113,30 @@ package DroneViews {
 
     view verificationMatrix : VerificationMatrix {
         doc /* Every requirement down the side, the tests that check it across the top. */
+    }
+
+    // Dependency matrices (libraries/DependencyMatrices.sysml): the same elements down the
+    // side and across the top, and in each cell how the row's element leads to the column's.
+
+    view droneDsm : DependencyMatrix {
+        doc /* The drone's parts against each other: which connect, pass signals or are bound to which. */
+        expose DroneArchitecture::drone::*;
+    }
+
+    view droneN2 : InterfaceN2 {
+        doc /* An N² chart of the drone: its parts on the diagonal, and what passes between them off it. */
+        expose DroneArchitecture::drone::*;
+    }
+
+    view deliveryFlightDsm : FunctionalDsm {
+        doc /* The steps of a delivery flight against each other: which step leads to which. */
+        expose DeliveryMission::DeliveryFlight::*;
+    }
+
+    view requirementDsm : RequirementDsm {
+        doc /* The stakeholder needs and the system requirements derived from them. */
+        expose StakeholderNeeds::*;
+        expose SystemRequirements::*;
     }
 
     view fmeaWorksheet : DesignFmeaWorksheet {

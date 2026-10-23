@@ -165,9 +165,11 @@ const CONNECTOR_KINDS: Record<string, RelationKind> = {
 	AllocationUsage: 'allocates'
 };
 
+/** A name as a connector's end writes it: `A::'b c'.d`. */
+export const WRITTEN_NAME = String.raw`((?:'(?:[^'\\]|\\.)*'|[\w$]+)(?:\s*(?:::|\.)\s*(?:'(?:[^'\\]|\\.)*'|[\w$]+))*)`;
+const NAME = WRITTEN_NAME;
 /** A connector's two ends as its declaration writes them. */
-const NAME = String.raw`((?:'(?:[^'\\]|\\.)*'|[\w$]+)(?:\s*(?:::|\.)\s*(?:'(?:[^'\\]|\\.)*'|[\w$]+))*)`;
-const WRITTEN_ENDS: Partial<Record<RelationKind, RegExp>> = {
+export const WRITTEN_ENDS: Partial<Record<RelationKind, RegExp>> = {
 	connects: new RegExp(String.raw`\bconnect\s+${NAME}\s+to\s+${NAME}`),
 	allocates: new RegExp(String.raw`\ballocate\s+${NAME}\s+to\s+${NAME}`),
 	flows: new RegExp(String.raw`\bfrom\s+${NAME}\s+to\s+${NAME}`),

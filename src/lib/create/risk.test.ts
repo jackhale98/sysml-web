@@ -228,9 +228,9 @@ describe('on a new Small system project', { timeout: 60_000 }, () => {
 				'8',
 				'224',
 				'high',
+				'',
 				'high',
 				'reduce',
-				'',
 				'Corroded contacts; the light fails',
 				'Left in for years'
 			]

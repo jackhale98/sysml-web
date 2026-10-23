@@ -41,6 +41,7 @@ import type {
 	Hover,
 	OutlineItem,
 	RenderedTable,
+	DependencyMatrix,
 	RiskPolicy,
 	FmeaLineInfo,
 	StateMachine,
@@ -324,6 +325,11 @@ export class ToolkitHost {
 	/** A view rendered as a table by its `@TableRendering`. */
 	renderView(files: SourceFile[], name: string): RenderedTable {
 		return views.renderView(this.viewContext(files), name);
+	}
+
+	/** A view as a dependency matrix (`views/dsm.ts`), made once per analysis. */
+	dependencyMatrix(files: SourceFile[], name: string): DependencyMatrix {
+		return views.dependencyMatrix(this.viewContext(files), name);
 	}
 
 	/** The project's risk policy, as its risk library states it (`views/riskLines.ts`). */

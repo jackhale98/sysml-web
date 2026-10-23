@@ -143,17 +143,16 @@ describe('the risk policy form’s SysML', { timeout: 60_000 }, () => {
 		expect(orderColumns('part; actionPriority = A; rpn = R; rpnBand = B; effect', 'rpn')).toBe(
 			'part; rpn = R; rpnBand = B; actionPriority = A; effect'
 		);
+		// The worksheets' own order (the controls before the band) comes back as it was.
+		const own = 'rpn = R; actionPriority = A; riskControls; rpnBand = B';
+		expect(orderColumns(own, 'rpn')).toBe(own);
+		expect(orderColumns(orderColumns(own, 'actionPriority'), 'rpn')).toBe(own);
 		const text = withPolicy(library, { lead: 'actionPriority' });
 		const files = withLibrary(text);
 		expect(problems(files)).toEqual([]);
 		expect(host.riskPolicy(files).lead).toBe('actionPriority');
 		const sheet = host.renderView(files, 'fmeaWorksheet');
-		expect(sheet.columns.slice(5, 9)).toEqual([
-			'actionPriority',
-			'rpn',
-			'rpnBand',
-			'acceptability'
-		]);
+		expect(sheet.columns.slice(5, 9)).toEqual(['actionPriority', 'rpn', 'riskControls', 'rpnBand']);
 		const priority = sheet.rows.map((r) => r[5]);
 		// High before medium before low, then by RPN.
 		expect(priority).toEqual([

@@ -165,3 +165,11 @@ number and level filters as the new view's `where`, over the columns' own
 expressions (`Rpn(severity, likelihood, detection) >= 100`); text filters
 are left out, since the expression language has no "contains". Why `where`
 rather than a view's `filter`: see [risk-analysis.md](risk-analysis.md#reviews-saved-as-views).
+
+## Matrices of elements against each other
+
+A view can also be a dependency matrix (a DSM or an N² chart): the same
+elements down the side and across the top, and in each cell how the row's
+element leads to the column's. Those views use `@MatrixRendering` from the
+`DependencyMatrices` library rather than `@TableRendering`; see
+[dsm.md](dsm.md).

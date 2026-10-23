@@ -321,7 +321,11 @@ function withLead(text: string, view: string, lead: Lead, reorder: boolean): str
 	return text.slice(0, block.start) + body + text.slice(block.end);
 }
 
-/** The column list with the action priority before the RPN (and its band), or after them. */
+/**
+ * The column list with the action priority before the RPN, or after it (and
+ * after its band, when the band follows it); a list already in the lead's
+ * order is left as it is.
+ */
 export function orderColumns(columns: string, lead: Lead): string {
 	const items = columns.split(';').map((c) => c.trim());
 	const name = (c: string) => c.split('=')[0]!.trim();
@@ -329,11 +333,12 @@ export function orderColumns(columns: string, lead: Lead): string {
 	const priority = at('actionPriority');
 	const rpn = at('rpn');
 	if (priority < 0 || rpn < 0) return columns;
+	if (priority < rpn === (lead === 'actionPriority')) return columns;
 	const [moved] = items.splice(priority, 1);
 	if (lead === 'actionPriority') items.splice(at('rpn'), 0, moved!);
 	else {
 		const band = at('rpnBand');
-		items.splice((band >= 0 ? band : at('rpn')) + 1, 0, moved!);
+		items.splice((band === at('rpn') + 1 ? band : at('rpn')) + 1, 0, moved!);
 	}
 	return items.filter(Boolean).join('; ');
 }

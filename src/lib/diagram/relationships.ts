@@ -143,6 +143,23 @@ function canAllocate(from: ModelElement, to: ModelElement): boolean {
 	);
 }
 
+/**
+ * A connection between two parts of the same thing, with ports or without
+ * (`connect a to b` joins the parts themselves): what a dependency matrix
+ * offers for an empty cell. Null when they are not parts of one thing.
+ */
+export function connectOption(
+	a: ModelElement,
+	b: ModelElement,
+	ctx: ModelContext
+): RelationOption | null {
+	if (a.key === b.key || a.isDefinition || b.isDefinition || !isStructure(a) || !isStructure(b))
+		return null;
+	return connectionOwner(a, b, ctx.owners)
+		? { kind: 'connect', label: 'connect', from: a, to: b }
+		: null;
+}
+
 function canConnect(a: ModelElement, b: ModelElement, ctx: ModelContext): boolean {
 	if (a.isDefinition || b.isDefinition || !isStructure(a) || !isStructure(b)) return false;
 	if (!connectionOwner(a, b, ctx.owners)) return false;
@@ -210,10 +227,15 @@ export function defaultChoice(option: RelationOption, ctx: ModelContext): Relati
 	}
 	if (option.kind === 'connect') {
 		const pair = bestPorts(option, ctx);
+		if (!pair) {
+			// One end has no ports: the other end's first port, if it has any.
+			const { from, to } = portsFor(option, ctx);
+			return { fromPort: from[0]?.name, toPort: to[0]?.name, interfaceDef: '' };
+		}
 		return {
-			fromPort: pair?.from.name,
-			toPort: pair?.to.name,
-			interfaceDef: pair ? (interfacesFor(pair.from, pair.to, ctx)[0]?.def.name ?? '') : ''
+			fromPort: pair.from.name,
+			toPort: pair.to.name,
+			interfaceDef: interfacesFor(pair.from, pair.to, ctx)[0]?.def.name ?? ''
 		};
 	}
 	return {};
@@ -437,11 +459,15 @@ export function planRelation(
 		case 'connect': {
 			const owner = connectionOwner(from, to, ctx.owners);
 			if (!owner) return `${from.label} and ${to.label} are not parts of the same thing.`;
-			if (!choice.fromPort || !choice.toPort) return 'Choose a port on each end.';
-			let a = `${relativePath(from, owner, ctx.owners)}.${choice.fromPort}`;
-			let b = `${relativePath(to, owner, ctx.owners)}.${choice.toPort}`;
+			// A part with ports connects through one; a part without, itself.
+			const ends = portsFor(option, ctx);
+			if ((ends.from.length && !choice.fromPort) || (ends.to.length && !choice.toPort))
+				return 'Choose a port on each end.';
+			const at = (path: string, port: string | undefined) => (port ? `${path}.${port}` : path);
+			let a = at(relativePath(from, owner, ctx.owners), choice.fromPort);
+			let b = at(relativePath(to, owner, ctx.owners), choice.toPort);
 			let statement = `connect ${a} to ${b};`;
-			if (choice.interfaceDef) {
+			if (choice.interfaceDef && choice.fromPort && choice.toPort) {
 				const def = findDefinition(choice.interfaceDef, ctx.elements);
 				const ports = portsFor(option, ctx);
 				const pa = ports.from.find((p) => p.name === choice.fromPort);

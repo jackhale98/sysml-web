@@ -251,6 +251,34 @@ export async function setTableColumns(
 }
 
 /**
+ * Save one setting of a view in its own rendering metadata (`@MatrixRendering
+ * { order = "clustered"; }`), as one undoable step.
+ */
+export async function setViewSetting(
+	workspace: Workspace,
+	view: { file: string; name: string; id?: string | undefined },
+	metadata: string,
+	field: string,
+	value: string,
+	label: string
+): Promise<string | null> {
+	const text = workspace.text(view.file);
+	if (text === undefined) return `${view.file} is not in the project.`;
+	return undoable(workspace, label, () =>
+		workspace.edit(view.file, {
+			op: 'setViewMetadata',
+			path: view.file,
+			source: text,
+			view: view.name,
+			...(view.id ? { id: view.id } : {}),
+			metadata,
+			field,
+			value
+		})
+	);
+}
+
+/**
  * One change of a model edit made on a diagram: a member the engine places
  * in a definition or package, or a text patch computed against the file as
  * it is now (`before`), for what the engine cannot edit yet.

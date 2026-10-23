@@ -7,6 +7,7 @@
 		FileCode,
 		FilePlus,
 		FileText,
+		Grid3x3,
 		LayoutDashboard,
 		ListChecks,
 		Network,
@@ -460,6 +461,8 @@
 												size={14}
 											/>{:else if v.presentation.kind === 'table'}<Table2
 												size={14}
+											/>{:else if v.presentation.kind === 'matrix'}<Grid3x3
+												size={14}
 											/>{:else}<Network size={14} />{/if}
 										<span class="label">{viewTitle(v.info.name)}</span>
 									</button>
@@ -587,6 +590,11 @@
 								<li>
 									<button type="button" class="item" onclick={() => create({ kind: 'hazard' })}>
 										<TriangleAlert size={14} /> <span class="label">Hazard…</span>
+									</button>
+								</li>
+								<li>
+									<button type="button" class="item" onclick={() => create({ kind: 'dsm' })}>
+										<Grid3x3 size={14} /> <span class="label">Dependency matrix…</span>
 									</button>
 								</li>
 								<li>

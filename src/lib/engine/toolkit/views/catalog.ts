@@ -60,6 +60,9 @@ export function listViews(ctx: ViewContext): ViewInfo[] {
 		)?.render[0];
 		if (render) info.renderAs = render;
 		if (clauses.expose.length) info.exposes = clauses.expose;
+		const elements = renderingSpec(ctx, view, 'MatrixRendering')?.get('elements')?.trim();
+		if (elements === 'parts' || elements === 'actions' || elements === 'requirements')
+			info.matrix = elements;
 		return info;
 	});
 }
@@ -123,11 +126,23 @@ export function viewChain(ctx: ViewContext, view: ElementRecord): ElementRecord[
  * typed by (`(category == …) and (severity >= 9)`).
  */
 export function tableSpec(ctx: ViewContext, view: ElementRecord): Map<string, string> | null {
+	return renderingSpec(ctx, view, 'TableRendering');
+}
+
+/**
+ * The values of a rendering's metadata (`TableRendering`, `MatrixRendering`)
+ * that apply to a view, as `tableSpec` merges them.
+ */
+export function renderingSpec(
+	ctx: ViewContext,
+	view: ElementRecord,
+	type: string
+): Map<string, string> | null {
 	let spec: Map<string, string> | null = null;
 	for (const record of viewChain(ctx, view).reverse()) {
 		const own = ctx
 			.metadataOf(record.id)
-			.find((a) => unquoteName(simpleName(a.metadata_type)) === 'TableRendering');
+			.find((a) => unquoteName(simpleName(a.metadata_type)) === type);
 		if (!own) continue;
 		spec ??= new Map();
 		for (const [key, written] of own.values) {

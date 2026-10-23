@@ -314,14 +314,15 @@ package RiskAnalysis {
     }
 
     // --- Worksheets: views of the @Fmea lines -------------------------------
-    // The figures come right after the failure, so they stay in view on a
-    // narrow screen; the effect and the cause follow.
+    // The figures come right after the failure, then the controls that answer
+    // them, so they stay in view on a narrow screen (beside the details panel);
+    // the RPN band, the acceptability, the effect and the cause follow.
 
     view def FmeaWorksheet {
         doc /* Every FMEA line, of every kind, highest risk first. */
         @TableRendering {
             rows = "@Fmea";
-            columns = "element; failureMode; severity; likelihood; detection; rpn = Rpn(severity, likelihood, detection); rpnBand = RpnBand(Rpn(severity, likelihood, detection)); actionPriority = ActionPriority(severity, likelihood, detection); acceptability = Acceptability(severity, likelihood); riskControls; effect; cause; category";
+            columns = "element; failureMode; severity; likelihood; detection; rpn = Rpn(severity, likelihood, detection); actionPriority = ActionPriority(severity, likelihood, detection); riskControls; rpnBand = RpnBand(Rpn(severity, likelihood, detection)); acceptability = Acceptability(severity, likelihood); effect; cause; category";
             sortBy = "-rpn";
         }
     }
@@ -330,7 +331,7 @@ package RiskAnalysis {
         doc /* A design FMEA: how the parts can fail. */
         @TableRendering {
             rows = "@Fmea";
-            columns = "part = element; failureMode; severity; likelihood; detection; rpn = Rpn(severity, likelihood, detection); rpnBand = RpnBand(Rpn(severity, likelihood, detection)); actionPriority = ActionPriority(severity, likelihood, detection); acceptability = Acceptability(severity, likelihood); riskControls; effect; cause";
+            columns = "part = element; failureMode; severity; likelihood; detection; rpn = Rpn(severity, likelihood, detection); actionPriority = ActionPriority(severity, likelihood, detection); riskControls; rpnBand = RpnBand(Rpn(severity, likelihood, detection)); acceptability = Acceptability(severity, likelihood); effect; cause";
             where = "category == RiskCategory::design or category == RiskCategory::software";
             sortBy = "-rpn";
         }
@@ -340,7 +341,7 @@ package RiskAnalysis {
         doc /* A process FMEA: how the steps of a process can go wrong. */
         @TableRendering {
             rows = "@Fmea";
-            columns = "processStep = element; failureMode; severity; likelihood; detection; rpn = Rpn(severity, likelihood, detection); rpnBand = RpnBand(Rpn(severity, likelihood, detection)); actionPriority = ActionPriority(severity, likelihood, detection); acceptability = Acceptability(severity, likelihood); riskControls; effect; cause";
+            columns = "processStep = element; failureMode; severity; likelihood; detection; rpn = Rpn(severity, likelihood, detection); actionPriority = ActionPriority(severity, likelihood, detection); riskControls; rpnBand = RpnBand(Rpn(severity, likelihood, detection)); acceptability = Acceptability(severity, likelihood); effect; cause";
             where = "category == RiskCategory::process";
             sortBy = "-rpn";
         }
@@ -350,7 +351,7 @@ package RiskAnalysis {
         doc /* A use FMEA: the use errors a user can make in each task, and what follows. */
         @TableRendering {
             rows = "@Fmea";
-            columns = "task = element; useError = failureMode; severity; likelihood; detection; rpn = Rpn(severity, likelihood, detection); rpnBand = RpnBand(Rpn(severity, likelihood, detection)); actionPriority = ActionPriority(severity, likelihood, detection); acceptability = Acceptability(severity, likelihood); riskControls; effect; cause";
+            columns = "task = element; useError = failureMode; severity; likelihood; detection; rpn = Rpn(severity, likelihood, detection); actionPriority = ActionPriority(severity, likelihood, detection); riskControls; rpnBand = RpnBand(Rpn(severity, likelihood, detection)); acceptability = Acceptability(severity, likelihood); effect; cause";
             where = "category == RiskCategory::'use'";
             sortBy = "-rpn";
         }

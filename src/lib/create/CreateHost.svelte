@@ -83,6 +83,10 @@
 			{#await import('./RiskPolicyForm.svelte') then { default: RiskPolicyForm }}
 				<RiskPolicyForm bind:open {workspace} {engine} />
 			{/await}
+		{:else if request.kind === 'dsm'}
+			{#await import('./DsmForm.svelte') then { default: DsmForm }}
+				<DsmForm bind:open {workspace} {ui} elements={request.elements} target={request.target} />
+			{/await}
 		{:else if request.kind === 'savedReview'}
 			{#await import('./SaveReviewForm.svelte') then { default: SaveReviewForm }}
 				<SaveReviewForm bind:open {workspace} {ui} {request} />

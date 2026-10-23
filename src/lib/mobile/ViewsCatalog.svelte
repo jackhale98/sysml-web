@@ -4,6 +4,7 @@
 		ChevronRight,
 		FileCode,
 		FileText,
+		Grid3x3,
 		LayoutDashboard,
 		ListChecks,
 		Network,
@@ -125,6 +126,13 @@
 					<span class="label">New hazard</span>
 				</button>
 			</li>
+			<li>
+				<button type="button" class="row" onclick={() => (ui.create = { kind: 'dsm' })}>
+					<span class="tile" style:--tone="var(--kind-interface)"><Grid3x3 size={18} /></span>
+					<span class="label">New DSM</span>
+					<span class="detail">Dependency matrix, N² chart</span>
+				</button>
+			</li>
 		</ul>
 	</section>
 
@@ -134,10 +142,22 @@
 			<ul>
 				{#each g.views as v (v.info.name)}
 					{@render row(
-						v.report ? FileText : v.presentation.kind === 'table' ? Table2 : Network,
+						v.report
+							? FileText
+							: v.presentation.kind === 'table'
+								? Table2
+								: v.presentation.kind === 'matrix'
+									? Grid3x3
+									: Network,
 						viewTitle(v.info.name),
 						{ kind: 'view', name: v.info.name, title: viewTitle(v.info.name) },
-						v.report ? 'Document' : v.presentation.kind === 'table' ? 'Table' : 'Diagram'
+						v.report
+							? 'Document'
+							: v.presentation.kind === 'table'
+								? 'Table'
+								: v.presentation.kind === 'matrix'
+									? 'Matrix'
+									: 'Diagram'
 					)}
 				{/each}
 			</ul>

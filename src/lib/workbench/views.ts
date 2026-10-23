@@ -8,6 +8,7 @@ import type { DiagramView, ViewInfo } from '#lib/engine/types.ts';
 
 export type Presentation =
 	| { kind: 'table' }
+	| { kind: 'matrix' }
 	| { kind: 'diagram'; view: DiagramView; scope: string | null }
 	| { kind: 'none' };
 
@@ -25,6 +26,7 @@ const RENDERED_AS: Record<string, string> = {
 };
 
 export function presentationOf(view: ViewInfo): Presentation {
+	if (view.matrix) return { kind: 'matrix' };
 	if (view.hasTable) return { kind: 'table' };
 	if (!view.isUsage) return { kind: 'none' };
 	const exposes = view.exposes ?? [];
@@ -77,7 +79,19 @@ export function breakable(text: string): string[] {
 }
 
 /** Abbreviations engineers write in capitals, even when a name is camel case (`fmeaWorksheet`). */
-const ACRONYMS = new Set(['fmea', 'icd', 'bom', 'rpn', 'uav', 'gps', 'id', 'si', 'ui', 'api']);
+const ACRONYMS = new Set([
+	'fmea',
+	'icd',
+	'bom',
+	'rpn',
+	'uav',
+	'gps',
+	'id',
+	'si',
+	'ui',
+	'api',
+	'dsm'
+]);
 
 /** The headings saved views are listed under, in order. */
 export type ViewFamily =
@@ -114,6 +128,10 @@ const FAMILY_OF: Record<string, ViewFamily> = {
 	PortTable: 'interfaces',
 	ConnectionTable: 'interfaces',
 	InterconnectionView: 'interfaces',
+	DependencyMatrix: 'interfaces',
+	InterfaceN2: 'interfaces',
+	FunctionalDsm: 'behaviour',
+	RequirementDsm: 'requirements',
 	AllocationMatrix: 'behaviour',
 	StateTransitionView: 'behaviour',
 	ActionFlowView: 'behaviour',
