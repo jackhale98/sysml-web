@@ -5,19 +5,23 @@
 		ArrowLeftRight,
 		ArrowRight,
 		BookOpen,
+		CircleQuestionMark,
 		Crosshair,
 		FileCode,
 		FileSpreadsheet,
 		FolderOpen,
 		GitBranch,
+		GitCompareArrows,
 		Keyboard,
 		ListPlus,
-		MonitorSmartphone,
 		PenLine,
 		Plus,
-		ServerOff,
-		WandSparkles
+		Server,
+		Smartphone,
+		WandSparkles,
+		WifiOff
 	} from '@lucide/svelte';
+	import Analysis from '#lib/landing/Analysis.svelte';
 	import ConceptDemo from '#lib/landing/ConceptDemo.svelte';
 	import DiffCard from '#lib/landing/DiffCard.svelte';
 	import HeroStage from '#lib/landing/HeroStage.svelte';
@@ -40,7 +44,7 @@
 		{
 			icon: PenLine,
 			title: 'Draw, and the text is written',
-			text: 'Add parts, ports and connections on the canvas. Each becomes a minimal, idiomatic line of SysML.'
+			text: 'Add parts, ports, connections, states and steps on the canvas. Each becomes a minimal, idiomatic line of SysML.'
 		},
 		{
 			icon: Crosshair,
@@ -57,36 +61,51 @@
 		},
 		{
 			icon: WandSparkles,
-			title: 'Problems come with a fix',
-			text: '“Battery is used but never defined — create it?” One click writes the SysML.'
+			title: 'Forms that write it for you',
+			text: 'New view, Add up, Set a limit, New FMEA: each guided form writes the SysML and shows you the text it wrote.'
 		},
 		{
 			icon: ListPlus,
 			title: 'Add what fits, where you are',
-			text: 'A port on a part, a transition from a state, satisfy on a requirement: offered in context.'
+			text: 'A port on a part, a transition from a state, what satisfies a requirement: offered in context.'
+		},
+		{
+			icon: CircleQuestionMark,
+			title: 'Help in plain words',
+			text: 'Every idea and every common job, with a button that starts it. Templates and next steps get a new project going.'
 		}
 	];
 
 	const yours = [
 		{
 			icon: FileCode,
-			title: 'Conformant SysML v2',
-			text: 'Plain .sysml text, tested against the OMG specification. Any conformant tool can read it.'
+			title: 'Standard SysML v2',
+			text: 'Plain .sysml text in the standard notation, readable by any conformant tool. Views and analyses are SysML too.'
 		},
 		{
 			icon: GitBranch,
 			title: 'In your git repository',
-			text: 'Branches, history and reviews like the rest of your engineering. Every edit is a small, readable diff.'
+			text: 'Save to GitHub, work on a branch and propose changes as a pull request. Every edit is a small, readable diff.'
 		},
 		{
-			icon: ServerOff,
-			title: 'No server holds your data',
-			text: 'The app runs entirely in your browser and talks straight to your git host.'
+			icon: GitCompareArrows,
+			title: 'Reviews in plain words',
+			text: 'Review changes says what changed in the model, from requirements to risk, and which checks it moves.'
 		},
 		{
-			icon: MonitorSmartphone,
+			icon: WifiOff,
+			title: 'Works offline, no server',
+			text: 'Once a project has opened, it works with no connection. Your projects stay in your browser until you save them elsewhere.'
+		},
+		{
+			icon: Smartphone,
 			title: 'At your desk or on your phone',
-			text: 'Full authoring on desktop; reading, reviewing and quick edits on the go.'
+			text: 'Full authoring on a computer. Add it to your Home Screen on iPhone or Android to read, review and edit on the go.'
+		},
+		{
+			icon: Server,
+			title: 'Open to other tools',
+			text: '.kpar archives, SysML v2 JSON and SysML v2 API servers such as SysON, merging with what others saved.'
 		}
 	];
 
@@ -95,33 +114,37 @@
 		['structure', 'Architecture'],
 		['interface', 'Interfaces'],
 		['behavior', 'Behaviour'],
-		['analysis', 'FMEA']
+		['analysis', 'Analysis and risk']
 	];
 
 	const projects = resolve('/projects');
 	const newProject = resolve('/projects?new');
-	const soon: { icon: typeof GitBranch; title: string; text: string; href?: string }[] = [
+	const fromSpreadsheet = resolve('/projects?new&template=requirements');
+	const fromGitHub = resolve('/projects?github');
+	const starts: { icon: typeof GitBranch; title: string; text: string; href: string }[] = [
 		{
 			icon: Plus,
 			title: 'Start a new project',
-			text: 'A starter model with a first requirement, the system and saved views.',
+			text: 'Blank, requirements first, or a small system to learn from, with next steps and a tour.',
 			href: newProject
-		},
-		{
-			icon: FolderOpen,
-			title: 'Open a folder or a .kpar',
-			text: 'Work on .sysml files from your computer or another SysML v2 tool.',
-			href: projects
-		},
-		{
-			icon: GitBranch,
-			title: 'Open a repository',
-			text: 'Work on a branch in GitHub, GitLab or Bitbucket and open a pull request.'
 		},
 		{
 			icon: FileSpreadsheet,
 			title: 'Start from a spreadsheet',
-			text: 'Turn an Excel or CSV requirements list into SysML, column by column.'
+			text: 'A requirements-first project, then import an Excel or CSV list into SysML, column by column.',
+			href: fromSpreadsheet
+		},
+		{
+			icon: GitBranch,
+			title: 'Open a GitHub repository',
+			text: 'Work on a branch, save back to it and propose changes as a pull request.',
+			href: fromGitHub
+		},
+		{
+			icon: FolderOpen,
+			title: 'Open a folder or a file',
+			text: 'Work on .sysml files on your computer, or import a .kpar or SysML v2 JSON from another tool.',
+			href: projects
 		}
 	];
 </script>
@@ -130,7 +153,7 @@
 	<title>Fairtide — SysML v2 in text and diagrams</title>
 	<meta
 		name="description"
-		content="A web workbench for SysML v2: build models in text or diagrams, live-synced, with every element explained in plain language. Standard SysML in your own git repository; no server holds your data."
+		content="A SysML v2 workbench: text and diagrams edit the same model, live, with every element explained in plain language. Standard SysML in your own git repository, offline and on your phone, with checks, budgets, trade studies, simulation, risk analysis and dependency matrices."
 	/>
 	<!-- eslint-disable-next-line svelte/no-at-html-tags -- a fixed script of ours, not content -->
 	{@html launchScript}
@@ -141,7 +164,8 @@
 		<a class="brand" href={resolve('/')}><Logo size={28} /> <Wordmark height={20} /></a>
 		<nav aria-label="Site">
 			<a class="nav-link" href="#how">How it works</a>
-			<a class="nav-link" href="#standard">Standard</a>
+			<a class="nav-link" href="#standard">Yours</a>
+			<a class="nav-link" href="#analysis">Analysis</a>
 			<a class="nav-link" href="#start">Get started</a>
 			<ThemeToggle />
 			<a class="button ghost small" href={demo}>Open the demo</a>
@@ -154,14 +178,15 @@
 		<div class="backdrop" aria-hidden="true"></div>
 		<div class="wrap hero-grid">
 			<div class="intro">
-				<p class="badge"><span class="pulse"></span> SysML v2 · open source · in your browser</p>
+				<p class="badge"><span class="pulse"></span> SysML v2 · open source · works offline</p>
 				<h1 id="hero-title">
 					<span>Write it.</span> <span>Draw it.</span>
 					<span class="gradient">Understand it.</span>
 				</h1>
 				<p class="lede">
-					A workbench where SysML v2 text and diagrams edit the same model, live — and every element
-					explains itself in plain language. Standard files, in your own git repository.
+					A SysML v2 workbench where text and diagrams edit the same model, live, and every element
+					explains itself in plain language. Standard files in your own git repository, with checks,
+					simulation and risk analysis on top: at your desk, on your phone, even offline.
 				</p>
 				<div class="actions">
 					<a class="button primary" href={demo}>Try the demo <ArrowRight size={18} /></a>
@@ -213,11 +238,61 @@
 		</div>
 	</section>
 
-	<section class="section tinted" aria-labelledby="explain-title">
+	<section id="standard" class="section tinted" aria-labelledby="standard-title">
+		<div class="wrap split reverse">
+			<div>
+				<header class="heading">
+					<p class="kicker"><span>02</span> Standard and yours</p>
+					<h2 id="standard-title">Plain SysML v2, in your own repository.</h2>
+				</header>
+				<ul class="pillars">
+					{#each yours as y (y.title)}
+						<li>
+							<span class="point-icon"><y.icon size={18} /></span>
+							<h3>{y.title}</h3>
+							<p>{y.text}</p>
+						</li>
+					{/each}
+				</ul>
+			</div>
+			<DiffCard />
+		</div>
+	</section>
+
+	<section id="analysis" class="section" aria-labelledby="analysis-title">
+		<div class="wrap">
+			<header class="heading center">
+				<p class="kicker"><span>03</span> Analysis on top</p>
+				<h2 id="analysis-title">Ask the model, not a spreadsheet.</h2>
+				<p class="intro-text">
+					One connected model answers the questions engineers ask: does the design meet its numbers,
+					which option wins, how it behaves over time, what can fail and what depends on what. The
+					tables and matrices are views saved in the model, so they stay current.
+				</p>
+			</header>
+			<Analysis />
+		</div>
+	</section>
+
+	<section class="section tinted" aria-labelledby="practice-title">
+		<div class="wrap">
+			<header class="heading center">
+				<p class="kicker"><span>04</span> Your practices, modernised</p>
+				<h2 id="practice-title">The work you already do, as live model views.</h2>
+				<p class="intro-text">
+					Requirements lists, interface tables, test matrices and FMEA worksheets become standard
+					SysML views over one model — always current, always traced.
+				</p>
+			</header>
+			<Practices />
+		</div>
+	</section>
+
+	<section class="section" aria-labelledby="explain-title">
 		<div class="wrap split">
 			<div>
 				<header class="heading">
-					<p class="kicker"><span>02</span> SysML that explains itself</p>
+					<p class="kicker"><span>05</span> SysML that explains itself</p>
 					<h2 id="explain-title">Learn the language by using it.</h2>
 					<p class="intro-text">
 						New to MBSE? Every keyword, element and relationship can tell you what it is, in plain
@@ -241,46 +316,11 @@
 		</div>
 	</section>
 
-	<section class="section" aria-labelledby="practice-title">
-		<div class="wrap">
-			<header class="heading center">
-				<p class="kicker"><span>03</span> Your practices, modernised</p>
-				<h2 id="practice-title">The work you already do, as live model views.</h2>
-				<p class="intro-text">
-					Requirements lists, interface tables, test matrices and FMEA worksheets become standard
-					SysML views over one model — always current, always traced.
-				</p>
-			</header>
-			<Practices />
-		</div>
-	</section>
-
-	<section id="standard" class="section tinted" aria-labelledby="standard-title">
-		<div class="wrap split reverse">
-			<div>
-				<header class="heading">
-					<p class="kicker"><span>04</span> Standard and yours</p>
-					<h2 id="standard-title">Plain SysML v2, in your own repository.</h2>
-				</header>
-				<ul class="pillars">
-					{#each yours as y (y.title)}
-						<li>
-							<span class="point-icon"><y.icon size={18} /></span>
-							<h3>{y.title}</h3>
-							<p>{y.text}</p>
-						</li>
-					{/each}
-				</ul>
-			</div>
-			<DiffCard />
-		</div>
-	</section>
-
 	<section id="start" class="section start" aria-labelledby="start-title">
 		<div class="glow" aria-hidden="true"></div>
 		<div class="wrap">
 			<header class="heading center">
-				<p class="kicker"><span>05</span> Get started</p>
+				<p class="kicker"><span>06</span> Get started</p>
 				<h2 id="start-title">Open a model in seconds.</h2>
 			</header>
 			<div class="start-grid">
@@ -289,7 +329,8 @@
 					<h3>The delivery drone</h3>
 					<p>
 						A complete model to explore and change: stakeholder needs and requirements, architecture
-						and interfaces, flight behaviour, verification and a design FMEA.
+						and interfaces, flight modes to simulate, budgets and a battery trade study,
+						verification, and a design FMEA with its hazards. A guided tour walks through it.
 					</p>
 					<ul class="families" aria-label="What the demo contains">
 						{#each families as [family, label] (family)}
@@ -298,20 +339,18 @@
 					</ul>
 					<a class="button primary" href={demo}>Open the drone demo <ArrowRight size={18} /></a>
 				</div>
-				<ul class="soon">
-					{#each soon as item (item.title)}
-						<li class:available={!!item.href}>
-							<span class="soon-icon"><item.icon size={18} /></span>
+				<ul class="ways">
+					{#each starts as item (item.title)}
+						<li class="available">
+							<span class="way-icon"><item.icon size={18} /></span>
 							<div>
 								<h3>
-									{#if item.href}<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- hrefs above come from resolve() -->
-										<a href={item.href}>{item.title}</a>{:else}{item.title}{/if}
+									<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- hrefs above come from resolve() -->
+									<a href={item.href}>{item.title}</a>
 								</h3>
 								<p>{item.text}</p>
 							</div>
-							{#if item.href}<ArrowRight size={18} class="go" />{:else}<span class="tag"
-									>Coming soon</span
-								>{/if}
+							<ArrowRight size={18} class="go" />
 						</li>
 					{/each}
 				</ul>
@@ -323,7 +362,12 @@
 <footer class="foot">
 	<div class="wrap foot-inner">
 		<p class="foot-brand"><Logo size={22} /> <Wordmark height={16} /></p>
-		<p>Open source under Apache-2.0 OR MIT.</p>
+		<p>
+			Open source under Apache-2.0 OR MIT.
+			<a href="https://github.com/jackhale98/sysml-web" rel="noopener noreferrer"
+				>Source on GitHub</a
+			>
+		</p>
 		<p>SysML is a registered trademark of the Object Management Group.</p>
 	</div>
 </footer>
@@ -882,14 +926,14 @@
 	.demo-card .button {
 		margin-top: var(--space-2);
 	}
-	.soon {
+	.ways {
 		list-style: none;
 		margin: 0;
 		padding: 0;
 		display: grid;
 		gap: var(--space-3);
 	}
-	.soon li {
+	.ways li {
 		display: flex;
 		align-items: flex-start;
 		gap: var(--space-3);
@@ -898,11 +942,11 @@
 		border-radius: var(--radius-lg);
 		background: color-mix(in srgb, var(--surface) 60%, transparent);
 	}
-	.soon li div {
+	.ways li div {
 		flex: 1;
 	}
 	/* Available options are whole-card links (the title link covers the card). */
-	.soon li.available {
+	.ways li.available {
 		position: relative;
 		border-style: solid;
 		border-color: color-mix(in oklab, var(--accent) 30%, var(--border));
@@ -911,25 +955,25 @@
 			border-color var(--duration) var(--ease),
 			box-shadow var(--duration) var(--ease);
 	}
-	.soon li.available:hover {
+	.ways li.available:hover {
 		border-color: var(--accent);
 		box-shadow: var(--shadow-md);
 	}
-	.soon li.available h3 a {
+	.ways li.available h3 a {
 		color: inherit;
 		text-decoration: none;
 	}
-	.soon li.available h3 a::after {
+	.ways li.available h3 a::after {
 		content: '';
 		position: absolute;
 		inset: 0;
 		border-radius: inherit;
 	}
-	.soon li.available :global(.go) {
+	.ways li.available :global(.go) {
 		align-self: center;
 		color: var(--accent);
 	}
-	.soon-icon {
+	.way-icon {
 		display: grid;
 		place-items: center;
 		flex: none;
@@ -939,36 +983,14 @@
 		background: var(--surface-2);
 		color: var(--text-2);
 	}
-	.soon h3 {
+	.ways h3 {
 		font-size: var(--text-lg);
 	}
-	.soon p {
+	.ways p {
 		margin-top: 0.15rem;
 		color: var(--text-2);
 		font-size: var(--text-md);
 	}
-	.tag {
-		flex: none;
-		padding: 0.1rem 0.55rem;
-		border-radius: var(--radius-pill);
-		background: var(--surface-2);
-		color: var(--text-2);
-		font-size: var(--text-xs);
-		font-weight: 600;
-		white-space: nowrap;
-	}
-	@media (max-width: 30rem) {
-		.soon li {
-			flex-wrap: wrap;
-		}
-		.soon li div {
-			flex-basis: calc(100% - 3rem);
-		}
-		.tag {
-			margin-left: 3rem;
-		}
-	}
-
 	/* ── Footer ────────────────────────────────────────────────────────────── */
 	.foot {
 		border-top: 1px solid var(--border);
@@ -981,6 +1003,11 @@
 		padding-block: var(--space-6);
 		color: var(--text-3);
 		font-size: var(--text-sm);
+	}
+	.foot-inner a {
+		color: inherit;
+		text-decoration: underline;
+		text-underline-offset: 0.15em;
 	}
 	.foot-brand {
 		display: inline-flex;

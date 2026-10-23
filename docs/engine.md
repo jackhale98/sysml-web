@@ -655,14 +655,16 @@ slips, and the report of what didn't carry over.
 
 What round-trips and what doesn't, the API's paths and what a server must
 allow (CORS) are in `docs/interchange.md`. In short: the demo goes to JSON
-and back with no problems and the same 6,291 elements (by qualified name and
-element by element); comments, layout and ids don't survive the trip
-through JSON; values the text can't hold, unknown element types and
-unresolved references are reported, not carried. Export of the demo takes
-0.2–0.4 s in Node (the full form with derived properties 1.6–4 s), the
+and back with no problems and the same elements (8,385 on 2026-10-23, by
+qualified name and element by element); comments, layout and ids don't
+survive the trip through JSON; values the text can't hold, unknown element
+types and unresolved references are reported, not carried. Measured on
+2026-10-22 with the demo as it was then (21 files, 6,291 elements): export
+took 0.2–0.4 s in Node (the full form with derived properties 1.6–4 s), the
 import about 2 s; with the standard library about 6 s in the browser (a
 54 MB file, 97,826 elements) and 140 MB of WebAssembly memory, in its own
-worker.
+worker. On 2026-10-23 a single cold run in Node on the 8,385-element demo
+took 1.3 s to export and 3.1 s to import.
 
 ## When the toolkit fails
 

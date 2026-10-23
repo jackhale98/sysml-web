@@ -2,7 +2,7 @@
 	"id": "./",
 	"name": "Fairtide",
 	"short_name": "Fairtide",
-	"description": "Requirements, architecture, verification and risk in one place, stored as standard SysML v2 in your own git repository.",
+	"description": "SysML v2 in text and diagrams: requirements, architecture, behaviour, verification and risk in one model, stored as standard SysML in your own git repository. Works offline.",
 	"lang": "en",
 	"dir": "ltr",
 	"start_url": "./projects?launch",
