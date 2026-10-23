@@ -51,7 +51,7 @@ original. `tools/interop/pilot/PilotExport.java` adds the pilot's own abstract s
 (its Jupyter kernel's `%export`) as a referee. New headless commands:
 `run.mjs kpar|unkpar|semantics|compare`.
 
-### Results (run)
+### Results (run; `tools/interop/acceptance.sh`, twice, same numbers)
 
 | Route | What came back | Semantic difference to the original |
 | --- | --- | --- |
@@ -66,7 +66,7 @@ original. `tools/interop/pilot/PilotExport.java` adds the pilot's own abstract s
 | SysON's JSON of a one-file model (EngineeringBasics) → Fairtide | imports; text identical in meaning | 0, but the report says 6 things "couldn't be carried over" and 45 "read differently" (false) |
 | Fairtide "Save … as a new project" on SysON | **fails, reported**: "The server answered with something other than JSON. Is … the address of a SysML v2 API?" | nothing created on SysON |
 | Fairtide "Save to server" into a SysON project | **fails, reported** (same message) | SysON unchanged (checked: 0 elements after) |
-| Pilot's own export of the fixture vs Fairtide | 2,978 elements (includes implied features and the library it reaches) | after the pilot's implied features: the differences listed under "Who is right" |
+| Pilot's own export of the fixture (`PilotExport.java`) vs Fairtide | 2,978 elements: it includes implied features (multiplicities, result and expression parameters) and the library elements it reaches | 10 / 139 / 52 — nearly all the pilot's implied elements and its library naming; the rest are the rows marked "pilot" below |
 
 **The pilot on every artifact Fairtide exported** (`acceptance.sh`, pilot 0.62.0): the text
 re-imported from each JSON form and the contents of the `.kpar`: 4 files, 0 errors, 0
