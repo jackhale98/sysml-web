@@ -1,0 +1,34 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`applied > on a Small system project: the library comes with the first matrix, which checks clean 1`] = `
+"private import DependencyMatrices::DependencyMatrix;
+private import DependencyMatrices::MatrixRendering;
+
+// in FlashlightViews
+
+view flashlightDSM : DependencyMatrix {
+    expose FlashlightDesign::flashlight::*;
+    @MatrixRendering { dependencies = "connection; flow"; order = "clustered"; }
+}"
+`;
+
+exports[`the generators > writes a view of the library’s def, with only the settings that differ 1`] = `
+"view flashlightDSM : DependencyMatrices::DependencyMatrix {
+    expose Flashlight::flashlight::*;
+}"
+`;
+
+exports[`the generators > writes a view of the library’s def, with only the settings that differ 2`] = `
+"view flashlightN2 : DependencyMatrices::InterfaceN2 {
+    doc /* What passes between the parts. */
+    expose Flashlight::flashlight::**;
+    @DependencyMatrices::MatrixRendering { dependencies = "connection; flow; allocation"; order = "clustered"; levels = 2; }
+}"
+`;
+
+exports[`the generators > writes a view of the library’s def, with only the settings that differ 3`] = `
+"view requirementDSM : DependencyMatrices::RequirementDsm {
+    expose Needs::*;
+    expose Needs::'Run time';
+}"
+`;
