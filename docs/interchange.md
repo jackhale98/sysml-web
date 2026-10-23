@@ -97,9 +97,9 @@ project.
 
 ### What round-trips
 
-The demo (21 files, 6,291 elements) → JSON → text: no problems, all 6,291
-elements, the same named elements by qualified name and kind, and the same
-structure element by element (`interchange.test.ts`, `exchange.spec.ts`
+The demo (22 files, 8,385 elements on 2026-10-23) → JSON → text: no
+problems, every element, the same named elements by qualified name and kind,
+and the same structure element by element (`interchange.test.ts`, `exchange.spec.ts`
 opens its views). A hand-written file from "another tool" (random ids,
 derived properties present, defaults omitted) imports with no notes, and
 saving it back changes nothing.

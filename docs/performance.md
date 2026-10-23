@@ -57,8 +57,9 @@ unless noted; read before against after within a table.
 
 ## Results
 
-Before is the benchmark's own commit (`856ce0e`, the code as it was), after
-is this branch. 10k is 10,546 lines in 66 files, 50k 50,020 in 304, 100k
+These were measured on 2026-10-22. Before is the benchmark's own commit
+(`856ce0e`, the code as it was), after is the branch that made the changes
+below (merged the same day). 10k is 10,546 lines in 66 files, 50k 50,020 in 304, 100k
 99,943 in 605.
 
 ### Engine, in Node
@@ -200,19 +201,44 @@ Bottlenecks found by the benchmark, in the order they hurt:
    than 500 elements isn't laid out (ELK runs on the main thread); it says
    how to narrow the view instead. The problems list shows the first 500.
 
-Behaviour on the demo is unchanged: its 14 packages start open, its tables
-and diagrams are far below the limits, its analysis takes well under 2 s,
-and every existing test passes.
+Behaviour on the demo is unchanged: it has fewer than 30 top-level
+packages, so they start open, its tables and diagrams are far below the
+limits, and its analysis takes well under 2 s.
+
+## Re-checked on 2026-10-23
+
+After risk analysis, dependency matrices, the simulator's clock and model
+exchange landed, the engine benchmark was run again in Node
+(`npm run bench -- --engine --lines 10000,50000 --runs 3`, medians of 3,
+through the shared test gate, load average under 1.5). The browser benchmark
+and the 100k size were not re-run, so the Chromium tables above and the 100k
+column are the 2026-10-22 figures.
+
+| ms (memory MiB) | 10k on 10-22 | 10k on 10-23 | 50k on 10-22 | 50k on 10-23 |
+| --- | ---: | ---: | ---: | ---: |
+| open: analysis | 1161 | 1114 | 7348 | 6747 |
+| open: checks | 455 | 482 | 2928 | 4332 |
+| open: page model | 15 | 14 | 98 | 73 |
+| keystroke: analysis | 1127 | 1057 | 6718 | 6948 |
+| keystroke: checks | 449 | 507 | 2774 | 4511 |
+| completion | 32 | 24 | 55 | 61 |
+| hover | 240 | 222 | 1394 | 1215 |
+| table: product bill of materials | 46 | 42 | 1001 | 784 |
+| WebAssembly memory | 333 | 333 | 1153 | 1153 |
+
+The numbers hold, except the checks at 50k lines: 4.3–4.5 s rather than
+2.8–2.9 s. That one hasn't been looked into yet; treat the 50k and 100k
+checks figures above as optimistic.
 
 ## Remaining limits
 
 - **Every keystroke re-analyses the whole project** in the toolkit: about
   1.1 s at 10k lines, 7 s at 50k and 16 s at 100k, then the checks (0.5 s,
-  3 s, 5 s). Session, `check()` and the adapter's first reads are each
-  linear in the project; the incremental path (`fromSourcesSettled`) saves
-  nothing measurable. Upstream request 12. The app keeps it from piling up
-  (one analysis at a time, a longer pause before analysing a large model)
-  but can't make it shorter.
+  3 s, 5 s; 4.3 s at 50k on 2026-10-23, see above). Session, `check()` and
+  the adapter's first reads are each linear in the project; the incremental
+  path (`fromSourcesSettled`) saves nothing measurable. Upstream request 12.
+  The app keeps it from piling up (one analysis at a time, a longer pause
+  before analysing a large model) but can't make it shorter.
 - **The first hover after an edit** rebuilds the language server's copy of
   the workspace (1.4 s at 50k, 3 s at 100k) and blocks the worker meanwhile.
   Upstream request 13.

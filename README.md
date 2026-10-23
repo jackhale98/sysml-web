@@ -1,29 +1,36 @@
 # Fairtide
 
-A web workbench that makes **SysML v2** approachable. Build models in text or
-diagrams — both edit the same SysML, live — with plain-language explanations
-of every element, so engineers new to MBSE can model productively. The model
-is standard SysML v2 text in your own git repository, readable by any
-conformant tool, and the app works on desktop and mobile.
+A web workbench that makes **SysML v2** approachable. Build a model in text or
+in diagrams (both edit the same SysML, live) with a plain-language explanation
+of every element, so engineers new to MBSE can model productively. The model is
+standard SysML v2 text in your own git repository, readable by any conformant
+tool. Fairtide runs in the browser on a computer or a phone, keeps working
+offline, and has no server of its own: projects stay in your browser until you
+save them to GitHub, a folder or a file.
 
-**Status:** early preview — explorer, engine-backed text editor, live diagrams
-you can edit, inspector, requirements view and a guided demo model. See
-[docs/PLAN.md](docs/PLAN.md) for the plan and roadmap.
+**Try it:** <https://jackhale98.github.io/sysml-web/> (open the delivery-drone
+demo, no sign-up).
 
-## Using it
+What it does today:
 
-New to Fairtide, or to SysML? The [user guide](docs/user-guide.md) covers
-starting a project (blank, requirements first, or a small example system),
-the ideas in plain words, how to do the common jobs, keyboard shortcuts and
-where your data is kept. It is the same guide as **Help** in the app.
+- **Text and diagrams, one model.** A SysML editor with completion, hover
+  explanations, go to definition, rename and formatting; general,
+  interconnection, state, action flow and sequence diagrams drawn from the text
+  and editable on the canvas; guided forms that write the SysML for you.
+- **Requirements and traceability.** Requirements tables, trace and
+  verification matrices, gaps, a specification and an interface control
+  document, import from Excel or CSV and export to Excel, CSV, SVG and PNG.
+- **Analysis on top of the model.** Requirement checks with units, budgets that
+  add up mass or power, trade studies, a state machine simulator with a
+  simulated clock, risk analysis (design, process and use FMEAs, hazards and a
+  hazard log, a risk matrix coloured by your risk policy) and dependency
+  matrices (DSM and N² charts).
+- **Your files, your history.** Save to GitHub, propose changes as a pull
+  request and review what changed in plain language; open a folder and save
+  back to it; exchange `.kpar`, SysML v2 JSON and Systems Modeling API servers
+  with other SysML v2 tools.
 
-FMEA worksheets, risk matrices and hazard logs are standard SysML with two
-small libraries; [docs/risk-analysis.md](docs/risk-analysis.md) says what
-each definition means and how another tool reads them, and
-[docs/table-rendering.md](docs/table-rendering.md) how any view becomes a
-table.
-
-## Development
+## Running it
 
 Requires Node 22.17+.
 
@@ -31,34 +38,80 @@ Requires Node 22.17+.
 npm install
 scripts/fetch-toolkit.sh  # the SysML engine and its standard library into static/toolkit/
 npm run dev               # http://localhost:5173
-npm test                  # unit tests (Vitest)
-npm run check && npm run lint
-npm run test:e2e          # Playwright end-to-end + axe accessibility checks
-npm run lighthouse        # Lighthouse CI, mobile and desktop (after npm run build)
 ```
+
+## Testing
+
+```sh
+npm test                  # unit tests (Vitest)
+npm run check && npm run lint && npm run format:check
+npm run test:e2e          # Playwright end to end, with axe accessibility checks (builds first)
+npm run build && npm run lighthouse   # Lighthouse budgets, mobile and desktop
+npm run bench             # performance on generated large models (docs/performance.md)
+```
+
+CI (`.github/workflows/ci.yml`) runs the formatting, lint, type checks, unit
+tests, build and end-to-end tests; `lighthouse.yml` runs the Lighthouse
+budgets.
+
+## Deploying
+
+Every push to `main` builds the static site and publishes it to GitHub Pages
+(`.github/workflows/deploy.yml`, with `BASE_PATH=/sysml-web`). The site is
+plain files, so any static host works: `BASE_PATH=/your/path npm run build` and
+serve `build/`, falling back to `404.html` for unknown paths.
 
 **Sign in with GitHub** needs a GitHub App and a small Cloudflare worker
 (`worker/`); see [docs/setup-github-sign-in.md](docs/setup-github-sign-in.md).
 Without them, people connect GitHub with a personal access token.
 
+## Documentation
+
+| Doc | What it is for | Who it is for |
+| --- | --- | --- |
+| [User guide](docs/user-guide.md) | Starting a project, the ideas in plain words, how to do the common jobs, shortcuts, where your data is kept. The same text as **Help** in the app. | Users |
+| [Risk analysis](docs/risk-analysis.md) | The FMEA and hazard libraries: each definition, the risk policy, reviews saved as views, how another tool reads them. | Modellers |
+| [Dependency matrices](docs/dsm.md) | The DSM and N² chart views: rows, links, suggested modules, change impact. | Modellers |
+| [Table rendering](docs/table-rendering.md) | How any SysML view becomes a table (`@TableRendering`), for views written by hand. | Modellers |
+| [State machine simulator](docs/simulator.md) | What the simulator does with a state machine: steps, the simulated clock, `do` actions, what is not supported. | Modellers |
+| [Model interchange](docs/interchange.md) | `.kpar`, SysML v2 JSON and Systems Modeling API servers: what round-trips, merging on Save to server, what a server must allow. | Modellers, developers |
+| [Interchange reference](docs/reference/interchange.md) | Background research on the standards: KerML clause 10, `.kpar`, element identity, the API, XMI. | Developers |
+| [The engine](docs/engine.md) | How the app uses the sysml-toolkit: the engine interface, positions, views, edits, diagrams, checks, and requests for upstream. | Developers |
+| [Performance](docs/performance.md) | How large models are measured, the results, and what still limits them. | Developers |
+| [Plan](docs/PLAN.md) | Product principles, architecture, what is built, what is next, and the decision log. | Developers |
+| [Sign in with GitHub](docs/setup-github-sign-in.md) | Setting up the GitHub App and the sign-in worker for your own deployment. | Self-hosters |
+| [Spike: WebAssembly engine](docs/spikes/wasm-engine.md) | A dated note (2026-10-21) from an engine the app no longer uses. | Developers (history) |
+
+The same list is in [docs/README.md](docs/README.md).
+
+## Where the code is
+
 The engine is the Open-MBEE [sysml-toolkit](https://github.com/Open-MBEE/sysml-toolkit)
-(`@sysml/wasm`), at the release pinned in `toolkit.json`; see
-[docs/engine.md](docs/engine.md).
+(`@sysml/wasm`), at the release pinned in `toolkit.json`, run in a Web Worker;
+see [docs/engine.md](docs/engine.md).
 
 | Path | What lives there |
 | --- | --- |
-| `src/lib/engine` | Engine interface, the sysml-toolkit worker and its model adapter |
-| `src/lib/project` | Open project state: files, analyses, elements, requirements |
-| `src/lib/workbench` | Workbench: explorer, text editor, inspector, views, edit actions |
-| `src/lib/diagram` | Diagram canvas (Svelte Flow), SysML notation, ELK layout |
+| `src/lib/engine` | Engine interface, the sysml-toolkit worker and its model adapter, views, diagrams, checks |
+| `src/lib/project` | Open project state: files, analyses, elements, requirements; project templates |
+| `src/lib/workbench` | Workbench: explorer, text editor, inspector, overview, tables, matrices, edit actions |
+| `src/lib/create` | Guided forms (new view, roll-up, limit, trade study, FMEA, hazard, DSM) and the SysML they write |
+| `src/lib/diagram` | Diagram canvas (Svelte Flow), SysML notation, ELK layout, export |
 | `src/lib/editor` | CodeMirror support driven by the engine |
+| `src/lib/sim` | State machine simulator |
+| `src/lib/review` | Comparing versions: what changed, in plain language |
+| `src/lib/reports` | Specification and interface control documents |
+| `src/lib/dataio` | Excel and CSV import and export |
+| `src/lib/interchange`, `src/lib/exchange` | `.kpar` archives; SysML v2 JSON and the Systems Modeling API client |
 | `src/lib/git` | GitHub: connecting, sign-in, opening and saving repositories |
+| `src/lib/offline` | Service worker rules, install prompts |
+| `src/lib/help`, `src/lib/learn` | The in-app help (source of the user guide) and plain-language explanations of SysML |
+| `src/lib/landing`, `src/lib/ui` | Landing page illustrations; design-system components |
+| `src/routes` | Landing page, projects, help and the workbench (`/p/[project]`) |
+| `src/demo/drone` | The demo project (SysML v2) and its tour |
 | `worker` | The sign-in worker (Cloudflare), for "Sign in with GitHub" |
-| `src/lib/learn` | Plain-language explanations of SysML concepts |
-| `src/lib/ui` | Design-system components |
-| `src/routes` | Landing page and the workbench (`/p/[project]`) |
-| `src/demo/drone` | The demo project (SysML v2) |
-| `docs` | Plan, interchange reference, spikes |
+| `tests` | End-to-end tests, the large-model unit test and the benchmark |
+| `docs` | The documentation above |
 
 ## Licence
 
@@ -71,3 +124,6 @@ and in Settings → About), the sysml-toolkit itself is Apache-2.0, and the ELK
 layout library (elkjs) is EPL-2.0.
 
 SysML is a registered trademark of the Object Management Group.
+
+The repository and site are still named `sysml-web`, the product's working name
+before it became Fairtide.

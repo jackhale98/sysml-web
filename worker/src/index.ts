@@ -1,4 +1,4 @@
-/// SysML Web sign-in worker — stateless, no storage, no logging.
+/// Fairtide sign-in worker — stateless, no storage, no logging.
 ///
 /// "Sign in with GitHub" ends with the browser holding a one-time code. Trading
 /// it for tokens needs the GitHub App's client secret, which the browser must

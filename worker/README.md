@@ -1,8 +1,8 @@
-# SysML Web sign-in worker
+# Fairtide sign-in worker
 
-A stateless Cloudflare Worker that completes **Sign in with GitHub** for SysML
-Web. The app talks to the GitHub API directly from the browser; it needs this
-worker only to trade a one-time sign-in code (or a refresh token) for tokens,
+A stateless Cloudflare Worker that completes **Sign in with GitHub** for
+Fairtide. The app talks to the GitHub API directly from the browser; it needs
+this worker only to trade a one-time sign-in code (or a refresh token) for tokens,
 because that takes the GitHub App's client secret, which the browser must
 never hold. The worker adds the secret, asks GitHub, and returns GitHub's
 answer unchanged.

@@ -657,6 +657,9 @@ engine that recomputes implied relationships itself unless it dedups on `isImpli
 
 ## 7. Implications for an implementation (written for `sysml-interchange`) - checklist
 
+*Historical: this checklist was for our earlier engine. What the app does now, and what it
+doesn't, is in [interchange.md](../interchange.md).*
+
 ### 7.1 Must emit to round-trip with other tools
 1. **Model files**: textual `.sysml`/`.kerml` (source of truth) and/or JSON `.json` array. Minimum for K conformance: textual OR JSON. XMI optional.
 2. **JSON element objects**: `@id` (UUID), `@type` (unprefixed metaclass name), `elementId`, every non-derived attribute of the metaclass chain incl. redefined-name pairs
