@@ -90,10 +90,13 @@
 		return d === undefined ? null : d === 1 ? 'direct' : 'indirect';
 	}
 
-	function cellLabel(r: number, c: number, links: MatrixLink[]): string {
+	/** A cell's accessible name, which starts with what it shows (the number on the diagonal, an N² cell's names). */
+	function cellLabel(r: number, c: number, links: MatrixLink[], k: number): string {
 		const from = itemLabel(matrix.items[r]!);
 		const to = itemLabel(matrix.items[c]!);
-		if (r === c) return `${from}, itself: its details`;
+		if (r === c)
+			return names ? `${from}, itself: its details` : `${k + 1} ${from}, itself: its details`;
+		if (links.length && names) return `From ${from} to ${to}: ${namesIn(r, links).join(', ')}`;
 		if (!links.length) return `No link from ${from} to ${to}`;
 		const what = cellMarks(links)
 			.map((m) => kindCount(m.kind, m.count))
@@ -284,7 +287,7 @@
 									data-k={k}
 									data-j={j}
 									tabindex={focusAt.k === k && focusAt.j === j ? 0 : -1}
-									aria-label={cellLabel(r, c, links)}
+									aria-label={cellLabel(r, c, links, k)}
 									aria-pressed={chosen}
 									onkeydown={move}
 									onclick={() => {

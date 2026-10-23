@@ -155,7 +155,7 @@
 					<div class="card-body">
 						{#each sides as side (side.side)}
 							{#if side.list.length}
-								<h4>{side.title}</h4>
+								<h3>{side.title}</h3>
 								{#each side.list as g (g.kind)}
 									<p class="kind">
 										<span class="mark k-{g.kind}" aria-hidden="true">{KIND_WORDS[g.kind].mark}</span
@@ -187,7 +187,7 @@
 							<p class="none">Nothing in this matrix links to it, among the kinds counted.</p>
 						{/if}
 						{#if outside.length}
-							<h4>Outside this matrix</h4>
+							<h3>Outside this matrix</h3>
 							<p class="outside">
 								{outside
 									.map((o) =>
@@ -336,7 +336,7 @@
 		gap: var(--space-1);
 		padding: 0 var(--space-3) var(--space-3);
 	}
-	h4 {
+	h3 {
 		margin-top: var(--space-2);
 		color: var(--text-2);
 		font-size: var(--text-xs);

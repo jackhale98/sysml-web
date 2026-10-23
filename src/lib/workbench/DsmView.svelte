@@ -93,6 +93,11 @@
 			if (current !== generation) return;
 			matrix = result;
 			error = null;
+			if (current >= settledFrom) {
+				chosenKinds = null;
+				chosenOrder = null;
+				settledFrom = Infinity;
+			}
 		} catch (e) {
 			if (current !== generation) return;
 			error = e instanceof Error ? e.message : String(e);
@@ -112,17 +117,10 @@
 
 	let chosenKinds = $state<DependencyKind[] | null>(null);
 	let chosenOrder = $state<'model' | 'clustered' | null>(null);
+	/** The first reading of the matrix that comes after the last setting was saved. */
+	let settledFrom = Infinity;
 	const kinds = $derived(chosenKinds ?? matrix?.kinds ?? []);
 	const order = $derived(chosenOrder ?? matrix?.order ?? 'model');
-	$effect(() => {
-		const m = matrix;
-		if (!m) return;
-		untrack(() => {
-			if (chosenKinds && chosenKinds.join() === m.kinds.join()) chosenKinds = null;
-			if (chosenOrder === m.order) chosenOrder = null;
-		});
-	});
-
 	const noun = $derived(
 		matrix?.elements === 'actions'
 			? ['step', 'steps']
@@ -143,6 +141,9 @@
 			value,
 			label
 		);
+		// The text says it now (or the change was refused): the next matrix read from it decides.
+		settledFrom = generation + 1;
+		void refresh();
 		if (error) toastError(error);
 	}
 
@@ -524,11 +525,10 @@
 							may affect <strong>{impact.size} of {matrix.items.length - 1}</strong>
 							{noun[1]}: {direct} directly, {impact.size - direct} through others.
 						</p>
-						<button
-							type="button"
-							class="small"
-							aria-label="Stop showing what a change affects"
-							onclick={() => (impactFrom = null)}><X size={14} aria-hidden="true" /> Clear</button
+						<button type="button" class="small" onclick={() => (impactFrom = null)}
+							><X size={14} aria-hidden="true" /> Clear<span class="visually-hidden">
+								what a change affects</span
+							></button
 						>
 					</div>
 				{/if}
