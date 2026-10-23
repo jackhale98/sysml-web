@@ -157,10 +157,13 @@ test('Add up a mass over the parts and see its budget', async ({ page }) => {
 	await expectAccessible(page);
 	await form.getByRole('button', { name: 'Add up', exact: true }).click();
 	await expect(toasts(page)).toContainText('system’s mass now adds up its parts');
+	// Reached by keyboard, the toast waits while the page is checked.
+	const undo = toasts(page).getByRole('button', { name: 'Undo' });
+	await undo.focus();
 	const budget = page.getByRole('region', { name: 'System mass budget view' });
 	await expect(budget.locator('tbody tr').first()).toContainText('29.5 kg', { timeout: 15_000 });
 	await expectAccessible(page);
-	await toasts(page).getByRole('button', { name: 'Undo' }).click();
+	await undo.click();
 	await expect(views(page).getByRole('button', { name: 'System mass budget' })).toBeHidden({
 		timeout: 15_000
 	});
@@ -259,6 +262,9 @@ test('A trade study of three alternatives, ranked', async ({ page }) => {
 	);
 	await form.getByRole('button', { name: 'Create' }).click();
 	await expect(toasts(page)).toContainText('Created the trade study Motor choice');
+	// Reached by keyboard, the toast waits while the page is checked.
+	const undo = toasts(page).getByRole('button', { name: 'Undo' });
+	await undo.focus();
 	const view = page.getByRole('region', { name: 'Motor choice view' });
 	await expect(view.getByText('is selected')).toBeVisible({ timeout: 20_000 });
 	await expect(view.locator('.verdict')).toContainText('smallMotor is selected');
@@ -266,7 +272,7 @@ test('A trade study of three alternatives, ranked', async ({ page }) => {
 		'0.00 0.61 0.94'
 	);
 	await expectAccessible(page);
-	await toasts(page).getByRole('button', { name: 'Undo' }).click();
+	await undo.click();
 	await expect(views(page).getByRole('button', { name: 'Motor choice' })).toBeHidden({
 		timeout: 15_000
 	});
