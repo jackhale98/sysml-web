@@ -1,9 +1,9 @@
 <!--
-	"SysML that explains itself": a keyword hover in the text and the inspector for a selected part,
-	drawn as the workbench shows them. Static content; no behaviour.
+	"SysML that explains itself": a keyword hover in the text and the inspector for a selected part
+	(the demo's battery), drawn as the workbench shows them. Static content; no behaviour.
 -->
 <script lang="ts">
-	import { Boxes, Check, CircleDot, Lightbulb, TriangleAlert } from '@lucide/svelte';
+	import { Boxes, Calculator, Check, CircleDot, Lightbulb } from '@lucide/svelte';
 </script>
 
 <div class="concept">
@@ -54,28 +54,24 @@
 				<dd>battery</dd>
 			</div>
 			<div>
-				<dt>Defined by</dt>
+				<dt>Type</dt>
 				<dd><span class="chip def">Battery</span></dd>
 			</div>
 			<div>
-				<dt>Owned by</dt>
-				<dd><span class="chip def">Drone</span></dd>
-			</div>
-			<div>
-				<dt>Multiplicity</dt>
+				<dt>How many</dt>
 				<dd>1</dd>
 			</div>
 			<div>
 				<dt>Satisfies</dt>
 				<dd>
-					<span class="chip req">SYS-001</span> Flight endurance <Check size={14} class="ok" />
+					<span class="chip req">SYS-009</span> Battery protection <Check size={14} class="ok" />
 				</dd>
 			</div>
 		</dl>
-		<p class="problem">
-			<TriangleAlert size={15} />
-			<span><code>Battery</code> has no <code>mass</code> attribute yet.</span>
-			<span class="fix">Add one</span>
+		<p class="value">
+			<Calculator size={15} />
+			<span><code>usableEnergy = capacity * usableFraction</code></span>
+			<span class="result">183.6 W·h</span>
 		</p>
 	</figure>
 </div>
@@ -273,7 +269,7 @@
 	dd :global(.ok) {
 		color: var(--ok);
 	}
-	.problem {
+	.value {
 		display: flex;
 		align-items: center;
 		flex-wrap: wrap;
@@ -281,25 +277,26 @@
 		margin-top: var(--space-4);
 		padding: var(--space-2) var(--space-3);
 		border-radius: var(--radius-sm);
-		background: var(--warn-weak);
+		background: var(--ok-weak);
 		color: var(--text);
 		font-size: var(--text-sm);
 	}
-	.problem :global(svg) {
-		color: var(--warn);
+	.value :global(svg) {
+		color: var(--ok);
 		flex: none;
 	}
-	.problem > span:first-of-type {
+	.value > span:first-of-type {
 		flex: 1;
 		min-width: 12rem;
 	}
-	.fix {
+	.result {
 		padding: 0.15rem 0.6rem;
 		border-radius: var(--radius-pill);
-		background: var(--accent);
-		color: var(--accent-text);
+		background: var(--surface);
+		color: var(--text);
 		font-weight: 600;
 		font-size: var(--text-xs);
+		white-space: nowrap;
 	}
 
 	@media (max-width: 30rem) {

@@ -18,18 +18,19 @@
 		keywords: string[];
 	}
 
+	// Rows are the delivery-drone demo's own, as its views show them.
 	const practices: Practice[] = [
 		{
 			family: 'requirement',
 			icon: ListChecks,
 			title: 'Requirements',
 			was: 'Word documents',
-			text: 'Each requirement is an element with an ID, a statement and an owner, traced to the parts that satisfy it and the tests that verify it.',
+			text: 'Each requirement is an element with an ID, a statement and an owner, traced to the parts that satisfy it and the tests that verify it. A limit with units is checked against the design.',
 			view: 'Requirements table',
 			rows: [
-				{ id: 'SYS-001', label: 'Flight endurance', status: 'Verified', tone: 'ok' },
-				{ id: 'SYS-004', label: 'Wind tolerance', status: 'Satisfied', tone: 'ok' },
-				{ id: 'SYS-005', label: 'Ingress protection', status: 'Not traced', tone: 'warn' }
+				{ id: 'SYS-001', label: 'Flight endurance', status: 'Satisfied', tone: 'ok' },
+				{ id: 'SYS-003', label: 'Maximum take-off mass', status: 'Satisfied', tone: 'ok' },
+				{ id: 'SYS-005', label: 'Ingress protection', status: 'Gap', tone: 'warn' }
 			],
 			keywords: ['requirement', 'satisfy', 'verify']
 		},
@@ -38,12 +39,12 @@
 			icon: Cable,
 			title: 'Interfaces',
 			was: 'ICD spreadsheets',
-			text: 'Ports say what flows in and out; interfaces connect them. Wire two parts together and mismatched ends show up at once.',
+			text: 'Ports say what flows in and out; interfaces connect them. The interface table and the interface control document list every port and what it is connected to, so a loose end shows.',
 			view: 'Interface table',
 			rows: [
-				{ id: 'PowerSupply', label: 'battery → motors', status: 'Matched', tone: 'ok' },
-				{ id: 'CommandLink', label: 'radio → flight ctrl', status: 'Matched', tone: 'ok' },
-				{ id: 'ImagePort', label: 'camera → ?', status: 'Unconnected', tone: 'warn' }
+				{ id: 'powerOut', label: 'battery → power distribution', status: 'Connected', tone: 'ok' },
+				{ id: 'commandLink', label: 'flight controller → radio', status: 'Connected', tone: 'ok' },
+				{ id: 'imageOut', label: 'camera → ?', status: 'Not connected', tone: 'warn' }
 			],
 			keywords: ['port def', 'interface def', 'flow']
 		},
@@ -52,28 +53,33 @@
 			icon: ShieldAlert,
 			title: 'Risk and FMEA',
 			was: 'FMEA workbooks',
-			text: 'Failure modes sit on the components that fail, linked to their controls. The risk priority number is calculated in SysML, never typed in.',
-			view: 'Design FMEA',
+			text: 'Failure modes sit on the components that fail, linked to their hazards and risk controls. The RPN, the action priority and whether the risk is acceptable are calculated in SysML, never typed in.',
+			view: 'FMEA worksheet',
 			rows: [
-				{ id: 'Battery', label: 'Thermal runaway', status: 'RPN 90', tone: 'danger' },
-				{ id: 'Rotor', label: 'Blade crack', status: 'RPN 48', tone: 'warn' },
-				{ id: 'GNSS', label: 'Signal loss', status: 'RPN 24', tone: 'ok' }
+				{
+					id: 'camera',
+					label: 'Person under drop point not seen',
+					status: 'RPN 288',
+					tone: 'danger'
+				},
+				{ id: 'battery', label: 'Thermal runaway', status: 'RPN 144', tone: 'warn' },
+				{ id: 'motor', label: 'Stops or loses torque', status: 'RPN 96', tone: 'warn' }
 			],
-			keywords: ['calc', 'metadata', 'occurrence']
+			keywords: ['metadata', 'calc', 'requirement']
 		},
 		{
 			family: 'requirement',
 			icon: FlaskConical,
 			title: 'Verification',
 			was: 'test plans and reports',
-			text: 'Verification cases name the requirement they prove and the verdict they expect, so coverage is a query instead of a weekly chase.',
+			text: 'Verification cases name the requirement they prove and how, so coverage is a query instead of a weekly chase, and every gap is listed.',
 			view: 'Verification matrix',
 			rows: [
-				{ id: 'VC-001', label: 'Endurance flight', status: 'Passed', tone: 'ok' },
-				{ id: 'VC-003', label: 'Wind hold', status: 'Planned', tone: 'muted' },
-				{ id: 'VC-005', label: 'Battery abuse', status: 'Failed', tone: 'danger' }
+				{ id: 'RC-001', label: 'Battery thermal protection', status: 'Verified', tone: 'ok' },
+				{ id: 'RC-005', label: 'Release height interlock', status: 'Verified', tone: 'ok' },
+				{ id: 'RC-007', label: 'Drop-zone clearance check', status: 'Not verified', tone: 'warn' }
 			],
-			keywords: ['verification', 'objective', 'verdict']
+			keywords: ['verification', 'objective', 'verify']
 		}
 	];
 </script>
