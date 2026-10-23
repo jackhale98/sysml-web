@@ -510,6 +510,12 @@
 							{flags.untyped.length === 1 ? 'connection' : 'connections'} with no interface definition</span
 						>{/if}
 				</p>
+				{#if info && !editable}
+					<p class="muted">
+						This is the library’s definition: what you choose here is shown, not saved. Make a view
+						of it with New DSM to keep the choices.
+					</p>
+				{/if}
 				{#if order === 'clustered'}
 					<p class="note">
 						<strong>Suggested modules</strong> put {noun[1]} that are linked to each other next to each
@@ -583,9 +589,11 @@
 					{@render cellDetail(shown.row, shown.column)}
 				{:else}
 					<p class="muted hint">
-						Read across a row for what it leads to, down a column for what leads to it. Point at or
-						select a cell for its links{#if matrix.elements === 'parts'}; select an empty one to
-							connect two parts{/if}.
+						Read across a row for what it leads to, down a column for what leads to it. {ui.phone
+							? 'Tap a cell for its links'
+							: 'Point at or select a cell for its links'}{matrix.elements === 'parts'
+							? '; choose an empty one to connect two parts'
+							: ''}.
 					</p>
 				{/if}
 			</div>

@@ -178,6 +178,15 @@ export function dsmTitle(kind: DsmKind, targets: Pick<DsmTarget, 'label'>[]): st
 	return `${words[0]!.toUpperCase()}${words.slice(1)} ${kind.suffix}`;
 }
 
+/**
+ * Whether a view's name is taken: as written, or as it reads (`droneDSM`
+ * and `droneDsm` are both "Drone DSM").
+ */
+export function nameTaken(taken: ReadonlySet<string>, name: string): boolean {
+	const lower = name.toLowerCase();
+	return [...taken].some((t) => t.toLowerCase() === lower);
+}
+
 /** What is wrong with the choices, in plain words, or null. */
 export function dsmProblem(input: {
 	kind: DsmKind | undefined;
@@ -192,7 +201,7 @@ export function dsmProblem(input: {
 	if (input.kind.single && input.targets.length > 1) return 'Choose one element.';
 	if (!input.kinds.length) return 'Choose at least one kind of link to count.';
 	if (!input.title.trim()) return 'Give the matrix a name.';
-	if (input.taken.has(viewNameOf(input.title)))
+	if (nameTaken(input.taken, viewNameOf(input.title)))
 		return `There is already a view called “${input.title.trim()}”. Choose another name.`;
 	return null;
 }

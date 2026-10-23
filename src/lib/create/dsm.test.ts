@@ -125,6 +125,15 @@ describe('the generators', () => {
 		expect(dsmProblem({ ...base, title: 'Flashlight DSM', kinds: ['connection'] })).toMatch(
 			/already a view called “Flashlight DSM”/
 		);
+		// Another spelling of the same name reads the same: taken too.
+		expect(
+			dsmProblem({
+				...base,
+				title: 'Flashlight dsm',
+				taken: new Set(['flashlightDsm']),
+				kinds: ['flow']
+			})
+		).toMatch(/already a view/);
 		expect(dsmProblem({ ...base, kind: undefined, kinds: ['connection'] })).toBe(
 			'Choose what kind of matrix to make.'
 		);

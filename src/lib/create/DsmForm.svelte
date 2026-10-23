@@ -23,6 +23,7 @@
 		dsmLibraryWrite,
 		dsmProblem,
 		dsmTitle,
+		nameTaken,
 		planDsm,
 		type DsmTarget
 	} from './dsm';
@@ -138,7 +139,7 @@
 		if (titleEdited || !kind) return;
 		const base = dsmTitle(kind, targets);
 		let candidate = base;
-		for (let i = 2; taken.has(viewNameOf(candidate)); i++) candidate = `${base} ${i}`;
+		for (let i = 2; nameTaken(taken, viewNameOf(candidate)); i++) candidate = `${base} ${i}`;
 		title = candidate;
 	});
 

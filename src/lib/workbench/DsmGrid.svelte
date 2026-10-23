@@ -341,6 +341,7 @@
 	}
 	.frame.touch {
 		--cell: 2.75rem;
+		--name-width: 9.5rem;
 		padding: 0 var(--space-3);
 	}
 	.frame.touch.names {
