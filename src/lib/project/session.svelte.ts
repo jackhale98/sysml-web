@@ -29,6 +29,11 @@ export class ProjectSession {
 	private folderTexts: Record<string, string> = {};
 	/** The files as they were when the project was opened on this page. */
 	private opened: ProjectFile[] = [];
+	/**
+	 * When the stored project was last saved, as this page knows it (null: not
+	 * stored yet), so a save from another tab meanwhile isn't overwritten.
+	 */
+	private stamp: string | null | undefined;
 
 	constructor(private workspace: Workspace) {
 		this.git = new GitConnection(this, workspace);
@@ -68,6 +73,7 @@ export class ProjectSession {
 		const stored = await loadProject(id).catch(() => undefined);
 		if (stored) {
 			this.record = stored;
+			this.stamp = stored.updated;
 			if (stored.origin === 'folder') {
 				// Files changed here but not written back are not what the folder holds:
 				// the folder's text of those is kept beside them.
@@ -92,6 +98,7 @@ export class ProjectSession {
 		if (id === 'demo') {
 			const demo = demoProject();
 			const now = timestamp();
+			this.stamp = null;
 			this.record = {
 				id,
 				info: demo.info,
@@ -148,11 +155,20 @@ export class ProjectSession {
 		if (this.timer !== undefined) await this.save();
 	}
 
-	async save() {
-		if (!this.record) return;
+	/** The save in progress: saves go one at a time, so each knows when the one before it saved. */
+	private saving: Promise<void> = Promise.resolve();
+
+	save(): Promise<void> {
+		if (!this.record) return Promise.resolve();
 		clearTimeout(this.timer);
 		this.timer = undefined;
 		this.saveState = 'saving';
+		this.saving = this.saving.then(() => this.write());
+		return this.saving;
+	}
+
+	private async write() {
+		if (!this.record) return;
 		try {
 			const info = this.workspace.info ?? this.record.info;
 			this.record = {
@@ -164,7 +180,7 @@ export class ProjectSession {
 					? { unsavedToFolder: this.unsavedToFolder, folderTexts: this.unsavedFolderTexts() }
 					: {})
 			};
-			await saveProject(this.record);
+			this.stamp = await saveProject(this.record, this.stamp);
 			this.saveState = 'saved';
 			this.saveError = null;
 		} catch (error) {
