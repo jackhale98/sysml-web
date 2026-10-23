@@ -13,9 +13,15 @@
  *   create  <api base> <name>                    SysmlApi.createProject, as the app does
  *   push    <api base> <project id> <model dir>  "Save to server" (plan + one commit)
  *   pull    <api base> <project id> <out dir>    "Open from server" (elements -> text)
+ *   kpar    <model dir> <out.kpar> [name]        "Download as .kpar"
+ *   unkpar  <in.kpar> <out dir>                  "Import" of a .kpar/.zip (files, warnings, skipped)
+ *   semantics <model dir | elements.json[.gz]> [out.txt]   the model's meaning as facts
+ *   compare <a> <b> [--json out.json]            compare two models' meaning (each a model
+ *                                                dir, read by Fairtide's engine, or element JSON)
  *
  * Exit status: 0 done, 1 the step ran but reported a failure, 2 crashed.
  */
+import { gunzipSync } from 'node:zlib';
 import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { connectTo, SysmlApi, type ApiBranch } from '#lib/exchange/api.ts';
@@ -23,6 +29,15 @@ import { readElements, type ElementJson } from '#lib/exchange/elements.ts';
 import { changeCount, planPush, push } from '#lib/exchange/sync.ts';
 import type { SourceFile } from '#lib/engine/protocol.ts';
 import { loadHost } from '#lib/engine/toolkit/testing.ts';
+import type { ToolkitHost } from '#lib/engine/toolkit/host.ts';
+import { readProjectArchive, writeKpar } from '#lib/interchange/kpar.ts';
+import {
+	compareDigests,
+	differenceSize,
+	digestLines,
+	semanticDigest,
+	type Digest
+} from '#lib/interchange/semantics-testing.ts';
 
 function modelFiles(dir: string): SourceFile[] {
 	const root = resolve(dir);
@@ -122,6 +137,50 @@ async function importJson(text: string, outDir: string): Promise<number> {
 	return errors.length ? 1 : 0;
 }
 
+/**
+ * A model's meaning (`semantics-testing.ts`): a folder of SysML text as
+ * Fairtide's engine reads it, or element JSON (any tool's; `.gz` too) as it
+ * stands. The standard library is named by qualified name.
+ */
+function digestOf(host: ToolkitHost, source: string): Digest {
+	const lookup = host.tk.Session.fromSourcesWithPreparedLibrary('[]', host.library);
+	const outside = (id: string): string | null => {
+		const h = lookup.elementById(id);
+		if (!h) return null;
+		let name = lookup.qualifiedName(h) ?? null;
+		if (!name) {
+			const member = JSON.parse(lookup.property(h, 'memberElement')) as { '@id': string } | null;
+			if (member) name = `membership(${outside(member['@id']) ?? '?'})`;
+		}
+		h.free();
+		return name;
+	};
+	try {
+		if (statSync(source).isDirectory()) {
+			const exported = host.exportInterchange(modelFiles(source), {});
+			return semanticDigest(readElements(exported.json), outside);
+		}
+		const raw = readFileSync(source);
+		const text = source.endsWith('.gz') ? gunzipSync(raw).toString() : raw.toString();
+		return semanticDigest(readElements(text), outside);
+	} finally {
+		lookup.free();
+	}
+}
+
+async function compare(a: string, b: string, jsonOut?: string): Promise<number> {
+	const host = await loadHost();
+	const difference = compareDigests(digestOf(host, a), digestOf(host, b));
+	const size = differenceSize(difference);
+	console.log(`compare ${a} ${b}: ${JSON.stringify(size)}`);
+	for (const k of difference.onlyInFirst.slice(0, 30)) console.log(`  only in the first:  ${k}`);
+	for (const k of difference.onlyInSecond.slice(0, 30)) console.log(`  only in the second: ${k}`);
+	for (const c of difference.changed.slice(0, 60))
+		console.log(`  ${c.key}: ${c.first.join('; ') || '-'}  =>  ${c.second.join('; ') || '-'}`);
+	if (jsonOut) writeFileSync(jsonOut, JSON.stringify(difference, null, 1));
+	return size.onlyInFirst || size.onlyInSecond || size.changed ? 1 : 0;
+}
+
 async function defaultBranch(api: SysmlApi, projectId: string): Promise<ApiBranch | null> {
 	const project = await api.project(projectId);
 	const branches = await api.branches(projectId);
@@ -195,9 +254,56 @@ export async function main(args: string[]): Promise<number> {
 			writeFileSync(join(outDir, '.server-elements.json'), JSON.stringify(elements));
 			return importJson(JSON.stringify(elements), outDir);
 		}
+		case 'kpar': {
+			const [dir, out, name] = rest;
+			const files = modelFiles(dir);
+			const bytes = await writeKpar({ name: name ?? 'model' }, files, new Date().toISOString());
+			mkdirSync(dirname(resolve(out)), { recursive: true });
+			writeFileSync(out, bytes);
+			console.log(`kpar: ${files.length} file(s), ${bytes.length} bytes -> ${out}`);
+			return 0;
+		}
+		case 'unkpar': {
+			const [file, outDir] = rest;
+			const archive = await readProjectArchive(new Uint8Array(readFileSync(file)), 'model');
+			// This tool writes to disk: never outside outDir (the app keeps paths as they are).
+			const unsafe = archive.files.filter(
+				(f) =>
+					f.path.startsWith('/') || /^[A-Za-z]:|\\/.test(f.path) || f.path.split('/').includes('..')
+			);
+			writeFiles(
+				outDir,
+				archive.files.filter((f) => !unsafe.includes(f))
+			);
+			if (unsafe.length)
+				console.log(
+					`unkpar: not written (outside the folder): ${unsafe.map((f) => f.path).join(', ')}`
+				);
+			console.log(
+				JSON.stringify(
+					{
+						info: archive.info,
+						files: archive.files.map((f) => f.path),
+						skipped: archive.skipped,
+						warnings: archive.warnings
+					},
+					null,
+					2
+				)
+			);
+			return archive.skipped.length || archive.warnings.length ? 1 : 0;
+		}
+		case 'semantics': {
+			const lines = digestLines(digestOf(await loadHost(), rest[0])).join('\n') + '\n';
+			if (rest[1]) writeFileSync(rest[1], lines);
+			else process.stdout.write(lines);
+			return 0;
+		}
+		case 'compare':
+			return compare(rest[0], rest[1], rest[2] === '--json' ? rest[3] : undefined);
 		default:
 			console.error(
-				'usage: run.mjs check|export|import|projects|create|push|pull ... (see tools/interop/fairtide/exchange.ts)'
+				'usage: run.mjs check|export|import|projects|create|push|pull|kpar|unkpar|semantics|compare ... (see tools/interop/fairtide/exchange.ts)'
 			);
 			return 2;
 	}

@@ -96,7 +96,27 @@ node tools/interop/fairtide/run.mjs projects <server>                      # con
 node tools/interop/fairtide/run.mjs create <api base> <name>               # SysmlApi.createProject
 node tools/interop/fairtide/run.mjs push <api base> <project id> <model dir>   # "Save to server"
 node tools/interop/fairtide/run.mjs pull <api base> <project id> <out dir>     # "Open from server"
+node tools/interop/fairtide/run.mjs kpar <model dir> <out.kpar> [name]          # "Download as .kpar"
+node tools/interop/fairtide/run.mjs unkpar <in.kpar> <out dir>                  # "Import" of an archive
+node tools/interop/fairtide/run.mjs semantics <model dir | elements.json[.gz]> [out.txt]
+node tools/interop/fairtide/run.mjs compare <a> <b> [--json out.json]           # normalized semantics
 ```
+
+`semantics`/`compare` use `src/lib/interchange/semantics-testing.ts`: a model's meaning as
+facts keyed by qualified name (kind, typing, specialization, multiplicity, values,
+relationships), from Fairtide's reading of a folder or from any tool's element JSON.
+
+## The interchange acceptance test: `acceptance.sh`
+
+```sh
+tools/interop/acceptance.sh [model dir] [out dir]   # default: src/lib/interchange/fixtures/acceptance
+```
+
+Sends one model through every route (JSON in three forms, `.kpar`, SysON text upload, SysON's
+element JSON and text export, Fairtide's API client against SysON), runs the pilot on every
+text artifact, adds the pilot's own abstract syntax (`pilot/PilotExport.java`, its kernel's
+`%export`), and compares each result's semantics with the original. Results and the
+classification: `docs/assessment/03-interchange.md`.
 
 ## What the tools say (2026-10-23)
 
