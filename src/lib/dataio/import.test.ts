@@ -354,7 +354,7 @@ describe('applying an import', () => {
 		expect(result).toMatchObject({ created: 3, path: 'requirements/StakeholderNeeds.sysml' });
 		const text = ws.files['requirements/StakeholderNeeds.sysml']!;
 		expect(text).toContain(
-			"    private import DeliveryContext::*;\n    private import RequirementDerivation::*;\n    private import SystemRequirements::DroneRequirement;\n\n    requirement <'STK-001'>"
+			"    private import DeliveryContext::*;\n    private import DroneArchitecture::DeliveryDrone;\n    private import RequirementDerivation::*;\n    private import SystemRequirements::DroneRequirement;\n\n    requirement <'STK-001'>"
 		);
 		expect(text.match(/import ModelingMetadata/g)).toHaveLength(1);
 		expect(text).toMatch(

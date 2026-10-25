@@ -20,6 +20,7 @@ import type {
 } from '#lib/engine/types.ts';
 import { checkProblems } from './checks';
 import { requirementIdProblems } from './requirementIds';
+import { satisfyProblems, subjectFirstProblems } from './requirementChecks';
 import {
 	buildTree,
 	byteToUtf16,
@@ -154,6 +155,10 @@ export class Workspace {
 			]),
 			// Requirements sharing an ID, or (as notes) without one.
 			...requirementIdProblems(Object.values(this.analyses)),
+			// A satisfy whose part has the name of the requirement's subject.
+			...satisfyProblems(Object.values(this.analyses), (path) => this.files[path]),
+			// A stakeholder or actor declared before the requirement's subject.
+			...subjectFirstProblems(Object.values(this.analyses)),
 			// A requirement the design doesn't meet; undecided checks are not problems.
 			...checkProblems(this.checks?.checks ?? [])
 		].sort((a, b) => severityRank(a.severity) - severityRank(b.severity))

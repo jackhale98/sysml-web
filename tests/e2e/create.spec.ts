@@ -190,7 +190,7 @@ test('Set a limit on a requirement, and see the check flip when the value change
 	await expectAccessible(page);
 	await form.getByRole('button', { name: 'Set the limit' }).click();
 	await expect(toasts(page)).toContainText(
-		'REQ-001 First requirement now checks system.mass <= 35 [kg]'
+		'REQ-001 First requirement now checks theSystem.mass <= 35 [kg]'
 	);
 
 	await command(page, 'new view design checks', /New view: Design checks/);

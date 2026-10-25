@@ -16,7 +16,7 @@ package SystemRequirements {
     requirement def DroneRequirement :> EngineeringRequirement {
         doc /* A requirement on the delivery drone. Specializing EngineeringRequirement adds a
              * subject: every requirement of this kind is about a DeliveryDrone. */
-        subject drone : DeliveryDrone;
+        subject system : DeliveryDrone;
     }
 
     // ---- Performance ----
@@ -29,7 +29,7 @@ package SystemRequirements {
         :>> verificationMethod = (VerificationMethod::'analysis', VerificationMethod::test);
         @StatusInfo { status = StatusKind::done; owner = "J. Hale"; }
         @Rationale { text = "A 3 km delivery and return takes about 10 minutes; the rest covers hover at the drop point, headwind and battery ageing."; }
-        require constraint { drone.endurance >= 25 [min] }
+        require constraint { system.endurance >= 25 [min] }
     }
 
     requirement <'SYS-002'> 'Payload capacity' : DroneRequirement {
@@ -38,7 +38,7 @@ package SystemRequirements {
         :>> priority = Priority::high;
         :>> verificationMethod = (VerificationMethod::test, VerificationMethod::inspection);
         @StatusInfo { status = StatusKind::closed; owner = "J. Hale"; }
-        require constraint { drone.payloadCapacity >= 1 [kg] }
+        require constraint { system.payloadCapacity >= 1 [kg] }
     }
 
     requirement <'SYS-003'> 'Maximum take-off mass' : DroneRequirement {
@@ -48,7 +48,7 @@ package SystemRequirements {
         :>> verificationMethod = (VerificationMethod::'analysis', VerificationMethod::test);
         @StatusInfo { status = StatusKind::done; owner = "J. Hale"; }
         @Rationale { text = "4 kg is the upper mass limit of the drone class the operator is approved for."; }
-        require constraint { drone.takeOffMass <= 4 [kg] }
+        require constraint { system.takeOffMass <= 4 [kg] }
     }
 
     // ---- Environment ----
