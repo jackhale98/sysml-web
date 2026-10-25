@@ -3,11 +3,11 @@
  * cells and columns, and diagram add, connect, rename and delete. Each
  * writes SysML text, and Undo puts the text back.
  */
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
+import { analyze } from './axe';
 
 async function expectAccessible(page: Page) {
-	const results = await new AxeBuilder({ page }).analyze();
+	const results = await analyze(page);
 	expect(results.violations.map((v) => v.id)).toEqual([]);
 }
 

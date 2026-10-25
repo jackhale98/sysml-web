@@ -74,8 +74,13 @@
 	let confirmed = false;
 	beforeNavigate((navigation) => {
 		const to = navigation.to?.url;
-		if (confirmed || navigation.type === 'leave' || !to || to.pathname === location.pathname)
+		// The tab is closing or going to another site: save what's waiting now, the
+		// earliest moment (the page being hidden next does the same).
+		if (navigation.type === 'leave') {
+			void session.flush();
 			return;
+		}
+		if (confirmed || !to || to.pathname === location.pathname) return;
 		if (!leaving.risk) {
 			void session.flush();
 			return;

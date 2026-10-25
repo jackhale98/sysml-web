@@ -31,6 +31,8 @@ export interface StoredProject {
 	 * (one made here has none), so a reload still knows what the folder holds.
 	 */
 	folderTexts?: Record<string, string>;
+	/** For `folder` projects: files whose text in the folder isn't known (kept before `folderTexts` were). */
+	unknownInFolder?: string[];
 }
 
 export type ProjectSummary = Omit<StoredProject, 'files'> & {
@@ -87,8 +89,44 @@ export function loadProject(id: string): Promise<StoredProject | undefined> {
 	return run<StoredProject | undefined>('readonly', (s) => s.get(id));
 }
 
-export async function saveProject(project: StoredProject): Promise<void> {
-	await run('readwrite', (s) => s.put({ ...project, updated: new Date().toISOString() }));
+/** Why a save was refused: the project was saved from another tab or window meanwhile. */
+export const SAVED_ELSEWHERE =
+	'This project was changed in another tab or window. Reload to see those changes: what you changed here since then is not saved.';
+
+/**
+ * Keep the project; gives the time it was saved (its new `updated`). With
+ * `expected` (the `updated` this copy was read or last saved with; null for
+ * a project not stored yet), the save is refused when the stored project
+ * was saved meanwhile by someone else (another tab), instead of replacing
+ * their changes.
+ */
+export async function saveProject(
+	project: StoredProject,
+	expected?: string | null
+): Promise<string> {
+	const updated = new Date().toISOString();
+	const database = await open();
+	await new Promise<void>((resolve, reject) => {
+		const transaction = database.transaction(STORE, 'readwrite');
+		const store = transaction.objectStore(STORE);
+		// Both requests are made at once (a page being closed may not get to make
+		// a second); the check aborts the transaction, put included, when stale.
+		if (expected !== undefined) {
+			const current = store.get(project.id);
+			current.onsuccess = () => {
+				const stored = current.result as StoredProject | undefined;
+				if (stored && stored.updated !== expected) {
+					reject(new Error(SAVED_ELSEWHERE));
+					transaction.abort();
+				}
+			};
+		}
+		store.put({ ...project, updated });
+		transaction.oncomplete = () => resolve();
+		transaction.onerror = transaction.onabort = () =>
+			reject(transaction.error ?? new Error('Browser storage failed.'));
+	});
+	return updated;
 }
 
 export async function deleteProject(id: string): Promise<void> {

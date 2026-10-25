@@ -199,7 +199,7 @@ export const HELP: HelpSection[] = [
 				title: 'Requirement',
 				keywords: 'shall statement id spec specification',
 				blocks: [
-					'A requirement is a “shall” statement with an ID, like a row of a requirements spreadsheet. Its statement is its `doc` text. When it can be checked by a number, a `require constraint` states the check, with units, and the app checks it against the design.',
+					"A requirement is a “shall” statement with an ID, like a row of a requirements spreadsheet. Its statement is its `doc` text. When it can be checked by a number, a `require constraint` states the check, with units, and the app checks it against the design. The ID (`<'REQ-12'>`) stays the same when the title changes or the requirement moves: Problems warns when two requirements share one, and the editor marks a requirement without one and suggests the next free ID.",
 					concept('requirement'),
 					concept('requirement def'),
 					exampleOf('requirement')
@@ -648,7 +648,7 @@ export const HELP: HelpSection[] = [
 					{
 						list: [
 							'**GitHub**: **Save to GitHub…** keeps every version, with who changed what, and lets your team work on it too. Only GitHub sees the files.',
-							'**A folder**: open a folder (in Chrome or Edge on a computer) and Fairtide saves back to the files there.',
+							'**A folder**: open a folder (in Chrome or Edge on a computer), and **Save to folder** writes your changes back to the files there. A file another program changed there meanwhile is brought in; one changed there and here too isn’t overwritten: you choose which version to keep.',
 							'**A file**: **Download as .kpar** in the project menu saves the whole project as one file, which any SysML v2 tool can read. Import it again from **Your projects**.',
 							'**Another tool or a server**: **Download as SysML v2 JSON…** and **Connect to a SysML v2 API server…** (see **Exchange models with other tools**).'
 						]

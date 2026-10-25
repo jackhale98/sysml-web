@@ -5,11 +5,11 @@
  * claim in the text; a violation is a problem until it is undone; the
  * inspector shows what an expression comes to.
  */
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
+import { analyze } from './axe';
 
 async function expectAccessible(page: Page) {
-	const results = await new AxeBuilder({ page }).analyze();
+	const results = await analyze(page);
 	expect(results.violations.map((v) => v.id)).toEqual([]);
 }
 

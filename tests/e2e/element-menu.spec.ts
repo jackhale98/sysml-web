@@ -4,13 +4,13 @@
  * the model, each the same action the inspector and diagrams have; and
  * "Duplicate" in the search box for the selected element.
  */
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { analyze } from './axe';
 
 test.describe.configure({ timeout: 120_000 });
 
 async function expectAccessible(page: Page, where: string) {
-	const results = await new AxeBuilder({ page }).analyze();
+	const results = await analyze(page);
 	expect(
 		results.violations.map((v) => `${v.id}: ${v.nodes[0]?.target}`),
 		`accessibility of ${where}`

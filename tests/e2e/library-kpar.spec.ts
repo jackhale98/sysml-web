@@ -1,6 +1,6 @@
 import { join } from 'node:path';
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
+import { analyze } from './axe';
 
 // The standard library browser (the sysml-toolkit's library, read in a worker)
 // and project archives (.kpar and .zip, read and written in TypeScript).
@@ -8,7 +8,7 @@ import { expect, test, type Page } from '@playwright/test';
 const FIXTURES = join(import.meta.dirname, 'fixtures');
 
 async function expectAccessible(page: Page) {
-	const results = await new AxeBuilder({ page }).analyze();
+	const results = await analyze(page);
 	const violations = results.violations.map(
 		(v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`
 	);

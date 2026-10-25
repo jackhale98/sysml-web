@@ -288,7 +288,14 @@ export function planLimit(workspace: Workspace, input: LimitInput): Plan {
 	const refs = new References(pkgName);
 	const type = input.subject.add ? refs.name(input.subject.type) : input.subject.type;
 	if (input.limit.unit) refs.library('SI::*');
-	const by = input.satisfyBy?.reference ? refs.reference(input.satisfyBy.reference) : null;
+	const satisfier = input.satisfyBy?.reference;
+	// `satisfy … by system` where the requirement's subject is `system` would name the
+	// subject itself: name the part from its package then.
+	const by = !satisfier
+		? null
+		: satisfier.text.split('.')[0] === sysmlName(input.subject.name)
+			? qualifiedReference(satisfier)
+			: refs.reference(satisfier);
 	const members: Write['members'] = [];
 	let label: string;
 	if (input.create) {
@@ -323,6 +330,13 @@ export function planLimit(workspace: Workspace, input: LimitInput): Plan {
 		members
 	};
 	return { write, preview: previewOf(write), label };
+}
+
+/** `Rover::system.battery` for `{ imports: 'Rover::system', text: 'system.battery' }`. */
+function qualifiedReference(ref: { imports: string; text: string }): string {
+	const at = ref.imports.lastIndexOf('::');
+	const simple = at < 0 ? ref.imports : ref.imports.slice(at + 2);
+	return ref.text.startsWith(simple) ? ref.imports + ref.text.slice(simple.length) : ref.text;
 }
 
 // --- New trade study -------------------------------------------------------------------

@@ -531,8 +531,40 @@ export class Evaluation {
 		};
 		if (!s.negated) this.decideByApp(check, constraintTexts);
 		if (s.constraints.length === 1) addMargin(check);
+		this.nameBySatisfier(check, requirement);
 		check.explanation = explain(check, s.vacuous);
 		return check;
+	}
+
+	/**
+	 * A satisfy's values named as the design names them: `system.endurance`, the
+	 * requirement's subject bound to `drone`, reads `drone.endurance`. Decided first,
+	 * under the constraint's own names.
+	 */
+	private nameBySatisfier(check: Check, requirement: ElementRecord | undefined) {
+		const subject = requirement && this.subjectOf(requirement);
+		if (!subject || !check.by) return;
+		const by = check.by;
+		const rename = (feature: string) =>
+			feature.startsWith(`${subject}.`) ? by + feature.slice(subject.length) : feature;
+		check.values = check.values.map((v) => ({ ...v, feature: rename(v.feature) }));
+		if (check.limit) check.limit = { ...check.limit, feature: rename(check.limit.feature) };
+	}
+
+	/** The name of a requirement's subject: its own, or its definition's (and theirs). */
+	private subjectOf(requirement: ElementRecord): string | null {
+		const seen = new Set<string>();
+		for (let r: ElementRecord | undefined = requirement; r && !seen.has(r.id);) {
+			seen.add(r.id);
+			const id = r.id;
+			const subject = this.source.extracted.elements.find(
+				(e) => e.kind === 'subject' && e.parentId === id && e.name
+			);
+			if (subject) return subject.name;
+			const next: string | undefined = r.typeIds[0] ?? r.generalIds[0];
+			r = next ? this.source.extracted.byId.get(next) : undefined;
+		}
+		return null;
 	}
 
 	private assertion(c: TkConstraintVerdict, at: Located, owner: ElementRecord | undefined): Check {

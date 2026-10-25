@@ -386,14 +386,14 @@ describe('setting a limit', { timeout: 30_000 }, () => {
 		const req = element(workspace, "'First requirement'");
 		const { [req.id!]: f } = await features(workspace, [req.id!]);
 		const subject = f!.features.find((x) => x.kind === 'subject')!;
-		expect(subject).toMatchObject({ name: 'system', type: 'Rover::System' });
+		expect(subject).toMatchObject({ name: 'theSystem', type: 'Rover::System' });
 		const plan = planLimit(workspace, {
 			attribute: 'mass',
 			limit: { kind: 'atMost', value: 30, unit: 'kg' },
 			requirement: { element: req, features: f! },
 			subject: { name: subject.name, type: subject.type!, add: false }
 		});
-		expect(plan.preview).toContain('require constraint { system.mass <= 30 [kg] }');
+		expect(plan.preview).toContain('require constraint { theSystem.mass <= 30 [kg] }');
 		await analysed(workspace, () => write(workspace, plan.label, plan.write));
 		expect(problemsOf(workspace)).toEqual([]);
 		const check = () => workspace.checks!.checks.find((c) => c.requirement?.id === 'REQ-001')!;

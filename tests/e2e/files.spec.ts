@@ -4,15 +4,16 @@
  * nothing breaks), and deleted (the dialog says what stops resolving, and
  * Undo brings it back). Once with a mouse, once on a phone with a long press.
  * In a project opened from a folder, a file deleted and not yet saved to the
- * folder is still a deleted file after a reload.
+ * folder is still a deleted file after a reload, and "Save to folder" asks
+ * before overwriting a file changed in the folder too.
  */
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
+import { analyze } from './axe';
 
 test.describe.configure({ timeout: 120_000 });
 
 async function expectAccessible(page: Page, where: string) {
-	const results = await new AxeBuilder({ page }).analyze();
+	const results = await analyze(page);
 	expect(
 		results.violations.map((v) => `${v.id}: ${v.nodes[0]?.target}`),
 		`accessibility of ${where}`
@@ -285,6 +286,119 @@ test('a file deleted in a folder project shows as deleted in the review after a 
 	await unsaved.click();
 	await expect(unsaved).toBeHidden();
 	expect(await folderFiles(page)).toEqual(['.project.json', 'model/Rig.sysml']);
+});
+
+/** Change a file in the folder project's folder, as another program would. */
+const writeInFolder = (page: Page, path: string, text: string) =>
+	page.evaluate(
+		async ({ path, text }) => {
+			let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('Rig');
+			const parts = path.split('/');
+			for (const part of parts.slice(0, -1)) dir = await dir.getDirectoryHandle(part);
+			const writable = await (await dir.getFileHandle(parts.at(-1)!)).createWritable();
+			await writable.write(text);
+			await writable.close();
+		},
+		{ path, text }
+	);
+
+/** A file's text in the folder project's folder. */
+const readInFolder = (page: Page, path: string) =>
+	page.evaluate(async (path) => {
+		let dir = await (await navigator.storage.getDirectory()).getDirectoryHandle('Rig');
+		const parts = path.split('/');
+		for (const part of parts.slice(0, -1)) dir = await dir.getDirectoryHandle(part);
+		return (await (await dir.getFileHandle(parts.at(-1)!)).getFile()).text();
+	}, path);
+
+test('saving to the folder asks before overwriting a file changed there too, and keeps what is chosen', async ({
+	page
+}) => {
+	await page.setViewportSize({ width: 1440, height: 900 });
+	const rig = 'package Rig {\n    part def Frame;\n    part def Mast;\n    part def Boom;\n}\n';
+	await openFolderProject(page, {
+		'.project.json': '{\n\t"name": "Rig"\n}\n',
+		'model/Rig.sysml': rig
+	});
+	await page.getByRole('tab', { name: 'Files' }).click();
+	await files(page)
+		.getByRole('button', { name: /^Rig\.sysml/ })
+		.click();
+	const text = page.getByRole('button', { name: 'Text', exact: true });
+	if (await text.isVisible()) await text.click();
+	await typeAfter(page, '    part def Frame;', 'part def Here;');
+	const save = page.getByRole('button', { name: /1 unsaved · Save to folder/ });
+	await expect(save).toBeVisible();
+	// Another program changes the same file meanwhile, on another line.
+	const there = rig.replace('part def Boom;', 'part def Boom;\n    part def There;');
+	await writeInFolder(page, 'model/Rig.sysml', there);
+
+	// Asked, and the folder is left as it is.
+	await save.click();
+	const ask = page.getByTestId('folder-conflicts');
+	await expect(
+		ask.getByRole('heading', { name: '1 file changed in the folder too' })
+	).toBeVisible();
+	await expect(toast(page, /changed in the folder too/)).toBeVisible();
+	await expect(ask.getByRole('group', { name: 'model/Rig.sysml' })).toBeVisible();
+	await expect(ask.getByRole('radio', { name: /Combine both/ })).toBeChecked();
+	await expect(ask.getByRole('radio', { name: /Keep mine/ })).toBeVisible();
+	await expect(ask.getByRole('radio', { name: /Take the folder’s/ })).toBeVisible();
+	await ask.getByText('Show the differences').click();
+	await expect(ask.getByRole('region', { name: /Differences/ })).toContainText('part def There;');
+	await expectAccessible(page, 'the question about files changed in the folder too');
+	expect(await readInFolder(page, 'model/Rig.sysml')).toBe(there);
+
+	// Not now: nothing changes on either side, and it is still unsaved.
+	await ask.getByRole('button', { name: 'Not now' }).last().click();
+	await expect(ask).toBeHidden();
+	await expect(save).toBeVisible();
+	expect(await readInFolder(page, 'model/Rig.sysml')).toBe(there);
+	await expect(page.locator('.cm-content')).not.toContainText('part def There;');
+
+	// Asked again; combining keeps both changes, in the folder and here.
+	await save.click();
+	await ask.getByRole('button', { name: 'Finish saving' }).click();
+	await expect(ask).toBeHidden();
+	await expect(toast(page, /Saved to the folder\./)).toBeVisible();
+	await expect(save).toBeHidden();
+	const both = there.replace('part def Frame;', 'part def Frame;\n    part def Here;');
+	expect(await readInFolder(page, 'model/Rig.sysml')).toBe(both);
+	await expect(page.locator('.cm-content')).toContainText('part def There;');
+	await expect(page.locator('.cm-content')).toContainText('part def Here;');
+});
+
+test('saving to the folder brings in a file changed only there', async ({ page }) => {
+	await page.setViewportSize({ width: 1440, height: 900 });
+	await openFolderProject(page, {
+		'model/Rig.sysml': 'package Rig {\n    part def Frame;\n}\n',
+		'model/Spares.sysml': 'package Spares {\n    part def Bolt;\n}\n'
+	});
+	await page.getByRole('tab', { name: 'Files' }).click();
+	await files(page)
+		.getByRole('button', { name: /^Rig\.sysml/ })
+		.click();
+	const text = page.getByRole('button', { name: 'Text', exact: true });
+	if (await text.isVisible()) await text.click();
+	await typeAfter(page, '    part def Frame;', 'part def Mast;');
+	await writeInFolder(
+		page,
+		'model/Spares.sysml',
+		'package Spares {\n    part def Bolt;\n    part def Nut;\n}\n'
+	);
+	await page.getByRole('button', { name: /1 unsaved · Save to folder/ }).click();
+	await expect(
+		toast(
+			page,
+			/Saved to the folder\. Spares\.sysml had changed there, so its change was brought in\./
+		)
+	).toBeVisible();
+	expect(await readInFolder(page, 'model/Rig.sysml')).toContain('part def Mast;');
+	expect(await readInFolder(page, 'model/Spares.sysml')).toContain('part def Nut;');
+	await files(page)
+		.getByRole('button', { name: /^Spares\.sysml/ })
+		.click();
+	await expect(page.locator('.cm-content')).toContainText('part def Nut;');
 });
 
 test('deleting a file of several packages counts only what uses them from elsewhere', async ({

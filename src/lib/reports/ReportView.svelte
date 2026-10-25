@@ -7,6 +7,7 @@
 	import { download } from '#lib/project/sources.ts';
 	import { isLibraryFile, type Workspace } from '#lib/project/workspace.svelte.ts';
 	import { toasts } from '#lib/ui/toasts.svelte.ts';
+	import { undoAction } from '#lib/workbench/actions.ts';
 	import type { WorkbenchUi } from '#lib/workbench/ui.svelte.ts';
 	import { viewTitle } from '#lib/workbench/views.ts';
 	import { buildReport } from './build.ts';
@@ -172,15 +173,10 @@
 				toasts.show(result.error, { tone: 'error' });
 				return;
 			}
+			const edit = workspace.lastEdit;
 			toasts.show(`Saved as the view ${result.name}; change its expose to change what it covers.`, {
 				tone: 'success',
-				action: {
-					label: 'Undo',
-					run: () => {
-						const undone = workspace.undo();
-						if (undone) toasts.show(`Undid: ${undone}`);
-					}
-				}
+				...(edit !== undefined ? { action: undoAction(workspace, edit) } : {})
 			});
 			// Open it once the model has been read again.
 			for (let i = 0; i < 40; i++) {
