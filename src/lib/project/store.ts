@@ -31,6 +31,8 @@ export interface StoredProject {
 	 * (one made here has none), so a reload still knows what the folder holds.
 	 */
 	folderTexts?: Record<string, string>;
+	/** For `folder` projects: files whose text in the folder isn't known (kept before `folderTexts` were). */
+	unknownInFolder?: string[];
 }
 
 export type ProjectSummary = Omit<StoredProject, 'files'> & {

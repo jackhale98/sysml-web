@@ -648,7 +648,7 @@ export const HELP: HelpSection[] = [
 					{
 						list: [
 							'**GitHub**: **Save to GitHub…** keeps every version, with who changed what, and lets your team work on it too. Only GitHub sees the files.',
-							'**A folder**: open a folder (in Chrome or Edge on a computer) and Fairtide saves back to the files there.',
+							'**A folder**: open a folder (in Chrome or Edge on a computer), and **Save to folder** writes your changes back to the files there. A file another program changed there meanwhile is brought in; one changed there and here too isn’t overwritten: you choose which version to keep.',
 							'**A file**: **Download as .kpar** in the project menu saves the whole project as one file, which any SysML v2 tool can read. Import it again from **Your projects**.',
 							'**Another tool or a server**: **Download as SysML v2 JSON…** and **Connect to a SysML v2 API server…** (see **Exchange models with other tools**).'
 						]

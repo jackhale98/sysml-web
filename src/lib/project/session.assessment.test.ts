@@ -198,8 +198,8 @@ describe('saving in this browser', () => {
 		expect(textOf('p', 'Rover.sysml')).toBe('package Rover {\n    part arm;\n}\n');
 	});
 
-	// Known gap: for the 0.6 s between an edit and its autosave the status still says "Saved" (from the save before), so an edit lost to a crash in that moment was shown as saved.
-	it.fails('does not show a change waiting for its autosave as saved', async () => {
+	// Fixed: for the 0.6 s between an edit and its autosave the status said "Saved" (from the save before), so an edit lost to a crash in that moment was shown as saved.
+	it('does not show a change waiting for its autosave as saved', async () => {
 		browserProject({ 'Rover.sysml': 'package Rover {\n}\n' });
 		const { workspace, session } = await openTab('p');
 		workspace.setText('Rover.sysml', 'package Rover {\n    part arm;\n}\n');
@@ -209,6 +209,37 @@ describe('saving in this browser', () => {
 		workspace.setText('Rover.sysml', 'package Rover {\n    part arm;\n    part leg;\n}\n');
 		session.changed();
 		expect(session.saveState).not.toBe('saved');
+		await session.flush();
+		expect(session.saveState).toBe('saved');
+	});
+
+	it('does not show a change made while a save was under way as saved by it', async () => {
+		browserProject({ 'Rover.sysml': 'package Rover {\n}\n' });
+		const { workspace, session } = await openTab('p');
+		workspace.setText('Rover.sysml', 'package Rover {\n    part arm;\n}\n');
+		const saving = session.save();
+		workspace.setText('Rover.sysml', 'package Rover {\n    part leg;\n}\n');
+		session.changed();
+		await saving;
+		expect(session.saveState).toBe('saving');
+		await session.flush();
+		expect(session.saveState).toBe('saved');
+		expect(textOf('p', 'Rover.sysml')).toBe('package Rover {\n    part leg;\n}\n');
+	});
+
+	it('keeps saying "Not saved" after a refused save until a save works', async () => {
+		browserProject({ 'Rover.sysml': 'package Rover {\n}\n' });
+		const { workspace, session } = await openTab('p');
+		failSave = new DOMException('The quota has been exceeded.', 'QuotaExceededError');
+		workspace.setText('Rover.sysml', 'package Rover {\n    part arm;\n}\n');
+		session.changed();
+		await session.flush();
+		workspace.setText('Rover.sysml', 'package Rover {\n    part leg;\n}\n');
+		session.changed();
+		expect(session.saveState).toBe('error');
+		failSave = null;
+		await session.flush();
+		expect(session.saveState).toBe('saved');
 	});
 
 	// Fixed in this assessment: two tabs of one project each saved the whole project, so the later save dropped the other tab's edits without a word.
@@ -310,22 +341,26 @@ describe('saving to the folder', () => {
 		expect(root.list()['model/Power.sysml']).toBe('package Power {\n}\n');
 	});
 
-	// Known gap: the folder is not re-read before saving, so a change made to the same file on disk (another editor, a git pull, a synced drive) is overwritten without a warning.
-	it.fails(
-		'does not overwrite a file changed on disk since it was opened without saying so',
-		async () => {
-			const { root, workspace, session } = await folderProject({
-				'model/A.sysml': 'package A {\n}\n'
-			});
-			// Someone else edits the file on disk…
-			(await (await root.getDirectoryHandle('model')).getFileHandle('A.sysml')).text =
-				'package A {\n    part fromDisk;\n}\n';
-			// …while it is edited here too.
-			workspace.setText('model/A.sysml', 'package A {\n    part fromHere;\n}\n');
-			session.changed();
-			const error = await session.saveToFolder();
-			const kept = root.list()['model/A.sysml']!.includes('fromDisk');
-			expect(kept || error !== null).toBe(true);
-		}
-	);
+	// Fixed: the folder was not re-read before saving, so a change made to the same file on disk (another editor, a git pull, a synced drive) was overwritten without a warning.
+	it('does not overwrite a file changed on disk since it was opened without saying so', async () => {
+		const { root, workspace, session } = await folderProject({
+			'model/A.sysml': 'package A {\n}\n'
+		});
+		// Someone else edits the file on disk…
+		(await (await root.getDirectoryHandle('model')).getFileHandle('A.sysml')).text =
+			'package A {\n    part fromDisk;\n}\n';
+		// …while it is edited here too.
+		workspace.setText('model/A.sysml', 'package A {\n    part fromHere;\n}\n');
+		session.changed();
+		const error = await session.saveToFolder();
+		const kept = root.list()['model/A.sysml']!.includes('fromDisk');
+		expect(kept || error !== null).toBe(true);
+		// Both are kept, and the person is asked which to keep for that file.
+		expect(kept).toBe(true);
+		expect(error).toMatch(/changed in the folder too/);
+		expect(session.folderPending?.conflicts.map((c) => c.path)).toEqual(['model/A.sysml']);
+		expect(workspace.files['model/A.sysml']).toContain('fromHere');
+		expect(session.unsavedToFolder).toEqual(['model/A.sysml']);
+		expect(session.leaveRisk).toEqual({ kind: 'folder', count: 1 });
+	});
 });
