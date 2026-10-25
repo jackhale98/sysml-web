@@ -22,6 +22,7 @@
 import { convert, formatMagnitude, formatQuantity, readable, type Quantity } from '../../quantity';
 import type { Check, ColumnKind, Evaluated } from '../../types';
 import { multiplicityOf, type ElementRecord } from '../model';
+import { referencesIn } from '../evaluation';
 import type { ViewContext } from './context';
 import { compositionRows, type Row } from './rows';
 import { simpleName, splitPath, unquoteName } from './text';
@@ -54,6 +55,8 @@ interface BudgetLine {
 	/** Why `each` is missing. */
 	note: string | null;
 	rolledUp: boolean;
+	/** The sibling collection this part is one of (`m1 :> motors`): counted there. */
+	memberOf?: string | null;
 }
 
 export function budgetRows(ctx: ViewContext, attribute: string): Row[] {
@@ -92,20 +95,41 @@ export function budgetRows(ctx: ViewContext, attribute: string): Row[] {
 		const own = valueRecord(ctx, line.record, line.row.typeId ?? null, name);
 		const children = childrenOf(line).filter((c) => included.has(c));
 		if (own) {
-			const value = evaluation?.valueOf(own.id) ?? null;
+			let value = evaluation?.valueOf(own.id) ?? null;
+			// Inherited as an expression (`mass = cells * cellMass`): with this part's values, not its type's.
+			if (
+				evaluation &&
+				own.ownerId !== line.record.id &&
+				line.record.qualifiedName &&
+				referencesIn(own.value!).length
+			)
+				value = evaluation.valueFor(line.record.qualifiedName, name) ?? value;
 			if (value?.kind === 'number') line.each = { value: value.value, unit: value.unit };
 			else line.note = noteOf(value);
 		}
+		// A part that is one of a sibling collection (`m1 :> motors`) is counted in the collection.
+		const siblings = new Map(childrenOf(line).map((c) => [c.record.id, c]));
+		for (const c of children) {
+			const collection = ctx.subsettedUsage(c.record);
+			if (collection && siblings.has(collection.id)) c.memberOf = collection.name;
+		}
 		if (!line.each && children.length) {
-			const parts = children.filter((c) => c.each);
+			const counted = children.filter((c) => !c.memberOf);
+			const parts = counted.filter((c) => c.each);
 			const sum = sumOf(parts.map((c) => scaled(c.each!, c.quantity)));
 			if (sum) {
 				line.each = sum;
 				line.rolledUp = true;
-				const missing = children.length - parts.length;
+				const missing = counted.length - parts.length;
 				line.note = missing
 					? `adds up the parts that have a ${name}; ${missing} ${missing === 1 ? 'has' : 'have'} none`
 					: `the sum of its parts`;
+				// Parts whose number may vary (`[0..1]`, `[2..4]`) are counted at their least.
+				const variable = childrenOf(line).filter(
+					(c) => (c.each || included.has(c)) && !c.memberOf && rangeOf(c.record.header)
+				);
+				if (variable.length)
+					line.note += `; counts ${variable.map((c) => `\`${c.record.name}\` (${rangeOf(c.record.header)}) as ${c.quantity}`).join(' and ')}, whose number can vary`;
 			}
 		}
 		// A part whose type declares the attribute belongs in the budget, without a value too
@@ -123,7 +147,7 @@ export function budgetRows(ctx: ViewContext, attribute: string): Row[] {
 	let rootTotal: Quantity | null = null;
 	for (const line of kept) {
 		const depth = Number(line.row.fields.get('depth') ?? '0');
-		const total = line.each ? scaled(line.each, line.extended) : null;
+		const total = line.each && !line.memberOf ? scaled(line.each, line.extended) : null;
 		if (depth === 0) rootTotal = total;
 		const fields = new Map(line.row.fields);
 		const shown = (q: Quantity | null) => (q ? formatQuantity(inUnit(q, unit)) : '');
@@ -132,6 +156,7 @@ export function budgetRows(ctx: ViewContext, attribute: string): Row[] {
 		fields.set('share', total && rootTotal ? percent(ratio(total, rootTotal)) : '');
 		const notes: Record<string, string> = {};
 		if (line.note && (!line.each || line.rolledUp)) notes.each = line.note;
+		if (line.memberOf) notes.total = `one of \`${line.memberOf}\`, counted there`;
 		const row: Row = {
 			...line.row,
 			fields,
@@ -205,7 +230,12 @@ function rootAttributes(
 		const of = declaration?.specializes.map((s) => unquoteName(simpleName(s))) ?? specializes;
 		if (!of.some((s) => kinds.has(s))) continue;
 		seen.add(a.name);
-		const value = evaluation.valueAt(`${root.record.qualifiedName}::${a.written ?? a.name}`);
+		const at = `${root.record.qualifiedName}::${a.written ?? a.name}`;
+		// Inherited as an expression: with the root's values (`evaluate` would use its type's).
+		const value =
+			(a.ownerId !== root.record.id && a.value && referencesIn(a.value).length
+				? evaluation.valueFor(root.record.qualifiedName, a.written ?? a.name)
+				: null) ?? evaluation.valueAt(at);
 		const path = `${root.row.fields.get('path') ?? root.record.name}.${a.name}`;
 		const fields = new Map<string, string>([
 			['element', a.name],
@@ -327,6 +357,15 @@ function declaresAttribute(
 	}
 	cache.set(key, found);
 	return found;
+}
+
+/** A multiplicity whose number can vary (`0..1`, `2..4`, `1..*`), as written; null for a fixed one. */
+function rangeOf(header: string): string | null {
+	const text = multiplicityOf(header)?.trim();
+	if (!text) return null;
+	const [lower, upper] = text.split('..').map((x) => x.trim());
+	if (upper === undefined) return lower === '*' ? text : null;
+	return lower === upper ? null : text;
 }
 
 function noteOf(value: Evaluated | null | undefined): string | null {

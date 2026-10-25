@@ -317,7 +317,7 @@ function asBool(value: Value): boolean | null {
 /**
  * Bring two numbers to a common unit. A bare number takes the other side's
  * unit; units that measure different things are an error; unknown units
- * compare by magnitude.
+ * compare by magnitude, but don't add up (`1 [furlong] + 1 [m]` is no 2 furlongs).
  */
 function align(op: string, a: Value, b: Value): { x: number; y: number; unit: string | null } {
 	const x = magnitude(a)!;
@@ -327,10 +327,15 @@ function align(op: string, a: Value, b: Value): { x: number; y: number; unit: st
 	if (!ua || !ub || ua === ub) return { x, y, unit: ua ?? ub };
 	const pa = parseUnit(ua);
 	const pb = parseUnit(ub);
-	if (!pa || !pb) return { x, y, unit: ua };
+	if (!pa || !pb) {
+		if (!COMPARISONS.has(op)) throw cannot(op, a, b);
+		return { x, y, unit: ua };
+	}
 	if (!sameDimension(pa, pb)) throw cannot(op, a, b);
 	return { x, y: convert(y, ub, ua), unit: ua };
 }
+
+const COMPARISONS = new Set(['<', '>', '<=', '>=', '==']);
 
 function withUnit(n: number, unit: string | null): Value {
 	return unit ? new Quantity(n, unit) : n;

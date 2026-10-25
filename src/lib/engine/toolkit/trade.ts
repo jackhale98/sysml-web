@@ -218,8 +218,14 @@ export class TradeStudies {
 			short.filter((x) => x === s).length > 1 ? alternatives[i]!.label : s
 		);
 
-		// The ranking and the selection.
-		const numbers = scores.map((s) => (s.kind === 'number' ? s.value : null));
+		// The ranking and the selection, with the scores in one unit (0.6 kg is more than 500 g).
+		const scoreUnit = scores.find((s) => s.kind === 'number')?.unit ?? null;
+		const numbers = scores.map((s) => {
+			if (s.kind !== 'number') return null;
+			if (s.unit === scoreUnit) return s.value;
+			return s.unit && scoreUnit ? convert(s.value, s.unit, scoreUnit) : null;
+		});
+		const apart = scores.some((s, i) => s.kind === 'number' && numbers[i] === null);
 		const ranked = numbers
 			.map((n, i) => ({ n, i }))
 			.filter((x): x is { n: number; i: number } => x.n !== null)
@@ -233,7 +239,11 @@ export class TradeStudies {
 		const best = goal && top ? ranked.filter((x) => same(x.n, top.n)).map((x) => x.i) : [];
 		let selected: number | null = null;
 		if (goal && ranked.length && ranked.length < alternatives.length)
-			notes.push('Some alternatives have no score, so nothing is selected.');
+			notes.push(
+				apart
+					? `The scores are in units that don’t convert to one another (${[...new Set(scores.flatMap((s) => (s.kind === 'number' && s.unit ? [`\`${s.unit}\``] : [])))].join(', ')}), so nothing is selected.`
+					: 'Some alternatives have no score, so nothing is selected.'
+			);
 		else if (best.length > 1)
 			notes.push(
 				`${best.map((i) => names[i]!).join(' and ')} have the same score: the objective doesn’t decide between them.`

@@ -275,35 +275,60 @@ export class Evaluation {
 		if (depth > 8) return null;
 		const path = `${context}::${feature.replace(/\./g, '::')}`;
 		const known = this.rawValueAt(path);
-		if (known?.kind === 'number')
-			return known.unit ? new ExprQuantity(known.value, known.unit) : known.value;
-		if (known && known.kind !== 'undecided') return null;
+		const decided =
+			known?.kind === 'number'
+				? known.unit
+					? new ExprQuantity(known.value, known.unit)
+					: known.value
+				: null;
+		// An expression the element inherits is evaluated by the toolkit with the definition's
+		// values (request 9): it is worked out here with the element's own, else the toolkit's stands.
+		if (decided !== null && !this.inheritsExpression(path)) return decided;
+		if (known && known.kind !== 'undecided' && decided === null) return null;
 		const segments = feature.split('.');
 		let scope = context;
 		for (const segment of segments.slice(0, -1)) {
 			// Through one part, not a collection: a collection only counts inside `sum`.
 			const record = this.recordAt(`${scope}::${segment}`);
-			if (!record || collectionCount(record.header) !== null) return null;
+			if (!record || collectionCount(record.header) !== null) return decided;
 			scope = `${scope}::${segment}`;
 		}
 		const record = this.recordAt(path);
-		if (!record?.value) return null;
+		if (!record?.value) return decided;
 		const owner = record.ownerId ? this.source.extracted.byId.get(record.ownerId) : undefined;
 		if (owner?.qualifiedName !== scope) trace.inherited = true;
 		let expr: Expr;
 		try {
 			expr = this.withSums(parseExpr(record.value), scope, depth, trace);
 		} catch {
-			return null;
+			return decided;
 		}
 		try {
 			return evaluateExpr(expr, {
 				get: (name) => this.appValue(scope, name, depth + 1, trace) ?? undefined
 			});
 		} catch (error) {
-			if (error instanceof EvalError) return null;
+			if (error instanceof EvalError) return decided;
 			throw error;
 		}
+	}
+
+	/** Whether the feature at `path` has a value written as an expression in a definition it inherits from. */
+	private inheritsExpression(path: string): boolean {
+		const record = this.recordAt(path);
+		if (!record?.value || !referencesIn(record.value).length) return false;
+		const owner = record.ownerId ? this.source.extracted.byId.get(record.ownerId) : undefined;
+		return !!owner?.qualifiedName && owner.qualifiedName !== path.slice(0, path.lastIndexOf('::'));
+	}
+
+	/**
+	 * `feature`'s value for the element at `context` (a qualified name), with an
+	 * expression it inherits worked out with the element's own values; null when
+	 * it can't be worked out.
+	 */
+	valueFor(context: string, feature: string): Evaluated | null {
+		const value = this.appValue(context, feature, 0, { over: [], inherited: false });
+		return value === null ? null : fromValue(value);
 	}
 
 	/** `expr` with every `sum(parts.x)` over a fixed-size collection replaced by its total. */
