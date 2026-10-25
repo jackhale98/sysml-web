@@ -50,7 +50,10 @@ export function exportModel(
 		? session.toFullJson(false)
 		: tk.canonicalizeCompact(session.toCompactJson());
 	let elements = JSON.parse(raw) as ElementJson[];
-	if (!options.derived) for (const e of elements) spellRedefined(e);
+	if (!options.derived) {
+		for (const e of elements) spellRedefined(e);
+		elements = redefineMetadataValues(tk, session, elements);
+	}
 	if (options.files) elements = ownElements(session, elements, new Set(options.files));
 
 	// A reference that never resolved comes out as `{"@ref": "Name"}`: not
@@ -220,6 +223,81 @@ function spellRedefined(e: ElementJson): void {
 		isRef(e.ownedRelatedElement[0])
 	)
 		e.memberElement = e.ownedRelatedElement[0];
+}
+
+/**
+ * A metadata body's `level = 3;` is `:>> level = 3;` (SysML 8.2.2.27): it
+ * redefines the metadata definition's `level`. The toolkit's compact JSON
+ * (0.10.10) writes it as a new feature named `level` instead, which another
+ * tool reads as the metadata's `level` left unset. Each such feature loses its
+ * name and gets the Redefinition the text means, as the pilot implementation
+ * writes it.
+ */
+function redefineMetadataValues(
+	tk: Toolkit,
+	session: TkSession,
+	elements: ElementJson[]
+): ElementJson[] {
+	const byId = new Map(elements.map((e) => [e['@id'], e]));
+	const refs = (value: unknown) =>
+		(Array.isArray(value) ? value : [value]).filter(isRef).map((r) => byId.get(r['@id']));
+	const qualifiedName = (id: string): string | null => {
+		const row = JSON.parse(
+			session.rows(JSON.stringify([id]), JSON.stringify(['qualifiedName']))
+		)[0];
+		return typeof row?.qualifiedName === 'string' ? row.qualifiedName : null;
+	};
+	const added: ElementJson[] = [];
+	for (const usage of elements) {
+		if (usage['@type'] !== 'MetadataUsage') continue;
+		const owned = refs(usage.ownedRelationship);
+		const typing = owned.find((r) => r?.['@type'] === 'FeatureTyping');
+		const type = typing && isRef(typing.type) ? qualifiedName(typing.type['@id']) : null;
+		if (!type) continue;
+		for (const membership of owned) {
+			if (membership?.['@type'] !== 'FeatureMembership') continue;
+			const feature = refs(membership.ownedRelatedElement)[0];
+			const name = feature?.declaredName;
+			if (!feature || typeof name !== 'string') continue;
+			if (refs(feature.ownedRelationship).some((r) => r?.['@type'] === 'Redefinition')) continue;
+			const target = session.resolve(`${type}::${name.includes(' ') ? `'${name}'` : name}`);
+			if (!target) continue;
+			const redefined = { '@id': session.elementId(target) };
+			target.free();
+			const self = { '@id': feature['@id'] };
+			const stub = {
+				'@id': derivedId(`${feature['@id']}/redefinition`),
+				'@type': 'Redefinition',
+				owningRelatedElement: self,
+				redefiningFeature: self,
+				redefinedFeature: redefined
+			};
+			const [redefinition] = JSON.parse(
+				tk.canonicalizeCompact(JSON.stringify([stub]))
+			) as ElementJson[];
+			if (!redefinition) continue;
+			spellRedefined(redefinition);
+			redefinition.elementId = redefinition['@id'];
+			feature.declaredName = null;
+			feature.ownedRelationship = [
+				{ '@id': redefinition['@id'] },
+				...((feature.ownedRelationship as unknown[]) ?? [])
+			];
+			added.push(redefinition);
+		}
+	}
+	return added.length ? [...elements, ...added] : elements;
+}
+
+/** A stable UUID-shaped id for an element the app adds (FNV-1a over the seed, four ways). */
+function derivedId(seed: string): string {
+	const words = [0x811c9dc5, 0x01000193, 0x9e3779b9, 0x85ebca6b].map((basis) => {
+		let h = basis >>> 0;
+		for (let i = 0; i < seed.length; i++) h = Math.imul(h ^ seed.charCodeAt(i), 0x01000193) >>> 0;
+		return h.toString(16).padStart(8, '0');
+	});
+	const hex = words.join('');
+	return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-${((parseInt(hex[16]!, 16) & 3) | 8).toString(16)}${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 }
 
 /**
