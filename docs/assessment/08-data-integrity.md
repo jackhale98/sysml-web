@@ -1,5 +1,7 @@
 # §8 Data integrity, Git collaboration and recovery
 
+> Written before the fixes that followed it: what became of each critical finding is in [the assessment summary](README.md#critical-findings-and-what-became-of-them).
+
 Assessed on `claude/assess-data-integrity` (based on 92cfbcf). Scores are Fairtide's unless
 marked "engine". Every test named here was run in this session unless it says otherwise.
 

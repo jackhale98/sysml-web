@@ -1,5 +1,7 @@
 # §1 SysML v2 and KerML language coverage (+ prioritized question 2)
 
+> Written before the fixes that followed it: what became of each critical finding is in [the assessment summary](README.md#critical-findings-and-what-became-of-them).
+
 Assessed on `origin/main` at `92cfbcf` (2026-10-23), worktree
 `/home/user/wt-assess-language`. Everything below marked "ran" was run in this
 session. Engine = the Open-MBEE sysml-toolkit 0.10.10 (WebAssembly); Fairtide =

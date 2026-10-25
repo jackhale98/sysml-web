@@ -1,5 +1,7 @@
 # §3 Model import, export and interoperability
 
+> Written before the fixes that followed it: what became of each critical finding is in [the assessment summary](README.md#critical-findings-and-what-became-of-them).
+
 Assessed on `claude/assess-interchange` (based on `claude/interop-tools`, a1b2509, which
 holds the reference tools: the OMG pilot implementation and Eclipse SysON, see
 `docs/interop-tools.md`). Covers checklist §3, prioritized question 3 (exchange a

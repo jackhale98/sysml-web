@@ -1,5 +1,7 @@
 # 02 — Text editing, diagrams and round-trip fidelity
 
+> Written before the fixes that followed it: what became of each critical finding is in [the assessment summary](README.md#critical-findings-and-what-became-of-them).
+
 Section §2 of the checklist, and prioritized questions 1 (edit and save/reload legs; external
 exchange is in `03-interchange.md`) and 4.
 
