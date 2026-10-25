@@ -1011,12 +1011,12 @@ describe('a redefinition left without its feature', { timeout: 60_000 }, () => {
 		}).toMatchSnapshot();
 	});
 
-	// Known gap (engine): `:>> mass` in a definition that no longer inherits a `mass` silently redefines the imported ISQ::mass; no problem is reported and the edit's toast gives no warning.
-	gap(
-		'removing the specialization says that the redefinition no longer has its feature',
-		async () => {
-			const { ws } = await afterUnspecializing();
-			expect(problemsOf(ws).join('\n') + ws.warnings.join(' ')).toMatch(/mass/);
-		}
-	);
+	// `:>> mass` in a definition that no longer inherits a `mass` redefines the imported
+	// ISQ::mass; the toolkit doesn't count that as a rebound reference, the app says so.
+	it('removing the specialization says that the redefinition now redefines something else', async () => {
+		const { ws } = await afterUnspecializing();
+		expect(ws.warnings.join(' ')).toMatch(
+			/Engine::mass now redefines ISQ\w*::mass instead of [\w:]*Base::mass/
+		);
+	});
 });
