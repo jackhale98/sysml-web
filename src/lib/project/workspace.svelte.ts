@@ -20,6 +20,7 @@ import type {
 } from '#lib/engine/types.ts';
 import { checkProblems } from './checks';
 import { requirementIdProblems } from './requirementIds';
+import { revertChanges } from './revert';
 import {
 	buildTree,
 	byteToUtf16,
@@ -89,15 +90,28 @@ const SLOW_ANALYSIS_MS = 2000;
 const SLOW_DELAY_MS = 1000;
 const UNDO_LIMIT = 50;
 
-interface UndoEntry {
-	label: string;
-	/** Text before the edit of each file it changed or removed; undo puts each back. */
-	before: Record<string, string>;
-	/** Files the edit created; undo removes them. */
-	created?: string[];
-	/** Files the edit renamed or moved, [from, to]; undo moves them back. */
-	moved?: [string, string][];
+/**
+ * A file a model edit changed: where it was and where it is after the edit
+ * (null: the edit created it, or removed it), with its text before and
+ * after. Undo takes back only what changed between the two, so later
+ * typing stays.
+ */
+interface FileEdit {
+	from: string | null;
+	to: string | null;
+	before: string;
+	after: string;
 }
+
+interface UndoEntry {
+	/** Which edit it is, for a toast to undo its own one (`undoEdit`). */
+	id: number;
+	label: string;
+	files: FileEdit[];
+}
+
+/** What undoing an edit did: its label, or why it couldn't be undone (nothing changed then). */
+export type UndoOutcome = { undone: string } | { refused: string };
 
 /** A file went to another path (`to`), or out of the project (`to` null). */
 export type FileMoveListener = (from: string, to: string | null) => void;
@@ -375,8 +389,9 @@ export class Workspace {
 	/**
 	 * Run a model edit (one or several engine edits, or file changes) as one
 	 * undoable step. Files it changed, created, removed or renamed are
-	 * remembered so `undo` can put them back; the engine's warnings about it
-	 * are in `warnings` afterwards. A transaction inside another is part of it.
+	 * remembered (their texts before and after) so `undo` can take it back;
+	 * the engine's warnings about it are in `warnings` afterwards. A
+	 * transaction inside another is part of it.
 	 */
 	async transact(
 		label: string | (() => string),
@@ -396,17 +411,30 @@ export class Workspace {
 		const changed = Object.keys(this.files).filter((p) => this.files[p] !== before[p]);
 		const removed = Object.keys(before).filter((p) => !(p in this.files));
 		if (changed.length || removed.length) {
-			const created = changed.filter((p) => !(p in before));
-			const kept = [...changed.filter((p) => p in before), ...removed];
-			const moved = this.moves.filter(([from, to]) => from in before && to in this.files);
+			const files: FileEdit[] = [];
+			// A file renamed (and maybe changed too) is one file that moved, not one removed and one created.
+			// eslint-disable-next-line svelte/prefer-svelte-reactivity -- local, not state
+			const moved = new Set<string>();
+			for (const [from, to] of this.moves) {
+				if (!(from in before) || from in this.files || !(to in this.files) || to in before)
+					continue;
+				if (moved.has(from) || moved.has(to)) continue;
+				moved.add(from).add(to);
+				files.push({ from, to, before: before[from]!, after: this.files[to]! });
+			}
+			for (const p of changed)
+				if (!moved.has(p))
+					files.push({
+						from: p in before ? p : null,
+						to: p,
+						before: before[p] ?? '',
+						after: this.files[p]!
+					});
+			for (const p of removed)
+				if (!moved.has(p)) files.push({ from: p, to: null, before: before[p]!, after: '' });
 			this.undoStack = [
 				...this.undoStack.slice(-(UNDO_LIMIT - 1)),
-				{
-					label: typeof label === 'function' ? label() : label,
-					before: Object.fromEntries(kept.map((p) => [p, before[p]!])),
-					...(created.length ? { created } : {}),
-					...(moved.length ? { moved } : {})
-				}
+				{ id: this.nextEdit++, label: typeof label === 'function' ? label() : label, files }
 			];
 		}
 		this.moves = [];
@@ -415,6 +443,8 @@ export class Workspace {
 
 	/** How deep in `transact` calls the current change is. */
 	private depth = 0;
+	/** The id of the next model edit (`UndoEntry.id`). */
+	private nextEdit = 1;
 	/** Renames made in the current transaction, [from, to]. */
 	private moves: [string, string][] = [];
 	// Bookkeeping, deliberately not reactive.
@@ -640,21 +670,80 @@ export class Workspace {
 		});
 	}
 
-	/** Undo the latest model edit; returns its label, or null when there is none. */
-	undo(): string | null {
-		const entry = this.undoStack.at(-1);
+	/** The latest model edit's id: to tell whether a transaction made one, and for its toast to undo it. */
+	get lastEdit(): number | undefined {
+		return this.undoStack.at(-1)?.id;
+	}
+
+	/**
+	 * Undo the latest model edit, or the one `id` names; returns its label,
+	 * or null when there is none or it can't be undone (`undoEdit` says why).
+	 */
+	undo(id?: number): string | null {
+		const outcome = this.undoEdit(id);
+		return outcome && 'undone' in outcome ? outcome.undone : null;
+	}
+
+	/**
+	 * Undo a model edit (the one `id` names, else the latest), keeping what
+	 * changed after it: only the edit's own changes are taken back, from
+	 * where they are now. When that would lose a later change (one inside
+	 * what the edit wrote, typing in a file it created, another file where
+	 * one it moved or removed was), nothing changes and it says why. Null
+	 * when there is no such edit (any more).
+	 */
+	undoEdit(id?: number): UndoOutcome | null {
+		const entry =
+			id === undefined ? this.undoStack.at(-1) : this.undoStack.find((e) => e.id === id);
 		if (!entry) return null;
-		this.undoStack = this.undoStack.slice(0, -1);
-		for (const path of entry.created ?? []) this.removeFile(path, false);
-		for (const [path, text] of Object.entries(entry.before)) {
-			if (path in this.files) this.replaceText(path, text);
-			else this.setText(path, text);
+		const refused = (why: string): UndoOutcome => ({
+			refused: `Can’t undo “${entry.label}”: ${why}`
+		});
+		// Work out every file first, so an undo that can't be made changes nothing.
+		const plan: { file: FileEdit; changes: Change[] }[] = [];
+		for (const file of entry.files) {
+			const now = file.to === null ? undefined : this.files[file.to];
+			if (file.from === null) {
+				// A file it created: gone already, or as the edit left it.
+				if (now !== undefined && now !== file.after)
+					return refused(`${file.to} has been changed since, and undoing would remove it.`);
+				plan.push({ file, changes: [] });
+				continue;
+			}
+			if (file.to !== null && now === undefined)
+				return refused(`${file.to} has been renamed or removed since.`);
+			if (file.from !== file.to && file.from in this.files)
+				return refused(`there is another file at ${file.from} now.`);
+			const changes = now === undefined ? [] : revertChanges(file.before, file.after, now);
+			if (!changes) return refused(`what it changed in ${file.to} has been changed again since.`);
+			plan.push({ file, changes });
 		}
-		// Open tabs of a renamed file go back with it; of a created one, they close.
-		const back = (entry.moved ?? []).map(([, to]) => to);
-		for (const [from, to] of entry.moved ?? []) this.moved(to, from);
-		for (const path of entry.created ?? []) if (!back.includes(path)) this.moved(path, null);
-		return entry.label;
+		this.undoStack = this.undoStack.filter((e) => e !== entry);
+		for (const { file, changes } of plan) {
+			if (file.from === null) this.removeFile(file.to!, false);
+			else if (file.to === null) this.setText(file.from, file.before);
+			else if (file.from === file.to) this.applyTo(file.to, this.files[file.to]!, changes);
+			else this.moveBack(file.to, file.from, applyChanges(this.files[file.to]!, changes));
+		}
+		// Open tabs of a moved file go back with it; of a created one, they close.
+		for (const { file } of plan) {
+			if (file.from === null) this.moved(file.to!, null);
+			else if (file.to !== null && file.from !== file.to) this.moved(file.to, file.from);
+		}
+		return { undone: entry.label };
+	}
+
+	/** Put a renamed file back at its old path, in its place, with this text (undoing the rename). */
+	private moveBack(path: string, to: string, text: string) {
+		const files: Record<string, string> = {};
+		for (const [p, t] of Object.entries(this.files)) {
+			if (p === path) files[to] = text;
+			else files[p] = t;
+		}
+		this.files = files;
+		this.dirty.delete(path);
+		this.dirty.add(to);
+		this.reanalyse(path, to);
 	}
 
 	/** Take a file out of the project (a delete, or undoing the edit that created it). */
@@ -666,16 +755,6 @@ export class Workspace {
 		this.dirty.delete(path);
 		if (tell) this.moved(path, null);
 		this.reanalyse(path);
-	}
-
-	/** Replace a file's text with one minimal change, through its editor when open. */
-	private replaceText(path: string, text: string) {
-		const current = this.files[path] ?? '';
-		const change = minimalChange(current, text);
-		if (!change) return;
-		const editor = this.editors.get(path);
-		if (editor) editor.apply([change]);
-		else this.setText(path, text);
 	}
 
 	/** Every model file, for project-wide engine calls such as diagrams. */

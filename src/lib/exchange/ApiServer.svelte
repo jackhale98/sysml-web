@@ -30,6 +30,7 @@
 	import type { Workspace } from '#lib/project/workspace.svelte.ts';
 	import SheetDialog from '#lib/ui/SheetDialog.svelte';
 	import { toasts } from '#lib/ui/toasts.svelte.ts';
+	import { undoAction } from '#lib/workbench/actions.ts';
 	import { minimalChange } from '#lib/project/workspace.svelte.ts';
 	import {
 		ApiError,
@@ -371,7 +372,7 @@
 	async function bringIn(result: WeaveResult, files: { path: string; text: string }[]) {
 		if (!result.files.length) return files;
 		const label = 'Brought in changes from the server';
-		const before = workspace.undoStack.length;
+		const before = workspace.lastEdit;
 		const error = await workspace.transact(label, async () => {
 			for (const f of result.files) {
 				if (f.status === 'added') await workspace.createFile(f.path, f.text);
@@ -384,17 +385,9 @@
 			return null;
 		});
 		if (error) throw new Error(error);
-		if (workspace.undoStack.length > before)
-			toasts.show(`${label}.`, {
-				tone: 'success',
-				action: {
-					label: 'Undo',
-					run: () => {
-						const undone = workspace.undo();
-						if (undone) toasts.show(`Undid: ${undone}`);
-					}
-				}
-			});
+		const edit = workspace.lastEdit;
+		if (edit !== undefined && edit !== before)
+			toasts.show(`${label}.`, { tone: 'success', action: undoAction(workspace, edit) });
 		const byPath = new Map(result.files.map((f) => [f.path, f]));
 		return [
 			...files
