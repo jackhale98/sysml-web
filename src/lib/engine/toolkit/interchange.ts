@@ -289,6 +289,38 @@ function redefineMetadataValues(
 	return added.length ? [...elements, ...added] : elements;
 }
 
+/**
+ * The other way (`redefineMetadataValues`), for the app's own work on its JSON
+ * (weaving a merge into the text): the metadata values it gave a Redefinition
+ * get their name back and lose it, so the text they lift to reads as written
+ * (`level = 3;`) and compares with the toolkit's own JSON.
+ */
+export function metadataValuesAsWritten(
+	session: TkSession,
+	elements: readonly ElementJson[]
+): ElementJson[] {
+	const byId = new Map(elements.map((e) => [e['@id'], e]));
+	const dropped = new Set<string>();
+	const out = elements.map((e) => {
+		if (!Array.isArray(e.ownedRelationship) || e.declaredName != null) return e;
+		const ownId = derivedId(`${e['@id']}/redefinition`);
+		const added = byId.get(ownId);
+		if (!added || added['@type'] !== 'Redefinition' || !isRef(added.redefinedFeature)) return e;
+		const target = added.redefinedFeature['@id'];
+		const name =
+			byId.get(target)?.declaredName ??
+			JSON.parse(session.rows(JSON.stringify([target]), JSON.stringify(['name'])))[0]?.name;
+		if (typeof name !== 'string') return e;
+		dropped.add(ownId);
+		return {
+			...e,
+			declaredName: name,
+			ownedRelationship: e.ownedRelationship.filter((r) => !(isRef(r) && r['@id'] === ownId))
+		};
+	});
+	return dropped.size ? out.filter((e) => !dropped.has(e['@id'])) : out;
+}
+
 /** A stable UUID-shaped id for an element the app adds (FNV-1a over the seed, four ways). */
 function derivedId(seed: string): string {
 	const words = [0x811c9dc5, 0x01000193, 0x9e3779b9, 0x85ebca6b].map((basis) => {
