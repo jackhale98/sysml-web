@@ -19,6 +19,7 @@
 		"test": "vitest run",
 		"test:e2e": "playwright test",
 		"bench": "node scripts/bench.mjs",
+		"assess:conformance": "vitest run --config tests/conformance/vitest.config.ts",
 		"lighthouse": "npm run lighthouse:mobile && npm run lighthouse:desktop",
 		"lighthouse:mobile": "LH_PRESET=mobile lhci autorun",
 		"lighthouse:desktop": "LH_PRESET=desktop lhci autorun"

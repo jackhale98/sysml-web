@@ -36,7 +36,7 @@ import type { TkLibrary, TkSession, TkSite, Toolkit } from './api';
 import { lineEnd, lineIndent, lineStart, removal } from './header';
 import { FORMAT_CONFIG } from './language';
 import { TextIndex } from './offsets';
-import { tidy } from './interchange';
+import { metadataValuesAsWritten, tidy } from './interchange';
 import * as views from './views';
 
 const EXPRESSION = /(Expression|^Literal\w*|^MultiplicityRange|^Multiplicity)$/;
@@ -78,6 +78,9 @@ export function weaveModel(
 	merged: readonly ElementJson[],
 	rename?: Rename
 ): WeaveResult {
+	// Metadata values as the toolkit writes them, like the lifted text's JSON below.
+	ours = metadataValuesAsWritten(session, ours);
+	merged = metadataValuesAsWritten(session, merged);
 	const texts = new Map(files.map((f) => [f.path, f.text]));
 	const O = new Map(ours.map((e) => [e['@id'], e]));
 	const M = new Map(merged.map((e) => [e['@id'], e]));

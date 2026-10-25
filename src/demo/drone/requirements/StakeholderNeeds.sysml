@@ -3,17 +3,19 @@ package StakeholderNeeds {
     /*
      * What the people around the delivery drone need from it, in their own words.
      * A stakeholder need is written as a requirement: it has an ID, a statement
-     * and the stakeholder who asked for it. The system requirements are derived
-     * from these needs (see SystemRequirements).
+     * and the stakeholder who asked for it; its subject is the drone. The system
+     * requirements are derived from these needs (see SystemRequirements).
      */
 
     private import EngineeringBasics::*;
     private import ModelingMetadata::*;
     private import DeliveryContext::*;
+    private import DroneArchitecture::DeliveryDrone;
 
     requirement <'STK-001'> 'Parcel delivery' : EngineeringRequirement {
         doc /* The operator needs to deliver parcels of up to 1 kg to recipients
              * within 3 km of the depot, and get the drone back after each delivery. */
+        subject system : DeliveryDrone;
         stakeholder operator : Operator;
         :>> kind = RequirementKind::functional;
         :>> priority = Priority::high;
@@ -24,6 +26,7 @@ package StakeholderNeeds {
     requirement <'STK-002'> 'Safe operation' : EngineeringRequirement {
         doc /* The aviation authority needs the drone not to endanger people on the ground,
              * other airspace users or property, including when something fails in flight. */
+        subject system : DeliveryDrone;
         stakeholder authority : AviationAuthority;
         :>> kind = RequirementKind::safety;
         :>> priority = Priority::high;
@@ -35,6 +38,7 @@ package StakeholderNeeds {
     requirement <'STK-003'> 'Flying in typical weather' : EngineeringRequirement {
         doc /* The operator needs to fly deliveries in light rain and moderate wind,
              * so that most scheduled delivery days are flyable. */
+        subject system : DeliveryDrone;
         stakeholder operator : Operator;
         :>> kind = RequirementKind::environmental;
         :>> priority = Priority::medium;
@@ -46,6 +50,7 @@ package StakeholderNeeds {
     requirement <'STK-004'> 'Approved for operation' : EngineeringRequirement {
         doc /* The operator needs the drone to meet the product rules for its class of
              * unmanned aircraft, so that delivery flights can be approved. */
+        subject system : DeliveryDrone;
         stakeholder operator : Operator;
         stakeholder authority : AviationAuthority;
         :>> kind = RequirementKind::regulatory;
@@ -56,6 +61,7 @@ package StakeholderNeeds {
 
     requirement <'STK-005'> 'Quiet neighbour' : EngineeringRequirement {
         doc /* Residents along the delivery routes need the drone not to be a noise nuisance. */
+        subject system : DeliveryDrone;
         stakeholder residents : Resident;
         :>> kind = RequirementKind::environmental;
         :>> priority = Priority::low;
@@ -67,6 +73,7 @@ package StakeholderNeeds {
     requirement <'STK-006'> 'Safe hand-over' : EngineeringRequirement {
         doc /* The recipient needs the parcel to arrive undamaged at the agreed drop point,
              * without having to go near the drone. */
+        subject system : DeliveryDrone;
         stakeholder recipient : Recipient;
         :>> kind = RequirementKind::functional;
         :>> priority = Priority::high;

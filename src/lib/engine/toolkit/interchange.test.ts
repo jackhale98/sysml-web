@@ -148,6 +148,44 @@ describe('export', () => {
 	}, 120_000);
 });
 
+describe('metadata values', () => {
+	const files: SourceFile[] = [
+		{
+			path: 'p.sysml',
+			text: 'package P {\n    private import ScalarValues::*;\n    metadata def Safety { attribute level : Integer; }\n    part x { @Safety { level = 3; } }\n}\n'
+		}
+	];
+
+	it('are written as redefinitions of the metadata’s features, as other tools read them', () => {
+		const els = readElements(host.exportInterchange(files, {}).json);
+		const byId = new Map(els.map((e) => [e['@id'], e]));
+		const defined = els.find((e) => e['@type'] === 'AttributeUsage' && e.declaredName === 'level')!;
+		const value = els.find((e) => e['@type'] === 'ReferenceUsage')!;
+		expect(value.declaredName).toBeNull();
+		const relationships = (value.ownedRelationship as { '@id': string }[]).map((r) =>
+			byId.get(r['@id'])
+		);
+		const redefinition = relationships.find((r) => r?.['@type'] === 'Redefinition')!;
+		expect(redefinition).toMatchObject({
+			redefiningFeature: { '@id': value['@id'] },
+			redefinedFeature: { '@id': defined['@id'] },
+			general: { '@id': defined['@id'] },
+			owningRelatedElement: { '@id': value['@id'] }
+		});
+		// The same ids on the next export.
+		expect(readElements(host.exportInterchange(files, {}).json).map((e) => e['@id'])).toEqual(
+			els.map((e) => e['@id'])
+		);
+	});
+
+	it('come back as the same metadata body', () => {
+		const imported = host.importInterchange(host.exportInterchange(files, {}).json);
+		expect(imported.files.map((f) => f.text).join('\n')).toMatch(
+			/@Safety \{\s*(:>> )?level = 3;\s*\}/
+		);
+	});
+});
+
 describe('import', () => {
 	it('turns a hand-written JSON file into text with no problems', () => {
 		const result = host.importInterchange(fixture('garage.json'));

@@ -4,14 +4,14 @@
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import { readXlsx } from '../../src/lib/dataio/xlsx-read';
+import { analyze } from './axe';
 
 const FIXTURE = join(import.meta.dirname, 'fixtures/requirements.csv');
 
 async function expectAccessible(page: Page) {
-	const results = await new AxeBuilder({ page }).analyze();
+	const results = await analyze(page);
 	const violations = results.violations.map(
 		(v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`
 	);

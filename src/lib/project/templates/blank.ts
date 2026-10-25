@@ -31,7 +31,7 @@ export function starterProject(
 
     requirement def SystemRequirement {
         doc /* A requirement on the system. */
-        subject system : System;
+        subject theSystem : System;
     }
 
     requirement <'REQ-001'> 'First requirement' : SystemRequirement {
