@@ -68,6 +68,30 @@ sample is too small to tell the two apart.
    "importing an archive says which files were left out, and what did not check out" ran
    as `test.fail` before the change (expected failure observed) and passes after.
 
+## Fixed after the assessment (`claude/fix-folder-save`)
+
+The answers below describe the app as assessed; these gaps are now closed.
+
+1. **"Save to folder" no longer overwrites a file changed on disk.** It re-reads the folder
+   first and compares each file with the folder's text as last read or written
+   (`src/lib/project/folderSync.ts`). Changed only here: written. Changed only in the folder
+   (or added or deleted there): brought into the project, as one undoable step, and the toast
+   says so. Changed on both sides, differently (including a file deleted on one side and
+   edited on the other, and a new file whose name a new file on disk took): nothing is
+   written; the same per-file choice as "Get latest" opens (combine both when the lines
+   differ, keep mine, take the folder's), and a file that changes again before the choice is
+   finished makes it stop and ask again. The folder's `.project.json` is no longer rewritten.
+   Tests: `session.assessment.test.ts` "does not overwrite a file changed on disk…" (failed
+   as plain `it` before, passes), `session-folder.test.ts` "files changed in the folder
+   meanwhile", e2e `files.spec.ts` "saving to the folder asks before overwriting…".
+2. **No stale "Saved" during the autosave delay.** A change shows "Saving…" until it is
+   stored (`session.assessment.test.ts` "does not show a change waiting for its autosave as
+   saved", failed before, passes).
+3. **The tab-close test is deterministic.** The page also saves on `beforeunload`; the e2e
+   test holds the autosave timer still (Playwright clock), checks the status says "Saving…",
+   fires the page-hidden or page-left event, and checks the store before closing the tab
+   (passes 60/60 with `--repeat-each=30`).
+
 ## Questions
 
 ### Can the application recover from browser crashes, tab closure, and interrupted saves without losing acknowledged edits?

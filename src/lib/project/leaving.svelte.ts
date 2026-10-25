@@ -9,7 +9,7 @@
  */
 import { toasts } from '#lib/ui/toasts.svelte.ts';
 import type { LeaveRisk } from './pending.ts';
-import type { ProjectSession } from './session.svelte.ts';
+import { savedToFolder, type ProjectSession } from './session.svelte.ts';
 
 /** Switching straight to another project, or leaving for another page. */
 export type LeaveAction = 'switch' | 'leave';
@@ -83,13 +83,13 @@ class Leaving {
 				await session.save();
 				continue;
 			}
-			// Save to the folder, then go on.
+			// Save to the folder, then go on (unless it stopped to ask about files changed there too).
 			const error = await session.saveToFolder();
 			if (error) {
-				toasts.show(error, { tone: 'error' });
+				toasts.show(error, { tone: session.folderPending ? 'info' : 'error' });
 				return false;
 			}
-			toasts.show('Saved to the folder.', { tone: 'success' });
+			toasts.show(savedToFolder(session.broughtIn), { tone: 'success' });
 			return true;
 		}
 	}

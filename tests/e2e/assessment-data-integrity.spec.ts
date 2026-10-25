@@ -125,17 +125,55 @@ test.beforeEach(async ({ page }) => {
 	await page.setViewportSize({ width: 1440, height: 900 });
 });
 
-test('an edit survives closing the tab straight after typing', async ({ page, context }) => {
-	await seed(page, { files: { 'Rig.sysml': RIG } });
-	await openFile(page, 'Rig.sysml');
-	await typeAfter(page, '    part def Frame;', 'part def Mast;');
-	// Closed at once: well within the autosave delay.
-	await page.close({ runBeforeUnload: true });
-	const again = await context.newPage();
-	await again.setViewportSize({ width: 1440, height: 900 });
-	await openFile(again, 'Rig.sysml');
-	await expect(again.locator('.cm-content')).toContainText('part def Mast;');
-});
+/** The save status by the project's name: "Saving…", "Saved" or "Not saved". */
+const saveStatus = (page: Page) => page.locator('.project-menu .save');
+
+/**
+ * Closing the tab straight after typing, inside the autosave delay: the page
+ * saves when it is left (`beforeunload`) and when it is hidden (closing a
+ * tab hides it first; phones also drop hidden pages without warning). The
+ * autosave's timer is held still, so only those can have saved the edit,
+ * and the store is checked before the tab goes: whether the browser lets a
+ * save started during the teardown itself finish is not up to the app, and
+ * waiting for it made this test fail about once in 30 runs.
+ */
+for (const [how, trigger] of [
+	['hidden', 'the page is hidden'],
+	['leave', 'the page is left']
+] as const)
+	test(`an edit made straight before the tab is closed is saved at once when ${trigger}`, async ({
+		page,
+		context
+	}) => {
+		await seed(page, { files: { 'Rig.sysml': RIG } });
+		await page.clock.install();
+		await openFile(page, 'Rig.sysml');
+		// From here no timer fires: the autosave can't save the edit.
+		await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1000);
+		await typeAfter(page, '    part def Frame;', 'part def Mast;');
+		await expect(page.locator('.cm-content')).toContainText('part def Mast;');
+		// Not shown as saved while it isn't (a crash now would lose it)…
+		await expect(saveStatus(page)).toHaveText('Saving…');
+		expect(await storedText(page, 'Rig.sysml')).toBe(RIG);
+
+		// …and saved at once, without the timer, when the tab starts to close.
+		await page.evaluate((how) => {
+			if (how === 'hidden') {
+				Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
+				document.dispatchEvent(new Event('visibilitychange'));
+			} else window.dispatchEvent(new Event('beforeunload', { cancelable: true }));
+		}, how);
+		await expect.poll(() => storedText(page, 'Rig.sysml')).toContain('part def Mast;');
+		await expect(saveStatus(page)).toHaveText('Saved');
+
+		// Closed: the edit is there in a new tab.
+		await page.clock.resume();
+		await page.close({ runBeforeUnload: true });
+		const again = await context.newPage();
+		await again.setViewportSize({ width: 1440, height: 900 });
+		await openFile(again, 'Rig.sysml');
+		await expect(again.locator('.cm-content')).toContainText('part def Mast;');
+	});
 
 // eslint-disable-next-line no-empty-pattern -- only the project settings are needed
 test('an edit shown as saved survives the browser being killed', async ({}, testInfo) => {
@@ -332,6 +370,50 @@ test('saving to GitHub after someone else saved is refused plainly, and the chan
 		.poll(async () => ((await storedRecord(page)) as { git: { base: string } }).git.base)
 		.toBe('c1');
 	await expect.poll(() => storedText(page, 'Rig.sysml')).toContain('Mast');
+});
+
+test('getting the latest from GitHub asks about a file changed on both sides, and keeps the choice', async ({
+	page
+}) => {
+	await seed(page, { files: { 'Rig.sysml': RIG }, git: { base: 'c1', token: TOKEN } });
+	await mockGitHub(page, 'c9');
+	const theirs = 'package Rig {\n    part def Frame;\n    part def Keel;\n}\n';
+	// The newer version on GitHub: Rig.sysml changed there too.
+	await page.route('https://api.github.com/repos/acme/drone/git/**', (route) => {
+		const path = new URL(route.request().url()).pathname.replace('/repos/acme/drone/git', '');
+		if (path === '/commits/c9') return route.fulfill({ json: { tree: { sha: 't9' } } });
+		if (path === '/trees/t9')
+			return route.fulfill({
+				json: {
+					sha: 't9',
+					truncated: false,
+					tree: [{ path: 'Rig.sysml', type: 'blob', sha: 'b9', size: theirs.length }]
+				}
+			});
+		if (path === '/blobs/b9')
+			return route.fulfill({
+				json: { content: Buffer.from(theirs).toString('base64'), encoding: 'base64' }
+			});
+		return route.fallback();
+	});
+	await openFile(page, 'Rig.sysml');
+	await typeAfter(page, '    part def Frame;', 'part def Mast;');
+	await page.locator('.project-menu').getByRole('button', { name: 'Rig' }).click();
+	await page.getByRole('menuitem', { name: /Get latest/ }).click();
+	const sheet = page.getByRole('dialog', { name: 'drone' });
+	await expect(
+		sheet.getByRole('heading', { name: /You and GitHub both changed 1 file/ })
+	).toBeVisible();
+	const file = sheet.getByRole('group', { name: 'Rig.sysml' });
+	await expect(file.getByRole('radio', { name: /Keep mine/ })).toBeVisible();
+	await file.getByText('Show the differences').click();
+	await expect(file.getByRole('region', { name: /Differences: GitHub's and Yours/ })).toContainText(
+		'part def Keel;'
+	);
+	await file.getByRole('radio', { name: /Take GitHub's/ }).check();
+	await sheet.getByRole('button', { name: 'Finish getting latest' }).click();
+	await expect(sheet).toContainText('Got the latest version from GitHub. Your choices were kept.');
+	await expect.poll(() => storedText(page, 'Rig.sysml')).toBe(theirs);
 });
 
 test('the GitHub token stays out of the project, its export, the offline cache, addresses and the console', async ({
