@@ -4,14 +4,14 @@
  * in playwright.config.ts); `PW_SIGN_IN=off` builds without it, which is how
  * the site behaves until it is configured.
  */
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page, type Route } from '@playwright/test';
 import { SIGN_IN_TEST } from '../../playwright.config.ts';
+import { analyze } from './axe';
 
 const WORKER = SIGN_IN_TEST?.PUBLIC_SYNC_WORKER ?? 'https://sync.example.test';
 
 async function expectAccessible(page: Page) {
-	const results = await new AxeBuilder({ page }).analyze();
+	const results = await analyze(page);
 	expect(
 		results.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(', ')}`)
 	).toEqual([]);

@@ -262,6 +262,30 @@ export class ToolkitHost {
 		);
 		if (!files.some((f) => f.path === request.path))
 			files.push({ path: request.path, text: request.source });
+		// Changing what an element specializes or is typed by, or removing one, can make a
+		// `:>> mass` elsewhere redefine another feature (the library's ISQ::mass) with no
+		// reference broken: the toolkit doesn't count redefinitions as references.
+		const before = rebindable(request) ? this.redefinitions(files) : null;
+		const result = this.editOn(files, request);
+		if (!before) return result;
+		const rebound = reboundRedefinitions(
+			before,
+			this.redefinitions(editedFiles(files, request, result))
+		);
+		if (rebound) result.warning = [result.warning, rebound].filter(Boolean).join(' ');
+		return result;
+	}
+
+	/** What each redefining feature of the project redefines, by qualified name. */
+	private redefinitions(files: SourceFile[]): Map<string, string> {
+		const extracted = this.build(files).extracted;
+		const map = new Map<string, string>();
+		for (const r of extracted?.elements ?? [])
+			if (r.qualifiedName && r.redefinesQualified) map.set(r.qualifiedName, r.redefinesQualified);
+		return map;
+	}
+
+	private editOn(files: SourceFile[], request: EditRequest): EditResult {
 		const built = this.built && sameFiles(this.built.files, files) ? this.built : null;
 		// An edit needs the session, not the analysis: an analysed build, or a session alone.
 		const start: Prepared = built?.session
@@ -791,4 +815,40 @@ const isModel = (path: string) => path.endsWith('.sysml') || path.endsWith('.ker
 
 function sameFiles(a: SourceFile[], b: SourceFile[]): boolean {
 	return a.length === b.length && a.every((f, i) => f.path === b[i]!.path && f.text === b[i]!.text);
+}
+
+/** Edits that can change what an untouched redefinition redefines (`edit`). */
+function rebindable(request: EditRequest): boolean {
+	if (request.op === 'remove') return true;
+	if (request.op !== 'setDeclaration') return false;
+	const set = request.set;
+	return 'specializes' in set || 'type' in set || 'conjugated' in set || 'redefines' in set;
+}
+
+/** The project's texts after an edit's changes. */
+function editedFiles(files: SourceFile[], request: EditRequest, result: EditResult): SourceFile[] {
+	const byPath = new Map<string, { from: number; to: number; insert: string }[]>();
+	byPath.set(request.path, [...result.changes]);
+	for (const { path, ...change } of result.otherFiles ?? [])
+		byPath.set(path, [...(byPath.get(path) ?? []), change]);
+	return files.map((f) => {
+		const changes = byPath.get(f.path);
+		if (!changes?.length) return f;
+		let text = f.text;
+		for (const c of [...changes].sort((a, b) => b.from - a.from))
+			text = text.slice(0, c.from) + c.insert + text.slice(c.to);
+		return { path: f.path, text };
+	});
+}
+
+/** "Engine::mass now redefines ISQ::mass instead of Base::mass." — or null when none moved. */
+function reboundRedefinitions(before: Map<string, string>, after: Map<string, string>) {
+	const moved = [...after]
+		.filter(([feature, target]) => before.has(feature) && before.get(feature) !== target)
+		.map(
+			([feature, target]) => `${feature} now redefines ${target} instead of ${before.get(feature)}`
+		);
+	if (!moved.length) return null;
+	const shown = moved.slice(0, 3).join('; ');
+	return `${shown}${moved.length > 3 ? `; and ${moved.length - 3} more` : ''}.`;
 }

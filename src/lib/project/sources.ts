@@ -90,6 +90,63 @@ async function readDirectory(dir: DirectoryHandle, prefix: string, out: ProjectF
 	}
 }
 
+/** Ask for permission to read and write the folder (once per visit); throws when refused. */
+async function allowWriting(root: DirectoryHandle): Promise<void> {
+	const allowed =
+		(await root.queryPermission?.({ mode: 'readwrite' })) === 'granted' ||
+		(await root.requestPermission?.({ mode: 'readwrite' })) === 'granted';
+	if (!allowed) throw new Error('Permission to save into the folder was not granted.');
+}
+
+/**
+ * What the folder holds now, path → text: its project files as `pickFolder`
+ * reads them, and each of `paths` wherever it is (a path not there is left
+ * out). Names match exactly, so on a disk that ignores case `power.sysml`
+ * is not taken for `Power.sysml`.
+ */
+export async function readFolder(
+	folder: FileSystemDirectoryHandle,
+	paths: string[]
+): Promise<Record<string, string>> {
+	const root = folder as unknown as DirectoryHandle;
+	await allowWriting(root);
+	const found: ProjectFile[] = [];
+	await readDirectory(root, '', found);
+	const texts: Record<string, string> = Object.fromEntries(found.map((f) => [f.path, f.text]));
+	// Paths the walk didn't reach (a skipped folder, past the limit): looked up one by one.
+	const listings = new Map<string, Promise<Map<string, DirectoryHandle | FileHandle> | null>>();
+	const listing = (dir: string) => {
+		let entries = listings.get(dir);
+		if (!entries) listings.set(dir, (entries = listDirectory(root, dir)));
+		return entries;
+	};
+	for (const path of paths) {
+		if (path in texts) continue;
+		const slash = path.lastIndexOf('/');
+		const entry = (await listing(path.slice(0, slash + 1)))?.get(path.slice(slash + 1));
+		if (entry?.kind === 'file') texts[path] = await (await entry.getFile()).text();
+	}
+	return texts;
+}
+
+/** The entries of a folder below the root (`a/b/`), by exact name; null when it isn't there. */
+async function listDirectory(
+	root: DirectoryHandle,
+	dir: string
+): Promise<Map<string, DirectoryHandle | FileHandle> | null> {
+	let handle = root;
+	try {
+		for (const part of dir.split('/').filter(Boolean))
+			handle = await handle.getDirectoryHandle(part);
+	} catch (error) {
+		if (error instanceof DOMException && error.name === 'NotFoundError') return null;
+		throw error;
+	}
+	const entries = new Map<string, DirectoryHandle | FileHandle>();
+	for await (const entry of handle.values()) entries.set(entry.name, entry);
+	return entries;
+}
+
 /**
  * Write the given files back into the folder, creating sub-folders as
  * needed, and take out the files at `removed` (deleted, or renamed away
@@ -101,10 +158,7 @@ export async function writeToFolder(
 	removed: string[] = []
 ): Promise<void> {
 	const root = folder as unknown as DirectoryHandle;
-	const allowed =
-		(await root.queryPermission?.({ mode: 'readwrite' })) === 'granted' ||
-		(await root.requestPermission?.({ mode: 'readwrite' })) === 'granted';
-	if (!allowed) throw new Error('Permission to save into the folder was not granted.');
+	await allowWriting(root);
 	// A rename that only changes case (power → Power) is the same file on most disks:
 	// take the old name out first, so writing the new one doesn't get removed after.
 	const written = new Set(files.map((f) => f.path.toLowerCase()));

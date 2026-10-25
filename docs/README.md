@@ -40,6 +40,18 @@ What each document is for, and who it is for. New to Fairtide? Start with the
 - [Spike: WebAssembly engine](spikes/wasm-engine.md): a dated historical note
   (2026-10-21) about an engine the app no longer uses.
 
+## Assessment
+
+- [Robustness and MBSE assessment](assessment/README.md): what Fairtide
+  demonstrably supports and how robustly, section by section, with the
+  evidence, the scores and every critical finding and its fix:
+  [language coverage](assessment/01-language.md),
+  [text, diagrams and round trips](assessment/02-round-trip.md),
+  [import, export and interoperability](assessment/03-interchange.md),
+  [data integrity, Git and recovery](assessment/08-data-integrity.md).
+- [Interop tools](interop-tools.md): the OMG pilot implementation and SysON,
+  run as checkers of Fairtide's output.
+
 ## For self-hosters
 
 - [Sign in with GitHub](setup-github-sign-in.md): the GitHub App and the

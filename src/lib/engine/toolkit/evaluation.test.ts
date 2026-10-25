@@ -52,7 +52,7 @@ describe('the demo’s checks', () => {
 		expect(endurance).toMatchObject({
 			kind: 'satisfy',
 			by: 'drone',
-			constraint: 'drone.endurance >= 25 [min]',
+			constraint: 'system.endurance >= 25 [min]',
 			file: 'system/Satisfaction.sysml',
 			span: { start_row: 12 },
 			constraintAt: { file: 'requirements/SystemRequirements.sysml', span: { start_row: 32 } },
@@ -122,7 +122,7 @@ describe('the demo’s checks', () => {
 		expect(payload).toMatchObject({
 			kind: 'require',
 			status: 'undecided',
-			constraint: 'drone.payloadCapacity >= 1 [kg]',
+			constraint: 'system.payloadCapacity >= 1 [kg]',
 			file: 'requirements/SystemRequirements.sysml'
 		});
 		expect(payload.explanation).toMatch(/^Nothing in the design claims to satisfy/);

@@ -197,6 +197,23 @@ describe('statements', () => {
 		);
 	});
 
+	it('satisfy names the part by its package when the requirement’s subject has its name', () => {
+		// With `subject drone` in the requirement, `by drone.camera` would mean the subject's camera.
+		const R = 'requirements/SystemRequirements.sysml';
+		const shadowing = {
+			...files,
+			[R]: files[R]!.replace('subject system : DeliveryDrone;', 'subject drone : DeliveryDrone;')
+		};
+		const saved = ctx;
+		ctx = contextFor(shadowing);
+		try {
+			const p = plan(el('drone.camera', false), el("'Ingress protection'", false), 'satisfies');
+			expect(p.statement).toBe("satisfy 'Ingress protection' by DroneArchitecture::drone.camera;");
+		} finally {
+			ctx = saved;
+		}
+	});
+
 	it('verify goes into the objective of the verification', () => {
 		const p = plan(el('windHoldTest', false), el("'Ingress protection'", false), 'verifies');
 		expect(p.statement).toBe("verify 'Ingress protection';");

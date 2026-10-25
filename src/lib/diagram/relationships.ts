@@ -421,7 +421,7 @@ export function planRelation(
 			const host = hostOf(/^\s*satisfy\s/m, ctx, from);
 			if (!host) return 'There is no package to write the satisfy statement in.';
 			const req = referenceFrom(to, host, ctx.owners, ctx.textOf);
-			const by = pathFrom(from, host, ctx.owners, ctx.textOf);
+			const by = pathFrom(from, host, ctx.owners, ctx.textOf, subjectNames(to, ctx.elements));
 			return step(
 				host,
 				`satisfy ${req} by ${by};`,
@@ -739,4 +739,18 @@ export function planLinkRemoval(
 			{ kind: 'patch', path: link.file, before: text, after: removeStatement(text, from, to) }
 		]
 	};
+}
+
+/** What a requirement's subject is called in it: declared there, or by its definitions. */
+function subjectNames(requirement: ModelElement, elements: ModelElement[]): Set<string> {
+	const names = new Set<string>();
+	const seen = new Set<string>();
+	for (let r: ModelElement | undefined = requirement; r && !seen.has(r.key);) {
+		seen.add(r.key);
+		const owner = r.name;
+		for (const e of elements) if (e.kind === 'subject' && e.parent === owner) names.add(e.label);
+		const type: string | null = r.typeRef ? simpleName(r.typeRef) : null;
+		r = type ? elements.find((e) => e.isDefinition && e.label === type) : undefined;
+	}
+	return names;
 }

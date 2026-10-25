@@ -56,6 +56,7 @@
 	import { forgetProject, lastProject, launchTarget, LAUNCH_PARAM } from '#lib/offline/launch.ts';
 	import { pwa } from '#lib/offline/pwa.svelte.ts';
 	import Logo from '#lib/ui/Logo.svelte';
+	import { toasts } from '#lib/ui/toasts.svelte.ts';
 	import ThemeToggle from '#lib/ui/ThemeToggle.svelte';
 
 	let projects = $state<ProjectSummary[] | null>(null);
@@ -111,14 +112,20 @@
 		}
 	}
 
-	/** Store a project and open it. */
-	async function keep(project: Omit<StoredProject, 'id' | 'created' | 'updated'>, label: string) {
+	/** Store a project and open it; `note` is said once it is stored (what didn't come across). */
+	async function keep(
+		project: Omit<StoredProject, 'id' | 'created' | 'updated'>,
+		label: string,
+		note?: { message: string; tone: 'info' | 'error' }
+	) {
 		busy = label;
 		error = null;
 		try {
 			const id = await newProjectId(project.info.name);
 			const now = new Date().toISOString();
 			await saveProject({ ...project, id, created: now, updated: now });
+			// Stays until dismissed: it is read once the project has opened.
+			if (note) toasts.show(note.message, { tone: note.tone, duration: 0 });
 			void persistStorage();
 			await goto(resolve('/p/[project]', { project: id }));
 		} catch (e) {
@@ -239,12 +246,24 @@
 				file.name.replace(/\.(kpar|zip)$/i, '')
 			);
 			const files = modelFiles(archive.files);
+			// What didn't come across: project files that aren't text, and checks that didn't hold.
+			const unreadable = archive.skipped.filter(isProjectFile);
+			const leftOut = unreadable.length
+				? `Left out ${unreadable.length === 1 ? 'a file that isn’t' : `${unreadable.length} files that aren’t`} readable as text (save as UTF-8 and import again): ${unreadable.join(', ')}.`
+				: '';
 			if (!files.some((f) => /\.(sysml|kerml)$/.test(f.path))) {
-				error = `No .sysml or .kerml files in ${file.name}.`;
+				error = `No .sysml or .kerml files in ${file.name}.${leftOut ? ` ${leftOut}` : ''}`;
 				busy = null;
 				return;
 			}
-			await keep({ info: archive.info, files, origin: 'archive' }, 'Opening…');
+			const notes = [leftOut, ...archive.warnings].filter(Boolean);
+			await keep(
+				{ info: archive.info, files, origin: 'archive' },
+				'Opening…',
+				notes.length
+					? { message: `${file.name}: ${notes.join(' ')}`, tone: leftOut ? 'error' : 'info' }
+					: undefined
+			);
 		} catch (e) {
 			error = `${file.name} could not be read: ${e instanceof Error ? e.message : String(e)}`;
 			busy = null;
