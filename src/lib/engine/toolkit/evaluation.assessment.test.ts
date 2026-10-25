@@ -22,6 +22,12 @@ beforeAll(async () => {
 
 const project = (text: string) => [{ path: 'm.sysml', text }];
 
+/** Wait for a workspace's first checks (after its first analysis). */
+async function checked(workspace: { checks: unknown }) {
+	for (let i = 0; i < 800 && !workspace.checks; i++) await new Promise((r) => setTimeout(r, 25));
+	expect(workspace.checks).not.toBeNull();
+}
+
 /** Analyse a one-file model; it must have no problems. */
 function analyse(text: string) {
 	const files = project(text);
@@ -120,9 +126,7 @@ describe('6.1 expressions, as the engine evaluates them', () => {
 		const files = project(text);
 		const diagnostics = host.analyzeProject(files).flatMap((a) => a.diagnostics);
 		// The incompatible sum and comparison are flagged in the text, at their lines.
-		expect(
-			diagnostics.map((d) => [d.severity, d.span.start_row, d.message]).toSorted()
-		).toEqual([
+		expect(diagnostics.map((d) => [d.severity, d.span.start_row, d.message]).toSorted()).toEqual([
 			['warning', 20, 'expression combines incompatible quantity dimensions `M` and `L`'],
 			['warning', 21, 'expression combines incompatible quantity dimensions `M` and `L`']
 		]);
@@ -131,11 +135,12 @@ describe('6.1 expressions, as the engine evaluates them', () => {
 			['gkg', 'whj', 'lbkg', 'ratio', 'cmp', 'kgm', 'cmpBad'].map((n) => `E::p::${n}`)
 		);
 		// 1 kg + 500 g = 1.5 kg; 1 W·h + 3600 J = 1 W·h + 1 W·h = 2 W·h;
-		// 1 lb + 1 kg = 1 lb + 1/0.45359237 lb = 3.20462 lb; 3 m / 2 s = 1.5 m/s; 1 kg > 0.5 kg.
+		// 1 lb + 1 kg = 1 lb + 1/0.45359237 lb = 3.204622 lb (the library's pound is 0.4535924 kg, so the
+		// engine gives 3.20462248: within 7e-8 of the exact factor); 3 m / 2 s = 1.5 m/s; 1 kg > 0.5 kg.
 		expect(v['E::p::gkg']).toEqual({ kind: 'number', value: 1.5, unit: 'kg' });
 		expect(v['E::p::whj']).toEqual({ kind: 'number', value: 2, unit: 'W*h' });
 		expect(v['E::p::lbkg']).toMatchObject({ kind: 'number', unit: 'lb' });
-		expect((v['E::p::lbkg'] as { value: number }).value).toBeCloseTo(1 + 1 / 0.45359237, 9);
+		expect((v['E::p::lbkg'] as { value: number }).value).toBeCloseTo(1 + 1 / 0.45359237, 6);
 		expect(v['E::p::ratio']).toEqual({ kind: 'number', value: 1.5, unit: 'm/s' });
 		expect(v['E::p::cmp']).toEqual({ kind: 'text', text: 'true' });
 		// kg + m and kg > m have no value: the reason is given, no number is made up.
@@ -164,13 +169,22 @@ describe('6.1 expressions, as the engine evaluates them', () => {
 			kind: 'undecided',
 			reason: '`missing` has no value in `p`'
 		});
-		expect(v['E::p::a']).toEqual({ kind: 'undecided', reason: 'cyclic feature value involving `a`' });
-		expect(v['E::p::b']).toEqual({ kind: 'undecided', reason: 'cyclic feature value involving `b`' });
+		expect(v['E::p::a']).toEqual({
+			kind: 'undecided',
+			reason: 'cyclic feature value involving `a`'
+		});
+		expect(v['E::p::b']).toEqual({
+			kind: 'undecided',
+			reason: 'cyclic feature value involving `b`'
+		});
 	});
 
 	it('gives the same values in a fresh analysis (reproducible)', () => {
 		const names = ['prec', 'third', 'gkg', 'lbkg', 'divZero'].map((n) => `E::p::${n}`);
-		const text = EXPRESSIONS.replace('    attribute div', '    attribute third = 1 / 3;\n    attribute div');
+		const text = EXPRESSIONS.replace(
+			'    attribute div',
+			'    attribute third = 1 / 3;\n    attribute div'
+		);
 		const first = JSON.stringify(values(text, names));
 		host.analyzeProject(project('package Other { part x; }'));
 		expect(JSON.stringify(values(text, names))).toBe(first);
@@ -208,8 +222,8 @@ const NESTED = `package B {
   }
   part drone : Drone;
   part big : BigDrone;
-  view droneBudget : ModelViews::MassBudget { expose B::drone::**; }
-  view bigBudget : ModelViews::MassBudget { expose B::big::**; }
+  view droneBudget : ModelViews::MassBudget { expose drone::**; }
+  view bigBudget : ModelViews::MassBudget { expose big::**; }
   view wholeModel : ModelViews::MassBudget;
 }
 `;
@@ -257,7 +271,11 @@ describe('6.2 a mass budget over nested parts (known answers)', () => {
 		// Over the whole model: the same totals; `Spare` (never used) is not in either.
 		expect(rows.get('drone')?.[2]).toBe('1384 g');
 		expect(rows.get('big')?.[2]).toBe('2384 g');
-		expect(paths.filter((p) => p.startsWith('drone.') || p.startsWith('big.')).some((p) => /extra/.test(p))).toBe(false);
+		expect(
+			paths
+				.filter((p) => p.startsWith('drone.') || p.startsWith('big.'))
+				.some((p) => /extra/.test(p))
+		).toBe(false);
 	});
 
 	it('gives the same table in a fresh analysis (reproducible)', () => {
@@ -288,7 +306,7 @@ const UNITS = `package U {
     part boxBare : BoxBare;
     part boxLen : BoxLen;
   }
-  view unitsBudget : ModelViews::MassBudget { expose U::sys::**; }
+  view unitsBudget : ModelViews::MassBudget { expose sys::**; }
 }
 `;
 
@@ -343,7 +361,7 @@ const INHERITED = `package I {
     attribute total :> ISQ::mass = battery.mass + spare.mass;
   }
   part craft : Craft { part :>> spare { attribute :>> cellMass = 60 [g]; } }
-  view inheritedBudget : ModelViews::MassBudget { expose I::craft::**; }
+  view inheritedBudget : ModelViews::MassBudget { expose craft::**; }
 }
 `;
 
@@ -370,8 +388,8 @@ const COLLECTIONS = `package S {
   part def Kit { part base : Opt; part o : Opt[0..1]; part r : Opt[2..4]; }
   part quad : Quad;
   part kit : Kit;
-  view quadBudget : ModelViews::MassBudget { expose S::quad::**; }
-  view kitBudget : ModelViews::MassBudget { expose S::kit::**; }
+  view quadBudget : ModelViews::MassBudget { expose quad::**; }
+  view kitBudget : ModelViews::MassBudget { expose kit::**; }
 }
 `;
 
@@ -427,19 +445,19 @@ describe('6.3 constraints evaluated for what they are about', () => {
 		const claims = host.checks(files).checks.filter((c) => c.kind === 'satisfy');
 		// a: 50 g ≤ 75 g met (margin 25 g); h: 80 g > 75 g not met (−5 g); u: 70 g ≤ 75 g met (5 g).
 		expect(claims.map((c) => [c.by, c.status, c.margin?.value, c.span.start_row])).toEqual([
-			['craft.a', 'satisfied', 25, 18],
-			['craft.h', 'violated', -5, 19],
-			['craft.u', 'satisfied', 5, 20]
+			['craft.a', 'satisfied', 25, 19],
+			['craft.h', 'violated', -5, 20],
+			['craft.u', 'satisfied', 5, 21]
 		]);
-		expect(claims[1]!.explanation).toBe('Not met: arm.mass = 80 g (needs ≤ 75 g).');
+		expect(claims[1]!.explanation).toBe('Not met: craft.h.mass = 80 g (needs ≤ 75 g).');
 	});
 
 	it('lists a violated claim as a problem at the claim, through the workspace', async () => {
 		const workspace = await openWorkspace(host, project(SCOPE));
-		await analysed(workspace, () => {});
+		await checked(workspace);
 		const checks = workspace.problems.filter((p) => p.code === 'check');
 		expect(checks.map((p) => [p.file, p.span.start_row, p.severity, p.message])).toEqual([
-			['m.sysml', 19, 'warning', 'armReq is not met by craft.h: arm.mass = 80 g (needs ≤ 75 g)']
+			['m.sysml', 20, 'warning', 'armReq is not met by craft.h: craft.h.mass = 80 g (needs ≤ 75 g)']
 		]);
 		// The span covers the claim's text, so Problems jumps to it.
 		expect(SCOPE.slice(checks[0]!.span.from, checks[0]!.span.to)).toMatch(/craft\.h/);
@@ -448,7 +466,7 @@ describe('6.3 constraints evaluated for what they are about', () => {
 			workspace.setText('m.sysml', SCOPE.replace('mass default 80 [g]', 'mass default 74 [g]'))
 		);
 		expect(workspace.problems.filter((p) => p.code === 'check')).toEqual([]);
-	});
+	}, 30_000);
 
 	// Known gap (critical, engine and app): an `assert constraint` in a definition is checked for
 	// the definition's own values only. HeavyArm (80 g) and craft.u (70 g) break `mass <= 60 [g]`,

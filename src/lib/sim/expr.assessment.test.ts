@@ -47,9 +47,9 @@ describe('6.1 the app’s evaluator', () => {
 
 	it('does not add a unit it does not know to one it knows', () => {
 		// 1 furlong + 1 m is 201.168 m + 1 m, not "2 furlong": unknown, so it is refused.
-		expect(fails('1 [furlong] + 1 [m]')).toMatch(/cannot apply `\+`/);
-		expect(fails('1 [furlong] - 1 [m]')).toMatch(/cannot apply `-`/);
-		expect(fails('sum(1 [furlong], 1 [m])')).toMatch(/cannot apply/);
+		expect(fails('1 [furlong] + 1 [m]') ?? 'no error').toMatch(/cannot apply `\+`/);
+		expect(fails('1 [furlong] - 1 [m]') ?? 'no error').toMatch(/cannot apply `-`/);
+		expect(fails('sum(1 [furlong], 1 [m])') ?? 'no error').toMatch(/cannot apply/);
 		// The same unknown unit adds up with itself.
 		expect(run('1 [furlong] + 2 [furlong]')).toEqual(new Quantity(3, 'furlong'));
 	});

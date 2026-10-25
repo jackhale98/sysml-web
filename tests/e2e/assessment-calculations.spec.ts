@@ -36,7 +36,9 @@ async function select(page: Page, name: string, kind: string, nth = 0, file?: st
 	return page.getByRole('complementary', { name: 'Inspector' });
 }
 
-test('a division by zero shows as unknown, with the reason, never as a number', async ({ page }) => {
+test('a division by zero shows as unknown, with the reason, never as a number', async ({
+	page
+}) => {
 	await openDemo(page);
 	const power = await select(page, 'hoverPower', 'attribute', 1, 'DroneArchitecture.sysml');
 	const value = power.getByRole('textbox', { name: /^Value \(/ });

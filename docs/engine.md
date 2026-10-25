@@ -421,11 +421,17 @@ ask and cached with it):
   in one `evaluate` call per selection.
 - **Budgets** walk the bill of materials' composition rows: each part's
   value of the attribute where the model binds it (on the usage, else its
-  type or a supertype), evaluated in its definition; a part without one
-  adds up its parts; totals are quantity × value; the root's own values of
-  the same quantity (`emptyMass :> mass`) follow, with the limit and margin
-  a claim's constraint sets on them. An attribute declared optional
-  (`powerDraw [0..1]`) leaves the parts without a value out.
+  type or a supertype), evaluated in its definition — except an expression
+  the part inherits (`mass = cells * cellMass` in `Battery`, with the part's
+  own `cells`), which `Evaluation.valueFor` works out with the part's values
+  (request 9); a part without one adds up its parts; totals are quantity ×
+  value; a part that is one of a sibling collection (`m1 :> motors`) is
+  counted in the collection, not again; parts whose number can vary
+  (`[0..1]`, `[2..4]`) count at their least, and the sum's note says so;
+  values whose units don't convert are not added (the sum is left empty).
+  The root's own values of the same quantity (`emptyMass :> mass`) follow,
+  with the limit and margin a claim's constraint sets on them. An attribute
+  declared optional (`powerDraw [0..1]`) leaves the parts without a value out.
 - **Cost on the demo in Node**: the evaluation session ~25–30 ms, `verify`
   ~15–30 ms (once per analysis, on first ask); `evaluate` of all 171
   attributes 3 ms; a budget table 2 ms after that. All in the worker.
@@ -480,8 +486,9 @@ toolkit's `conforms`).
   doesn't read directly (`hoverPower`) are shown without a verdict.
 - **Selection.** The toolkit doesn't evaluate `TradeStudy::selectedAlternative`
   nor `TradeStudyObjective::best` (request 7), so the app ranks the scores
-  by the objective's kind and selects the best; a tie selects nothing and
-  says so. `trade.test.ts` fails when the toolkit evaluates
+  by the objective's kind and selects the best, the scores converted to one
+  unit (0.6 kg ranks above 500 g); scores in units that don't convert
+  select nothing and say so; a tie selects nothing and says so. `trade.test.ts` fails when the toolkit evaluates
   `selectedAlternative`, so the selection can be taken from it.
 - **The design's choice**: an alternative that is a part of the design (owned
   by a part usage that isn't a variation, `drone.battery`), or one a part of

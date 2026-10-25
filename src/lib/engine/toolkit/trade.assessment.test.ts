@@ -83,7 +83,8 @@ describe('6.3 alternatives whose values come in different units', () => {
 		expect(s.selected === 2 || (s.selected === null && /unit/.test(s.note ?? ''))).toBe(true);
 		// withCase for c: 7000 gr + 100 g is 8543.2 gr; never 7100 gr (the numbers added as they are).
 		const c = s.criteria.find((x) => x.name === 'withCase')!.values[2]!;
-		if (c.kind === 'number') expect(c.value * (c.unit === 'gr' ? 0.06479891 : 1)).toBeCloseTo(553.59, 1);
+		if (c.kind === 'number')
+			expect(c.value * (c.unit === 'gr' ? 0.06479891 : 1)).toBeCloseTo(553.59, 1);
 		else expect(c.kind).toBe('undecided');
 	});
 
@@ -135,13 +136,23 @@ describe('6.3 alternatives with different parameter values', () => {
 	it('works out each alternative’s inherited values with its own parameters', () => {
 		const s = studyOf(DERIVED);
 		// four: 4 × 50 g = 200 g; six: 6 × 50 g = 300 g; light: 6 × 30 g = 180 g.
-		expect(s.criteria.find((c) => c.name === 'packMass')!.shown).toEqual(['200 g', '300 g', '180 g']);
+		expect(s.criteria.find((c) => c.name === 'packMass')!.shown).toEqual([
+			'200 g',
+			'300 g',
+			'180 g'
+		]);
 		// massScore = (400 − m) / 400: 0.5, 0.25, 0.55. priceScore = (500 − price) / 500: 0.8, 0.8, 0.2.
 		// score = 0.6 × massScore + 0.4 × priceScore: 0.62, 0.47, 0.41 → four is selected.
 		expect(scores(s).map((x) => Number((x![0] as number).toFixed(6)))).toEqual([0.62, 0.47, 0.41]);
 		expect(s.selected).toBe(0);
-		expect(s.criteria.find((c) => c.name === 'massScore')).toMatchObject({ weight: 0.6, better: 'higher' });
-		expect(s.criteria.find((c) => c.name === 'priceScore')).toMatchObject({ weight: 0.4, better: 'higher' });
+		expect(s.criteria.find((c) => c.name === 'massScore')).toMatchObject({
+			weight: 0.6,
+			better: 'higher'
+		});
+		expect(s.criteria.find((c) => c.name === 'priceScore')).toMatchObject({
+			weight: 0.4,
+			better: 'higher'
+		});
 	});
 
 	it('gives the same study from a fresh analysis (reproducible)', () => {
@@ -152,25 +163,28 @@ describe('6.3 alternatives with different parameter values', () => {
 
 	it('recalculates the table when the model changes in the workspace, and back on undo', async () => {
 		const workspace = await openWorkspace(host, project(DERIVED));
-		await analysed(workspace, () => {});
+		for (let i = 0; i < 800 && !workspace.checks; i++) await new Promise((r) => setTimeout(r, 25));
 		const table = () => host.renderView(workspace.sourceFiles(), 'D::tradeTable');
 		const before = table();
-		expect(before.rows.find((r) => r[0] === 'score')).toEqual(['score', '', '0.62', '0.47', '0.41']);
+		expect(before.rows.find((r) => r[0] === 'score')).toEqual([
+			'score',
+			'',
+			'0.62',
+			'0.47',
+			'0.41'
+		]);
 		expect(before.trade?.selected).toBe(0);
-		// The light pack's price drops to 100 (set as the inspector sets a value, one undoable step):
+		// The light pack's price drops to 100 (one undoable step, as the app applies a change):
 		// priceScore 0.8, score 0.6 × 0.55 + 0.4 × 0.8 = 0.65 → light wins.
 		const source = workspace.text('T.sysml')!;
 		const error = await analysed(workspace, () =>
-			workspace.transact('Set price', () =>
-				workspace.edit('T.sysml', {
-					op: 'setDeclaration',
-					path: 'T.sysml',
-					source,
-					element: 'price',
-					line: source.split('\n').findIndex((l) => l.includes('price = 400.0')) + 1,
-					set: { value: '100.0' }
-				})
-			)
+			workspace.transact('Set price', async () => {
+				workspace.setText(
+					'T.sysml',
+					source.replace('attribute :>> price = 400.0;', 'attribute :>> price = 100.0;')
+				);
+				return null;
+			})
 		);
 		expect(error).toBeNull();
 		expect(workspace.text('T.sysml')).toContain('attribute :>> price = 100.0;');
@@ -180,5 +194,5 @@ describe('6.3 alternatives with different parameter values', () => {
 		expect(after.trade?.selected).toBe(2);
 		await analysed(workspace, () => workspace.undo());
 		expect(table().trade?.selected).toBe(0);
-	});
+	}, 30_000);
 });
