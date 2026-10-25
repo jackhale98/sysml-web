@@ -2,11 +2,11 @@
  * The landing page: what it says Fairtide does, its links, accessibility in
  * both themes, and a phone without sideways scrolling.
  */
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
+import { analyze } from './axe';
 
 async function expectAccessible(page: Page) {
-	const results = await new AxeBuilder({ page }).analyze();
+	const results = await analyze(page);
 	const violations = results.violations.map(
 		(v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`
 	);

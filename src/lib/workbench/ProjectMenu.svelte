@@ -38,11 +38,16 @@
 	import type { Progress, RepoChoice } from '#lib/git/types.ts';
 	import { leaving } from '#lib/project/leaving.svelte.ts';
 	import { pendingLabel } from '#lib/project/pending.ts';
-	import type { ProjectSession } from '#lib/project/session.svelte.ts';
+	import {
+		FOLDER_CONFLICTS,
+		savedToFolder,
+		type ProjectSession
+	} from '#lib/project/session.svelte.ts';
 	import { deleteProject, listProjects, type ProjectSummary } from '#lib/project/store.ts';
 	import type { Workspace } from '#lib/project/workspace.svelte.ts';
 	import { settings } from '#lib/settings/settings.svelte.ts';
 	import { toasts } from '#lib/ui/toasts.svelte.ts';
+	import FolderConflicts from './FolderConflicts.svelte';
 	import LeaveDialog from './LeaveDialog.svelte';
 
 	/**
@@ -200,7 +205,10 @@
 	async function saveToFolder() {
 		open = false;
 		const error = await session.saveToFolder();
-		toasts.show(error ?? 'Saved to the folder.', { tone: error ? 'error' : 'success' });
+		// Files changed in the folder too: the question opens (FolderConflicts).
+		if (session.folderPending) toasts.show(error ?? FOLDER_CONFLICTS);
+		else
+			toasts.show(error ?? savedToFolder(session.broughtIn), { tone: error ? 'error' : 'success' });
 	}
 
 	async function exportKpar() {
@@ -515,6 +523,7 @@
 </div>
 
 <LeaveDialog />
+<FolderConflicts {session} />
 
 <!-- Loaded when first opened, to keep the first load small. -->
 {#if !onopensourcecontrol && ownSourceControl}

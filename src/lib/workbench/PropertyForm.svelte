@@ -7,7 +7,7 @@
 	import { elementAt, utf16ToByte, type ModelElement } from '#lib/project/elements.ts';
 	import type { Workspace } from '#lib/project/workspace.svelte.ts';
 	import { toasts } from '#lib/ui/toasts.svelte.ts';
-	import { parentOf, withImported } from './actions.ts';
+	import { parentOf, undoAction, withImported } from './actions.ts';
 	import TypePicker from './TypePicker.svelte';
 	import type { WorkbenchUi } from './ui.svelte.ts';
 
@@ -96,7 +96,7 @@
 			return;
 		}
 		const label = `Added ${kind} def ${name} and typed ${element.label} by it`;
-		const before = workspace.undoStack.length;
+		const before = workspace.lastEdit;
 		const error = await workspace.transact(label, async () => {
 			const source = workspace.text(element.file);
 			if (source === undefined) return `${element.file} is not open.`;
@@ -116,7 +116,7 @@
 				text: `${kind} def ${name} {\n}`
 			});
 		});
-		if (error || workspace.undoStack.length > before) done(error, label);
+		if (error || workspace.lastEdit !== before) done(error, label);
 	}
 
 	/** How an edit names the element: its id, with its name and line for when the id is stale. */
@@ -130,18 +130,19 @@
 			toasts.show(error, { tone: 'error' });
 			return;
 		}
+		const edit = workspace.lastEdit;
 		const warning = workspace.warnings.join(' ');
 		toasts.show(warning ? `${label}. ${warning}` : label, {
 			tone: warning ? 'info' : 'success',
 			...(warning ? { duration: 12_000 } : {}),
-			action: { label: 'Undo', run: () => workspace.undo() }
+			...(edit !== undefined ? { action: undoAction(workspace, edit) } : {})
 		});
 	}
 
 	async function apply(set: DeclarationSet, label: string) {
 		const source = workspace.text(element.file);
 		if (source === undefined) return;
-		const before = workspace.undoStack.length;
+		const before = workspace.lastEdit;
 		let imported: string[] = [];
 		const result = await workspace.transact(
 			() => withImported(label, imported),
@@ -159,7 +160,7 @@
 				return error;
 			}
 		);
-		if (result || workspace.undoStack.length > before) done(result, withImported(label, imported));
+		if (result || workspace.lastEdit !== before) done(result, withImported(label, imported));
 	}
 
 	function commit(

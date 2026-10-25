@@ -1,0 +1,172 @@
+# Conformance run 2026-10-23
+
+Toolkit 0.10.10; library OMG SysML v2 Release 2026-05 (de1070ae), as bundled by the toolkit; corpus de1070ae8e79c21532b8004fc663d47b35d0e9fa; pilot suites fa709f28dfd49dfdb7ee83e4e19da2f57e0eb3aa; negatives a662c2bce8882349feeac0c54a29952fde1cc143.
+
+## Release corpus, engine (each folder as one project)
+
+| Suite | Files | Parsed | References | Unresolved | Resolved | Errors | Warnings | Files with errors |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| sysml/src/examples | 95 | 95 | 5933 | 34 | 99.43 % | 17 | 21 | 1 |
+| sysml/src/training | 100 | 100 | 1901 | 110 | 94.21 % | 2 | 110 | 1 |
+| sysml/src/validation | 56 | 56 | 2374 | 53 | 97.77 % | 4 | 54 | 1 |
+| kerml/src/examples | 58 | 58 | 1998 | 51 | 97.45 % | 86 | 61 | 13 |
+| demo | 22 | 22 | 1529 | 0 | 100.00 % | 0 | 0 | 0 |
+| all | 331 | 331 | 13735 | 248 | 98.19 % | 109 | 246 | 16 |
+
+## Release corpus, engine (each suite as one project)
+
+| Suite | Files | Parsed | References | Unresolved | Resolved | Errors | Warnings | Files with errors |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| sysml/src/examples | 95 | 95 | 5933 | 34 | 99.43 % | 17 | 21 | 1 |
+| sysml/src/training | 100 | 100 | 1901 | 4 | 99.79 % | 0 | 4 | 0 |
+| sysml/src/validation | 56 | 56 | 2374 | 5 | 99.79 % | 3 | 3 | 1 |
+| kerml/src/examples | 58 | 58 | 1998 | 51 | 97.45 % | 86 | 61 | 13 |
+
+## Release corpus, engine (each file alone)
+
+| Suite | Files | Parsed | References | Unresolved | Resolved | Files with errors |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| sysml/src/examples | 95 | 95 | 5933 | 345 | 94.19 % | 2 |
+| sysml/src/training | 100 | 100 | 1901 | 337 | 82.27 % | 4 |
+| sysml/src/validation | 56 | 56 | 2374 | 59 | 97.51 % | 1 |
+| kerml/src/examples | 58 | 58 | 1998 | 237 | 88.14 % | 13 |
+| all | 309 | 309 | 12206 | 978 | 91.99 % | 20 |
+
+## Release corpus, Fairtide layer
+
+- Diagnostics: 355 of 355 engine findings shown on their line (0 missing, 0 extra); 355 over exactly the engine's range.
+- Model adapter: 10792 located elements of 13941 walked; 0 lost; 209 named elements have no place in the text; 0 named records missing from the app's model.
+- Diagrams: 801 built, 0 failed.
+
+| Metaclass | Named elements | In a diagram | Share |
+| --- | ---: | ---: | ---: |
+| ReferenceUsage | 1711 | 605 | 35.36 % |
+| PartUsage | 1116 | 581 | 52.06 % |
+| AttributeUsage | 936 | 493 | 52.67 % |
+| Feature | 696 | 0 | 0.00 % |
+| Package | 576 | 576 | 100.00 % |
+| PartDefinition | 520 | 520 | 100.00 % |
+| PortUsage | 301 | 212 | 70.43 % |
+| ActionUsage | 241 | 71 | 29.46 % |
+| ItemUsage | 189 | 127 | 67.20 % |
+| AttributeDefinition | 164 | 148 | 90.24 % |
+| StateUsage | 139 | 98 | 70.50 % |
+| RequirementUsage | 138 | 138 | 100.00 % |
+| OccurrenceUsage | 126 | 26 | 20.63 % |
+| ActionDefinition | 115 | 115 | 100.00 % |
+| Class | 113 | 0 | 0.00 % |
+| ItemDefinition | 101 | 100 | 99.01 % |
+| PortDefinition | 97 | 97 | 100.00 % |
+| EnumerationUsage | 92 | 89 | 96.74 % |
+| FlowUsage | 91 | 0 | 0.00 % |
+| EventOccurrenceUsage | 79 | 0 | 0.00 % |
+| PerformActionUsage | 68 | 33 | 48.53 % |
+| TransitionUsage | 53 | 50 | 94.34 % |
+| Classifier | 52 | 0 | 0.00 % |
+| ViewUsage | 51 | 11 | 21.57 % |
+| MetadataDefinition | 50 | 50 | 100.00 % |
+| Association | 49 | 0 | 0.00 % |
+| CalculationDefinition | 47 | 47 | 100.00 % |
+| OccurrenceDefinition | 46 | 44 | 95.65 % |
+| Step | 45 | 0 | 0.00 % |
+| Usage | 44 | 12 | 27.27 % |
+| Behavior | 42 | 0 | 0.00 % |
+| Structure | 41 | 0 | 0.00 % |
+| ViewDefinition | 38 | 38 | 100.00 % |
+| RequirementDefinition | 35 | 35 | 100.00 % |
+| InterfaceUsage | 35 | 0 | 0.00 % |
+| EnumerationDefinition | 31 | 31 | 100.00 % |
+| CalculationUsage | 30 | 2 | 6.67 % |
+| AnalysisCaseUsage | 29 | 2 | 6.90 % |
+| ConnectionDefinition | 27 | 27 | 100.00 % |
+| Connector | 27 | 0 | 0.00 % |
+| ExhibitStateUsage | 26 | 15 | 57.69 % |
+| Succession | 22 | 0 | 0.00 % |
+| ConstraintDefinition | 21 | 21 | 100.00 % |
+| AssertConstraintUsage | 20 | 10 | 50.00 % |
+| UseCaseUsage | 20 | 0 | 0.00 % |
+| InterfaceDefinition | 19 | 19 | 100.00 % |
+| ConstraintUsage | 19 | 10 | 52.63 % |
+| StateDefinition | 18 | 18 | 100.00 % |
+| VerificationCaseUsage | 17 | 13 | 76.47 % |
+| AcceptActionUsage | 16 | 0 | 0.00 % |
+| Type | 15 | 0 | 0.00 % |
+| AnalysisCaseDefinition | 14 | 14 | 100.00 % |
+| ConnectionUsage | 13 | 0 | 0.00 % |
+| LibraryPackage | 12 | 12 | 100.00 % |
+| SendActionUsage | 11 | 0 | 0.00 % |
+| MergeNode | 9 | 3 | 33.33 % |
+| UseCaseDefinition | 9 | 9 | 100.00 % |
+| VerificationCaseDefinition | 8 | 8 | 100.00 % |
+| ConcernUsage | 7 | 1 | 14.29 % |
+| JoinNode | 6 | 3 | 50.00 % |
+| IncludeUseCaseUsage | 6 | 4 | 66.67 % |
+| Metaclass | 6 | 0 | 0.00 % |
+| AllocationDefinition | 5 | 5 | 100.00 % |
+| AllocationUsage | 5 | 0 | 0.00 % |
+| RenderingUsage | 5 | 1 | 20.00 % |
+| SatisfyRequirementUsage | 4 | 0 | 0.00 % |
+| ForkNode | 4 | 1 | 25.00 % |
+| Dependency | 4 | 0 | 0.00 % |
+| AssignmentActionUsage | 4 | 0 | 0.00 % |
+| ViewpointDefinition | 3 | 3 | 100.00 % |
+| ViewpointUsage | 3 | 1 | 33.33 % |
+| Definition | 2 | 2 | 100.00 % |
+| SuccessionFlowUsage | 2 | 0 | 0.00 % |
+| MetadataUsage | 2 | 0 | 0.00 % |
+| BindingConnectorAsUsage | 2 | 0 | 0.00 % |
+| SuccessionAsUsage | 2 | 0 | 0.00 % |
+| FlowDefinition | 2 | 2 | 100.00 % |
+| DecisionNode | 2 | 2 | 100.00 % |
+| TextualRepresentation | 2 | 0 | 0.00 % |
+| ConcernDefinition | 2 | 2 | 100.00 % |
+| RenderingDefinition | 2 | 2 | 100.00 % |
+| DataType | 2 | 0 | 0.00 % |
+| AssociationStructure | 2 | 0 | 0.00 % |
+| BindingConnector | 2 | 0 | 0.00 % |
+| FeatureTyping | 2 | 0 | 0.00 % |
+| Conjugation | 2 | 0 | 0.00 % |
+| WhileLoopActionUsage | 1 | 0 | 0.00 % |
+| TerminateActionUsage | 1 | 1 | 100.00 % |
+| SuccessionFlow | 1 | 0 | 0.00 % |
+| Flow | 1 | 0 | 0.00 % |
+| Subclassification | 1 | 0 | 0.00 % |
+| Function | 1 | 0 | 0.00 % |
+| TypeFeaturing | 1 | 0 | 0.00 % |
+| Subsetting | 1 | 0 | 0.00 % |
+| Redefinition | 1 | 0 | 0.00 % |
+| FeatureInverting | 1 | 0 | 0.00 % |
+| Invariant | 1 | 0 | 0.00 % |
+| Specialization | 1 | 0 | 0.00 % |
+
+## Pilot Xpect suites (as Fairtide shows them)
+
+| Suite | Files | `errors` items | Error there | Any problem there | `noErrors` files | Held | `linkedName` | Agreed |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| org.omg.kerml.xpect.tests/imports/global | 12 | 0 | 0 | 0 | 12 | 11 | 0 | 0 |
+| org.omg.kerml.xpect.tests/imports/local | 8 | 78 | 0 | 60 | 3 | 3 | 4 | 4 |
+| org.omg.kerml.xpect.tests/imports/recursive | 12 | 1 | 0 | 1 | 9 | 9 | 3 | 3 |
+| org.omg.kerml.xpect.tests/indexing | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| org.omg.kerml.xpect.tests/linking | 3 | 0 | 0 | 0 | 0 | 0 | 7 | 5 |
+| org.omg.kerml.xpect.tests/parsing | 28 | 19 | 12 | 14 | 21 | 17 | 0 | 0 |
+| org.omg.kerml.xpect.tests/scoping | 9 | 0 | 0 | 0 | 8 | 8 | 5 | 5 |
+| org.omg.kerml.xpect.tests/testsuite | 117 | 8 | 3 | 8 | 108 | 102 | 147 | 146 |
+| org.omg.kerml.xpect.tests/validation | 52 | 88 | 52 | 71 | 10 | 10 | 0 | 0 |
+| org.omg.kerml.xpect.tests/visibility | 61 | 134 | 0 | 117 | 29 | 29 | 25 | 25 |
+| org.omg.sysml.xpect.tests/expression | 4 | 0 | 0 | 0 | 4 | 4 | 0 | 0 |
+| org.omg.sysml.xpect.tests/linking | 1 | 1 | 0 | 0 | 0 | 0 | 3 | 3 |
+| org.omg.sysml.xpect.tests/queryx/failing | 3 | 0 | 0 | 0 | 3 | 0 | 0 | 0 |
+| org.omg.sysml.xpect.tests/simpletests | 36 | 0 | 0 | 0 | 36 | 36 | 0 | 0 |
+| org.omg.sysml.xpect.tests/validation/invalid | 47 | 184 | 134 | 144 | 1 | 1 | 0 | 0 |
+| org.omg.sysml.xpect.tests/validation/valid | 34 | 2 | 2 | 2 | 32 | 31 | 0 | 0 |
+| all | 428 | 515 | 203 | 417 | 276 | 261 | 194 | 191 |
+
+## Negative corpus (OpenSysML; every file must be rejected)
+
+| Category | Files | Rejected (an error) | Flagged (error or warning) | Pilot rejects (recorded) |
+| --- | ---: | ---: | ---: | ---: |
+| extensions | 12 | 12 | 12 | 12 |
+| grammar | 112 | 109 | 109 | 112 |
+| semantic | 175 | 161 | 165 | 164 |
+| xpect | 35 | 33 | 34 | 35 |
+| all | 334 | 315 | 320 | 323 |

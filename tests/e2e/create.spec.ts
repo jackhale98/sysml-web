@@ -5,11 +5,11 @@
  * of three alternatives, ranked. Each is accessible and can be undone; one
  * form is used on a phone.
  */
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
+import { analyze } from './axe';
 
 async function expectAccessible(page: Page) {
-	const results = await new AxeBuilder({ page }).analyze();
+	const results = await analyze(page);
 	expect(results.violations.map((v) => `${v.id}: ${v.nodes[0]?.target}`)).toEqual([]);
 }
 
@@ -157,10 +157,13 @@ test('Add up a mass over the parts and see its budget', async ({ page }) => {
 	await expectAccessible(page);
 	await form.getByRole('button', { name: 'Add up', exact: true }).click();
 	await expect(toasts(page)).toContainText('system’s mass now adds up its parts');
+	// Reached by keyboard, the toast waits while the page is checked.
+	const undo = toasts(page).getByRole('button', { name: 'Undo' });
+	await undo.focus();
 	const budget = page.getByRole('region', { name: 'System mass budget view' });
 	await expect(budget.locator('tbody tr').first()).toContainText('29.5 kg', { timeout: 15_000 });
 	await expectAccessible(page);
-	await toasts(page).getByRole('button', { name: 'Undo' }).click();
+	await undo.click();
 	await expect(views(page).getByRole('button', { name: 'System mass budget' })).toBeHidden({
 		timeout: 15_000
 	});
@@ -187,7 +190,7 @@ test('Set a limit on a requirement, and see the check flip when the value change
 	await expectAccessible(page);
 	await form.getByRole('button', { name: 'Set the limit' }).click();
 	await expect(toasts(page)).toContainText(
-		'REQ-001 First requirement now checks system.mass <= 35 [kg]'
+		'REQ-001 First requirement now checks theSystem.mass <= 35 [kg]'
 	);
 
 	await command(page, 'new view design checks', /New view: Design checks/);
@@ -259,6 +262,9 @@ test('A trade study of three alternatives, ranked', async ({ page }) => {
 	);
 	await form.getByRole('button', { name: 'Create' }).click();
 	await expect(toasts(page)).toContainText('Created the trade study Motor choice');
+	// Reached by keyboard, the toast waits while the page is checked.
+	const undo = toasts(page).getByRole('button', { name: 'Undo' });
+	await undo.focus();
 	const view = page.getByRole('region', { name: 'Motor choice view' });
 	await expect(view.getByText('is selected')).toBeVisible({ timeout: 20_000 });
 	await expect(view.locator('.verdict')).toContainText('smallMotor is selected');
@@ -266,7 +272,7 @@ test('A trade study of three alternatives, ranked', async ({ page }) => {
 		'0.00 0.61 0.94'
 	);
 	await expectAccessible(page);
-	await toasts(page).getByRole('button', { name: 'Undo' }).click();
+	await undo.click();
 	await expect(views(page).getByRole('button', { name: 'Motor choice' })).toBeHidden({
 		timeout: 15_000
 	});

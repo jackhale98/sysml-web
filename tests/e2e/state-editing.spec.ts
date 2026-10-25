@@ -1,5 +1,5 @@
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { analyze } from './axe';
 
 /**
  * Building behaviour by drawing: a state machine in a new project, from an
@@ -8,7 +8,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
  */
 
 async function expectAccessible(page: Page) {
-	const results = await new AxeBuilder({ page }).analyze();
+	const results = await analyze(page);
 	const violations = results.violations.map(
 		(v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`
 	);

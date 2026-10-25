@@ -99,7 +99,7 @@ describe('elementFeatures', () => {
 			evaluated: { kind: 'number', unit: 'g' }
 		});
 		expect(out[req]!.features.find((x) => x.kind === 'subject')).toMatchObject({
-			name: 'drone',
+			name: 'system',
 			type: 'DroneArchitecture::DeliveryDrone',
 			declaredBy: 'DroneRequirement'
 		});

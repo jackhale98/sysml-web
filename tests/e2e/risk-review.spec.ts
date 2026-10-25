@@ -6,11 +6,11 @@
  * same on a phone. Each is accessible and can be undone.
  */
 import { readFileSync } from 'node:fs';
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { analyze } from './axe';
 
 async function expectAccessible(page: Page) {
-	const results = await new AxeBuilder({ page }).analyze();
+	const results = await analyze(page);
 	expect(results.violations.map((v) => `${v.id}: ${v.nodes[0]?.target}`)).toEqual([]);
 }
 
@@ -84,6 +84,9 @@ test.describe('on a desktop', () => {
 		await expectAccessible(page);
 		await form.getByRole('button', { name: 'Save policy' }).click();
 		await expect(form).toBeHidden();
+		// Reached by keyboard, the toast waits while the page is checked.
+		const undo = toasts(page).getByRole('button', { name: 'Undo' }).last();
+		await undo.focus();
 
 		await expect(cell).toHaveAttribute('data-zone', 'unacceptable', { timeout: 15_000 });
 		await expect(zones).toContainText(/Unacceptable\s*3 lines/);
@@ -92,7 +95,7 @@ test.describe('on a desktop', () => {
 			/Problems: 0 errors, [1-9]\d* warnings/
 		);
 		await expectAccessible(page);
-		await toasts(page).getByRole('button', { name: 'Undo' }).last().click();
+		await undo.click();
 		await expect(cell).toHaveAttribute('data-zone', 'reduce', { timeout: 15_000 });
 	});
 
@@ -188,12 +191,15 @@ test.describe('on a desktop', () => {
 		await line.getByRole('searchbox').fill('thermal');
 		await expectAccessible(page);
 		await line.getByRole('button', { name: /RC-001 Battery thermal protection/ }).click();
+		// Reached by keyboard, the toast waits while the page is checked.
+		const undo = toasts(page).getByRole('button', { name: 'Undo' }).last();
+		await undo.focus();
 		await expect(line).toContainText('Verified by batteryAbuseTest', { timeout: 15_000 });
 		await expect(row).toContainText('RC-001 Battery thermal protection');
 		await expect(row.locator('.control-state').filter({ hasText: /^\s*Verified/ })).toHaveCount(1);
 		await expectAccessible(page);
 
-		await toasts(page).getByRole('button', { name: 'Undo' }).last().click();
+		await undo.click();
 		await expect(row).not.toContainText('RC-001', { timeout: 15_000 });
 	});
 });

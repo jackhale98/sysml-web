@@ -4,14 +4,28 @@
  * exporting it as a `.kpar`.
  */
 import { GitConnection } from '#lib/git/connection.svelte.ts';
+import type { Resolution } from '#lib/git/sync.ts';
 import { noteDownloaded } from '#lib/workbench/home/nextSteps.ts';
 import { demoProject } from './demo.ts';
+import { planFolderSave, sameConflicts, settleFolderSave, type FolderPlan } from './folderSync.ts';
 import { leaveRisk, type LeaveRisk } from './pending.ts';
-import { download, writeToFolder } from './sources.ts';
+import { download, readFolder, writeToFolder } from './sources.ts';
 import { loadProject, saveProject, timestamp, type StoredProject } from './store.ts';
 import type { ProjectFile, ProjectSource, Workspace } from './workspace.svelte.ts';
 
 const AUTOSAVE_MS = 600;
+
+/** Said when a save to the folder stops to ask about files changed there too. */
+export const FOLDER_CONFLICTS =
+	'Some files changed in the folder too. Choose what to keep: nothing is saved until you do.';
+
+/** Said after a save to the folder, with the files it brought in from there. */
+export function savedToFolder(broughtIn: string[]): string {
+	if (!broughtIn.length) return 'Saved to the folder.';
+	if (broughtIn.length === 1)
+		return `Saved to the folder. ${broughtIn[0]!.split('/').pop()} had changed there, so its change was brought in.`;
+	return `Saved to the folder. ${broughtIn.length} files had changed there, so their changes were brought in.`;
+}
 
 export type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -21,14 +35,28 @@ export class ProjectSession {
 	saveError = $state<string | null>(null);
 	/** Files changed since the folder was last written (folder projects). */
 	unsavedToFolder = $state.raw<string[]>([]);
+	/** A save to the folder waiting for the person to choose, for files changed in the folder too. */
+	folderPending = $state.raw<FolderPlan | null>(null);
+	/** Files the latest save to the folder brought in from it (changed there, not here). */
+	broughtIn = $state.raw<string[]>([]);
+	/** A save to the folder is under way. */
+	savingToFolder = $state(false);
 
 	/** The link to a git repository: changes, Save to GitHub, Get latest, … */
 	readonly git: GitConnection;
 
 	private timer: ReturnType<typeof setTimeout> | undefined;
+	/** The folder's text of each file, as last read or written here. */
 	private folderTexts: Record<string, string> = {};
+	/** Files whose text in the folder isn't known (kept before the folder's texts were). */
+	private unknownInFolder: string[] = [];
 	/** The files as they were when the project was opened on this page. */
 	private opened: ProjectFile[] = [];
+	/**
+	 * When the stored project was last saved, as this page knows it (null: not
+	 * stored yet), so a save from another tab meanwhile isn't overwritten.
+	 */
+	private stamp: string | null | undefined;
 
 	constructor(private workspace: Workspace) {
 		this.git = new GitConnection(this, workspace);
@@ -68,6 +96,7 @@ export class ProjectSession {
 		const stored = await loadProject(id).catch(() => undefined);
 		if (stored) {
 			this.record = stored;
+			this.stamp = stored.updated;
 			if (stored.origin === 'folder') {
 				// Files changed here but not written back are not what the folder holds:
 				// the folder's text of those is kept beside them.
@@ -78,11 +107,15 @@ export class ProjectSession {
 					),
 					...stored.folderTexts
 				};
+				this.unknownInFolder = [...(stored.unknownInFolder ?? [])];
 				if (!stored.folderTexts) {
 					// Kept before the folder's texts were: a file deleted or renamed here is
-					// still in the folder, its text there unknown.
+					// still in the folder, and what the folder holds of these is unknown.
 					const kept = stored.files.map((f) => f.path);
-					for (const path of unsaved) if (!kept.includes(path)) this.folderTexts[path] = '';
+					for (const path of unsaved) {
+						if (!kept.includes(path)) this.folderTexts[path] = '';
+						if (!this.unknownInFolder.includes(path)) this.unknownInFolder.push(path);
+					}
 				}
 				this.unsavedToFolder = unsaved;
 			}
@@ -92,6 +125,7 @@ export class ProjectSession {
 		if (id === 'demo') {
 			const demo = demoProject();
 			const now = timestamp();
+			this.stamp = null;
 			this.record = {
 				id,
 				info: demo.info,
@@ -106,11 +140,13 @@ export class ProjectSession {
 		return null;
 	}
 
-	/** Call when the workspace files change: saves shortly afterwards. */
+	/** Call when the workspace files change: saves shortly afterwards (shown as saving until then). */
 	changed() {
 		if (!this.record) return;
 		clearTimeout(this.timer);
 		this.timer = setTimeout(() => void this.save(), AUTOSAVE_MS);
+		// Not saved yet: a crash before the autosave would lose it. "Not saved" stays until a save works.
+		if (this.saveState !== 'error') this.saveState = 'saving';
 		if (this.record.origin === 'folder') this.unsavedToFolder = this.notInFolder();
 	}
 
@@ -148,11 +184,20 @@ export class ProjectSession {
 		if (this.timer !== undefined) await this.save();
 	}
 
-	async save() {
-		if (!this.record) return;
+	/** The save in progress: saves go one at a time, so each knows when the one before it saved. */
+	private saving: Promise<void> = Promise.resolve();
+
+	save(): Promise<void> {
+		if (!this.record) return Promise.resolve();
 		clearTimeout(this.timer);
 		this.timer = undefined;
 		this.saveState = 'saving';
+		this.saving = this.saving.then(() => this.write());
+		return this.saving;
+	}
+
+	private async write() {
+		if (!this.record) return;
 		try {
 			const info = this.workspace.info ?? this.record.info;
 			this.record = {
@@ -161,11 +206,16 @@ export class ProjectSession {
 				files: this.files(),
 				// Remembered, so a reload still knows what isn't in the folder yet.
 				...(this.record.origin === 'folder'
-					? { unsavedToFolder: this.unsavedToFolder, folderTexts: this.unsavedFolderTexts() }
+					? {
+							unsavedToFolder: this.unsavedToFolder,
+							folderTexts: this.unsavedFolderTexts(),
+							unknownInFolder: this.unknownInFolder.length ? [...this.unknownInFolder] : undefined
+						}
 					: {})
 			};
-			await saveProject(this.record);
-			this.saveState = 'saved';
+			this.stamp = await saveProject(this.record, this.stamp);
+			// A change made while this save was under way is still waiting for its own.
+			this.saveState = this.timer === undefined ? 'saved' : 'saving';
 			this.saveError = null;
 		} catch (error) {
 			this.saveState = 'error';
@@ -173,32 +223,130 @@ export class ProjectSession {
 		}
 	}
 
-	/** Write changed files (and `.project.json`) back into the opened folder. */
-	async saveToFolder(): Promise<string | null> {
+	/**
+	 * Write the files changed here back into the opened folder, after reading
+	 * it again: a file changed only in the folder meanwhile is brought into the
+	 * project instead (`broughtIn`), and when files changed on both sides
+	 * nothing is written until the person chooses (`folderPending`,
+	 * `resolveFolder`). Returns what to tell the person when it didn't save.
+	 */
+	saveToFolder(): Promise<string | null> {
+		this.folderPending = null;
+		return this.toFolder(null);
+	}
+
+	/** Finish a save to the folder that stopped for conflicts, with the person's choice for each file. */
+	resolveFolder(choices: Record<string, Resolution>): Promise<string | null> {
+		const plan = this.folderPending;
+		if (!plan) return Promise.resolve(null);
+		return this.toFolder({ plan, choices });
+	}
+
+	/** Leave the folder as it is: the changes stay here, unsaved to it. */
+	cancelFolderSave() {
+		this.folderPending = null;
+	}
+
+	private folderSaving: Promise<string | null> | null = null;
+
+	private toFolder(
+		resolving: { plan: FolderPlan; choices: Record<string, Resolution> } | null
+	): Promise<string | null> {
+		// One at a time: a second Save to folder while one is under way is the same save.
+		if (this.folderSaving) return this.folderSaving;
+		this.savingToFolder = true;
+		this.folderSaving = this.writeFolder(resolving).finally(() => {
+			this.folderSaving = null;
+			this.savingToFolder = false;
+		});
+		return this.folderSaving;
+	}
+
+	private async writeFolder(
+		resolving: { plan: FolderPlan; choices: Record<string, Resolution> } | null
+	): Promise<string | null> {
 		const folder = this.record?.folder;
 		if (!folder) return 'This project was not opened from a folder.';
-		const changed = this.files().filter((f) => this.folderTexts[f.path] !== f.text);
-		const removed = this.removedFromFolder();
+		const local = this.workspace.files;
+		let disk: Record<string, string>;
 		try {
-			await writeToFolder(
+			disk = await readFolder(
 				folder,
-				[
-					...changed,
-					{
-						path: '.project.json',
-						text: JSON.stringify(this.workspace.info ?? this.record!.info, null, '\t') + '\n'
-					}
-				],
-				removed
+				Object.keys({ ...this.folderTexts, ...local, '.project.json': '' })
 			);
 		} catch (error) {
 			return error instanceof Error ? error.message : String(error);
 		}
-		for (const f of changed) this.folderTexts[f.path] = f.text;
-		for (const path of removed) delete this.folderTexts[path];
-		this.unsavedToFolder = [];
+		const plan = planFolderSave(this.folderTexts, local, disk, this.unknownInFolder);
+		if (resolving && !sameConflicts(resolving.plan, plan)) {
+			this.folderPending = null;
+			return 'Files changed since you chose Save to folder, so nothing was saved. Save to folder again to compare them anew.';
+		}
+		if (plan.conflicts.length && !resolving) {
+			this.folderPending = plan;
+			return FOLDER_CONFLICTS;
+		}
+		const save = settleFolderSave(plan, resolving?.choices);
+		const known = this.folderTexts;
+		const put = (path: string, text: string | null) => {
+			if (text === null) delete known[path];
+			else known[path] = text;
+		};
+		// Into the project first, while the files are as they were read. A combined
+		// version not taken (edited here meanwhile) isn't written either.
+		const taken = await this.take(save.take, local);
+		for (const path of Object.keys(save.take)) {
+			if (!taken.includes(path)) delete save.write[path];
+			else if (!(path in save.write)) put(path, save.take[path] ?? null);
+		}
+		this.broughtIn = taken.filter((path) => path in plan.updates);
+		this.folderPending = null;
+		const files = Object.entries(save.write).map(([path, text]) => ({ path, text }));
+		// The project's info, for a folder that has none (one there is left as it is).
+		if (!('.project.json' in disk))
+			files.push({
+				path: '.project.json',
+				text: JSON.stringify(this.workspace.info ?? this.record!.info, null, '\t') + '\n'
+			});
+		let error: string | null = null;
+		try {
+			await writeToFolder(folder, files, save.remove);
+			for (const [path, text] of Object.entries(plan.same)) put(path, text);
+			for (const [path, text] of Object.entries(save.write)) put(path, text);
+			for (const path of save.remove) delete known[path];
+			this.unknownInFolder = [];
+		} catch (e) {
+			// Some files may be written (or made empty) already: what the folder holds of
+			// these is this save's doing, so a retry writes them without asking.
+			for (const path of [...Object.keys(save.write), ...save.remove])
+				if (!this.unknownInFolder.includes(path)) this.unknownInFolder.push(path);
+			error = e instanceof Error ? e.message : String(e);
+		}
+		this.unsavedToFolder = this.notInFolder();
 		await this.save();
-		return null;
+		return error;
+	}
+
+	/**
+	 * Bring files from the folder (or combined) into the project, as one
+	 * undoable step; one edited here since `was` is left as it is. Gives the
+	 * paths brought in.
+	 */
+	private async take(
+		texts: Record<string, string | null>,
+		was: Record<string, string>
+	): Promise<string[]> {
+		const taken: string[] = [];
+		await this.workspace.transact('Brought in changes from the folder', async () => {
+			for (const [path, text] of Object.entries(texts)) {
+				if (this.workspace.files[path] !== was[path]) continue;
+				if (text === null) await this.workspace.deleteFile(path);
+				else this.workspace.setText(path, text);
+				taken.push(path);
+			}
+			return null;
+		});
+		return taken;
 	}
 
 	/**

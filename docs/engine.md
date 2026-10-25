@@ -863,6 +863,31 @@ by `interchange.test.ts` → "the toolkit printer (upstream bugs)"):
   `validateFlowEndSubsetting`. The app mends it to `message m of T from a to
   b;` and collapses the double spaces.
 
+Found by the assessment (`docs/assessment/`), with the OMG pilot
+implementation as the reference (`docs/interop-tools.md`):
+
+- **`satisfy R by x.y` resolves `x` outside the satisfy.** When R's subject
+  is called `x`, KerML 8.2.3.5 and SysML 8.4.17.3 make `x` the satisfy's own
+  subject (the pilot reports `x.y` unresolved, and binds `by x` to itself);
+  the toolkit resolves it to an imported `x` and reports nothing. Pinned by
+  `semantics.assessment.test.ts`. The app warns at such a satisfy
+  (`project/requirementChecks.ts`) and its writers qualify the part.
+- **A requirement's subject need not come first.** The toolkit accepts a
+  requirement (or definition) that declares a stakeholder or actor before
+  its subject, or without one (SysML 8.3.21,
+  `validate…SubjectParameterPosition`, which the pilot enforces). The app
+  warns.
+- **A metadata body's values export as new features.** `@Safety { level =
+  3; }` gives a `ReferenceUsage` named `level` with no Redefinition of
+  `Safety::level` in `toCompactJson`; the pilot and SysON write the
+  redefinition. The app adds it (`redefineMetadataValues` in
+  `interchange.ts`).
+- **An edit that rebinds a redefinition is not refused.** `replaceMember`
+  refuses an edit that would rebind a reference, but not one that makes an
+  untouched `:>> mass` redefine another feature (the library's `ISQ::mass`
+  once a specialization is gone). The app says so in the edit's toast
+  (`reboundRedefinitions` in `host.ts`).
+
 **Probably a bug, possibly intended** — `canonicalizeCompact` writes some
 properties as `null` (`memberElement`, `general`/`specific`,
 `subsettedFeature`/`subsettingFeature`, `conjugatedPortDefinition`) that
