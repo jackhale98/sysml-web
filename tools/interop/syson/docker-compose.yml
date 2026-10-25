@@ -1,0 +1,31 @@
+# Eclipse SysON + PostgreSQL, for checking Fairtide's exchange against an
+# independent SysML v2 tool. Started by tools/interop/syson-up.sh.
+# SysON then serves its web UI on http://localhost:${SYSON_PORT:-8080}/ and the
+# Systems Modeling API on http://localhost:${SYSON_PORT:-8080}/api/rest.
+name: fairtide-interop-syson
+services:
+  database:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: dbuser
+      POSTGRES_PASSWORD: dbpwd
+      POSTGRES_DB: syson-db
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U dbuser -d syson-db']
+      interval: 2s
+      timeout: 5s
+      retries: 30
+  syson:
+    image: eclipsesyson/syson:${SYSON_VERSION:-v2026.9.3}
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://database:5432/syson-db
+      SPRING_DATASOURCE_USERNAME: dbuser
+      SPRING_DATASOURCE_PASSWORD: dbpwd
+      # Let a Fairtide dev server (another origin) call the API from the browser.
+      SIRIUS_COMPONENTS_CORS_ALLOWEDORIGINPATTERNS: '*'
+      SERVER_PORT: 8080
+    ports:
+      - '${SYSON_PORT:-8080}:8080'

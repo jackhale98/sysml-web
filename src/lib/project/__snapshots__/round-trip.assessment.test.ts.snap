@@ -1,0 +1,1124 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`a redefinition left without its feature > on the demo, deleting the Camera → Component line on a diagram rebinds Camera’s \`:>> mass\` to ISQ::mass without a word 1`] = `
+{
+  "budgets": [
+    "Drone power budget: 397 W -> 394 W",
+  ],
+  "semantic": [
+    "added other attribute :>> powerDraw = 3 [W] (in Camera)",
+    "changed part def DroneComponents::Camera {specializes: Component -> -}",
+    "removed attribute DroneComponents::Camera::powerDraw",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > add a definition to a package with a trailing comment after it 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "+111 	part def Trailer {",
+      "+112 	}",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "added part def Hostile::Trailer",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > add a part to a definition 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "+45 		part spare : Base;",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "added part Hostile::Vehicle::spare",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > add a port to a one-line body 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "+30 	part def Tank :> Base{attribute :>> mass=40[kg];port fuelOut:FuelPort;",
+      "+31 		port vent : FuelPort;",
+      "+32 } // KEEP-08 compact",
+      "-30 	part def Tank :> Base{attribute :>> mass=40[kg];port fuelOut:FuelPort;} // KEEP-08 compact",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "added port Hostile::Tank::vent",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > add a state 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "+100 		state standby;",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "added state Hostile::Power::standby",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > add a step to an action flow 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "+92 		action park;",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "added action Hostile::Drive::park",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > add an attribute to a body that ends in blank lines and a comment 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "+28 		attribute torque : Real;",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "added attribute Hostile::Engine::torque",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > add an element to a view (expose) 1`] = `
+{
+  "lines": {
+    "views/HostileViews.sysml": [
+      "+9 		expose Hostile::car;",
+    ],
+  },
+  "problems": [],
+  "semantic": [],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > change a direction 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "+32 	port def FuelPort { in item fuel : Fuel; }",
+      "-32 	port def FuelPort { out item fuel : Fuel; }",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "changed item Hostile::FuelPort::fuel {direction: out -> in}",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > change a doc comment that has tabs and unicode 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "+4 	doc /* Replaced µ doc. */",
+      "-4 	doc /* KEEP-03 package doc with tabs	and unicode: µ Ω ✓ — “quotes” */",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "changed package def Hostile {doc: KEEP-03 package doc with tabs and unicode: µ Ω ✓ — “quotes” KEEP-04 a block comment before a definition KEEP-11 an unattached comment -> Replaced µ doc. KEEP-04 a block comment before a definition KEEP-11 an unattached comment}",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > change a metadata field in a table cell 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "+21 		@Review { reviewer = "B. Someone"; approved = true; }",
+      "-21 		@Review { reviewer = "A. N. Other"; approved = true; }",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "changed part def Hostile::Engine {metadata:Review.reviewer: A. N. Other -> B. Someone}",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > change a multiplicity written before ordered nonunique 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "+41 		part wheels : Base [6] ordered nonunique;",
+      "-41 		part wheels : Base [4] ordered nonunique;",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "changed part Hostile::Vehicle::wheels {multiplicity: 4 -> 6}",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > change a redefinition’s value in another file 1`] = `
+{
+  "lines": {
+    "model/Uses.sysml": [
+      "+6 		attribute :>> rpmLimit = 7500.0;   // KEEP-21 a redefinition",
+      "-6 		attribute :>> rpmLimit = 7000.0;   // KEEP-21 a redefinition",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "changed attribute Uses::fleet::rpmLimit {value: 7000.0 -> 7500.0}",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > change a requirement’s id in a table cell 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "+74 	requirement <'R-2'> 'Mass limit' {",
+      "-74 	requirement <'R-1'> 'Mass limit' {",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "changed requirement Hostile::'Mass limit' {shortName: R-1 -> R-2}",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > change a requirement’s statement in a table cell 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "+75 		doc /* At most 2.5 t. */",
+      "-75 		doc /* KEEP-12 The vehicle shall weigh at most 2 t. */",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "changed requirement Hostile::'Mass limit' {doc: KEEP-12 The vehicle shall weigh at most 2 t. -> At most 2.5 t.}",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > change a transition’s trigger 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "+100 		transition off_on first off accept after 5 [s] then on;",
+      "-100 		transition off_on first off accept Go then on;",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "changed transition Hostile::Power::off_on {multiplicity: - -> s}",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > change a type 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "+23 		attribute rpm : Integer = 3000.0;",
+      "-23 		attribute rpm : Real = 3000.0;",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "changed attribute Hostile::Engine::rpm {type: Real -> Integer}",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > change a value 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "+23 		attribute rpm : Real = 3500.0;",
+      "-23 		attribute rpm : Real = 3000.0;",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "changed attribute Hostile::Engine::rpm {value: 3000.0 -> 3500.0}",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > change a value in a compact body 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "+30 	part def Tank :> Base{attribute :>> mass=45 [kg];port fuelOut:FuelPort;} // KEEP-08 compact",
+      "-30 	part def Tank :> Base{attribute :>> mass=40[kg];port fuelOut:FuelPort;} // KEEP-08 compact",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "changed attribute Hostile::Tank::mass {value: 40 kg -> 45 kg}",
+    "value Vehicle.totalMass: 160 kg -> 165 kg",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > change a value to a default 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "+23 		attribute rpm : Real default = 3000.0;",
+      "-23 		attribute rpm : Real = 3000.0;",
+    ],
+  },
+  "problems": [],
+  "semantic": [],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > change an enum value in a table cell 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "+85 		attribute colour : Colour = Colour::green;",
+      "-85 		attribute colour : Colour = Colour::red;",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "changed attribute Hostile::car::colour {value: red -> green}",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > delete a connection line that has a comment after it 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "+42 		/* KEEP-09 after a connection */",
+      "-42 		connect tank.fuelOut to engine.fuelIn;   /* KEEP-09 after a connection */",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "removed connect tank.fuelOut to engine.fuelIn (in Vehicle)",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > delete a definition something refers to (with a warning) 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "-35 	#Review part def Gearbox :> Base { attribute :>> mass = 30 [kg]; }",
+    ],
+  },
+  "problems": [
+    "model/Hostile.sysml:39 unresolved reference \`Gearbox\`",
+  ],
+  "semantic": [
+    "changed part Hostile::Vehicle::gearbox {type: Gearbox -> -}",
+    "removed part def Hostile::Gearbox",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > delete a definition with a textual representation in it 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "-107 	part def Annotated {",
+      "-108 		attribute x : Real;",
+      "-109 		rep inOcl language "ocl" /* KEEP-13 self.x > 0 */",
+      "-110 	}",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "removed part def Hostile::Annotated",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > delete a satisfy line 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "-87 	satisfy 'Mass limit' by car;",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "removed satisfy R-1 ‘Mass limit’ by car (in Hostile)",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > delete a state and the transition to it 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "-99 		state on;",
+      "-100 		transition off_on first off accept Go then on;",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "removed state Hostile::Power::on",
+    "removed transition Hostile::Power::off_on",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > delete a transition 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "-100 		transition off_on first off accept Go then on;",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "removed transition Hostile::Power::off_on",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > delete an attribute nothing refers to 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "-23 		attribute rpm : Real = 3000.0;",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "removed attribute Hostile::Engine::rpm",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > draw a connection between parts without ports 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "+45 		connect wheels to gearbox;",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "added connect wheels to gearbox (in Vehicle)",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > draw a satisfy from a part in another file 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "+88 	satisfy 'Rev limit' by Uses::fleet;",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "added satisfy R-3 ‘Rev limit’ by Uses::fleet (in Hostile)",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > draw a step to done 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "+93 		first cruise then done;",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "added succession cruise then done (in Drive)",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > draw a transition 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "+101 		transition on_to_off first on accept Go then off;",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "added transition Hostile::Power::on_to_off",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > draw a verify into a one-line objective 1`] = `
+{
+  "lines": {
+    "model/Uses.sysml": [
+      "+12 		objective { verify 'Mass limit'; verify 'Rev limit'; }",
+      "-12 		objective { verify 'Mass limit'; }",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "added other objective (in MassCheck)",
+    "added verify R-3 ‘Rev limit’ (in MassCheck)",
+    "removed other objective (in MassCheck)",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > draw an allocation 1`] = `
+{
+  "lines": {
+    "model/Uses.sysml": [
+      "+17 	allocate car to fleet;",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "added allocate car to fleet (in Uses)",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > draw composition: a new part 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "+45 		item reserve : Fuel;",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "added item Hostile::Vehicle::reserve",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > draw specialization on an individual definition 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "+57 	individual part def TestCar :> Vehicle, Base;",
+      "-57 	individual part def TestCar :> Vehicle;",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "changed part def Hostile::TestCar {specializes: Vehicle -> Vehicle, Base}",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > duplicate a compact definition with a comment after it on its line 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "+30 	part def Tank :> Base{attribute :>> mass=40[kg];port fuelOut:FuelPort;} part def Tank2 :> Base{attribute :>> mass=40[kg];port fuelOut:FuelPort;} // KEEP-08 compact",
+      "-30 	part def Tank :> Base{attribute :>> mass=40[kg];port fuelOut:FuelPort;} // KEEP-08 compact",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "added part def Hostile::Tank2",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > duplicate a definition with metadata, comments and blank lines 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "+29 	part def  Engine2  :>  Base   {     // KEEP-06 odd spacing",
+      "+30 		@Review { reviewer = "A. N. Other"; approved = true; }",
+      "+31 		attribute :>> mass = 120 [kg];",
+      "+32 		attribute rpm : Real = 3000.0;",
+      "+33 		port fuelIn : ~FuelPort;",
+      "+35 ",
+      "+36 		// KEEP-07 two blank lines above, a comment inside a body",
+      "+37 	}",
+      "+38 ",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "added part def Hostile::Engine2",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > duplicate a usage with a body 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "+87 	part car2 : Vehicle {",
+      "+88 		attribute colour : Colour = Colour::red;",
+      "+89 	}",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "added part Hostile::car2",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > give a compact definition a doc comment 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "+30 	part def Tank :> Base{ doc /* The tank. */attribute :>> mass=40[kg];port fuelOut:FuelPort;} // KEEP-08 compact",
+      "-30 	part def Tank :> Base{attribute :>> mass=40[kg];port fuelOut:FuelPort;} // KEEP-08 compact",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "changed part def Hostile::Tank {doc: - -> The tank.}",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > give a definition a doc comment 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "+20 	part def  Engine  :>  Base   {",
+      "+21 		doc /* The engine. */     // KEEP-06 odd spacing",
+      "-20 	part def  Engine  :>  Base   {     // KEEP-06 odd spacing",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "changed part def Hostile::Engine {doc: KEEP-10 a named comment about Engine -> The engine. KEEP-10 a named comment about Engine}",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > give a definition a short name, beside a trailing comment 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "+20 	part def  <'E1'> Engine  :>  Base   {     // KEEP-06 odd spacing",
+      "-20 	part def  Engine  :>  Base   {     // KEEP-06 odd spacing",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "changed part def Hostile::Engine {shortName: - -> E1}",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > give a state an entry action 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "+99 		state on {",
+      "+100 		    entry action greet;",
+      "+101 		}",
+      "-99 		state on;",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "added perform Hostile::Power::on::greet",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > give a value with a unit its file does not import (imports SI with it) 1`] = `
+{
+  "lines": {
+    "model/Uses.sysml": [
+      "+4 	private import SI::*;",
+      "+8 		attribute payload :> ISQ::mass = 500 [kg];",
+      "-7 		attribute payload :> ISQ::mass;",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "changed attribute Uses::fleet::payload {value: - -> 500 kg}",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > make a value derived 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "+43 		derived attribute totalMass :> ISQ::mass = engine.mass + tank.mass;",
+      "-43 		attribute totalMass :> ISQ::mass = engine.mass + tank.mass;",
+    ],
+  },
+  "problems": [],
+  "semantic": [],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > make an oddly spaced definition abstract 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "+20 	abstract part def  Engine  :>  Base   {     // KEEP-06 odd spacing",
+      "-20 	part def  Engine  :>  Base   {     // KEEP-06 odd spacing",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "changed part def Hostile::Engine {abstract: - -> abstract}",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > make another state the start 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "+97 		entry; then on;",
+      "-97 		entry; then off;",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "added succession on (in Power)",
+    "removed succession off (in Power)",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > new requirement from the limit form, in a package with comments 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "+111 	requirement <'R-9'> 'Maximum rpm limit' {",
+      "+112 		doc /* The v's rpm limit shall be at most 7000. */",
+      "+113 		subject v : Vehicle;",
+      "+114 		require constraint { v.rpmLimit <= 7000.0 }",
+      "+115 	}",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "added requirement Hostile::'Maximum rpm limit'",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > remove a multiplicity 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "+40 		part gearbox : Gearbox;",
+      "-40 		part gearbox : Gearbox [0..1];",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "changed part Hostile::Vehicle::gearbox {multiplicity: 0..1 -> -}",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > remove an oddly spaced specialization 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "+20 	part def  Engine   {     // KEEP-06 odd spacing",
+      "-20 	part def  Engine  :>  Base   {     // KEEP-06 odd spacing",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "changed part def Hostile::Engine {specializes: Base -> -}",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > rename a compact one-line definition 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "+30 	part def Reservoir :> Base{attribute :>> mass=40[kg];port fuelOut:FuelPort;} // KEEP-08 compact",
+      "-30 	part def Tank :> Base{attribute :>> mass=40[kg];port fuelOut:FuelPort;} // KEEP-08 compact",
+      "+39 		part tank : Reservoir;",
+      "-39 		part tank : Tank;",
+      "+103 	dependency from Reservoir to Engine;",
+      "-103 	dependency from Tank to Engine;",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "renamed part def Hostile::Tank -> Hostile::Reservoir",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > rename a definition used across files, by an alias, a comment and a dependency 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "+20 	part def  PowerUnit  :>  Base   {     // KEEP-06 odd spacing",
+      "-20 	part def  Engine  :>  Base   {     // KEEP-06 odd spacing",
+      "+38 		part engine : PowerUnit;",
+      "-38 		part engine : Engine;",
+      "+47 	comment noteAboutEngine about PowerUnit /* KEEP-10 a named comment about Engine */",
+      "-47 	comment noteAboutEngine about Engine /* KEEP-10 a named comment about Engine */",
+      "+50 	alias Motor for PowerUnit;",
+      "-50 	alias Motor for Engine;",
+      "+52 	variation part def EngineChoice :> PowerUnit {",
+      "+53 		variant part petrol : PowerUnit;",
+      "+54 		variant part diesel : PowerUnit;",
+      "-52 	variation part def EngineChoice :> Engine {",
+      "-53 		variant part petrol : Engine;",
+      "-54 		variant part diesel : Engine;",
+      "+103 	dependency from Tank to PowerUnit;",
+      "-103 	dependency from Tank to Engine;",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "renamed part def Hostile::Engine -> Hostile::PowerUnit",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > rename a requirement satisfied and verified elsewhere 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "+74 	requirement <'R-1'> 'Mass cap' {",
+      "-74 	requirement <'R-1'> 'Mass limit' {",
+      "+87 	satisfy 'Mass cap' by car;",
+      "-87 	satisfy 'Mass limit' by car;",
+    ],
+    "model/Uses.sysml": [
+      "+12 		objective { verify 'Mass cap'; }",
+      "-12 		objective { verify 'Mass limit'; }",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "renamed requirement Hostile::'Mass limit' -> Hostile::'Mass cap'",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > rename an attribute redefined in another file 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "+44 		attribute maxRpm : Real default 6000.0;",
+      "-44 		attribute rpmLimit : Real default 6000.0;",
+    ],
+    "model/Uses.sysml": [
+      "+6 		attribute :>> maxRpm = 7000.0;   // KEEP-21 a redefinition",
+      "-6 		attribute :>> rpmLimit = 7000.0;   // KEEP-21 a redefinition",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "renamed attribute Hostile::Vehicle::rpmLimit -> Hostile::Vehicle::maxRpm",
+    "renamed attribute Uses::fleet::rpmLimit -> Uses::fleet::maxRpm",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > show a view as another kind 1`] = `
+{
+  "lines": {
+    "views/HostileViews.sysml": [
+      "+6 	view vehicleParts : InterconnectionView {",
+      "-6 	view vehicleParts : GeneralView {",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "changed view HostileViews::vehicleParts {type: GeneralView -> InterconnectionView}",
+  ],
+}
+`;
+
+exports[`every kind of edit changes only what it is about > un-conjugate a port 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "+24 		port fuelIn : FuelPort;",
+      "-24 		port fuelIn : ~FuelPort;",
+    ],
+  },
+  "problems": [],
+  "semantic": [
+    "changed port Hostile::Engine::fuelIn {type: ~FuelPort -> FuelPort}",
+  ],
+}
+`;
+
+exports[`quick fixes > a fix changes only what the problem is about, as one undoable step 1`] = `
+{
+  "lines": [
+    "+4 	private import SI::kg;",
+  ],
+  "title": "Add import SI::kg",
+}
+`;
+
+exports[`the formatter > keeps every comment, is idempotent, and its changes are pinned 1`] = `
+{
+  "lines": {
+    "model/Hostile.sysml": [
+      "+4     doc /* KEEP-03 package doc with tabs	and unicode: µ Ω ✓ — “quotes” */",
+      "-4 	doc /* KEEP-03 package doc with tabs	and unicode: µ Ω ✓ — “quotes” */",
+      "+6     private import ScalarValues::*;",
+      "+7     private import ISQ::*;",
+      "+8     private import SI::*;",
+      "-6 	private import ScalarValues::*;",
+      "-7 	private import ISQ::*;",
+      "-8 	private import SI::*;",
+      "+10     metadata def Review {",
+      "+11         attribute reviewer : String;",
+      "+12         attribute approved : Boolean;",
+      "+13     }",
+      "-10 	metadata def Review {",
+      "-11 		attribute reviewer : String;",
+      "-12 		attribute approved : Boolean;",
+      "-13 	}",
+      "+15     /* KEEP-04 a block comment before a definition */",
+      "+16     abstract part def Base {",
+      "+17         // KEEP-05 trailing comment on a header",
+      "+18         attribute mass :> ISQ::mass;",
+      "+19     }",
+      "-15 	/* KEEP-04 a block comment before a definition */",
+      "-16 	abstract part def Base {   // KEEP-05 trailing comment on a header",
+      "-17 		attribute mass :> ISQ::mass;",
+      "-18 	}",
+      "+21     part def Engine :> Base {",
+      "+22         // KEEP-06 odd spacing",
+      "+23         @Review {",
+      "+24             reviewer = "A. N. Other";",
+      "+25             approved = true;",
+      "+26         }",
+      "+27         attribute :>> mass = 120 [kg];",
+      "+28         attribute rpm : Real = 3000.0;",
+      "+29         port fuelIn : ~FuelPort;",
+      "-20 	part def  Engine  :>  Base   {     // KEEP-06 odd spacing",
+      "-21 		@Review { reviewer = "A. N. Other"; approved = true; }",
+      "-22 		attribute :>> mass = 120 [kg];",
+      "-23 		attribute rpm : Real = 3000.0;",
+      "-24 		port fuelIn : ~FuelPort;",
+      "+31         // KEEP-07 two blank lines above, a comment inside a body",
+      "+32     }",
+      "+34     part def Tank :> Base {",
+      "+35         attribute :>> mass = 40 [kg]; // KEEP-08 compact",
+      "+36         port fuelOut : FuelPort;",
+      "+37     }",
+      "-27 		// KEEP-07 two blank lines above, a comment inside a body",
+      "-28 	}",
+      "+39     port def FuelPort {",
+      "+40         out item fuel : Fuel;",
+      "+41     }",
+      "+42     item def Fuel;",
+      "-30 	part def Tank :> Base{attribute :>> mass=40[kg];port fuelOut:FuelPort;} // KEEP-08 compact",
+      "+44     #Review part def Gearbox :> Base {",
+      "+45         attribute :>> mass = 30 [kg];",
+      "+46     }",
+      "-32 	port def FuelPort { out item fuel : Fuel; }",
+      "-33 	item def Fuel;",
+      "+48     part def Vehicle {",
+      "+49         part engine : Engine;",
+      "+50         part tank : Tank;",
+      "+51         part gearbox : Gearbox[0..1];",
+      "+52         part wheels : Base[4] ordered nonunique;",
+      "+53         connect tank.fuelOut to engine.fuelIn;",
+      "+54         /* KEEP-09 after a connection */",
+      "+55         attribute totalMass :> ISQ::mass = engine.mass + tank.mass;",
+      "+56         attribute rpmLimit : Real default = 6000.0;",
+      "+57     }",
+      "-35 	#Review part def Gearbox :> Base { attribute :>> mass = 30 [kg]; }",
+      "+59     comment noteAboutEngine about Engine /* KEEP-10 a named comment about Engine */",
+      "+60     /* KEEP-11 an unattached comment */",
+      "-37 	part def Vehicle {",
+      "-38 		part engine : Engine;",
+      "-39 		part tank : Tank;",
+      "-40 		part gearbox : Gearbox [0..1];",
+      "-41 		part wheels : Base [4] ordered nonunique;",
+      "-42 		connect tank.fuelOut to engine.fuelIn;   /* KEEP-09 after a connection */",
+      "-43 		attribute totalMass :> ISQ::mass = engine.mass + tank.mass;",
+      "-44 		attribute rpmLimit : Real default 6000.0;",
+      "-45 	}",
+      "+62     alias Motor for Engine;",
+      "-47 	comment noteAboutEngine about Engine /* KEEP-10 a named comment about Engine */",
+      "-48 	comment /* KEEP-11 an unattached comment */",
+      "+64     variation part def EngineChoice :> Engine {",
+      "+65         variant part petrol : Engine;",
+      "+66         variant part diesel : Engine;",
+      "+67     }",
+      "-50 	alias Motor for Engine;",
+      "+69     individual part def TestCar :> Vehicle;",
+      "-52 	variation part def EngineChoice :> Engine {",
+      "-53 		variant part petrol : Engine;",
+      "-54 		variant part diesel : Engine;",
+      "-55 	}",
+      "+71     enum def Colour {",
+      "+72         enum red;",
+      "+73         enum green;",
+      "+74     }",
+      "-57 	individual part def TestCar :> Vehicle;",
+      "+76     constraint def MassLimit {",
+      "+77         in m : MassValue;",
+      "+78         m <= 2000 [kg]",
+      "+79     }",
+      "-59 	enum def Colour {",
+      "-60 		enum red;",
+      "-61 		enum green;",
+      "-62 	}",
+      "+81     calc def Double {",
+      "+82         in x : Real;",
+      "+83         return : Real = x * 2;",
+      "+84     }",
+      "-64 	constraint def MassLimit {",
+      "-65 		in m : MassValue;",
+      "-66 		m <= 2000 [kg]",
+      "-67 	}",
+      "+86     requirement <'R-1'> 'Mass limit' {",
+      "+87         doc /* KEEP-12 The vehicle shall weigh at most 2 t. */",
+      "+88         subject v : Vehicle;",
+      "+89         require constraint {",
+      "+90             v.totalMass <= 2000 [kg]",
+      "+91         }",
+      "+92     }",
+      "-69 	calc def Double {",
+      "-70 		in x : Real;",
+      "-71 		return : Real = x * 2;",
+      "-72 	}",
+      "+94     requirement <'R-3'> 'Rev limit' {",
+      "+95         subject v : Vehicle;",
+      "+96     }",
+      "-74 	requirement <'R-1'> 'Mass limit' {",
+      "-75 		doc /* KEEP-12 The vehicle shall weigh at most 2 t. */",
+      "-76 		subject v : Vehicle;",
+      "-77 		require constraint { v.totalMass <= 2000 [kg] }",
+      "-78 	}",
+      "+98     part car : Vehicle {",
+      "+99         attribute colour : Colour = Colour::red;",
+      "+100     }",
+      "+101     satisfy 'Mass limit'  by car;",
+      "-80 	requirement <'R-3'> 'Rev limit' {",
+      "-81 		subject v : Vehicle;",
+      "-82 	}",
+      "+103     action def Drive {",
+      "+104         action ignite;",
+      "+105         action cruise;",
+      "+106         first ignite then cruise;",
+      "+107     }",
+      "-84 	part car : Vehicle {",
+      "-85 		attribute colour : Colour = Colour::red;",
+      "-86 	}",
+      "-87 	satisfy 'Mass limit' by car;",
+      "+109     item def Go;",
+      "+110     state def Power {",
+      "+111         entry;",
+      "+112         then off;",
+      "+113         state off;",
+      "+114         state on;",
+      "+115         transition off_on first off accept : Go then on;",
+      "+116     }",
+      "-89 	action def Drive {",
+      "-90 		action ignite;",
+      "-91 		action cruise;",
+      "-92 		first ignite then cruise;",
+      "-93 	}",
+      "+118     dependency Tank to Engine;",
+      "-95 	item def Go;",
+      "-96 	state def Power {",
+      "-97 		entry; then off;",
+      "-98 		state off;",
+      "-99 		state on;",
+      "-100 		transition off_on first off accept Go then on;",
+      "-101 	}",
+      "+120     part def 'Ünïcödé part';",
+      "-103 	dependency from Tank to Engine;",
+      "+122     part def Annotated {",
+      "+123         attribute x : Real;",
+      "+124         rep inOcl language "ocl" /* KEEP-13 self.x > 0 */",
+      "+125     }",
+      "-105 	part def 'Ünïcödé part';",
+      "-106 ",
+      "-107 	part def Annotated {",
+      "-108 		attribute x : Real;",
+      "-109 		rep inOcl language "ocl" /* KEEP-13 self.x > 0 */",
+      "-110 	}",
+    ],
+    "model/Uses.sysml": [
+      "+2     // KEEP-20 a second file that refers to the first",
+      "+3     private import Hostile::*;",
+      "-2 	// KEEP-20 a second file that refers to the first",
+      "-3 	private import Hostile::*;",
+      "+5     part fleet : Vehicle[2..*] {",
+      "+6         attribute :>> rpmLimit = 7000.0; // KEEP-21 a redefinition",
+      "+7         attribute payload :> ISQ::mass;",
+      "+8     }",
+      "-5 	part fleet : Vehicle [2..*] {",
+      "-6 		attribute :>> rpmLimit = 7000.0;   // KEEP-21 a redefinition",
+      "-7 		attribute payload :> ISQ::mass;",
+      "-8 	}",
+      "+10     verification def MassCheck {",
+      "+11         subject v : Vehicle;",
+      "+12         objective {",
+      "+13             verify 'Mass limit';",
+      "+14         }",
+      "+15     }",
+      "-10 	verification def MassCheck {",
+      "-11 		subject v : Vehicle;",
+      "-12 		objective { verify 'Mass limit'; }",
+      "-13 	}",
+      "+17     allocation def EngineToTank;",
+      "+18     allocate fleet.engine to fleet.tank;",
+      "-15 	allocation def EngineToTank;",
+      "-16 	allocate fleet.engine to fleet.tank;",
+    ],
+    "views/HostileViews.sysml": [
+      "+2     private import StandardViewDefinitions::*;",
+      "+3     private import Hostile::*;",
+      "-2 	private import StandardViewDefinitions::*;",
+      "-3 	private import Hostile::*;",
+      "+5     /* KEEP-30 a comment in a view package */",
+      "+6     view vehicleParts : GeneralView {",
+      "+7         doc /* KEEP-31 the vehicle's parts */",
+      "+8         expose Hostile::Vehicle::*; // KEEP-32 an expose with a comment",
+      "+9         filter @SysML::PartUsage;",
+      "+10     }",
+      "-5 	/* KEEP-30 a comment in a view package */",
+      "-6 	view vehicleParts : GeneralView {",
+      "-7 		doc /* KEEP-31 the vehicle's parts */",
+      "-8 		expose Hostile::Vehicle::*;   // KEEP-32 an expose with a comment",
+      "-9 		filter @SysML::PartUsage;",
+      "-10 	}",
+    ],
+  },
+  "semantic": [
+    "added other dependency Tank to Engine (in Hostile)",
+    "changed attribute Hostile::Tank::mass {multiplicity: kg -> -}",
+    "removed other dependency from Tank to Engine (in Hostile)",
+  ],
+}
+`;

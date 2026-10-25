@@ -80,6 +80,12 @@ Without them, people connect GitHub with a personal access token.
 | [Performance](docs/performance.md) | How large models are measured, the results, and what still limits them. | Developers |
 | [Plan](docs/PLAN.md) | Product principles, architecture, what is built, what is next, and the decision log. | Developers |
 | [Sign in with GitHub](docs/setup-github-sign-in.md) | Setting up the GitHub App and the sign-in worker for your own deployment. | Self-hosters |
+| [Robustness and MBSE assessment](docs/assessment/README.md) | What Fairtide demonstrably supports, with evidence and scores, and every critical finding and its fix. | Everyone |
+| [Assessment: language coverage](docs/assessment/01-language.md) | The official corpus, the engine against the OMG pilot, a construct matrix. | Developers |
+| [Assessment: text, diagrams, round trips](docs/assessment/02-round-trip.md) | Every edit kind, save/reload, exports, edit latency. | Developers |
+| [Assessment: import, export, interoperability](docs/assessment/03-interchange.md) | JSON, `.kpar` and SysON, compared by meaning. | Developers |
+| [Assessment: data integrity, Git, recovery](docs/assessment/08-data-integrity.md) | Crashes, tabs, folders, GitHub, archives, credentials. | Developers |
+| [Interop tools](docs/interop-tools.md) | Running the OMG pilot implementation and SysON as checkers. | Developers |
 | [Spike: WebAssembly engine](docs/spikes/wasm-engine.md) | A dated note (2026-10-21) from an engine the app no longer uses. | Developers (history) |
 
 The same list is in [docs/README.md](docs/README.md).

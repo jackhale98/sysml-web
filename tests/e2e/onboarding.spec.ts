@@ -5,13 +5,13 @@
  * Settings, the ? key and search, and finds topics; on a phone too. Every
  * screen is checked for accessibility.
  */
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
+import { analyze } from './axe';
 
 test.describe.configure({ timeout: 120_000 });
 
 async function expectAccessible(page: Page) {
-	const results = await new AxeBuilder({ page }).analyze();
+	const results = await analyze(page);
 	expect(results.violations.map((v) => `${v.id}: ${v.nodes[0]?.target}`)).toEqual([]);
 }
 

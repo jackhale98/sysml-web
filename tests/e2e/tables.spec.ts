@@ -3,11 +3,11 @@
  * `ModelViews`, the demo's saved views with their `expose`, and editing a
  * metadata cell (an FMEA rating) back into the SysML text.
  */
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
+import { analyze } from './axe';
 
 async function expectAccessible(page: Page) {
-	const results = await new AxeBuilder({ page }).analyze();
+	const results = await analyze(page);
 	expect(results.violations.map((v) => v.id)).toEqual([]);
 }
 

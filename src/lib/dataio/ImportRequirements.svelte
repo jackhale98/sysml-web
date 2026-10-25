@@ -17,6 +17,7 @@
 	import type { Workspace } from '#lib/project/workspace.svelte.ts';
 	import KindGlyph from '#lib/ui/KindGlyph.svelte';
 	import { toasts } from '#lib/ui/toasts.svelte.ts';
+	import { undoAction } from '#lib/workbench/actions.ts';
 	import type { WorkbenchUi } from '#lib/workbench/ui.svelte.ts';
 	import { decodeText, parseDelimited } from './csv.ts';
 	import { applyImport, type ImportResult } from './import-apply.ts';
@@ -250,7 +251,7 @@
 			created > 0
 				? `Imported ${plural(created, 'requirement')} from ${source.name}`
 				: `Updated ${plural(updated, 'requirement')} from ${source.name}`;
-		const before = workspace.undoStack.length;
+		const before = workspace.lastEdit;
 		let result: ImportResult | null = null;
 		const currentPlan = plan;
 		const currentOptions = importOptions;
@@ -263,7 +264,7 @@
 		busy = false;
 		if (failure || !result) {
 			// Put back whatever part of the import was written.
-			if (workspace.undoStack.length > before) workspace.undo();
+			if (workspace.lastEdit !== before) workspace.undo();
 			error = failure ?? 'The import did not finish.';
 			return;
 		}
@@ -272,15 +273,10 @@
 			created ? `Imported ${plural(created, 'requirement')}` : '',
 			updated ? `${created ? 'updated' : 'Updated'} ${updated}` : ''
 		].filter(Boolean);
+		const edit = workspace.lastEdit;
 		toasts.show(`${parts.join(' and ')}${skipped ? ` (${skipped} skipped)` : ''}`, {
 			tone: 'success',
-			action: {
-				label: 'Undo',
-				run: () => {
-					const undone = workspace.undo();
-					if (undone) toasts.show(`Undid: ${undone}`);
-				}
-			}
+			...(edit !== undefined ? { action: undoAction(workspace, edit) } : {})
 		});
 		ui.open({ kind: 'requirements' });
 	}

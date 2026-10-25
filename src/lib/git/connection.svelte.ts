@@ -210,9 +210,29 @@ export class GitConnection {
 		return this.run('pulling', async () => {
 			const plan = this.pending;
 			if (!plan) return;
+			// Files edited here since the pull was planned would be replaced by the
+			// versions it compared: plan it again instead.
+			if (!this.asPlanned(plan)) {
+				this.pending = null;
+				throw new GitError(
+					'invalid',
+					'Files changed here since you chose Get latest, so nothing was changed. Get latest again to compare them anew.'
+				);
+			}
 			await this.finish(plan, choices, engine);
 			this.pending = null;
 		});
+	}
+
+	/** Whether the files a pull would write are still as they were when it was planned. */
+	private asPlanned(plan: PullPlan): boolean {
+		const files = this.workspace.files;
+		const now = (path: string) => (path in files ? files[path]! : null);
+		const base = this.record?.files ?? {};
+		return (
+			Object.keys(plan.updates).every((path) => now(path) === (base[path]?.text ?? null)) &&
+			plan.conflicts.every((c) => now(c.path) === c.mine)
+		);
 	}
 
 	cancelPull() {

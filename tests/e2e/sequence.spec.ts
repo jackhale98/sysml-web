@@ -1,8 +1,8 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join, relative, resolve } from 'node:path';
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
+import { analyze } from './axe';
 
 async function openSequence(page: Page) {
 	await page.goto('/p/demo');
@@ -54,7 +54,7 @@ test('a sequence view draws the lifelines and the messages in time order', async
 	expect(first.x).toBeGreaterThan(operator!.x + operator!.width / 2);
 	expect(first.x + first.width).toBeLessThan(station!.x + station!.width / 2);
 
-	const results = await new AxeBuilder({ page }).analyze();
+	const results = await analyze(page);
 	expect(
 		results.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)
 	).toEqual([]);
@@ -222,7 +222,7 @@ test('in a review, the sequence marks the messages that are new or changed', asy
 		})
 	).toBeVisible();
 	await expect(diagram.locator('.review-badge')).not.toHaveCount(0);
-	const results = await new AxeBuilder({ page }).analyze();
+	const results = await analyze(page);
 	expect(
 		results.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)
 	).toEqual([]);

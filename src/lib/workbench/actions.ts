@@ -21,9 +21,10 @@ export async function undoable(
 	given: string | (() => string),
 	run: () => Promise<string | null>
 ): Promise<string | null> {
-	const before = workspace.undoStack.length;
+	const before = workspace.lastEdit;
 	const error = await workspace.transact(given, run);
-	if (!error && workspace.undoStack.length > before) {
+	const edit = workspace.lastEdit;
+	if (!error && edit !== undefined && edit !== before) {
 		const label = typeof given === 'function' ? given() : given;
 		// A deletion that leaves references unresolved says so (they show in Problems).
 		const warning = workspace.warnings.join(' ');
@@ -31,16 +32,28 @@ export async function undoable(
 			tone: warning ? 'info' : 'success',
 			// Long enough to read what no longer resolves.
 			...(warning ? { duration: 12_000 } : {}),
-			action: {
-				label: 'Undo',
-				run: () => {
-					const undone = workspace.undo();
-					if (undone) toasts.show(`Undid: ${undone}`);
-				}
-			}
+			action: undoAction(workspace, edit)
 		});
 	}
 	return error;
+}
+
+/**
+ * A toast's Undo: it undoes the edit the toast is about (`edit`, its id),
+ * not whichever came last, keeping what was typed or edited since; it says
+ * what it undid, or why it couldn't.
+ */
+export function undoAction(workspace: Workspace, edit: number): { label: string; run: () => void } {
+	return {
+		label: 'Undo',
+		run: () => {
+			const outcome = workspace.undoEdit(edit);
+			if (!outcome) toasts.show('That change can’t be undone any more.', { tone: 'error' });
+			else if ('refused' in outcome)
+				toasts.show(outcome.refused, { tone: 'error', duration: 12_000 });
+			else toasts.show(`Undid: ${outcome.undone}`);
+		}
+	};
 }
 
 export async function addElement(

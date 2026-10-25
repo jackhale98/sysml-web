@@ -89,16 +89,23 @@ export function referenceFrom(
 		: qualified;
 }
 
-/** A usage path (`drone.battery`) as written from `host`, qualified at its root if needed. */
+/**
+ * A usage path (`drone.battery`) as written from `host`, qualified at its root if needed,
+ * or when its root's name is one of `shadowed` (a satisfy's requirement has a subject
+ * called `drone`: `by drone` would name the subject itself).
+ */
 export function pathFrom(
 	element: ModelElement,
 	host: ModelElement,
 	owners: Owners,
-	textOf: (path: string) => string | undefined
+	textOf: (path: string) => string | undefined,
+	shadowed: ReadonlySet<string> = new Set()
 ): string {
 	if (element.isDefinition) return referenceFrom(element, host, owners, textOf);
 	const { root, path } = usagePath(element, owners);
-	const rootRef = referenceFrom(root, host, owners, textOf);
+	const rootRef = shadowed.has(root.label)
+		? qualifiedName(root, owners)
+		: referenceFrom(root, host, owners, textOf);
 	return rootRef === root.name ? path : rootRef + path.slice(root.name.length);
 }
 
