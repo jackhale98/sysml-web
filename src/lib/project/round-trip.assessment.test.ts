@@ -860,20 +860,19 @@ describe(
 			expect(semanticLines(host.compareModels(list(FILES), ws.sourceFiles()).diff)).toEqual([]);
 		});
 
-		// Known gap: undo puts back the whole file as it was before the edit, so text typed in that file after the edit (and before Undo) goes with it.
-		gap('undoing a model edit keeps what was typed in the same file after it', async () => {
+		it('undoing a model edit keeps what was typed in the same file after it', async () => {
 			const ws = await openWorkspace(host, list(FILES));
 			const vehicle = ws.elements.find((e) => e.label === 'Vehicle')!;
 			await analysed(ws, () => addElement(ws, vehicle, 'part', 'spare', 'Base'));
-			const typed = ws.text(H)!.replace('part def Fuel;', 'part def Fuel;\n\titem def Typed;');
+			const typed = ws.text(H)!.replace('item def Fuel;', 'item def Fuel;\n\titem def Typed;');
+			expect(typed).toContain('item def Typed;');
 			ws.setText(H, typed);
-			ws.undo();
+			expect(ws.undo()).not.toBeNull();
 			expect(ws.text(H)).toContain('item def Typed;');
 			expect(ws.text(H)).not.toContain('part spare');
 		});
 
-		// Known gap: a toast's Undo undoes the latest edit, not the one the toast is about, when two toasts are showing.
-		gap('a toast’s Undo undoes its own edit', async () => {
+		it('a toast’s Undo undoes its own edit', async () => {
 			const { toasts } = await import('#lib/ui/toasts.svelte.ts');
 			const ws = await openWorkspace(host, list(FILES));
 			const el = (label: string) => ws.elements.find((e) => e.label === label)!;
