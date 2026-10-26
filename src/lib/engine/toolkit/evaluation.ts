@@ -61,7 +61,14 @@ import {
 	type Expr,
 	type Value
 } from '#lib/sim/expr.ts';
-import { convert, formatQuantity, parseLiteral, readable, type Quantity } from '../quantity';
+import {
+	convert,
+	formatQuantity,
+	isAffine,
+	parseLiteral,
+	readable,
+	type Quantity
+} from '../quantity';
 import type {
 	Check,
 	CheckReport,
@@ -402,13 +409,22 @@ export class Evaluation {
 
 	/**
 	 * A verdict the engine left undecided for want of a value the app worked
-	 * out: each constraint evaluated with the check's values.
+	 * out: each constraint evaluated with the check's values. Also any verdict
+	 * on a temperature in `°C` or `°F`: the toolkit (0.10.10) compares those
+	 * without their scale's zero, so 60 °C read as within 330 K.
 	 */
 	private decideByApp(check: Check, constraints: string[]): void {
 		const reasons = check.values.flatMap((v) =>
 			v.value.kind === 'number' && v.value.byApp ? [v.value.byApp] : []
 		);
-		if (check.status !== 'undecided' || !reasons.length || !constraints.length) return;
+		const temperature =
+			check.values.some((v) => v.value.kind === 'number' && isAffine(v.value.unit)) ||
+			constraints.some((text) =>
+				[...text.matchAll(/\[\s*'?([^\]']+?)'?\s*\]/g)].some((m) => isAffine(m[1]))
+			);
+		if (temperature) reasons.push("the app compared temperatures from their scale's zero");
+		else if (check.status !== 'undecided') return;
+		if (!reasons.length || !constraints.length) return;
 		const values = new Map(check.values.map((v) => [v.feature, v.value]));
 		const scope = {
 			get: (name: string): Value | undefined => {

@@ -1024,7 +1024,9 @@ implementation as the reference (`docs/interop-tools.md`):
   *difference* unit, factor 1 to K), never the zero shift of its
   `°C_abs` scale, so a requirement `t <= 330 [K]` with `t = 60 ['°C']`
   (333.15 K) is met. The app compares a lone `°C` as a temperature and
-  never adds one across units; the checks are the engine's.
+  never adds one across units, and decides any check with a `°C` or `°F`
+  value or limit itself (`decideByApp` in `toolkit/evaluation.ts`;
+  `toolkit/temperature.test.ts`).
 - **The library's units, where they are off** (the bundled `SI` and
   `USCustomaryUnits`, which NIST SP 811's rounded factors generated): the
   pound is `4.535924E-01` kg (exactly 0.45359237 kg, a relative error of
