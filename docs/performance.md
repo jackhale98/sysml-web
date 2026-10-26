@@ -262,7 +262,10 @@ after an edit); the 2,122 annotations at 50k (456 at 10k) give no problems
 either way. Against the analysis of the same run, the checks at 50k went
 from 0.75 of its time to 0.52 (0.40 on 2026-10-22); the rest of the
 2026-10-23 increase is not attributed (more checks per analysis since, such
-as requirement IDs). 100k was not re-run.
+as requirement IDs). 100k was not re-run. These figures are without the
+change, made beside this one, that has each check look up its own inputs and
+check a definition's assertions for every part that has it; the checks are
+to be measured again with both.
 
 ## Remaining limits
 
