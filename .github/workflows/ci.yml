@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  ci:
+  checks:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -44,16 +44,44 @@ jobs:
       - run: npm test
       - run: npm run build
 
+  # The browser tests, a third each on three runners: run one after the other
+  # they take longer than a job may.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Cache toolkit download
+        uses: actions/cache@v4
+        with:
+          path: .cache/toolkit
+          key: toolkit-${{ hashFiles('toolkit.json') }}
+      - name: Fetch toolkit
+        run: scripts/fetch-toolkit.sh
+
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
 
+      # The test server builds the site first (playwright.config.ts).
       - name: End-to-end and accessibility tests
-        run: npm run test:e2e
+        run: npm run test:e2e -- --shard=${{ matrix.shard }}/3
 
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.shard }}
           path: playwright-report/
           retention-days: 7
