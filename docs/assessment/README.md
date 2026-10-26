@@ -101,7 +101,7 @@ ones.
 | 1. A definition's constraints for each part and subtype | **Done.** Undecided checks are shown in Problems with what's missing. |
 | 2. Deploy only what passed CI | **Done.** Deploys run after CI succeeds on the same commit. |
 | 3. Engine calls that never answer | **Done.** Calls time out and say so; a memory warning before the tab gives out. |
-| 4. Checks at 50k lines | **Done.** The metadata checks are cached per view: 2,946 → 13 ms at 50k. |
+| 4. Checks at 50k lines | **Done.** The metadata checks are cached per view. Re-measured with every fix merged (50k lines, 3 runs): checks on opening 4.6 s → 3.4 s median, of which the metadata checks 1.4 s → 6 ms. |
 | 5. Verification results | **Done (core).** Results are recorded on verification cases as SysML metadata (verdict, date, who, commit, evidence), shown in tables, matrices, the home view and the report, and marked out of date once the model changes after their commit ([verification](../verification.md)). Simulator runs export with their commit but aren't results. |
 | 6. Save to server | **Done.** The server is read back after saving and anything it didn't keep is named. Requests now fit SysON's API, checked live: creating and opening projects and changing names and values work; SysON ignores changed references and new elements, and Fairtide says so. |
 | 7. Change impact | **Done.** A review names what relies on a changed requirement or risk control (designs, tests, mitigations, derived requirements, FMEA lines); circular derivations are problems. |
