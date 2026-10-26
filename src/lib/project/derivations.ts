@@ -44,9 +44,12 @@ export interface Derivation {
  * (also `@Derivation` and `derivation connection` spellings).
  */
 export function readDerivations(file: string, source: string): Derivation[] {
+	if (!/derivation/i.test(source)) return [];
 	const text = withoutComments(source);
 	const out: Derivation[] = [];
-	const block = /(?:#|@)?\s*derivation\s+connection\b[^{;]*\{([\s\S]*?)\}/gi;
+	// No `\s*` ahead of `derivation`: blanked comments are long runs of spaces,
+	// and one would be rescanned from each of them.
+	const block = /(?:[#@]\s*)?derivation\s+connection\b[^{;]*\{([\s\S]*?)\}/gi;
 	for (const match of text.matchAll(block)) {
 		const body = match[1]!;
 		const end = (role: string) =>

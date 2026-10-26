@@ -63,3 +63,16 @@ describe('derivations', () => {
 		expect(derivationLinks(rows, readDerivations('r.sysml', self))).toEqual([]);
 	});
 });
+
+describe('reading derivations from long texts', () => {
+	it('takes time in proportion to the text, however long its blank runs', () => {
+		// Comments are blanked to spaces before reading, so a library's long doc
+		// comment is a long run of them; reading must not rescan it from each space.
+		const blank = ' '.repeat(200_000);
+		const text = `package P {\n/* ${'x'.repeat(200_000)} */\n${blank}\n#derivation connection { end #original ::> A; end #derive ::> B; }\n}`;
+		const start = performance.now();
+		const found = readDerivations('p.sysml', text);
+		expect(performance.now() - start).toBeLessThan(1000);
+		expect(found.map((d) => [d.original, d.derived])).toEqual([['A', ['B']]]);
+	});
+});
