@@ -37,7 +37,7 @@ function renderers() {
 			// gone
 		}
 	}
-	const under = (pid) => {
+	const under = (/** @type {number} */ pid) => {
 		for (let p = pid, depth = 0; p > 1 && depth < 20; p = parent.get(p) ?? 1, depth++)
 			if (p === root) return true;
 		return false;
@@ -47,7 +47,7 @@ function renderers() {
 
 let pids = renderers();
 setInterval(() => (pids = renderers()), 500).unref();
-const signal = (sig) => {
+const signal = (/** @type {NodeJS.Signals} */ sig) => {
 	for (const pid of pids)
 		try {
 			process.kill(pid, sig);
@@ -61,7 +61,7 @@ process.on('SIGTERM', () => {
 	signal('SIGCONT');
 	process.exit(0);
 });
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const sleep = (/** @type {number} */ ms) => new Promise((r) => setTimeout(r, ms));
 while (!stopping) {
 	signal('SIGCONT');
 	await sleep(run);

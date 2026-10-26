@@ -12,8 +12,9 @@ import { createReadStream, existsSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, normalize } from 'node:path';
 
-const [dir, base = '', port = '4329'] = process.argv.slice(2);
+const [dir = 'build', base = '', port = '4329'] = process.argv.slice(2);
 const csp = process.argv.includes('--csp');
+/** @type {Record<string, string>} */
 const TYPES = {
 	'.html': 'text/html; charset=utf-8',
 	'.js': 'text/javascript',
@@ -62,6 +63,7 @@ createServer((req, res) => {
 		file = join(dir, '404.html');
 		status = 404;
 	}
+	/** @type {Record<string, string>} */
 	const headers = { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream' };
 	if (csp) headers['content-security-policy'] = POLICY;
 	res.writeHead(status, headers);
