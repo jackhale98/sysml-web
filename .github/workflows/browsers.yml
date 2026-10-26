@@ -1,0 +1,62 @@
+name: Browsers
+
+# The end-to-end smoke set on Firefox and WebKit (Safari's engine), beside
+# CI's Chromium run. Not required yet: a failure here is reported, not
+# blocking, until the set has run green for a while.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: browsers-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Smoke (${{ matrix.browser }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [firefox, webkit]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Cache toolkit download
+        uses: actions/cache@v4
+        with:
+          path: .cache/toolkit
+          key: toolkit-${{ hashFiles('toolkit.json') }}
+      - name: Fetch toolkit
+        run: scripts/fetch-toolkit.sh
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps ${{ matrix.browser }}
+
+      - name: End-to-end smoke set
+        run: npx playwright test --project=${{ matrix.browser }}
+        env:
+          PW_BROWSERS: ${{ matrix.browser }}
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ matrix.browser }}
+          path: playwright-report/
+          retention-days: 7

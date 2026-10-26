@@ -47,6 +47,53 @@ export function countModel(m: Measured): Counts {
 	};
 }
 
+/**
+ * A limit the checks can't judge because a value it reads has none yet
+ * (`theSystem.mass` with `mass` declared but not set): what to give a
+ * value, and to which part (the one that satisfies the requirement).
+ */
+export interface MissingValue {
+	/** The attribute's name: `mass`. */
+	attribute: string;
+	/** The part that must have it, when found in the model. */
+	part: ModelElement | undefined;
+	/** The requirement's ID or name, as the check names it. */
+	requirement: string;
+	/** The limit's unit (`kg`), for an example value. */
+	unit: string | null;
+}
+
+export function missingValue(
+	checks: CheckReport | null,
+	elements: readonly ModelElement[]
+): MissingValue | null {
+	for (const c of checks?.checks ?? []) {
+		if (!c.checkable || c.kind === 'assert' || c.status !== 'undecided') continue;
+		if (isLibraryFile(c.constraintAt?.file ?? c.file)) continue;
+		// A check's value without one reads as undecided, "it has no value" (engine/toolkit/evaluation.ts).
+		const unset = c.values.find(
+			(v) =>
+				v.value.kind === 'none' ||
+				(v.value.kind === 'undecided' && v.value.reason === 'it has no value')
+		);
+		if (!unset) continue;
+		const attribute = unset.feature.split('.').pop()!.replace(/^'|'$/g, '');
+		const by = c.by?.split('.').pop()?.replace(/^'|'$/g, '');
+		const part = by
+			? elements.find(
+					(e) => e.kind === 'part' && !e.isDefinition && e.name === by && !isLibraryFile(e.file)
+				)
+			: undefined;
+		return {
+			attribute,
+			part,
+			requirement: c.requirement?.id ?? c.requirement?.name ?? '',
+			unit: c.limit?.unit ?? null
+		};
+	}
+	return null;
+}
+
 export type StepId = 'requirement' | 'part' | 'link' | 'view' | 'numbers' | 'keep';
 
 export const STEP_ORDER: readonly StepId[] = [

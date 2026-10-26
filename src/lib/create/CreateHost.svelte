@@ -64,6 +64,7 @@
 				{engine}
 				element={request.element}
 				attribute={request.attribute}
+				choose={request.choose}
 			/>
 		{:else if request.kind === 'trade'}
 			<TradeForm bind:open {workspace} {ui} {engine} alternatives={request.alternatives ?? []} />

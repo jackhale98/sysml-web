@@ -647,8 +647,7 @@ export class Evaluation {
 		}
 		for (const name of candidates) {
 			const value = this.valueAt(name);
-			if (value)
-				return value.kind === 'none' ? { kind: 'undecided', reason: 'it has no value' } : value;
+			if (value) return value.kind === 'none' ? { kind: 'undecided', reason: NO_VALUE } : value;
 		}
 		return { kind: 'undecided', reason: 'its value is not known' };
 	}
@@ -941,6 +940,12 @@ function explain(check: Check, vacuous: boolean): string {
 				return `\`${unresolved[1]}\` is not a feature of ${check.by ?? 'what the constraint is evaluated for'}, so the constraint cannot be evaluated.`;
 			const unsupported = /unsupported for evaluation: ([^;)]+)/.exec(check.detail);
 			const first = unknown[0];
+			// Declared but never given a value (`attribute mass :> ISQ::mass;`): say what to do.
+			const unset = unknown.filter(
+				(v) => v.value.kind === 'undecided' && v.value.reason === NO_VALUE
+			);
+			if (unset.length && unset.length === unknown.length && !unsupported)
+				return `${unset.map((v) => v.feature).join(', ')} ${unset.length === 1 ? 'has' : 'have'} no value yet: give ${unset.length === 1 ? 'it one' : 'them one'} and the check will say whether it is met.`;
 			if (first?.value.kind === 'undecided' && /`/.test(first.value.reason))
 				return `${first.feature} cannot be worked out: ${first.value.reason}.`;
 			if (unknown.length)
@@ -950,6 +955,9 @@ function explain(check: Check, vacuous: boolean): string {
 		}
 	}
 }
+
+/** Why a value a check reads is not known, when it simply has none. */
+const NO_VALUE = 'it has no value';
 
 const SYMBOL: Record<string, string> = { '<=': '≤', '>=': '≥', '<': '<', '>': '>', '==': '=' };
 

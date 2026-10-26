@@ -121,6 +121,20 @@
 		view.focus();
 	}
 
+	/**
+	 * A tap on the text while it is for reading: say how to type, by the
+	 * button that does it (the keyboard doesn't open, and nothing else says why).
+	 */
+	let readHint = $state(false);
+	let readHintTimer: ReturnType<typeof setTimeout> | undefined;
+	function onreadtap() {
+		if (!phone || ui.editingText) return;
+		readHint = true;
+		clearTimeout(readHintTimer);
+		readHintTimer = setTimeout(() => (readHint = false), 5000);
+	}
+	$effect(() => () => clearTimeout(readHintTimer));
+
 	function stopEditing() {
 		ui.editingText = false;
 		view?.contentDOM.blur();
@@ -335,8 +349,13 @@
 </script>
 
 <div class="text-editor" class:phone>
-	<div class="editor" bind:this={host}></div>
+	<!-- A tap on read-only text only explains; the keyboard has its own way in (Edit text). -->
+	<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+	<div class="editor" bind:this={host} onclick={onreadtap}></div>
 	{#if phone && !ui.editingText}
+		<p class="read-hint" role="status">
+			{#if readHint}The text is for reading here. Tap <strong>Edit text</strong> to type.{/if}
+		</p>
 		<button type="button" class="edit" onclick={startEditing}>
 			<PencilLine size={17} /> Edit text
 		</button>
@@ -421,6 +440,28 @@
 	}
 	.edit:active {
 		transform: scale(0.96);
+	}
+	.read-hint {
+		position: absolute;
+		right: max(var(--space-4), env(safe-area-inset-right));
+		bottom: calc(var(--space-4) + 3.5rem + var(--sheet-cover, 0px));
+		left: max(var(--space-4), env(safe-area-inset-left));
+		z-index: 5;
+		max-width: 20rem;
+		margin-left: auto;
+		padding: var(--space-2) var(--space-3);
+		border-radius: var(--radius-md);
+		background: var(--surface);
+		color: var(--text);
+		box-shadow: var(--shadow-lg);
+		font-size: var(--text-sm);
+		animation: rise 180ms var(--ease);
+	}
+	/* Kept in the page while empty, so what it says next is announced. */
+	.read-hint:empty {
+		padding: 0;
+		background: none;
+		box-shadow: none;
 	}
 	.accessory {
 		display: flex;

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ModelElement } from '#lib/project/elements.ts';
 import type { RequirementRow } from '#lib/project/requirements.ts';
 import type { CheckReport, ViewInfo } from '#lib/engine/types.ts';
-import { countModel, doneSteps, STEP_ORDER, type Counts } from './nextSteps.ts';
+import { countModel, doneSteps, missingValue, STEP_ORDER, type Counts } from './nextSteps.ts';
 
 const element = (kind: string, more: Partial<ModelElement> = {}): ModelElement => ({
 	key: `${kind}@${Math.random()}`,
@@ -68,5 +68,39 @@ describe('next steps', () => {
 			downloaded: true
 		});
 		expect(STEP_ORDER.filter((s) => some[s])).toEqual(['requirement', 'numbers', 'keep']);
+	});
+
+	it('names the value a new limit needs before the checks can judge it', () => {
+		const system = element('part', { name: 'system', label: 'system' });
+		const check = (more: object) =>
+			({
+				checks: [
+					{
+						kind: 'satisfy',
+						checkable: true,
+						status: 'undecided',
+						requirement: { id: 'REQ-002', name: 'Light enough to carry' },
+						by: 'system',
+						values: [
+							{ feature: 'theSystem.mass', value: { kind: 'undecided', reason: 'it has no value' } }
+						],
+						limit: { feature: 'theSystem.mass', operator: '<=', value: 12, unit: 'kg' },
+						file: 'model/M.sysml',
+						...more
+					}
+				]
+			}) as unknown as CheckReport;
+		expect(missingValue(check({}), [element('part', { isDefinition: true }), system])).toEqual({
+			attribute: 'mass',
+			part: system,
+			requirement: 'REQ-002',
+			unit: 'kg'
+		});
+		// Judged, or undecided for another reason: nothing to ask.
+		expect(missingValue(check({ status: 'satisfied' }), [system])).toBeNull();
+		expect(
+			missingValue(check({ values: [{ feature: 'x', value: { kind: 'undecided' } }] }), [system])
+		).toBeNull();
+		expect(missingValue(null, [system])).toBeNull();
 	});
 });

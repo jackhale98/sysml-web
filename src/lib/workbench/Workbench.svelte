@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import {
 		BookLock,
 		ChevronsUpDown,
@@ -303,6 +303,24 @@
 		ui.lowerDetails();
 	}
 
+	// ── Skip links: past the top bar to the model, or to the open view ────────
+	let explorerPane = $state<HTMLDivElement>();
+	let editorPane = $state<HTMLElement>();
+
+	async function skipTo(event: MouseEvent, to: 'model' | 'view') {
+		event.preventDefault();
+		// A phone shows one section at a time: go to it first.
+		if (phone && to === 'model' && section !== 'model') navigate('model');
+		if (phone && to === 'view' && section === 'model') navigate('views');
+		await tick();
+		const target = to === 'model' ? explorerPane : editorPane;
+		if (!target) return;
+		// Focusable only while the skip link has put focus there (a click inside stays as it was).
+		target.tabIndex = -1;
+		target.addEventListener('blur', () => target.removeAttribute('tabindex'), { once: true });
+		target.focus();
+	}
+
 	function toggleDetails() {
 		if (detailsOpen) ui.lowerDetails();
 		else ui.showDetails('full');
@@ -399,6 +417,12 @@
 	data-section={section}
 	data-details={phone ? ui.details : undefined}
 >
+	<a class="skip-link" href="#workbench-model" onclick={(e) => skipTo(e, 'model')}
+		>Skip to the model</a
+	>
+	<a class="skip-link" href="#workbench-view" onclick={(e) => skipTo(e, 'view')}
+		>Skip to the open view</a
+	>
 	<header class="topbar">
 		<button
 			type="button"
@@ -490,11 +514,16 @@
 
 	<main class="panes">
 		<h1 class="visually-hidden">{workspace.info?.name ?? 'Project'}</h1>
-		<div class="pane explorer-pane">
+		<div class="pane explorer-pane" id="workbench-model" bind:this={explorerPane}>
 			{#if explorerMounted}<Explorer {workspace} {ui} />{/if}
 		</div>
 
-		<section class="pane editor-pane" aria-label="Editor">
+		<section
+			class="pane editor-pane"
+			aria-label="Editor"
+			id="workbench-view"
+			bind:this={editorPane}
+		>
 			{#if phone}
 				<div class="phone-bar">
 					<button
@@ -597,7 +626,10 @@
 				{:else if tab.kind === 'view'}
 					{@const info = workspace.views.find((v) => v.name === tab.name)}
 					{@const presentation = info ? presentationOf(info) : { kind: 'table' as const }}
-					{#if reportTab}
+					{#if !info && !workspace.settled}
+						<!-- Just made: opened at once, shown once the model has it. -->
+						<p class="empty" role="status">Opening the view…</p>
+					{:else if reportTab}
 						{#key tab.name}
 							{#await loadReport()}
 								<p class="empty">Loading the report…</p>
@@ -1146,6 +1178,27 @@
 		min-width: 0;
 		min-height: 0;
 		background: var(--surface);
+	}
+	/* Reached by a skip link: the next Tab goes into it. */
+	.pane:focus {
+		outline: none;
+	}
+	/* The first tab stops: out of sight until focused. */
+	.skip-link {
+		position: fixed;
+		top: var(--space-2);
+		left: var(--space-2);
+		z-index: 100;
+		padding: var(--space-2) var(--space-3);
+		border-radius: var(--radius-sm);
+		background: var(--surface);
+		color: var(--text);
+		font-weight: 600;
+		box-shadow: var(--shadow-lg);
+		transform: translateY(calc(-100% - 2 * var(--space-2)));
+	}
+	.skip-link:focus {
+		transform: none;
 	}
 	.explorer-pane {
 		grid-area: explorer;

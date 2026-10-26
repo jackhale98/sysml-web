@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import {
@@ -87,6 +87,8 @@
 
 	let open = $state(false);
 	let menu: HTMLDivElement | undefined = $state();
+	let button: HTMLButtonElement | undefined = $state();
+	let list: HTMLDivElement | undefined = $state();
 	let ownSettings = $state(false);
 	let ownSourceControl = $state(false);
 	let openRepo = $state(false);
@@ -226,6 +228,63 @@
 		location.reload();
 	}
 
+	/** The items that can take focus, in order. */
+	function items(): HTMLElement[] {
+		return [...(list?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])].filter(
+			(item) => !(item as HTMLButtonElement).disabled
+		);
+	}
+
+	/** Focus the first or last item, or the one `step` from the focused one (wrapping). */
+	function move(to: 'first' | 'last' | 1 | -1) {
+		const all = items();
+		if (!all.length) return;
+		const at = all.indexOf(document.activeElement as HTMLElement);
+		const next =
+			to === 'first'
+				? 0
+				: to === 'last'
+					? all.length - 1
+					: at < 0
+						? to === 1
+							? 0
+							: all.length - 1
+						: (at + to + all.length) % all.length;
+		all[next]!.focus();
+	}
+
+	/** The menu button pattern: arrows open the menu at its first or last item. */
+	async function onbuttonkeydown(event: KeyboardEvent) {
+		if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+		event.preventDefault();
+		open = true;
+		await tick();
+		move(event.key === 'ArrowDown' ? 'first' : 'last');
+	}
+
+	/** Arrows, Home and End move between the items; Tab still works as well. */
+	function onmenukeydown(event: KeyboardEvent) {
+		const keys: Record<string, 'first' | 'last' | 1 | -1> = {
+			ArrowDown: 1,
+			ArrowUp: -1,
+			Home: 'first',
+			End: 'last'
+		};
+		const to = keys[event.key];
+		if (to === undefined) return;
+		event.preventDefault();
+		move(to);
+	}
+
+	/**
+	 * Choosing an item closes the menu and takes its item away: focus goes
+	 * back to the menu button first, so a dialog the item opens gives focus
+	 * back there when it closes (a native dialog returns it to what had it).
+	 */
+	function onmenuclick(event: MouseEvent) {
+		if ((event.target as Element | null)?.closest('[role="menuitem"]')) button?.focus();
+	}
+
 	function onfocusout(event: FocusEvent) {
 		if (!menu?.contains(event.relatedTarget as Node | null)) open = false;
 	}
@@ -242,6 +301,7 @@
 	function onkeydown(event: KeyboardEvent) {
 		if (event.key === 'Escape' && open) {
 			open = false;
+			if (menu?.contains(document.activeElement)) button?.focus();
 			return;
 		}
 		if (!(event.metaKey || event.ctrlKey)) return;
@@ -261,11 +321,13 @@
 
 <div class="project-menu" bind:this={menu} {onfocusout}>
 	<button
+		bind:this={button}
 		type="button"
 		class="name"
 		aria-expanded={open}
 		aria-haspopup="menu"
 		onclick={() => (open = !open)}
+		onkeydown={onbuttonkeydown}
 	>
 		<strong>{workspace.info?.name ?? 'Project'}</strong>
 		<ChevronDown size={14} aria-hidden="true" />
@@ -341,7 +403,15 @@
 					{:else}Kept in this browser. Save it to GitHub or export it to share or back it up.{/if}
 				</p>
 			{/if}
-			<div class="menu" role="menu" aria-label="Project">
+			<div
+				class="menu"
+				role="menu"
+				aria-label="Project"
+				tabindex="-1"
+				bind:this={list}
+				onkeydown={onmenukeydown}
+				onclick={onmenuclick}
+			>
 				{#if git}
 					<button type="button" role="menuitem" onclick={showSourceControl}>
 						<CloudUpload size={15} /> Save to GitHub… <small>commit & push</small>

@@ -102,7 +102,7 @@ export const HELP: HelpSection[] = [
 				keywords: 'source of truth view editor split same model',
 				blocks: [
 					'The **text** is the model. Every **diagram** and **table** is drawn from it, so they never disagree: add a part in a diagram and the line appears in the text; change a cell in a table and the text changes too.',
-					'Open a model file to see its text and its diagram side by side (**Split**), or choose **Text** or **Diagram** at the top right. On a phone, a file opens as its diagram; **Text** is one tap away.',
+					'Open a model file to see its text and its diagram side by side (**Split**), or choose **Text** or **Diagram** at the top right. On a phone, a file opens as its diagram; **Text** is one tap away, for reading: **Edit text** (bottom right) turns typing on, and **Done** puts the keyboard away.',
 					'You don’t have to write SysML. **Add** in a diagram, the forms in the details panel and **New view** write it for you, and show you the text they write, so you learn it as you go.'
 				]
 			},
@@ -551,6 +551,8 @@ export const HELP: HelpSection[] = [
 							['Ctrl S', 'Save to the folder (projects opened from a folder)'],
 							['Ctrl D', 'Duplicate the selected element (not in the text)'],
 							['Ctrl ,', 'Settings'],
+							['Tab', 'First: skip to the model, or to the open view'],
+							['↑ ↓ Home End', 'Move through the project menu (↓ on its button opens it)'],
 							['Esc', 'Close a dialog or menu']
 						]
 					}
