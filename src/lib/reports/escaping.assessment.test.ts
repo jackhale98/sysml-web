@@ -66,8 +66,10 @@ describe('report markup from model text', () => {
 		// …and nothing it holds became an element or an attribute.
 		expect(svg).not.toMatch(/<(img|script)\b/i);
 		expect(svg).not.toMatch(/\sonerror\s*=\s*["']/i);
-		// The document's text (rendered by Svelte, which escapes) carries the name as written.
+		// The Markdown export keeps the names, with the angle brackets escaped, so a
+		// Markdown renderer shows them as text.
 		const markdown = toMarkdown(buildReport(rendered));
-		expect(markdown).toContain(PART);
+		expect(markdown).toContain('\\<img src=x onerror="alert(1)"\\>');
+		expect(markdown).not.toMatch(/(^|[^\\])<(img|script)\b/m);
 	}, 120_000);
 });
