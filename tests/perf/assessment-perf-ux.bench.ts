@@ -18,12 +18,16 @@
  *   ASSESS_SIZES=demo,10000,50000,100000   projects (demo = src/demo/drone)
  *   ASSESS_RUNS=5                          runs per size (or e.g. "demo:7,10000:5,50000:3")
  *   ASSESS_DEVICE=desktop|phone            phone = Pixel 7 emulation (viewport, touch, DPR)
- *   ASSESS_THROTTLE=6                      CPU throttling of the page and, when
- *                                          ASSESS_THROTTLE_WORKER=1, of the engine's worker
+ *   ASSESS_THROTTLE=6                      DevTools CPU throttling of the page's main thread
+ *                                          (ASSESS_THROTTLE_WORKER=1 also asks for the worker;
+ *                                          Chromium refuses: "only supported for pages")
+ *   ASSESS_DUTY=4                          slow the whole renderer, worker included, about 4×
+ *                                          (`assessment-duty-cycle.mjs`, Linux)
  *   ASSESS_OUT=<file.json>                 every run's numbers
  *
  * Run: npx playwright test --config tests/perf/assessment-playwright.config.ts
  */
+import { spawn } from 'node:child_process';
 import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import {
@@ -44,6 +48,29 @@ const runSpec = process.env.ASSESS_RUNS ?? '3';
 const device = process.env.ASSESS_DEVICE === 'phone' ? 'phone' : 'desktop';
 const throttle = Number(process.env.ASSESS_THROTTLE || 1);
 const throttleWorker = process.env.ASSESS_THROTTLE_WORKER === '1';
+const duty = Number(process.env.ASSESS_DUTY || 1);
+
+/** A fixed amount of work on the page's main thread and in a worker (ms): how slow the CPU is. */
+async function calibrate(page: Page) {
+	return page.evaluate(async () => {
+		const work = `let x = 0; for (let i = 0; i < 3e7; i++) x = (x + i * 7) % 1000003;`;
+		let at = performance.now();
+		new Function(work)();
+		const main = performance.now() - at;
+		const blob = new Blob([
+			`onmessage = () => { const t = performance.now(); ${work} postMessage(performance.now() - t); };`
+		]);
+		const worker = new Worker(URL.createObjectURL(blob));
+		at = performance.now();
+		const inside = await new Promise<number>((resolve) => {
+			worker.onmessage = (e) => resolve(e.data as number);
+			worker.postMessage(null);
+		});
+		const wall = performance.now() - at;
+		worker.terminate();
+		return { main, worker: inside, workerWall: wall };
+	});
+}
 
 function runsFor(size: string): number {
 	if (/^\d+$/.test(runSpec)) return Number(runSpec);
@@ -283,6 +310,12 @@ async function measure(
 	await page.goto('/projects');
 	await store(page, id, files);
 	const cdp = await applyThrottle(page, log);
+	// The duty cycler looks for new renderers every half second.
+	if (duty > 1) await page.waitForTimeout(1500);
+	const speed = await calibrate(page);
+	t['calibration: main thread ms'] = speed.main;
+	t['calibration: worker ms'] = speed.worker;
+	t['calibration: worker wall ms'] = speed.workerWall;
 	const cpu0 = (await renderers(browser)).cpu;
 
 	const step = (name: string) =>
@@ -336,6 +369,9 @@ async function measure(
 	}
 	const textButton = page.getByRole('button', { name: 'Text', exact: true });
 	if (await textButton.isVisible().catch(() => false)) await textButton.click();
+	// On a phone the text opens to read; "Edit text" makes it editable.
+	const editText = page.getByRole('button', { name: 'Edit text' });
+	if (await editText.isVisible().catch(() => false)) await editText.click();
 	await expect(page.locator('.cm-content .cm-line').first()).toBeVisible({ timeout: LONG });
 	await page.locator('.cm-content').click();
 	await page.keyboard.press('Control+Home');
@@ -380,13 +416,25 @@ const contextOptions = device === 'phone' ? pixel7 : { viewport: { width: 1440, 
 
 for (const size of sizes) {
 	const files = size === 'demo' ? demoFiles() : generateLines(Number(size));
-	const label = `${size === 'demo' ? 'demo' : `${Math.round(lineCount(files) / 1000)}k`} ${device}${throttle > 1 ? ` ${throttle}x${throttleWorker ? '+worker' : ''}` : ''}`;
+	const label = `${size === 'demo' ? 'demo' : `${Math.round(lineCount(files) / 1000)}k`} ${device}${throttle > 1 ? ` ${throttle}x${throttleWorker ? '+worker' : ''}` : ''}${duty > 1 ? ` duty ${duty}x` : ''}`;
 	test(`assessment: ${label}`, async ({ browser }) => {
 		const runs = runsFor(size);
 		test.setTimeout(LONG * runs);
 		const all: (Timings & { error?: string })[] = [];
 		for (let round = 0; round < runs; round++) {
 			const context = await browser.newContext(contextOptions);
+			const cycler =
+				duty > 1
+					? spawn(
+							'node',
+							[
+								join(import.meta.dirname, 'assessment-duty-cycle.mjs'),
+								String(process.pid),
+								String(duty)
+							],
+							{ stdio: 'ignore' }
+						)
+					: null;
 			const page = await context.newPage();
 			await page.addInitScript(() => {
 				const tasks: PerformanceEntry[] = [];
@@ -409,6 +457,7 @@ for (const size of sizes) {
 			if (log.length) console.log(`${label}: cdp log ${log.slice(0, 6).join(' | ')}`);
 			console.log(`${label} run ${round}: ${JSON.stringify(t)}`);
 			all.push(t);
+			cycler?.kill('SIGTERM');
 			await context.close();
 		}
 		const out = process.env.ASSESS_OUT;

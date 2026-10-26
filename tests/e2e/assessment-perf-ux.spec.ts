@@ -12,6 +12,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import { generateLines } from '../perf/generate';
+import { analyze } from './axe';
 
 test.describe.configure({ timeout: 300_000 });
 
@@ -23,14 +24,20 @@ function measure(name: string, value: number | string) {
 
 /** Wait for running CSS animations (a dialog's entrance) to finish. */
 async function settled(page: Page) {
+	// Only animations that end (a spinner's never does).
 	await page.evaluate(() =>
-		Promise.all(document.getAnimations().map((a) => a.finished.catch(() => undefined)))
+		Promise.all(
+			document
+				.getAnimations()
+				.filter((a) => a.effect?.getComputedTiming().endTime !== Infinity)
+				.map((a) => a.finished.catch(() => undefined))
+		)
 	);
 }
 
 async function violations(page: Page, where: string) {
 	await settled(page);
-	const results = await new AxeBuilder({ page }).analyze();
+	const results = await analyze(page);
 	return results.violations.map(
 		(v) => `${where} — ${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`
 	);
@@ -101,7 +108,7 @@ const longestTaskSince = (page: Page, from: number) =>
 	);
 const now = (page: Page) => page.evaluate(() => performance.now());
 
-/** 5,000 unresolved types in ten files: 5,000 errors. */
+/** 5,000 unresolved types in ten files: 5,000 problems (the engine reports unresolved names as warnings). */
 function brokenProject(files = 10, perFile = 500) {
 	return Array.from({ length: files }, (_, f) => ({
 		path: `broken/Broken${f}.sysml`,
@@ -123,22 +130,24 @@ test('a model with 5,000 problems stays usable: problems list, editor, status ba
 	await observeLongTasks(page);
 	await page.setViewportSize({ width: 1440, height: 900 });
 	await store(page, 'five-thousand-problems', brokenProject());
-	let from = Date.now();
+	const from = Date.now();
 	await page.goto('/p/five-thousand-problems');
 	await ready(page, 120_000);
 	measure('open → Model ready (ms)', Date.now() - from);
 	const chip = page.getByRole('button', { name: /^Problems: \d+ errors/ });
-	await expect(chip).toHaveAccessibleName(/^Problems: 5000 errors/, { timeout: 60_000 });
-	measure('open → 5000 errors in the status bar (ms)', Date.now() - from);
+	await expect(chip).toHaveAccessibleName(/^Problems: 0 errors, 5000 warnings/, {
+		timeout: 60_000
+	});
+	measure('open → 5000 problems in the status bar (ms)', Date.now() - from);
 	measure('open: longest main-thread task (ms)', await longestTaskSince(page, 0));
 
 	// The problems list: the first 500, and how many more.
 	let t0 = await now(page);
 	await chip.click();
 	const pane = page.getByRole('region', { name: 'Problems' });
-	await expect(pane.getByRole('button').first()).toBeVisible();
+	await expect(pane.locator('ul > li > button').first()).toBeVisible();
 	measure('open the problems list (ms)', (await now(page)) - t0);
-	await expect(pane.getByRole('button')).toHaveCount(500);
+	await expect(pane.locator('ul > li > button')).toHaveCount(500);
 	await expect(pane.getByText('4500 more not listed.')).toBeVisible();
 	measure('problems list: longest task (ms)', await longestTaskSince(page, t0));
 
@@ -158,10 +167,12 @@ test('a model with 5,000 problems stays usable: problems list, editor, status ba
 
 	// A problem opens its file at the place, with 500 errors marked in it.
 	t0 = await now(page);
-	await pane.getByRole('button').nth(250).click();
+	await pane.locator('ul > li > button').nth(250).click();
 	await expect(page.locator('.cm-content .cm-line').first()).toBeVisible();
 	measure('open a problem in the editor (ms)', (await now(page)) - t0);
-	await expect(page.locator('.cm-lintRange-error').first()).toBeVisible({ timeout: 30_000 });
+	await expect(page.locator('.cm-lintRange-warning, .cm-lintRange-error').first()).toBeVisible({
+		timeout: 30_000
+	});
 	measure('open a problem: longest task (ms)', await longestTaskSince(page, t0));
 
 	// Typing in that file: a character appears at once; the analysis follows.
@@ -181,7 +192,9 @@ test('a model with 5,000 problems stays usable: problems list, editor, status ba
 	await page.keyboard.press('Control+a');
 	await page.keyboard.press('Delete');
 	await page.keyboard.insertText('package Fixed { part def Holder; }\n');
-	await expect(chip).toHaveAccessibleName(/^Problems: 4500 errors/, { timeout: 60_000 });
+	await expect(chip).toHaveAccessibleName(/^Problems: 0 errors, 4500 warnings/, {
+		timeout: 60_000
+	});
 
 	// The command palette still answers.
 	t0 = await now(page);
@@ -392,14 +405,18 @@ test('keyboard only: search, select, open a dialog and get focus back', async ({
 			const s = getComputedStyle(el);
 			const ring =
 				(s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) > 0) || s.boxShadow !== 'none';
+			const label = (el.getAttribute('aria-label') ?? el.textContent ?? '').trim().slice(0, 30);
 			return {
-				name: (el.getAttribute('aria-label') ?? el.textContent ?? el.tagName).trim().slice(0, 30),
+				name: label || `<${el.tagName.toLowerCase()} class="${el.className}">`,
 				ring
 			};
 		});
 		if (!info) continue;
 		stops.push(info.name);
-		if (!info.ring) unringed++;
+		if (!info.ring) {
+			unringed++;
+			measure('no focus ring on', info.name);
+		}
 	}
 	measure('first 25 tab stops', stops.join(' | '));
 	measure('tab stops without a visible focus ring', unringed);
@@ -528,8 +545,9 @@ test('recovery without a reload: a failed import, an invalid edit, a runaway sim
 	const emulator = page.locator('section.emulator');
 	await expect(emulator.getByText(/Started in a/)).toBeVisible({ timeout: 15_000 });
 	const started = Date.now();
-	await emulator.getByRole('button', { name: /^Wait/ }).first().click();
-	await expect(emulator.getByText(/stopped after \d+ steps|keeps moving/)).toBeVisible({
+	await emulator.getByRole('combobox', { name: 'How long to wait' }).selectOption('10 s');
+	await emulator.getByRole('button', { name: 'Wait', exact: true }).click();
+	await expect(page.getByText(/keeps moving without time passing/).first()).toBeVisible({
 		timeout: 30_000
 	});
 	measure('runaway machine stopped after (ms)', Date.now() - started);
@@ -611,7 +629,7 @@ test('Settings → About names the app version and the engine release', async ({
 	await expect(about.getByText(/^Version \d+\.\d+\.\d+/)).toBeVisible();
 	await expect(about.getByRole('link', { name: /sysml-toolkit \d+\.\d+\.\d+/ })).toBeVisible();
 	// The running engine reports its own version beside the pinned release.
-	await expect(about.getByText(/\(\d+\.\d+\.\d+.*\)/)).toBeVisible({ timeout: 30_000 });
+	await expect(about.getByText(/^\((toolkit )?\d+\.\d+\.\d+\)$/)).toBeVisible({ timeout: 30_000 });
 	measure('about', (await about.locator('dl').innerText()).replace(/\s+/g, ' '));
 });
 
