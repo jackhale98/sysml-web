@@ -14,6 +14,7 @@ import {
 	keyLabel,
 	nameOf,
 	ownerOf,
+	ownershipKeys,
 	readElements,
 	referencesOf,
 	InterchangeError,
@@ -504,6 +505,7 @@ function spell(tk: Toolkit, name: string): string {
  */
 export function importModel(tk: Toolkit, library: TkLibrary, text: string): InterchangeImport {
 	const elements = readElements(text);
+	refuseSharedIds(elements);
 	const notes: ImportNote[] = [];
 
 	// The standard library is built in: its elements are not the project's.
@@ -520,7 +522,7 @@ export function importModel(tk: Toolkit, library: TkLibrary, text: string): Inte
 	} finally {
 		lookup.free();
 	}
-	const own = elements.filter(
+	let own = elements.filter(
 		(e) =>
 			!libraryIds.has(e['@id']) &&
 			// A root namespace holding only library packages goes with them.
@@ -541,12 +543,17 @@ export function importModel(tk: Toolkit, library: TkLibrary, text: string): Inte
 		throw new InterchangeError(
 			'This file holds only the standard library: there is no model in it to open.'
 		);
-	const implied = own.filter((e) => e.isImplied === true).length;
+	const implied = impliedIds(own).size;
 	if (implied)
 		notes.push({
 			kind: 'implied',
 			message: `${count(implied, 'implied relationship')} not written out: the text implies ${implied === 1 ? 'it' : 'them'}, and ${implied === 1 ? 'it is' : 'they are'} worked out from it again.`
 		});
+
+	// What other tools write that the lift can't take as it is (SysON's element JSON).
+	const prepared = prepareForLift(own);
+	notes.push(...prepared.notes);
+	own = prepared.elements;
 
 	let lifted: TkSession;
 	try {
@@ -565,10 +572,6 @@ export function importModel(tk: Toolkit, library: TkLibrary, text: string): Inte
 	try {
 		liftedElements = JSON.parse(lifted.toCompactJson()) as ElementJson[];
 		const byId = new Map(own.map((e) => [e['@id'], e]));
-		const kept = new Set(liftedElements.map((e) => e['@id']));
-		const lost = new Set(
-			own.filter((e) => !kept.has(e['@id']) && e.isImplied !== true).map((e) => e['@id'])
-		);
 		// The toolkit's warnings: types it doesn't know go with what was left out; that
 		// ids weren't kept says nothing new (text has no ids).
 		const unknown = new Set<string>();
@@ -578,33 +581,18 @@ export function importModel(tk: Toolkit, library: TkLibrary, text: string): Inte
 			else if (!/no structural counterpart|ids are not preserved/.test(warning))
 				notes.push({ kind: 'warning', message: plainWarning(warning) });
 		}
+		const { lost, changed } = carriedOver(tk, own, lifted, liftedElements);
 		notes.push(...leftOutNotes(own, lost, byId, unknown));
 		// What the file says that the lifted model doesn't (a value the text can't hold).
-		const canonical = JSON.parse(
-			tk.canonicalizeCompact(JSON.stringify(liftedElements))
-		) as ElementJson[];
-		const keptOnly = (value: unknown) =>
-			Array.isArray(value) ? value.filter((v) => !(isRef(v) && lost.has(v['@id']))) : value;
-		for (const l of canonical) {
-			spellRedefined(l);
-			const e = byId.get(l['@id']);
-			if (!e) continue;
-			const properties = Object.keys(l).filter(
-				(p) =>
-					p !== '@id' &&
-					p !== 'elementId' &&
-					p in e &&
-					JSON.stringify(keptOnly(e[p]) ?? null) !== JSON.stringify(l[p] ?? null)
-			);
-			if (properties.length)
-				notes.push({
-					kind: 'changed',
-					message: `${article(e['@type'], true)} reads differently from the file: ${properties
-						.map((p) => `${p} ${shown(e[p], byId)} → ${shown(l[p], byId)}`)
-						.join(', ')}.`,
-					element: elementLabel(e, byId)
-				});
-		}
+		const liftedById = new Map(liftedElements.map((l) => [l['@id'], l]));
+		for (const { element: e, lifted: l, properties } of changed)
+			notes.push({
+				kind: 'changed',
+				message: `${article(e['@type'], true)} reads differently from the file: ${properties
+					.map((p) => `${p} ${shown(e[p], byId)} → ${shown(l[p], liftedById)}`)
+					.join(', ')}.`,
+				element: elementLabel(e, byId)
+			});
 		try {
 			lifted.minimizeQualifications();
 		} catch {
@@ -682,6 +670,24 @@ export function importModel(tk: Toolkit, library: TkLibrary, text: string): Inte
 			message: f.message
 		}))
 	};
+}
+
+/**
+ * Two elements with one `@id` can't both be read (references to the id would
+ * mean either): refused, naming both, rather than one quietly replacing the
+ * other.
+ */
+function refuseSharedIds(elements: readonly ElementJson[]): void {
+	const { duplicates } = checkStructure(elements);
+	if (!duplicates.length) return;
+	const byId = new Map<string, ElementJson>();
+	for (const e of elements) if (!byId.has(e['@id'])) byId.set(e['@id'], e);
+	const id = duplicates[0]!;
+	const sharing = elements.filter((e) => e['@id'] === id).map((e) => elementLabel(e, byId));
+	const more = new Set(duplicates).size - 1;
+	throw new InterchangeError(
+		`Elements in this file share the same @id ${id}: ${sharing.join(' and ')}. Every element needs an id of its own, so it was not opened${more ? ` (${count(more, 'other id')} ${more === 1 ? 'is' : 'are'} shared too)` : ''}.`
+	);
 }
 
 /**
@@ -809,6 +815,351 @@ export function mendPrinted(
 		return { path: file.path, text: lines.join('\n') };
 	});
 	return { files: out, changed, messages };
+}
+
+/**
+ * The implied part of a file (KerML 10.4 lets a file include it): implied
+ * relationships, and what they own (a calculation's `result`, a
+ * connection's `thisThing`, written out by a tool's derived form). The text
+ * implies them all again.
+ */
+function impliedIds(elements: readonly ElementJson[]): Set<string> {
+	const byId = new Map(elements.map((e) => [e['@id'], e]));
+	const implied = new Set<string>();
+	const decided = new Map<string, boolean>();
+	const isImplied = (e: ElementJson, depth = 0): boolean => {
+		const known = decided.get(e['@id']);
+		if (known !== undefined) return known;
+		const owner = ownerOf(e);
+		const parent = owner ? byId.get(owner) : undefined;
+		const result =
+			e.isImplied === true || (!!parent && depth < 256 && isImplied(parent, depth + 1));
+		decided.set(e['@id'], result);
+		return result;
+	};
+	for (const e of elements) if (isImplied(e)) implied.add(e['@id']);
+	return implied;
+}
+
+const isEmpty = (value: unknown) =>
+	value === undefined ||
+	value === null ||
+	value === false ||
+	(Array.isArray(value) && value.length === 0);
+
+const OWNING = new Set(['owningRelationship', 'owningRelatedElement']);
+
+/**
+ * Element JSON from another tool made liftable, where the meaning is
+ * certain (each case seen in SysON 2026.9's API JSON):
+ * - a `ConjugatedPortDefinition` without a declared name gets the name the
+ *   specification derives for it, `~` and its port definition's name (the
+ *   lift names references by declared names; the toolkit writes it so too);
+ * - an unnamed transition with neither trigger, guard nor effect from a
+ *   state's `entry` action, which is what `entry; then off;` reads as in
+ *   SysON, becomes the succession that text is (SysML 8.2.2.20,
+ *   `EntryTransitionMember`; the pilot implementation reads it so);
+ * - an expression referring to a feature the file doesn't name (a name its
+ *   tool couldn't resolve) can't be written as text: the whole expression
+ *   is left out and named in a note, rather than refusing the file.
+ */
+export function prepareForLift(input: readonly ElementJson[]): {
+	elements: ElementJson[];
+	notes: ImportNote[];
+} {
+	const byId = new Map(input.map((e) => [e['@id'], { ...e }]));
+	const notes: ImportNote[] = [];
+	const removed = new Set<string>();
+	const added: ElementJson[] = [];
+	const refs = (value: unknown) =>
+		(Array.isArray(value) ? value : [value]).filter(isRef).map((r) => r['@id']);
+	const owned = (e: ElementJson) => [...refs(e.ownedRelationship), ...refs(e.ownedRelatedElement)];
+	const subtree = (id: string) => {
+		const out: string[] = [];
+		const walk = (at: string, depth: number) => {
+			const e = byId.get(at);
+			if (!e || depth > 256) return;
+			out.push(at);
+			for (const child of owned(e)) walk(child, depth + 1);
+		};
+		walk(id, 0);
+		return out;
+	};
+	const ownerElement = (e: ElementJson) => {
+		const relationship = byId.get(refs(e.owningRelationship)[0] ?? '');
+		return relationship ? byId.get(refs(relationship.owningRelatedElement)[0] ?? '') : undefined;
+	};
+	const unnamed = (e: ElementJson) => !nameOf({ ...e, name: null, shortName: null });
+
+	// Conjugated port definitions: `~` and the original's name.
+	for (const e of byId.values()) {
+		if (e['@type'] !== 'ConjugatedPortDefinition' || typeof e.declaredName === 'string') continue;
+		const conjugation = owned(e)
+			.map((id) => byId.get(id))
+			.find((r) => r?.['@type'] === 'PortConjugation');
+		const original =
+			byId.get(refs(conjugation?.originalPortDefinition)[0] ?? '') ??
+			byId.get(refs(e.originalPortDefinition)[0] ?? '') ??
+			ownerElement(e);
+		const name = original?.declaredName;
+		if (typeof name === 'string' && name) e.declaredName = `~${name}`;
+	}
+
+	// What the metaclass fixes, left out: a feature chain's operator is `.`.
+	for (const e of byId.values())
+		if (e['@type'] === 'FeatureChainExpression' && typeof e.operator !== 'string') e.operator = '.';
+
+	// An invocation typed by what it invokes (KerML 1.0's beta form): the
+	// final form's membership of the invoked type, first.
+	for (const e of [...byId.values()]) {
+		if (e['@type'] !== 'InvocationExpression') continue;
+		const parts = owned(e).map((id) => byId.get(id));
+		if (parts.some((r) => r?.['@type'] === 'Membership')) continue;
+		const typing = parts.find((r) => r?.['@type'] === 'FeatureTyping');
+		const type = refs(typing?.type)[0];
+		if (!typing || !type) continue;
+		removed.add(typing['@id']);
+		const membership: ElementJson = {
+			'@id': typing['@id'],
+			'@type': 'Membership',
+			owningRelatedElement: { '@id': e['@id'] },
+			memberElement: { '@id': type },
+			visibility: 'public'
+		};
+		added.push(membership);
+		e.ownedRelationship = [
+			{ '@id': typing['@id'] },
+			...refs(e.ownedRelationship)
+				.filter((id) => id !== typing['@id'])
+				.map((id) => ({ '@id': id }))
+		];
+	}
+
+	// `entry; then X;` held as a transition: the succession it is.
+	for (const t of [...byId.values()]) {
+		if (t['@type'] !== 'TransitionUsage' || !unnamed(t)) continue;
+		const parts = owned(t).map((id) => byId.get(id));
+		if (parts.some((r) => r?.['@type'] === 'TransitionFeatureMembership')) continue;
+		const source = byId.get(refs(t.source)[0] ?? '');
+		const state = ownerElement(t);
+		const sourceMembership = source && byId.get(refs(source.owningRelationship)[0] ?? '');
+		if (
+			!source ||
+			!state ||
+			!unnamed(source) ||
+			sourceMembership?.['@type'] !== 'StateSubactionMembership' ||
+			sourceMembership.kind !== 'entry' ||
+			refs(sourceMembership.owningRelatedElement)[0] !== state['@id']
+		)
+			continue;
+		const inner = parts
+			.flatMap((r) => (r ? refs(r.ownedRelatedElement) : []))
+			.map((id) => byId.get(id))
+			.find((x) => x?.['@type'] === 'SuccessionAsUsage');
+		const target = refs(t.target)[0] ?? refs(inner?.targetFeature)[0];
+		if (!target || !byId.has(target)) continue;
+		for (const id of subtree(t['@id'])) removed.add(id);
+		const id = (part: string) => derivedId(`${t['@id']}/${part}`);
+		const self = { '@id': t['@id'] };
+		added.push(
+			{
+				'@id': t['@id'],
+				'@type': 'SuccessionAsUsage',
+				owningRelationship: t.owningRelationship,
+				ownedRelationship: [{ '@id': id('end1') }, { '@id': id('end2') }]
+			},
+			{
+				'@id': id('end1'),
+				'@type': 'EndFeatureMembership',
+				owningRelatedElement: self,
+				ownedRelatedElement: [{ '@id': id('end1/feature') }],
+				visibility: 'public'
+			},
+			{
+				'@id': id('end1/feature'),
+				'@type': 'ReferenceUsage',
+				owningRelationship: { '@id': id('end1') }
+			},
+			{
+				'@id': id('end2'),
+				'@type': 'EndFeatureMembership',
+				owningRelatedElement: self,
+				ownedRelatedElement: [{ '@id': id('end2/feature') }],
+				visibility: 'public'
+			},
+			{
+				'@id': id('end2/feature'),
+				'@type': 'ReferenceUsage',
+				owningRelationship: { '@id': id('end2') },
+				ownedRelationship: [{ '@id': id('end2/reference') }]
+			},
+			{
+				'@id': id('end2/reference'),
+				'@type': 'ReferenceSubsetting',
+				owningRelatedElement: { '@id': id('end2/feature') },
+				referencedFeature: { '@id': target }
+			}
+		);
+		notes.push({
+			kind: 'repaired',
+			message: `The file holds “entry; then ${nameOf(byId.get(target)) ?? '…'};” as a transition; it was read as the succession that text is.`,
+			element: namePath(state, byId)
+		});
+	}
+
+	// Expressions referring to what the file doesn't name: left out whole, and said.
+	const isExpression = (e: ElementJson | undefined) => !!e && /Expression$/.test(e['@type']);
+	for (const e of [...byId.values()]) {
+		if (e['@type'] !== 'FeatureReferenceExpression' || removed.has(e['@id'])) continue;
+		const memberships = owned(e)
+			.map((id) => byId.get(id))
+			.filter((r) => r?.['@type'] === 'Membership');
+		const names = memberships.some((m) => refs(m!.memberElement).length > 0);
+		if (refs(e.referent).length || names || !memberships.length) continue;
+		// Up to the outermost expression it is part of.
+		let top = e;
+		for (let depth = 0; depth < 64; depth++) {
+			const owner = ownerElement(top);
+			if (isExpression(owner)) top = owner!;
+			else if (owner && owner['@type'] === 'Feature' && isExpression(ownerElement(owner)))
+				top = ownerElement(owner)!;
+			else break;
+		}
+		const membership = byId.get(refs(top.owningRelationship)[0] ?? '');
+		const holder = membership && byId.get(refs(membership.owningRelatedElement)[0] ?? '');
+		if (!membership || !holder) continue;
+		for (const id of subtree(membership['@id'])) removed.add(id);
+		holder.ownedRelationship = refs(holder.ownedRelationship)
+			.filter((id) => id !== membership['@id'])
+			.map((id) => ({ '@id': id }));
+		notes.push({
+			kind: 'left-out',
+			message: `Not carried over: ${article(top['@type'])} that refers to something the file doesn’t name (the tool that wrote it couldn’t resolve the name).`,
+			element: namePath(holder, byId)
+		});
+	}
+
+	if (!removed.size && !added.length)
+		return { elements: input.map((e) => byId.get(e['@id'])!), notes };
+	const kept = input.filter((e) => !removed.has(e['@id'])).map((e) => byId.get(e['@id'])!);
+	return { elements: [...kept, ...added], notes };
+}
+
+/**
+ * What of the file's explicit elements the lifted model has, decided by
+ * meaning rather than by id: each element is matched to the lifted one in
+ * the same place (`ownershipKeys`: by name under its owner, an unnamed one
+ * by kind and position among its owner's unnamed parts of that kind), so a
+ * tool that orders members otherwise (a multiplicity before the typing) or
+ * numbers them otherwise reads as the same model. Implied elements aren't
+ * compared (the text implies them), nor are derived properties, which follow
+ * from the rest: a property the toolkit's compact form leaves empty and its
+ * full form fills in.
+ */
+function carriedOver(
+	tk: Toolkit,
+	own: ElementJson[],
+	lifted: TkSession,
+	liftedElements: ElementJson[]
+): {
+	lost: Set<string>;
+	changed: { element: ElementJson; lifted: ElementJson; properties: string[] }[];
+} {
+	const implied = impliedIds(own);
+	const explicit = own.filter((e) => !implied.has(e['@id']));
+	const file = canonicalModel(tk, explicit);
+	const liftedImplied = impliedIds(liftedElements);
+	const canonical = JSON.parse(
+		tk.canonicalizeCompact(
+			JSON.stringify(liftedElements.filter((l) => !liftedImplied.has(l['@id'])))
+		)
+	) as ElementJson[];
+	for (const l of canonical) spellRedefined(l);
+	let full = new Map<string, ElementJson>();
+	try {
+		full = new Map(
+			(JSON.parse(lifted.toFullJson(false)) as ElementJson[]).map((l) => [l['@id'], l])
+		);
+	} catch {
+		// Without the full form every property is compared: more notes, none missed.
+	}
+	const derived = (l: ElementJson, p: string) => isEmpty(l[p]) && !isEmpty(full.get(l['@id'])?.[p]);
+
+	// Files and root namespaces don't matter (a server may leave the roots out).
+	const fileKeys = ownershipKeys(file, { transparentRoots: true });
+	const liftKeys = ownershipKeys(canonical, { transparentRoots: true });
+	const liftByKey = new Map<string, ElementJson>();
+	for (const l of canonical) {
+		const key = liftKeys.get(l['@id']);
+		if (key) liftByKey.set(key, l);
+	}
+	const liftIds = new Set(liftedElements.map((l) => l['@id']));
+	const counterpart = new Map<string, ElementJson>();
+	const lost = new Set<string>();
+	const canonicalById = new Map(file.map((e) => [e['@id'], e]));
+	const ownById = new Map(own.map((e) => [e['@id'], e]));
+	const liftById = new Map(canonical.map((l) => [l['@id'], l]));
+	const membership = (type: string) => type.endsWith('Membership');
+	for (const e of explicit) {
+		const key = fileKeys.get(e['@id']);
+		// Without a place (its owner isn't in the file), by id.
+		const l = key ? liftByKey.get(key) : liftById.get(e['@id']);
+		if (l && (l['@type'] === e['@type'] || (membership(l['@type']) && membership(e['@type']))))
+			counterpart.set(e['@id'], l);
+		else if (key || !liftIds.has(e['@id'])) lost.add(e['@id']);
+	}
+	// What another tool writes out that the text implies (a transition's parameters, a
+	// calculation's result): the lifted model's full form has it, implied, in its place.
+	if (lost.size && full.size) {
+		const declared = [...full.values()].map((l) => ({ ...l, name: null, shortName: null }));
+		const fullImplied = impliedIds(declared);
+		const fullKeys = ownershipKeys(declared, { transparentRoots: true });
+		const fullByKey = new Map<string, ElementJson>();
+		for (const l of declared) {
+			const key = fullKeys.get(l['@id']);
+			if (key) fullByKey.set(key, l);
+		}
+		for (const id of lost) {
+			const key = fileKeys.get(id);
+			const there = key ? fullByKey.get(key) : undefined;
+			if (there && there['@type'] === ownById.get(id)?.['@type'] && fullImplied.has(there['@id']))
+				lost.delete(id);
+		}
+	}
+
+	// References compare by place (ids differ between the file and the lift); others by id.
+	const fileRef = (id: string) => fileKeys.get(id) ?? id;
+	const gone = new Set([...lost, ...implied]);
+	const liftRef = (id: string) => liftKeys.get(id) ?? id;
+	const spelled = (value: unknown, ref: (id: string) => string, drop?: Set<string>): unknown =>
+		isRef(value)
+			? ref(value['@id'])
+			: Array.isArray(value)
+				? value
+						.filter((v) => !(drop && isRef(v) && drop.has(v['@id'])))
+						.map((v) => (isRef(v) ? ref(v['@id']) : v))
+				: value;
+	// Unset, false and empty are one value (KerML 10.4 lets a file leave out defaults).
+	const same = (a: unknown, b: unknown) =>
+		(isEmpty(a) && isEmpty(b)) || JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+	const changed: { element: ElementJson; lifted: ElementJson; properties: string[] }[] = [];
+	for (const [id, l] of counterpart) {
+		const e = canonicalById.get(id);
+		const original = ownById.get(id);
+		if (!e || !original) continue;
+		const properties = Object.keys(l).filter(
+			(p) =>
+				p !== '@id' &&
+				p !== 'elementId' &&
+				p in original &&
+				!derived(l, p) &&
+				// An owner the file leaves out (SysON's API does) is the text's to supply.
+				!(OWNING.has(p) && isRef(e[p]) && !ownById.has(e[p]['@id'])) &&
+				!same(spelled(e[p], fileRef, gone), spelled(l[p], liftRef, liftedImplied))
+		);
+		if (properties.length) changed.push({ element: original, lifted: l, properties });
+	}
+	return { lost, changed };
 }
 
 /**

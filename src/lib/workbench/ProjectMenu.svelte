@@ -216,7 +216,11 @@
 	async function exportKpar() {
 		open = false;
 		try {
-			await session.exportKpar();
+			const added = await session.exportKpar();
+			if (added.length)
+				toasts.show(
+					`The archive includes ${added.join(' and ')}: your project uses ${added.length === 1 ? 'this library' : 'these libraries'} from the app without holding ${added.length === 1 ? 'it' : 'them'}, and other tools need ${added.length === 1 ? 'it' : 'them'}.`
+				);
 		} catch (error) {
 			toasts.show(error instanceof Error ? error.message : String(error), { tone: 'error' });
 		}

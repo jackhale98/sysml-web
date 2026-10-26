@@ -20,6 +20,10 @@ memory for the duration of a request and are never written anywhere.
 
 ## Deploy
 
+The worker talks to github.com only; GitHub Enterprise Server users connect
+with an access token instead (Settings → Accounts in the app; see the
+walkthrough's last section).
+
 Full walkthrough, including registering the GitHub App and setting the site's
 build variables: [docs/setup-github-sign-in.md](../docs/setup-github-sign-in.md).
 

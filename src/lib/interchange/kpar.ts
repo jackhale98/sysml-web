@@ -11,6 +11,7 @@
  */
 import type { ProjectArchive } from '#lib/engine/types.ts';
 import { unzip, zip } from '#lib/dataio/zip.ts';
+import { missingViewLibraries } from '#lib/engine/toolkit/views/libraries.ts';
 import { topLevelNames } from '#lib/library/declarations.ts';
 
 export const PROJECT_FILE = '.project.json';
@@ -74,16 +75,66 @@ export type ChecksumProblem =
 
 const NOT_A_ZIP = 'a .kpar file is one';
 
-/** Read a project interchange file; throws when `.project.json` or `.meta.json` is missing or invalid. */
+/** Most an archive may unpack to: far more than any model's text, far less than a ZIP bomb's. */
+export const MAX_UNPACKED = 256_000_000;
+
+/**
+ * An entry's path as a project path: forward slashes, no leading `./`. Null
+ * for a path that would leave the project: absolute, with a drive letter
+ * (`C:`), or with a `..` segment.
+ */
+export function projectPath(entry: string): string | null {
+	const path = entry.replace(/\\/g, '/').replace(/^(\.\/)+/, '');
+	if (!path || path.startsWith('/') || /^[A-Za-z]:/.test(path)) return null;
+	if (path.split('/').some((segment) => segment === '..')) return null;
+	return path;
+}
+
+/** The archive's entries under project paths, with what was left out or doubtful in plain words. */
+async function entriesOf(bytes: Uint8Array): Promise<{
+	entries: { path: string; data: Uint8Array }[];
+	warnings: string[];
+	damaged: string[];
+}> {
+	const warnings: string[] = [];
+	const outside: string[] = [];
+	const damaged: string[] = [];
+	const entries: { path: string; data: Uint8Array }[] = [];
+	for (const entry of await unzip(bytes, NOT_A_ZIP, { maxTotal: MAX_UNPACKED })) {
+		const path = projectPath(entry.path);
+		if (path === null) {
+			outside.push(entry.path);
+			continue;
+		}
+		if (entry.damaged) damaged.push(path);
+		entries.push({ path, data: entry.data });
+	}
+	if (outside.length)
+		warnings.push(
+			`Left out ${outside.length === 1 ? 'a file whose path leads' : `${outside.length} files whose paths lead`} outside the project: ${outside.join(', ')}.`
+		);
+	return { entries, warnings, damaged };
+}
+
+const damagedWarning = (path: string) =>
+	`${path} is damaged in the archive (its data fails the ZIP file’s own check): read it through before relying on it.`;
+
+/**
+ * Read a project interchange file; throws when `.project.json` or
+ * `.meta.json` is missing or invalid, or an entry is outside the project or
+ * damaged.
+ */
 export async function readKpar(bytes: Uint8Array): Promise<Kpar> {
 	let info: ProjectInfo | undefined;
 	let meta: ProjectMeta | undefined;
 	const files = new Map<string, Uint8Array>();
-	for (const entry of await unzip(bytes, NOT_A_ZIP)) {
-		const path = entry.path.replace(/^(\.\/)+/, '');
-		if (path === PROJECT_FILE) info = projectInfo(parseJson(PROJECT_FILE, entry.data));
-		else if (path === META_FILE) meta = projectMeta(parseJson(META_FILE, entry.data));
-		else files.set(path, entry.data);
+	const { entries, warnings, damaged } = await entriesOf(bytes);
+	warnings.push(...damaged.map(damagedWarning));
+	if (warnings.length) throw new Error(warnings.join(' '));
+	for (const { path, data } of entries) {
+		if (path === PROJECT_FILE) info = projectInfo(parseJson(PROJECT_FILE, data));
+		else if (path === META_FILE) meta = projectMeta(parseJson(META_FILE, data));
+		else files.set(path, data);
 	}
 	if (!info) throw new Error(`The archive has no top-level ${PROJECT_FILE}.`);
 	if (!meta) throw new Error(`The archive has no top-level ${META_FILE}.`);
@@ -92,7 +143,8 @@ export async function readKpar(bytes: Uint8Array): Promise<Kpar> {
 
 /**
  * Read any ZIP of a project: a `.kpar`, or a plain archive such as a
- * repository download. One top-level folder shared by every entry (as in
+ * repository download. Entries whose paths leave the project are left out
+ * (`warnings` says so); `damaged` lists the files failing the ZIP's CRC. One top-level folder shared by every entry (as in
  * `repo-main/…`) is left out of the paths. Without `.project.json` the
  * project is named after that folder (or `fallbackName`); without
  * `.meta.json` nothing is checked. Unreadable metadata becomes a warning.
@@ -100,13 +152,10 @@ export async function readKpar(bytes: Uint8Array): Promise<Kpar> {
 export async function readArchiveLeniently(
 	bytes: Uint8Array,
 	fallbackName: string
-): Promise<{ kpar: Kpar; warnings: string[] }> {
-	const entries = (await unzip(bytes, NOT_A_ZIP)).map((e) => ({
-		path: e.path.replace(/^(\.\/)+/, ''),
-		data: e.data
-	}));
+): Promise<{ kpar: Kpar; warnings: string[]; damaged: string[] }> {
+	const { entries, warnings, damaged } = await entriesOf(bytes);
 	const root = commonRoot(entries.map((e) => e.path));
-	const warnings: string[] = [];
+	const twice = new Set<string>();
 	let info: ProjectInfo | undefined;
 	let meta: ProjectMeta | undefined;
 	const files = new Map<string, Uint8Array>();
@@ -115,11 +164,18 @@ export async function readArchiveLeniently(
 		try {
 			if (path === PROJECT_FILE) info = projectInfo(parseJson(PROJECT_FILE, entry.data));
 			else if (path === META_FILE) meta = projectMeta(parseJson(META_FILE, entry.data));
-			else files.set(path, entry.data);
+			else {
+				if (files.has(path)) twice.add(path);
+				files.set(path, entry.data);
+			}
 		} catch (error) {
 			warnings.push(`${error instanceof Error ? error.message : String(error)} It was left out.`);
 		}
 	}
+	for (const path of twice)
+		warnings.push(
+			`The archive holds ${path} more than once: the last copy was kept, the others left out.`
+		);
 	const name = root ? root.slice(0, -1) : fallbackName;
 	return {
 		kpar: {
@@ -127,7 +183,8 @@ export async function readArchiveLeniently(
 			meta: meta ?? { index: {}, created: '' },
 			files: sorted(files)
 		},
-		warnings
+		warnings,
+		damaged: damaged.map((path) => (root && path.startsWith(root) ? path.slice(root.length) : path))
 	};
 }
 
@@ -200,8 +257,12 @@ export async function readProjectArchive(
 	bytes: Uint8Array,
 	fallbackName: string
 ): Promise<ProjectArchive> {
-	const { kpar, warnings } = await readArchiveLeniently(bytes, fallbackName);
-	warnings.push(...(await verifyChecksums(kpar)).map(describeProblem));
+	const { kpar, warnings, damaged } = await readArchiveLeniently(bytes, fallbackName);
+	const problems = await verifyChecksums(kpar);
+	warnings.push(...problems.map(describeProblem));
+	// A file whose recorded checksum already failed is said once.
+	const mismatched = new Set(problems.map((p) => p.path));
+	warnings.push(...damaged.filter((p) => !mismatched.has(p)).map(damagedWarning));
 	const decoder = new TextDecoder('utf-8', { fatal: true });
 	const files: ProjectArchive['files'] = [];
 	const skipped: string[] = [];
@@ -216,10 +277,39 @@ export async function readProjectArchive(
 }
 
 /**
+ * The bundled view libraries (`ModelViews`, `Reporting`) the files use
+ * without holding them, and what those use in turn. The app resolves them
+ * from its own copies; anywhere else they must come with the project.
+ */
+export function bundledLibrariesUsed(
+	files: readonly { path: string; text: string }[]
+): { path: string; text: string; package: string }[] {
+	const missing = missingViewLibraries(files).map((lib) => ({
+		...lib,
+		package: /package\s+(\w+)/.exec(lib.text)?.[1] ?? lib.path
+	}));
+	const uses = (text: string, pkg: string) => new RegExp(`(^|[^\\w'])${pkg}::`).test(text);
+	const needed: typeof missing = [];
+	let texts = files.map((f) => f.text);
+	for (let grew = true; grew;) {
+		grew = false;
+		for (const lib of missing) {
+			if (needed.includes(lib) || !texts.some((t) => uses(t, lib.package))) continue;
+			needed.push(lib);
+			texts = [...texts, lib.text];
+			grew = true;
+		}
+	}
+	return needed;
+}
+
+/**
  * The project as a `.kpar`: `info` becomes `.project.json`, and
  * `.meta.json` gets an index of each `.sysml`/`.kerml` file's top-level
  * names (the first file declaring a name wins), `created` (ISO 8601) and a
- * SHA256 checksum per file.
+ * SHA256 checksum per file. The bundled view libraries the project uses
+ * without holding them are written in too (`bundledLibrariesUsed`), so the
+ * archive is complete without this app.
  */
 export async function writeKpar(
 	info: object,
@@ -230,7 +320,7 @@ export async function writeKpar(
 	const meta: ProjectMeta = { index: {}, created };
 	const stored = new Map<string, Uint8Array>();
 	const encoder = new TextEncoder();
-	for (const file of files) {
+	for (const file of [...files, ...bundledLibrariesUsed(files)]) {
 		if (file.path === PROJECT_FILE || file.path === META_FILE) continue;
 		if (/\.(sysml|kerml)$/.test(file.path)) {
 			for (const name of topLevelNames(file.text)) meta.index[name] ??= file.path;

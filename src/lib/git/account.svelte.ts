@@ -18,7 +18,7 @@
  * - before sign-in existed: `{ token, user, connectedAt }`, an access token.
  * The older key is read until the first change, then replaced.
  */
-import { GitHubProvider } from './github.ts';
+import { GITHUB_API, GitHubProvider } from './github.ts';
 import type { GitProvider, GitUser } from './types.ts';
 import { GitError, type Access } from './errors.ts';
 import {
@@ -45,6 +45,8 @@ export interface StoredAccount {
 	connectedAt: string;
 	/** Missing in accounts stored before sign-in existed: those are access tokens. */
 	via?: Access;
+	/** The GitHub API it belongs to, when not github.com's (GitHub Enterprise Server); tokens only. */
+	api?: string;
 	refreshToken?: string | null;
 	/** When `token` expires (ms since 1970). */
 	expiresAt?: number | null;
@@ -287,14 +289,24 @@ export class Accounts {
 		this.lastAdded = { login: account.user.login, existed };
 	}
 
-	/** Check a personal access token with GitHub and remember it. Throws a friendly GitError if refused. */
-	async connect(token: string): Promise<GitUser> {
+	/**
+	 * Check a personal access token with GitHub (or the GitHub Enterprise
+	 * Server whose API is `api`) and remember it, with that server: the token
+	 * is only ever sent there. Throws a friendly GitError if refused.
+	 */
+	async connect(token: string, api: string = GITHUB_API): Promise<GitUser> {
 		const clean = token.trim();
 		if (!clean) throw new GitError('auth', 'Paste a token first.');
 		if (/\s/.test(clean))
 			throw new GitError('auth', 'That doesn’t look like a token: it has spaces.');
-		const user = await new GitHubProvider(clean, { fetch: this.fetch }).currentUser();
-		await this.add({ token: clean, user, connectedAt: isoTime(this.now()), via: 'token' });
+		const user = await new GitHubProvider(clean, { fetch: this.fetch, api }).currentUser();
+		await this.add({
+			token: clean,
+			user,
+			connectedAt: isoTime(this.now()),
+			via: 'token',
+			...(api === GITHUB_API ? {} : { api })
+		});
 		return user;
 	}
 
@@ -416,7 +428,8 @@ export class Accounts {
 	provider(login?: string | null): GitProvider {
 		const account = this.account(login);
 		const who = account.user.login;
-		if (account.via === 'token') return new GitHubProvider(account.token, { fetch: this.fetch });
+		if (account.via === 'token')
+			return new GitHubProvider(account.token, { fetch: this.fetch, api: account.api });
 		return new GitHubProvider(
 			{
 				access: 'app',

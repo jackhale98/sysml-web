@@ -100,6 +100,10 @@ describe('reading', () => {
 		await expect(new SysmlApi(BASE, null, html).projects()).rejects.toMatchObject({
 			kind: 'format'
 		});
+		// To a change, a web page means the request wasn't taken (the address answered reads).
+		await expect(new SysmlApi(BASE, null, html).createProject('x')).rejects.toThrow(
+			/didn’t take the request: it answered with a web page/
+		);
 	});
 });
 
@@ -118,10 +122,49 @@ describe('saving', () => {
 		expect(server.headElements(project.id)).toHaveLength(21);
 		// The commit carries data versions with the elements as payloads.
 		const change = server.posted[0]!.change as {
-			identity: { '@id': string };
+			identity: { '@type': string; '@id': string };
 			payload: ElementJson;
 		}[];
 		expect(change[0]!.identity['@id']).toBe(change[0]!.payload['@id']);
+		// Typed as the specification's DataIdentity (SysON ignores an untyped one).
+		expect(change[0]!.identity['@type']).toBe('DataIdentity');
+	});
+
+	it('sends a changed element whole to a server that replaces elements with their payload', async () => {
+		const { server, id } = serverWithGarage();
+		const api = new SysmlApi(BASE, null, server.fetch);
+		expect(api.minimalPayloads).toBe(false);
+		const [branch] = await api.branches(id);
+		const ours = garage();
+		ours.find((e) => e.declaredName === 'Engine')!.declaredName = 'Motor';
+		const plan = await planPush(api, id, branch!, ours);
+		await push(api, id, branch!, plan, 'Rename');
+		const sent = (server.posted.at(-1)!.change as { payload: ElementJson }[])[0]!.payload;
+		expect(sent).toEqual(ours.find((e) => e.declaredName === 'Motor'));
+		// SysON's API (under /api/rest) gets only the change.
+		expect(new SysmlApi('http://localhost:8080/api/rest').minimalPayloads).toBe(true);
+	});
+
+	it('says what the server did not keep instead of "saved"', async () => {
+		const { server, id } = serverWithGarage();
+		// A server that answers every commit and keeps none of it.
+		const forgetful: typeof fetch = async (input, init) => {
+			if (init?.method === 'POST' && String(input).includes('/commits'))
+				return new Response(JSON.stringify({ '@id': 'c-1', '@type': 'Commit' }), {
+					status: 201,
+					headers: { 'Content-Type': 'application/json' }
+				});
+			return server.fetch(input, init);
+		};
+		const api = new SysmlApi(BASE, null, forgetful);
+		const [branch] = await api.branches(id);
+		const ours = garage();
+		ours.find((e) => e.declaredName === 'Engine')!.declaredName = 'Motor';
+		const plan = await planPush(api, id, branch!, ours);
+		expect(changeCount(plan.changes)).toBe(1);
+		await expect(push(api, id, branch!, plan, 'Rename')).rejects.toThrow(
+			/^sysml\.example\.org didn’t keep all of this save\. Read back from the server, the changed element is not as sent \(Motor\)\./
+		);
 	});
 
 	it('sends only what changed, matched to the server’s ids by place', async () => {

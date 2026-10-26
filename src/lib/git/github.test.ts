@@ -1,6 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import { GitError } from './errors.ts';
-import { GitHubProvider, parseRepoUrl, tokenUrl, treePayload } from './github.ts';
+import {
+	GITHUB_API,
+	GitHubProvider,
+	githubApi,
+	githubWeb,
+	parseRepoUrl,
+	tokenUrl,
+	treePayload
+} from './github.ts';
 
 interface Call {
 	method: string;
@@ -386,5 +394,62 @@ describe('GitHubProvider', () => {
 		);
 		await expect(stuck.currentUser()).rejects.toMatchObject({ kind: 'auth' });
 		expect(seen).toEqual(['Bearer old']);
+	});
+});
+
+describe('GitHub Enterprise Server', () => {
+	const ghes = 'https://github.example.com/api/v3';
+
+	it('finds the API from the server address github.com or an Enterprise server has', () => {
+		expect(githubApi('')).toBe(GITHUB_API);
+		expect(githubApi(' github.com ')).toBe(GITHUB_API);
+		expect(githubApi('github.example.com')).toBe(ghes);
+		expect(githubApi('https://github.example.com/')).toBe(ghes);
+		expect(githubApi('https://github.example.com/api/v3')).toBe(ghes);
+		expect(githubApi('https://git.example.com:8443')).toBe('https://git.example.com:8443/api/v3');
+		expect(() => githubApi('http://github.example.com')).toThrow(/must start with https/);
+		expect(githubWeb(ghes)).toBe('https://github.example.com');
+		expect(githubWeb()).toBe('https://github.com');
+	});
+
+	it('makes tokens, reads repository addresses and links on that server', () => {
+		expect(tokenUrl(ghes)).toMatch(
+			/^https:\/\/github\.example\.com\/settings\/personal-access-tokens\/new\?/
+		);
+		expect(parseRepoUrl('https://github.example.com/acme/drone/tree/dev', ghes)).toEqual({
+			owner: 'acme',
+			repo: 'drone',
+			branch: 'dev'
+		});
+		expect(parseRepoUrl('git@github.example.com:acme/drone.git', ghes)).toEqual({
+			owner: 'acme',
+			repo: 'drone'
+		});
+		// github.com's addresses are not that server's.
+		expect(parseRepoUrl('https://github.com/acme/drone', ghes)).toBeNull();
+		expect(new GitHubProvider('tok', { api: ghes }).webUrl(ref, 'main')).toBe(
+			'https://github.example.com/acme/drone/tree/main'
+		);
+	});
+
+	it('sends the token to that server only', async () => {
+		const sent: { url: string; auth: string | null }[] = [];
+		const fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+			sent.push({ url: String(input), auth: new Headers(init?.headers).get('authorization') });
+			return new Response(JSON.stringify({ login: 'octo', name: null, avatar_url: '' }), {
+				headers: { 'content-type': 'application/json' }
+			});
+		}) as typeof globalThis.fetch;
+		const github = new GitHubProvider('tok', { fetch, api: ghes });
+		await github.currentUser();
+		expect(sent).toEqual([{ url: `${ghes}/user`, auth: 'Bearer tok' }]);
+		// An address on another site (as a link in an answer could name) is not requested at all.
+		const request = (
+			github as unknown as { request: (m: string, u: string) => Promise<unknown> }
+		).request.bind(github);
+		await expect(request('GET', 'https://api.github.com/user')).rejects.toThrow(
+			/pointed to another site \(api\.github\.com\)/
+		);
+		expect(sent).toHaveLength(1);
 	});
 });

@@ -25,8 +25,38 @@ import type {
 	TreeEntry
 } from './types.ts';
 
-const API = 'https://api.github.com';
+/** github.com's API. */
+export const GITHUB_API = 'https://api.github.com';
 const HOST = 'GitHub';
+
+/**
+ * The API address for a GitHub server: github.com's for none (or
+ * github.com), else a GitHub Enterprise Server's (`https://github.example.com`
+ * → `https://github.example.com/api/v3`). Throws, in plain words, for what
+ * isn't an https address.
+ */
+export function githubApi(server?: string | null): string {
+	const text = server?.trim();
+	if (!text) return GITHUB_API;
+	let url: URL;
+	try {
+		url = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(text) ? text : `https://${text}`);
+	} catch {
+		throw new Error(`“${text}” isn’t a web address.`);
+	}
+	if (url.protocol !== 'https:')
+		throw new Error('The GitHub server’s address must start with https://.');
+	if (url.host === 'github.com' || url.host === 'www.github.com' || url.host === 'api.github.com')
+		return GITHUB_API;
+	const path = url.pathname.replace(/\/+$/, '');
+	return `${url.origin}${path.endsWith('/api/v3') ? path : `${path}/api/v3`}`;
+}
+
+/** The web address for a GitHub API address: `https://github.com`, or the Enterprise server's. */
+export function githubWeb(api: string = GITHUB_API): string {
+	if (api === GITHUB_API) return 'https://github.com';
+	return api.replace(/\/api\/v3$/, '');
+}
 /** Parallel blob downloads: quick without tripping GitHub's abuse limits. */
 const PARALLEL = 6;
 const MAX_REPO_PAGES = 5;
@@ -46,7 +76,7 @@ export interface TokenSource {
  * Where to create a fine-grained token with the right permissions filled
  * in. The person still picks which repositories it covers.
  */
-export function tokenUrl(): string {
+export function tokenUrl(api: string = GITHUB_API): string {
 	const params = new URLSearchParams({
 		name: 'Fairtide',
 		description: 'Open and save SysML models from Fairtide.',
@@ -55,18 +85,25 @@ export function tokenUrl(): string {
 		pull_requests: 'write',
 		metadata: 'read'
 	});
-	return `https://github.com/settings/personal-access-tokens/new?${params}`;
+	// GitHub Enterprise Server has classic tokens only on some versions; its token page is the same path.
+	return `${githubWeb(api)}/settings/personal-access-tokens/new?${params}`;
 }
 
 /** `owner/repo` from a GitHub URL, an SSH remote or `owner/repo`; the branch too if the URL has one. */
-export function parseRepoUrl(input: string): (RepoRef & { branch?: string }) | null {
+export function parseRepoUrl(
+	input: string,
+	api: string = GITHUB_API
+): (RepoRef & { branch?: string }) | null {
 	const text = input.trim();
-	const ssh = /^git@github\.com:([\w.-]+)\/([\w.-]+?)(?:\.git)?$/.exec(text);
+	const host = (api === GITHUB_API ? 'github.com' : new URL(githubWeb(api)).host).replace(
+		/[.]/g,
+		'\\.'
+	);
+	const ssh = new RegExp(`^git@${host}:([\\w.-]+)\\/([\\w.-]+?)(?:\\.git)?$`).exec(text);
 	if (ssh) return { owner: ssh[1]!, repo: ssh[2]! };
-	const web =
-		/^(?:https?:\/\/)?(?:www\.)?github\.com\/([\w.-]+)\/([\w.-]+?)(?:\.git)?(?:\/tree\/([^?#]+))?\/?(?:[?#].*)?$/.exec(
-			text
-		);
+	const web = new RegExp(
+		`^(?:https?:\\/\\/)?(?:www\\.)?${host}\\/([\\w.-]+)\\/([\\w.-]+?)(?:\\.git)?(?:\\/tree\\/([^?#]+))?\\/?(?:[?#].*)?$`
+	).exec(text);
 	if (web)
 		return {
 			owner: web[1]!,
@@ -148,12 +185,24 @@ export class GitHubProvider implements GitProvider {
 		this.auth = typeof auth === 'string' ? { token: () => auth } : auth;
 		this.access = this.auth.access ?? 'token';
 		this.fetch = options.fetch ?? ((...args) => globalThis.fetch(...args));
-		this.api = options.api ?? API;
+		this.api = options.api ?? GITHUB_API;
+	}
+
+	/** The server's web address (`https://github.com`, or a GitHub Enterprise Server's). */
+	get web(): string {
+		return githubWeb(this.api);
 	}
 
 	private async send(method: string, url: string, body: unknown, token: string) {
+		const target = url.startsWith('http') ? url : this.api + url;
+		// The token is for this server only, whatever address an answer links to.
+		if (new URL(target).origin !== new URL(this.api).origin)
+			throw new GitError(
+				'invalid',
+				`${HOST} pointed to another site (${new URL(target).host}); it was not followed.`
+			);
 		try {
-			return await this.fetch(url.startsWith('http') ? url : this.api + url, {
+			return await this.fetch(target, {
 				method,
 				headers: {
 					Accept: 'application/vnd.github+json',
@@ -470,7 +519,7 @@ export class GitHubProvider implements GitProvider {
 	}
 
 	webUrl(ref: RepoRef, branch?: string): string {
-		const base = `https://github.com/${ref.owner}/${ref.repo}`;
+		const base = `${this.web}/${ref.owner}/${ref.repo}`;
 		return branch ? `${base}/tree/${branchPath(branch)}` : base;
 	}
 }

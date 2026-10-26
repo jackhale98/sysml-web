@@ -272,6 +272,25 @@ describe('several accounts', () => {
 		});
 	});
 
+	it('keeps a GitHub Enterprise Server with its account and sends that token only there', async () => {
+		const gh = github(new Set(['pat_ghes', 'pat_octo']), { pat_ghes: 'ghes-user' });
+		const accounts = accountsWith(gh.fetch);
+		const ghes = 'https://github.example.com/api/v3';
+		await accounts.connect('pat_ghes', ghes);
+		await accounts.connect('pat_octo');
+		const saved = JSON.parse(stored.get(ACCOUNTS_KEY)!) as { accounts: { api?: string }[] };
+		expect(saved.accounts.map((a) => a.api)).toEqual([ghes, undefined]);
+		await accounts.provider('ghes-user').currentUser();
+		await accounts.provider('octo').currentUser();
+		const where = gh.calls.map((c) => `${new URL(c.url).host} ${c.auth}`);
+		expect(where).toEqual([
+			'github.example.com Bearer pat_ghes',
+			'api.github.com Bearer pat_octo',
+			'github.example.com Bearer pat_ghes',
+			'api.github.com Bearer pat_octo'
+		]);
+	});
+
 	it('adds a second account, which becomes the default, and keeps both', async () => {
 		stored.set(ACCOUNT_KEY, JSON.stringify({ token: 'pat_octo', user: octo, connectedAt: 'x' }));
 		const gh = github(new Set(['pat_octo', 'pat_team']), { pat_team: 'team-bot' });

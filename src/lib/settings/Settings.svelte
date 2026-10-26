@@ -37,6 +37,7 @@
 	import { pendingLabel, strandedBySignOut } from '#lib/project/pending.ts';
 	import ConnectGitHub from '#lib/git/ConnectGitHub.svelte';
 	import GitHubMark from '#lib/git/GitHubMark.svelte';
+	import { githubApi } from '#lib/git/github.ts';
 	import { takeResume } from '#lib/git/oauth.ts';
 	import { chooseRepositories, chooseRepositoriesUrl, SIGN_IN } from '#lib/git/signin.ts';
 	import {
@@ -193,6 +194,19 @@
 
 	// --- Accounts -------------------------------------------------------------
 	let addingAccount = $state(false);
+	let serverError = $state<string | null>(null);
+
+	/** The GitHub Enterprise Server address: kept when it is one, else said why not. */
+	function setGitHubServer(event: Event) {
+		const value = (event.currentTarget as HTMLInputElement).value.trim();
+		try {
+			githubApi(value);
+			settings.githubServer = value;
+			serverError = null;
+		} catch (e) {
+			serverError = e instanceof Error ? e.message : String(e);
+		}
+	}
 	/** Signing out of an account whose projects have changes not on GitHub: which ones. */
 	let signingOut = $state.raw<{ login: string; projects: ProjectSummary[] } | null>(null);
 	/** Back from adding an account: say who was added (or that it was already here). */
@@ -693,6 +707,29 @@
 						{:else}
 							<ConnectGitHub resume="settings" />
 						{/if}
+					</section>
+					<section class="block" aria-labelledby="{uid}-ghes">
+						<h3 id="{uid}-ghes">GitHub Enterprise Server</h3>
+						<p class="muted">
+							Leave empty for github.com. For your organisation's own GitHub server, enter its
+							address: accounts you add afterwards connect there, with an access token made on that
+							server (signing in with GitHub is for github.com). Accounts already added stay with
+							their server.
+						</p>
+						<label class="server">
+							Server address
+							<input
+								type="url"
+								inputmode="url"
+								placeholder="https://github.example.com"
+								autocomplete="off"
+								spellcheck="false"
+								value={settings.githubServer}
+								onchange={setGitHubServer}
+								aria-invalid={serverError ? 'true' : undefined}
+							/>
+						</label>
+						{#if serverError}<p class="error" role="alert">{serverError}</p>{/if}
 					</section>
 					<p class="muted small">
 						{SIGN_IN ? 'GitLab is planned.' : 'GitLab and sign-in without a token are planned.'}
@@ -1257,6 +1294,20 @@
 		display: flex;
 		flex-wrap: wrap;
 		gap: var(--space-2);
+	}
+	.server {
+		display: grid;
+		gap: var(--space-1);
+		max-width: 28rem;
+	}
+	.server input {
+		min-height: 2.5rem;
+		padding: 0 var(--space-3);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-sm);
+		background: var(--surface);
+		color: var(--text);
+		font: inherit;
 	}
 	.error {
 		padding: var(--space-2) var(--space-3);

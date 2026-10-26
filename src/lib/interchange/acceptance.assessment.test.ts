@@ -21,7 +21,7 @@ import type { ToolkitHost } from '#lib/engine/toolkit/host.ts';
 import { loadHost } from '#lib/engine/toolkit/testing.ts';
 import { InterchangeError, readElements, type ElementJson } from '#lib/exchange/elements.ts';
 import { summarizeImport } from '#lib/exchange/report.ts';
-import { readProjectArchive, writeKpar } from './kpar';
+import { bundledLibrariesUsed, readProjectArchive, writeKpar } from './kpar';
 import { compareDigests, differenceSize, semanticDigest, type Digest } from './semantics-testing';
 
 const FIXTURES = join(import.meta.dirname, 'fixtures');
@@ -162,19 +162,10 @@ describe('Fairtide → SysML v2 JSON → Fairtide', () => {
 		}, 120_000);
 	}
 
-	// Known gap: the derived form lists implied features (`result`, `thisThing`…) as elements and spells derived properties; the import counts them as lost (104 notes here, 1,172 for the demo) and as "reads differently" (807), though the meaning is identical.
-	it.fails(
-		'says everything came across: with derived properties',
-		() => {
-			const imported = host.importInterchange(
-				host.exportInterchange(model, { derived: true }).json
-			);
-			expect(imported.notes.filter((n) => n.kind !== 'library' && n.kind !== 'implied')).toEqual(
-				[]
-			);
-		},
-		120_000
-	);
+	it('says everything came across: with derived properties', () => {
+		const imported = host.importInterchange(host.exportInterchange(model, { derived: true }).json);
+		expect(imported.notes.filter((n) => n.kind !== 'library' && n.kind !== 'implied')).toEqual([]);
+	}, 120_000);
 
 	it('keeps element ids from one export to the next while files stay put', () => {
 		const ids = (files: SourceFile[]) =>
@@ -216,18 +207,34 @@ describe('.kpar round trip', () => {
 describe('SysON → Fairtide (what SysON v2026.9.3 made of the acceptance model)', () => {
 	const syson = () => gz('syson/acceptance.elements.json.gz');
 
-	it('says plainly that it cannot open SysON’s element JSON, rather than dropping parts of it', () => {
-		let error: unknown;
-		try {
-			host.importInterchange(syson());
-		} catch (e) {
-			error = e;
-		}
-		expect(error).toBeInstanceOf(InterchangeError);
-		expect(String(error)).toMatch(/could not read these elements/);
-	});
+	it('opens SysON’s element JSON, leaving out only the expression SysON could not resolve, and says so', () => {
+		const imported = host.importInterchange(syson());
+		expect(imported.problems.filter((p) => p.severity === 'error')).toEqual([]);
+		const difference = compareDigests(reference, digestOf(imported.files));
+		// SysON left `total` and `limit` in `constraint def MassBudget { total <= limit }` unresolved.
+		expect(difference.onlyInSecond).toEqual([]);
+		expect(difference.changed).toEqual([]);
+		expect(difference.onlyInFirst.length).toBeGreaterThan(0);
+		expect(
+			difference.onlyInFirst.filter((k) => !k.startsWith('Basics::MassBudget/OperatorExpression#0'))
+		).toEqual([]);
+		// ...and the report says so, as it says how `entry; then off;` was read.
+		expect(imported.notes).toContainEqual({
+			kind: 'left-out',
+			message:
+				'Not carried over: an operator expression that refers to something the file doesn’t name (the tool that wrote it couldn’t resolve the name).',
+			element: 'Basics::MassBudget'
+		});
+		expect(imported.notes).toContainEqual(
+			expect.objectContaining({ kind: 'repaired', element: 'VehicleBehaviour::DriveStates' })
+		);
+		// The conjugated port is typed by the conjugate of PowerPort, as in the original.
+		expect(imported.files.map((f) => f.text).join('\n')).toMatch(
+			/port input\s*:\s*~(\w+::)*PowerPort\b/
+		);
+	}, 120_000);
 
-	// Known gap: the toolkit cannot lift SysON's unnamed ConjugatedPortDefinitions or the unnamed `entry` action a succession refers to, so the whole import is refused.
+	// Known gap (SysON): its element JSON has `total <= limit` in `constraint def MassBudget` with both names unresolved (its Memberships name nothing), so that expression cannot come back; everything else does (test above). Upstream report: docs/interchange.md.
 	it.fails('opens SysON’s element JSON with the same meaning', () => {
 		const imported = host.importInterchange(syson());
 		expect(differenceSize(compareDigests(reference, digestOf(imported.files)))).toEqual({
@@ -246,7 +253,7 @@ describe('SysON → Fairtide (what SysON v2026.9.3 made of the acceptance model)
 		expect(errors.join('\n')).toMatch(/expected an expression/);
 	});
 
-	// Known gap (SysON's text export): it drops `variant`, metadata values and a calculation call; the text is not the model that was sent.
+	// Known gap (SysON's text export): it drops `variant`, metadata values and a calculation call; the text is not the model that was sent. Upstream report: docs/interchange.md.
 	it.fails('reads SysON’s text export back with the same meaning', () => {
 		const text = filesIn(join(FIXTURES, 'syson/acceptance-text'));
 		expect(differenceSize(compareDigests(reference, digestOf(text)))).toEqual({
@@ -256,8 +263,7 @@ describe('SysON → Fairtide (what SysON v2026.9.3 made of the acceptance model)
 		});
 	});
 
-	// Known gap: elements of a file are matched to the lifted model by id, and the toolkit gives ids by position, so SysON's other member order shows as "not carried over" for typings and multiplicities the text does have.
-	it.fails('opens a one-file SysON model without claiming that present typings were lost', () => {
+	it('opens a one-file SysON model without claiming that present typings were lost', () => {
 		const imported = host.importInterchange(gz('syson/engineering-basics.elements.json.gz'));
 		const text = imported.files.map((f) => f.text).join('\n');
 		// The typings and multiplicities are in the text...
@@ -277,8 +283,7 @@ describe('malformed SysML v2 JSON', () => {
 			).json
 		);
 
-	// Known gap: duplicate @ids are not refused; the later element silently takes the earlier one's place and the report names the wrong element.
-	it.fails('refuses (or names) elements that share an @id', () => {
+	it('refuses (or names) elements that share an @id', () => {
 		const elements = small();
 		const p = elements.find((e) => e.declaredName === 'p')!;
 		const twice: ElementJson[] = [...elements, { ...p, declaredName: 'q' }];
@@ -289,6 +294,8 @@ describe('malformed SysML v2 JSON', () => {
 			message = String(e);
 		}
 		expect(message).toMatch(/A::p\b|same @id|duplicate/i);
+		// Both elements are named, the one that would have been replaced first.
+		expect(message).toMatch(/same @id .*: A::p \(PartUsage\) and A::q \(PartUsage\)/);
 	});
 
 	it('keeps a reference to an unknown id visible, as a warning and in the text', () => {
@@ -331,21 +338,26 @@ describe('what an exported project needs elsewhere', () => {
 		expect(standaloneErrors(model)).toEqual([]);
 	});
 
-	// Known gap: Fairtide resolves `ModelViews`/`Reporting` from bundled copies the project doesn't hold, so a project can check clean here while its .kpar is incomplete everywhere else; nothing tells the user.
-	it.fails(
-		'a project that checks clean exports a .kpar that is complete without Fairtide',
-		async () => {
-			const files: SourceFile[] = [
-				{
-					path: 'Model.sysml',
-					text: 'package Model {\n    private import ModelViews::*;\n    requirement r1;\n    view reqs : RequirementsTable { expose Model::**; }\n}\n'
-				}
-			];
-			expect(errorsOf(files)).toEqual([]);
-			const read = await readProjectArchive(await writeKpar({ name: 'M' }, files, ''), 'M');
-			expect(standaloneErrors(read.files)).toEqual([]);
-		}
-	);
+	it('a project that checks clean exports a .kpar that is complete without Fairtide', async () => {
+		const files: SourceFile[] = [
+			{
+				path: 'Model.sysml',
+				text: 'package Model {\n    private import ModelViews::*;\n    requirement r1;\n    view reqs : RequirementsTable { expose Model::**; }\n}\n'
+			}
+		];
+		expect(errorsOf(files)).toEqual([]);
+		const read = await readProjectArchive(await writeKpar({ name: 'M' }, files, ''), 'M');
+		expect(standaloneErrors(read.files)).toEqual([]);
+		// The libraries the project uses came along: ModelViews, and Reporting, which it uses.
+		expect(read.files.map((f) => f.path)).toEqual([
+			'Model.sysml',
+			'libraries/ModelViews.sysml',
+			'libraries/Reporting.sysml'
+		]);
+		expect(bundledLibrariesUsed(files).map((l) => l.package)).toEqual(['ModelViews', 'Reporting']);
+		// A project that doesn't use them gets nothing added.
+		expect(bundledLibrariesUsed(model)).toEqual([]);
+	});
 
 	it('KerML files: a project with one exports, but its JSON cannot be opened again (said plainly)', () => {
 		const files: SourceFile[] = [

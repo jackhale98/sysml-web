@@ -22,6 +22,11 @@ export interface SettingsValues {
 	lineNumbers: boolean;
 	/** What a phone shows first when a file opens. */
 	phoneStart: PhoneStart;
+	/**
+	 * A GitHub Enterprise Server's address (`https://github.example.com`),
+	 * or '' for github.com. Accounts connected afterwards use it.
+	 */
+	githubServer: string;
 }
 
 export const DEFAULTS: SettingsValues = {
@@ -30,7 +35,8 @@ export const DEFAULTS: SettingsValues = {
 	editorFontSize: 13,
 	lineWrapping: false,
 	lineNumbers: true,
-	phoneStart: 'diagram'
+	phoneStart: 'diagram',
+	githubServer: ''
 };
 
 export const FONT_SIZES = { min: 11, max: 20 };
@@ -76,7 +82,9 @@ export function parseSettings(raw: string | null): SettingsValues {
 			typeof stored.lineWrapping === 'boolean' ? stored.lineWrapping : DEFAULTS.lineWrapping,
 		lineNumbers:
 			typeof stored.lineNumbers === 'boolean' ? stored.lineNumbers : DEFAULTS.lineNumbers,
-		phoneStart: pick(stored.phoneStart, ['diagram', 'text'] as const, DEFAULTS.phoneStart)
+		phoneStart: pick(stored.phoneStart, ['diagram', 'text'] as const, DEFAULTS.phoneStart),
+		githubServer:
+			typeof stored.githubServer === 'string' ? stored.githubServer.trim() : DEFAULTS.githubServer
 	};
 }
 
@@ -99,6 +107,7 @@ class Settings implements SettingsValues {
 	lineWrapping = $state(DEFAULTS.lineWrapping);
 	lineNumbers = $state(DEFAULTS.lineNumbers);
 	phoneStart = $state<PhoneStart>(DEFAULTS.phoneStart);
+	githubServer = $state(DEFAULTS.githubServer);
 
 	/** Whether the system asks for less motion. */
 	private systemReduced = $state(false);
@@ -116,7 +125,8 @@ class Settings implements SettingsValues {
 			editorFontSize: this.editorFontSize,
 			lineWrapping: this.lineWrapping,
 			lineNumbers: this.lineNumbers,
-			phoneStart: this.phoneStart
+			phoneStart: this.phoneStart,
+			githubServer: this.githubServer
 		};
 	}
 
