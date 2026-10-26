@@ -78,7 +78,9 @@ test('the app works under its Content-Security-Policy without a single refusal',
 test('the policy refuses a script from another site and string evaluation', async ({ page }) => {
 	// The page's own code, not Playwright's (its evaluation is exempt from the policy): the
 	// landing page as served, with an inline script that tries to evaluate a string (inline
-	// scripts are allowed; evaluating strings isn't) and a script from another site.
+	// scripts are allowed; evaluating strings isn't) and a script from another site. What is
+	// refused is read from the policy's own violation events, not from the console's
+	// wording, which changes between browser versions.
 	const said: string[] = [];
 	page.on('console', (m) => said.push(m.text()));
 	await page.route('**/*', async (route) => {
@@ -86,7 +88,8 @@ test('the policy refuses a script from another site and string evaluation', asyn
 		const response = await route.fetch();
 		const body = (await response.text()).replace(
 			'</body>',
-			`<script>try { eval('1'); console.log('eval: ran'); } catch { console.log('eval: refused'); }</script>` +
+			`<script>document.addEventListener('securitypolicyviolation', (e) => console.log('refused: ' + e.blockedURI));` +
+				`try { eval('1'); console.log('eval: ran'); } catch { console.log('eval: refused'); }</script>` +
 				'<script src="https://scripts.example.test/injected.js"></script></body>'
 		);
 		return route.fulfill({ response, body });
@@ -96,5 +99,5 @@ test('the policy refuses a script from another site and string evaluation', asyn
 	expect(said).toContain('eval: refused');
 	await expect
 		.poll(() => said.join('\n'))
-		.toMatch(/Refused to load the script 'https:\/\/scripts\.example\.test\/injected\.js'/);
+		.toContain('refused: https://scripts.example.test/injected.js');
 });
