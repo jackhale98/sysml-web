@@ -102,7 +102,10 @@ describe('state machines from the toolkit', () => {
 		]);
 		// The initial state is where `entry; then a;` is written.
 		expect(state(m, 'r1.entry')!.line).toBe(11);
-		expect(m.warnings).toBeUndefined();
+		// The simulator runs assignments only, and says so for the `send`.
+		expect(m.warnings).toEqual([
+			'do action of `b`: `send Sig() to p` is not run; only assignments are'
+		]);
 	});
 
 	it('reads entry, do and exit actions in the emulator’s conventions', () => {

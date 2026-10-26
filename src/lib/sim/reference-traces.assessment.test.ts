@@ -126,7 +126,8 @@ const CASES: Case[] = [
 	},
 	{
 		id: 'T02',
-		title: 'entry, do and exit actions: do starts after entry; exit, effect, entry, do on a transition',
+		title:
+			'entry, do and exit actions: do starts after entry; exit, effect, entry, do on a transition',
 		basis:
 			'SysML 7.18.1 (a do action starts after the entry action completes), 7.18.3 transition steps 1–5',
 		source: `state def T02 {
@@ -153,7 +154,8 @@ const CASES: Case[] = [
 	},
 	{
 		id: 'T03',
-		title: 'nested states: exits innermost first, entries outermost first, default substates entered',
+		title:
+			'nested states: exits innermost first, entries outermost first, default substates entered',
 		basis:
 			'KerML StatePerformances (`entry then middle`, `middle then exit`; substates are middle performances, SysML 8.4.14.1), SysML 7.18.2 (`entry; then x` is the initial substate)',
 		source: `state def T03 {
@@ -204,7 +206,8 @@ const CASES: Case[] = [
 	},
 	{
 		id: 'T04',
-		title: 'a transition into a nested state enters its ancestors, then that state, not the default',
+		title:
+			'a transition into a nested state enters its ancestors, then that state, not the default',
 		basis:
 			'SysML 7.18.3 (the target may be any state usage, named by a feature chain); KerML StatePerformances (`entry then middle`)',
 		source: `state def T04 {
@@ -251,7 +254,8 @@ const CASES: Case[] = [
 	},
 	{
 		id: 'T06',
-		title: 'parallel regions: entered together, one event steps both, the parallel state completes when every region is done',
+		title:
+			'parallel regions: entered together, one event steps both, the parallel state completes when every region is done',
 		basis:
 			'SysML 7.18.1 (Parallel States), 7.18.3 (`then done`: the final state of the containing state), KerML StateTransitionPerformance (`nonDoMiddle then self`: a transition without a trigger waits for the substates)',
 		source: `state def T06 {
@@ -295,7 +299,8 @@ const CASES: Case[] = [
 	},
 	{
 		id: 'T08',
-		title: 'event ordering: an event no transition of the current state accepts is discarded, not kept',
+		title:
+			'event ordering: an event no transition of the current state accepts is discarded, not kept',
 		basis:
 			'SysML 7.18.3 rule 1 (a transition is triggered only during its source); no transfer is deferrable unless modelled so (StatePerformance::deferrable)',
 		source: `state def T08 {
@@ -375,7 +380,8 @@ const CASES: Case[] = [
 	{
 		id: 'T15',
 		title: 'a top-level `then done` completes the machine',
-		basis: 'SysML 7.18.3 (a transition to done: the source is the final state of the containing state)',
+		basis:
+			'SysML 7.18.3 (a transition to done: the source is the final state of the containing state)',
 		source: `state def T15 {
             entry; then a;
             state a;
@@ -506,9 +512,9 @@ describe('competing transitions (the specifications fix that one fires, not whic
 	});
 });
 
-describe('where the simulator departs from the semantics', () => {
-	// Known gap (critical): an event sent while a transition without a trigger is ready is taken from a state the machine has already left.
-	it.fails('a transition without a trigger is taken before an event sent after it became ready', () => {
+describe('events wait for what is ready now (fixed in this assessment)', () => {
+	// Before the fix an event sent here was taken from `a`, a state the machine had already left.
+	it('a transition without a trigger is taken before an event sent after it became ready', () => {
 		// `a` has nothing to wait for, so its untriggered transition happens as it
 		// is entered (StateTransitionPerformance: `nonDoMiddle then self`); the
 		// simulator's own rule is "transitions without a trigger come before
@@ -522,12 +528,13 @@ describe('where the simulator departs from the semantics', () => {
                 transition first b accept Go then d;
             }`,
 			'G1'
-		).fire('Go');
+		);
+		expect(run.fire('Go').session.messages).toEqual(['`a -> b` fires first: Step, then send `Go`']);
+		run.fire(null).fire('Go');
 		expect(run.trace).toEqual(['0: entry -> a', '0: a -> b', '0: b -> d']);
 	});
 
-	// Known gap (critical): as above, for a change trigger whose condition already holds.
-	it.fails('a change trigger that holds on entry fires before a later event', () => {
+	it('a change trigger that holds on entry fires before a later event', () => {
 		// 7.17.8: a change signal is sent at once if the condition is true when first evaluated.
 		const run = new Run(
 			`state def G2 {
@@ -538,11 +545,13 @@ describe('where the simulator departs from the semantics', () => {
                 transition first a accept Go then c;
             }`,
 			'G2'
-		).fire('Go');
+		)
+			.fire('Go')
+			.fire(null);
 		expect(run.trace).toEqual(['0: entry -> a', '0: a -> b']);
 	});
 
-	it('the UI offers the event as ready while the untriggered transition is pending (how G1 reaches the user)', () => {
+	it('the event is shown as waiting, with the reason, while the untriggered transition is ready', () => {
 		const run = new Run(
 			`state def G1u {
                 entry; then a;
@@ -555,12 +564,13 @@ describe('where the simulator departs from the semantics', () => {
 		const go = run.session.enabled.find((e) => e.trigger === 'Go')!;
 		const completion = run.session.enabled.find((e) => !e.trigger)!;
 		expect(completion.ready).toBe(true);
-		// Records today's behaviour: Go is offered as ready too.
-		expect(go.ready).toBe(true);
+		expect(go).toMatchObject({ ready: false, reason: '`a -> b` fires first' });
 	});
+});
 
-	// Known gap (critical): two signals with the same simple name in different packages are treated as one.
-	it.fails('signals are matched by the signal they name, not by their last name segment', () => {
+describe('signals (fixed in this assessment)', () => {
+	// Before the fix `A::Go` fired the `B::Go` transition, and the `A::Go` one showed as pre-empted.
+	it('signals are matched by the signal they name, not by their last name segment', () => {
 		const run = new Run(
 			`package G3 {
                 package A { item def Go; }
@@ -579,6 +589,24 @@ describe('where the simulator departs from the semantics', () => {
 		expect(run.trace).toEqual(['0: entry -> s', '0: s -> x']);
 	});
 
+	it('a signal written with and without its package is still one signal', () => {
+		const run = new Run(
+			`package G3b {
+                package A { item def Go; }
+                state def M {
+                    entry; then s; state s; state t; state u;
+                    transition first s accept A::Go then t;
+                    transition first t accept Go then u;
+                }
+            }`,
+			'M'
+		);
+		run.fire('Go').fire('A::Go');
+		expect(run.trace).toEqual(['0: entry -> s', '0: s -> t', '0: t -> u']);
+	});
+});
+
+describe('where the simulator departs from the semantics', () => {
 	// Known gap: a change signal that comes while the guard is false is kept, not lost (the simulator loses time signals in that case).
 	it.fails('a change signal that comes while the guard is false is not taken later', () => {
 		// Observation::ObserveChange sends the change signal once; a transfer
@@ -654,52 +682,85 @@ describe('where the simulator departs from the semantics', () => {
 		expect(m.warnings?.length ?? 0).toBeGreaterThan(0);
 	});
 
-	// Known gap: a signal a state's entry action sends to its own part is not delivered.
-	it.fails('a signal sent to the machine’s own part by an entry action triggers its transition', () => {
-		const run = new Run(
-			`package G7 {
-                item def Ping;
-                part ctl {
-                    exhibit state m {
-                        entry; then a;
-                        state a { entry send new Ping() to ctl; }
-                        state b;
-                        transition first a accept Ping then b;
-                    }
-                }
-            }`,
-			'm'
-		).fire(null);
-		expect(run.session.current).toEqual(['b']);
+	const SEND = `package G7 {
+        item def Ping;
+        part ctl {
+            exhibit state m {
+                entry; then a;
+                state a { entry send new Ping() to ctl; }
+                state b;
+                transition first a accept Ping then b;
+            }
+        }
+    }`;
+
+	it('…and the machine carries a note that the send is not run (fixed in this assessment)', () => {
+		expect(machineOf(SEND, 'm').warnings).toEqual([
+			'entry action of `a`: `send new Ping() to ctl` is not run; only assignments are'
+		]);
 	});
 
-	// Known gap: the steps of an action other than assignments (if, successions) are skipped without a note.
-	it.fails('an `if` inside an entry action runs (or the step says it was skipped)', () => {
-		const run = new Run(
-			`state def G8 {
-                attribute x : Integer = 10;
-                attribute y : Integer = 0;
-                entry; then a;
-                state a { entry action { assign y := 5; if x > 5 { assign y := 7; } } }
+	// Known gap: a signal a state's entry action sends to its own part is not delivered.
+	it.fails(
+		'a signal sent to the machine’s own part by an entry action triggers its transition',
+		() => {
+			const run = new Run(SEND, 'm').fire(null);
+			expect(run.session.current).toEqual(['b']);
+		}
+	);
+
+	const IF = `state def G8 {
+        attribute x : Integer = 10;
+        attribute y : Integer = 0;
+        entry; then a;
+        state a { entry action { assign y := 5; if x > 5 { assign y := 7; } } }
+    }`;
+	const THEN = `state def G9 {
+        attribute n : Integer = 0;
+        entry; then a;
+        state a { entry action { assign n := 1; then assign n := n + 10; } }
+    }`;
+
+	// Before the fix only `assign y := 5` ran, the trace showed only it, and nothing said the `if` was left out.
+	it('an `if` or a succession inside an action is noted on the machine as not run (fixed in this assessment)', () => {
+		expect(machineOf(IF, 'G8').warnings).toEqual([
+			'entry action of `a`: `if x > 5 { assign y := 7; }` is not run; only assignments are'
+		]);
+		expect(machineOf(THEN, 'G9').warnings).toEqual([
+			'entry action of `a`: `then assign n := n + 10` is not run; only assignments are'
+		]);
+	});
+
+	it('a transition effect that sends is noted too; assignments and named actions are not', () => {
+		const m = machineOf(
+			`package G9b {
+                item def Timeout;
+                action def PowerUp;
+                state def M {
+                    attribute n : Integer = 0;
+                    entry; then a;
+                    state a { do action { assign n := n + 1; } exit action powerUp : PowerUp; }
+                    state b { entry assign n := 0; do monitor; }
+                    action monitor;
+                    transition t1 first a accept Go do send new Timeout() to self then b;
+                    transition t2 first b accept Back do assign n := 2 then a;
+                }
             }`,
-			'G8'
+			'M'
 		);
-		const reported = !!(run.session.trace[0]?.notes?.length || run.session.messages?.length);
-		expect(run.session.variables.y === 7 || reported).toBe(true);
+		expect(m.warnings).toEqual([
+			'effect of transition t1: `send new Timeout() to self` is not run; only assignments are'
+		]);
+	});
+
+	// Known gap: the steps of an action other than assignments (if, successions) are not run.
+	it.fails('an `if` inside an entry action runs', () => {
+		expect(new Run(IF, 'G8').session.variables.y).toBe(7);
 	});
 
 	// Known gap: as above, for `then` successions inside an action.
-	it.fails('a succession inside an entry action runs in order (or the step says it was skipped)', () => {
-		const run = new Run(
-			`state def G9 {
-                attribute n : Integer = 0;
-                entry; then a;
-                state a { entry action { assign n := 1; then assign n := n + 10; } }
-            }`,
-			'G9'
-		);
-		const reported = !!(run.session.trace[0]?.notes?.length || run.session.messages?.length);
-		expect(run.session.variables.n === 11 || reported).toBe(true);
+	it.fails('a succession inside an entry action runs in order', () => {
+		expect(new Run(THEN, 'G9').session.variables.n).toBe(11);
 	});
 
 	it('a guard that reads the trigger’s payload blocks, with a reason, rather than firing', () => {
@@ -742,7 +803,8 @@ describe('machines that never let time pass', () => {
 	it('a `when` that is always true on a self-transition stops the same way', () => {
 		const run = new Run(ALWAYS, 'L2').play([{ wait: 10 }]);
 		expect(run.session.messages?.join(' ')).toMatch(/stopped after 200 steps/);
-		expect(run.session.variables.n).toBe(201);
+		// 200 transitions fired, then the Wait stopped.
+		expect(run.session.variables.n).toBe(200);
 	});
 
 	it('stepping one at a time reaches the step limit and the status says so', () => {

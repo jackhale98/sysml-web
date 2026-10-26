@@ -76,8 +76,13 @@ test('a machine with a construct the simulator cannot run says so before it runs
 });
 
 test('a machine that never lets time pass stops a Wait and says why', async ({ page }) => {
+	// The 200 steps are animated one by one before the message shows (about 1.5 min).
+	test.setTimeout(240_000);
 	const emulator = await runTyped(page, MACHINES, 'Spinning');
 	await emulator.getByLabel('How long to wait').selectOption('10');
 	await emulator.getByRole('button', { name: 'Wait' }).click();
-	await expect(emulator.getByText(/stopped after 200 steps/).first()).toBeVisible();
+	await expect(emulator.getByText(/Step 200/).first()).toBeVisible({ timeout: 30_000 });
+	await expect(emulator.getByText(/stopped after 200 steps/).first()).toBeVisible({
+		timeout: 180_000
+	});
 });

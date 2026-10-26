@@ -559,10 +559,13 @@ function check(chart: Chart, t: Transition, active: Set<string>, env: Env, clock
 	return out;
 }
 
-/** Whether `event` names this signal: exactly, or by its last segment. */
+/**
+ * Whether `event` names this signal: exactly, or one is the other with fewer
+ * qualifying segments (`ArmCommand`, `DroneInterfaces::ArmCommand`). Two
+ * names that differ in a qualifier (`A::Go`, `B::Go`) are different signals.
+ */
 function signalMatches(signal: string, event: string): boolean {
-	const last = (s: string) => s.split('::').pop();
-	return signal === event || last(signal) === last(event);
+	return signal === event || signal.endsWith(`::${event}`) || event.endsWith(`::${signal}`);
 }
 
 /**
@@ -642,21 +645,35 @@ function enabled(chart: Chart, active: Set<string>, env: Env, clock: Clock): Ena
 	const checks = new Map(list.map((t) => [t, check(chart, t, active, env, clock)]));
 	// A ready transition that a higher-priority one pre-empts on the same event is not ready.
 	const winner = new Map<Transition, Transition>();
-	const groups = new Map<string, Transition[]>();
-	for (const t of list) {
-		if (!checks.get(t)!.ready) continue;
-		const key =
-			t.trigger?.kind === 'signal' ? `signal:${t.trigger.name.split('::').pop()}` : 'step';
-		groups.set(key, [...(groups.get(key) ?? []), t]);
-	}
-	for (const group of groups.values()) {
+	const ready = list.filter((t) => checks.get(t)!.ready);
+	/** Pre-empt the transitions of `group` that `own` picks and a chosen one conflicts with. */
+	const preempt = (group: Transition[], own: (t: Transition) => boolean) => {
 		const chosen = select(chart, group, active);
 		for (const t of group) {
-			if (chosen.includes(t)) continue;
+			if (chosen.includes(t) || !own(t) || winner.has(t)) continue;
 			const leaving = new Set(exits(chart, t, active));
 			const by = chosen.find((c) => exits(chart, c, active).some((s) => leaving.has(s)));
 			if (by) winner.set(t, by);
 		}
+		return chosen;
+	};
+	const steps = preempt(
+		ready.filter((t) => accepts(t, null)),
+		() => true
+	);
+	// What a Step would fire comes before any event (as UML's completion events): events wait.
+	if (steps.length) {
+		for (const t of ready) if (t.trigger?.kind === 'signal') winner.set(t, steps[0]!);
+	}
+	// Each event pre-empts among the transitions that accept it.
+	const names = new Set(
+		ready.flatMap((t) => (t.trigger?.kind === 'signal' ? [t.trigger.name] : []))
+	);
+	for (const name of names) {
+		preempt(
+			ready.filter((t) => accepts(t, name)),
+			(t) => t.trigger?.kind === 'signal' && t.trigger.name === name
+		);
 	}
 	return list.map((t) => {
 		const c = checks.get(t)!;
@@ -1039,6 +1056,11 @@ export function step(
 			run.messages.push(`\`${t.label}\` does not leave ${where}`);
 			return session(run, options);
 		}
+		const first = select(chart, readyNow(run, list, before), run.active)[0];
+		if (t.trigger?.kind === 'signal' && first) {
+			run.messages.push(`\`${first.label}\` fires first: Step, then \`${t.label}\``);
+			return session(run, options);
+		}
 		const c = check(chart, t, run.active, before, run.clock);
 		if (!c.ready) {
 			run.messages.push(`\`${t.label}\` cannot fire: ${c.reason}`);
@@ -1047,6 +1069,13 @@ export function step(
 		ready = [t];
 	} else {
 		const event = choice.event?.trim() || null;
+		// What a Step would fire comes first: an event sent now would find the machine elsewhere.
+		const pending = event !== null ? readyNow(run, list, before) : [];
+		const first = select(chart, pending, run.active)[0];
+		if (first && !pending.some((t) => accepts(t, event))) {
+			run.messages.push(`\`${first.label}\` fires first: Step, then send \`${event}\``);
+			return session(run, options);
+		}
 		if (event !== null) {
 			ready = list.filter(
 				(t) => accepts(t, event) && check(chart, t, run.active, before, run.clock).ready
