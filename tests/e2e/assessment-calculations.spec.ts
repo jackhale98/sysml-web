@@ -46,18 +46,19 @@ test('a division by zero shows as unknown, with the reason, never as a number', 
 	await value.fill('0 [W]');
 	await value.press('Enter');
 
+	// The requirement it decides is neither met nor violated (once the edit is analysed).
+	const checks = await openView(page, 'Design checks');
+	await expect(checks.locator('tbody tr').filter({ hasText: 'SYS-001' })).toContainText(
+		'Undecided',
+		{ timeout: 15_000 }
+	);
+
 	// endurance = HoverEndurance(usable energy, 0 W): energy / power has no value.
 	const endurance = await select(page, 'endurance', 'attribute', 1, 'DroneArchitecture.sysml');
 	await expect(endurance.getByText('= ?')).toBeVisible({ timeout: 15_000 });
 	await endurance.getByRole('button', { name: 'Why?' }).click();
 	await expect(endurance).toContainText(/division by zero/i);
 
-	// The requirement it decides is neither met nor violated.
-	const checks = await openView(page, 'Design checks');
-	await expect(checks.locator('tbody tr').filter({ hasText: 'SYS-001' })).toContainText(
-		'Undecided',
-		{ timeout: 15_000 }
-	);
 	// The mass budget doesn't depend on it: the drone still weighs 2770 g.
 	const budget = await openView(page, 'Drone mass budget');
 	await expect(

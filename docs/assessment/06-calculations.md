@@ -35,10 +35,10 @@ neither. The engine's own units come from the standard library.
 | Run | Result |
 | --- | --- |
 | New unit tests (3 files) without the fixes (pristine `main` 68cb9db, in a separate worktree) | 7 fail, 16 pass, 4 expected fail. The 7 are the critical findings below and the workspace test (below). |
-| The same with the fixes | RESULT_AFTER |
+| The same with the fixes | 23 pass, 4 expected fail (`it.fails` known gaps, each checked failing for its stated reason in probe runs) |
 | Existing related unit suites (20 files, list above) with the fixes | 20 files, 305 tests pass |
-| `tests/e2e/assessment-calculations.spec.ts`, `budgets.spec.ts`, `trade.spec.ts` with the fixes | RESULT_E2E |
-| `npm run check` | RESULT_CHECK |
+| `tests/e2e/assessment-calculations.spec.ts`, `budgets.spec.ts`, `trade.spec.ts` with the fixes | 10/10 pass. `budgets.spec.ts` and `trade.spec.ts` 9/9 in one run. The new spec failed once: it selected an element before the edit was analysed, which is a test-order issue, not an app one. Reordered to wait for the checks first, it passed alone. |
+| `npm run check` | 0 errors, 0 warnings |
 
 The workspace trade test failed on `main` for a reason in the test, not the app: it first
 used a `setDeclaration` edit that matched nothing. It now applies a text change as one
@@ -146,7 +146,7 @@ passes with the fix (both runs above).
   `assessment-calculations.spec.ts`: hover power 0 W → endurance `= ?`, Why? says
   division by zero, SYS-001 Undecided, budget unchanged, undo restores. Existing
   `budgets.spec.ts` "the inspector shows what an expression comes to, and why when it
-  cannot". RESULT_E2E_SHORT
+  cannot".
 - **Limitations:** An undecided requirement check is not a problem: a division by zero that
   leaves a requirement undecided shows only in the checks view, not in Problems. A
   self-reference (`selfRef = selfRef + 1`) gives an "unresolved reference" warning instead
