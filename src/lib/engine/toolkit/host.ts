@@ -471,6 +471,8 @@ export class ToolkitHost {
 				: this.snapshotApart(current);
 		const currentMs = performance.now() - started - baseMs;
 		const diff = compareSnapshots(before.snapshot, now.snapshot);
+		// What depends on each requirement, so the review can name it for one that changed.
+		diff.dependants = { ...before.snapshot.dependants, ...now.snapshot.dependants };
 		return {
 			diff,
 			ms: {
@@ -564,16 +566,23 @@ export class ToolkitHost {
 			brokenFiles: built.broken ?? []
 		};
 		if (!built.extracted) return empty;
-		return buildSnapshot({
+		const context = this.viewContextOf(built, built.files);
+		const snapshot = buildSnapshot({
 			extracted: built.extracted,
 			units: built.units,
 			content: new Set(built.files.map((f) => f.path)),
 			evaluation: this.evaluationOf(built),
-			views: this.viewContextOf(built, built.files),
+			views: context,
 			broken:
 				built.broken ??
 				built.analyses.filter((a) => a.model.syntax_errors.length).map((a) => a.model.file)
 		});
+		try {
+			snapshot.dependants = views.dependantsOf(context);
+		} catch {
+			// Dependants are extra: the comparison stands without them.
+		}
+		return snapshot;
 	}
 
 	/**
@@ -649,7 +658,11 @@ export class ToolkitHost {
 				session: built.session,
 				model: built.extracted,
 				units: built.units
-			})
+			}),
+			// FMEA lines: from the element a line is about to the controls, mitigations and hazard it names.
+			views
+				.fmeaReferences(this.viewContextOf(built, built.files))
+				.map((r) => ({ from: r.about, to: r.named, kind: 'fmea' as const }))
 		);
 		return built.relations.of(id);
 	}

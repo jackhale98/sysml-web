@@ -75,12 +75,9 @@
 
 	// ── Requirements ──────────────────────────────────────────────────────────
 	const coverage = $derived(workspace.coverage);
-	const traced = $derived(
-		workspace.requirements.filter((r) => r.satisfiedBy.length > 0 && r.verifiedBy.length > 0).length
-	);
-	const gaps = $derived(
-		workspace.requirements.filter((r) => r.satisfiedBy.length === 0 || r.verifiedBy.length === 0)
-	);
+	// One coverage rule (#lib/project/coverage.ts): directly, or through the requirements derived from it.
+	const traced = $derived(workspace.requirements.filter((r) => r.satisfied && r.verified).length);
+	const gaps = $derived(workspace.requirements.filter((r) => !r.satisfied || !r.verified));
 	const GAP_LIMIT = 6;
 
 	const TONE_ORDER: Tone[] = ['ok', 'info', 'warn', 'danger', 'muted'];
@@ -201,6 +198,14 @@
 								color="var(--kind-view)"
 								{ready}
 							/>
+							<CoverageRing
+								label="Tests passed"
+								hint="Every test of it passed, and the model hasn’t changed since."
+								value={coverage.passed}
+								total={coverage.total}
+								color="var(--kind-analysis)"
+								{ready}
+							/>
 						</div>
 					</div>
 
@@ -283,8 +288,8 @@
 											<span class="id mono">{r.id ?? '—'}</span>
 											<span class="title">{r.title}</span>
 											<span class="tags">
-												{#if r.satisfiedBy.length === 0}<Pill tone="warn">Not allocated</Pill>{/if}
-												{#if r.verifiedBy.length === 0}<Pill tone="warn">No test</Pill>{/if}
+												{#if !r.satisfied}<Pill tone="warn">Not allocated</Pill>{/if}
+												{#if !r.verified}<Pill tone="warn">No test</Pill>{/if}
 											</span>
 										</button>
 									</li>
@@ -574,8 +579,13 @@
 	}
 	@container (min-width: 26rem) {
 		.rings {
-			grid-template-columns: repeat(3, minmax(0, 1fr));
+			grid-template-columns: repeat(2, minmax(0, 1fr));
 			gap: var(--space-3);
+		}
+	}
+	@container (min-width: 36rem) {
+		.rings {
+			grid-template-columns: repeat(4, minmax(0, 1fr));
 		}
 	}
 	.status {

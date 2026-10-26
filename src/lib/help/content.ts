@@ -348,9 +348,29 @@ export const HELP: HelpSection[] = [
 							'Under **Verified by**, choose **Add a test that verifies it**: pick a test, or type a name to make a new one.'
 						]
 					},
-					'Each pick writes a `satisfy` or `verify` line, and the requirement leaves the **Gaps** list once both are there. In a diagram, **Connect** from a part to a requirement does the same.'
+					'Each pick writes a `satisfy` or `verify` line, and the requirement leaves the **Gaps** list once both are there. In a diagram, **Connect** from a part to a requirement does the same.',
+					'Coverage follows one rule everywhere (the home page, the tables and reports): a requirement counts as satisfied when something in the design satisfies it, or when every requirement derived from it is satisfied; verified and tests passed count the same way. So a stakeholder need is covered once all the requirements derived from it are. A requirement derived, through others, from itself is flagged under **Problems**.'
 				],
 				action: { action: 'link', label: 'Link a requirement' }
+			},
+			{
+				id: 'record-result',
+				title: 'Record a test result',
+				keywords:
+					'verification result outcome pass fail passed failed verdict inconclusive error evidence commit revision out of date stale run test report coverage',
+				blocks: [
+					{
+						steps: [
+							'Select the verification case (the test), for example from **Verified by** in a requirement’s details.',
+							'Under **Result**, choose **Record a result**.',
+							'Choose the verdict (passed, failed, inconclusive or error), the date and who ran it, and say where the evidence is: a link to the test report, or where it is kept.',
+							'Check the commit: it is the version of the model on GitHub the test was run against, filled in when the project is saved there. Choose **Record**.'
+						]
+					},
+					'The result is written in the model, on the case, as SysML’s own `@VerificationResult` (the first one adds `libraries/VerificationResults.sysml` to the project), so it is reviewed, saved and shared like the rest, and other tools can read it. A new result replaces the case’s last one; the earlier ones stay in the history.',
+					'The requirements table’s **Result** column, the verification matrix, a requirement’s details, the **Tests passed** ring on the home page and the specification report show how each requirement’s tests went: passed, failed, inconclusive or not run yet. A result run against an earlier version of the model is **out of date** once the model has changed since (results recorded since don’t count as changes). In a project not connected to GitHub the commit can’t be compared, and the result says **commit unknown**.'
+				],
+				action: { action: 'requirements', label: 'Open the requirements table' }
 			},
 			{
 				id: 'check-budget',
@@ -433,10 +453,24 @@ export const HELP: HelpSection[] = [
 						]
 					},
 					'On the matrix, **Counts** switches kinds of link on and off: connections, flows, bindings, allocations, uses and satisfies for parts. **Suggested modules** reorders the parts so the ones linked to each other sit together and outlines the groups with more links inside than between them; it is a suggestion from the links alone. Both are saved in the view, and Undo takes them back.',
-					'Point at or select a cell for its links, with **Show in SysML**. Select an empty cell between two parts to **Connect them**. The lightning button beside a part shows what a change to it may affect, directly and through others, with how many. A part with no links, and a connection with no interface definition, are flagged for review.',
+					'Point at or select a cell for its links, with **Show in SysML**. Select an empty cell between two parts to **Connect them**. The lightning button beside a part shows what a change to it may affect, directly and through others, with how many. A part with no links of the kinds counted (to the others or to anything outside the matrix), and a connection with no interface definition, are flagged for review.',
 					'On a phone each part is a card that opens to what it is connected with, leads to and comes from, with **What a change affects** and **Add a connection**; **Grid** shows the matrix, scrolling sideways.'
 				],
 				action: { action: 'dsm', label: 'New DSM' }
+			},
+			{
+				id: 'conventions',
+				title: 'Check modelling conventions',
+				keywords:
+					'convention rule style guide naming check lint enforce problems where filter owner verification method',
+				blocks: [
+					'A project’s own rules, such as “every requirement names its owner”, are saved views: a table whose rows are what breaks the rule, marked `@Convention`. Every row it lists shows under **Problems**, at the element it is about, with the rule’s words.',
+					{
+						code: 'view requirementsWithoutOwner : RequirementsTable {\n    @TableRendering { where = "owner == \\"\\""; }\n    @Convention { rule = "Every requirement names its owner."; }\n}'
+					},
+					'Make the table first (**Filter** a table and **Save as a view** writes the `where`), then add the `@Convention` line in its text. `severity = ConventionSeverity::error` (or `note`) changes how much it matters; a warning otherwise. The marker comes from the `Reporting` library.'
+				],
+				action: { action: 'problems', label: 'Show problems' }
 			},
 			{
 				id: 'draw-state-machine',
@@ -459,7 +493,8 @@ export const HELP: HelpSection[] = [
 				title: 'Make a report',
 				keywords: 'document specification icd print export pdf word',
 				blocks: [
-					'**New view** › **Specification** makes a document of the requirements with their trace and gaps; **Interface control document** does the same for interfaces. **Print / PDF** prints it or saves it as a PDF; it also downloads as one HTML file or as Markdown. Tables export to Excel or CSV from their **Export** menu, and diagrams to SVG or PNG (or copy to the clipboard) from theirs.'
+					'**New view** › **Specification** makes a document of the requirements with their trace, test results and gaps; **Interface control document** does the same for interfaces. **Print / PDF** prints it or saves it as a PDF; it also downloads as one HTML file or as Markdown. Tables export to Excel or CSV from their **Export** menu, and diagrams to SVG or PNG (or copy to the clipboard) from theirs.',
+					'A report names the version of the model it was made from: the commit on GitHub (with “changes not committed” when the model has changed since), or **Not committed** for a project that isn’t on GitHub. To make a report for review or audit, save to GitHub first.'
 				],
 				action: { action: 'report', label: 'New report' }
 			},
@@ -486,7 +521,7 @@ export const HELP: HelpSection[] = [
 				blocks: [
 					'**Save to GitHub…** in the project menu connects the project to a repository and saves your changes there, with a note of what changed. Others can then open it from GitHub, and you can start a branch or propose changes for review. No git know-how needed.',
 					'Once a project is on GitHub, the project menu also has **Get latest** (bring in what others saved; where you both changed a file, choose whose to keep), **Propose changes…** (a pull request) and **Open on GitHub**. Sign in with GitHub, or connect with an access token; **Settings** › **Accounts** can hold more than one account. For a GitHub Enterprise Server, enter its address under **Settings** › **Accounts** first, then connect with an access token made on that server: the token goes only there.',
-					'**Review changes** in the project menu says what changed in the model, in plain words: requirements, design, behaviour, verification and risk, with the checks and budgets the change affects first. Compare with what is not on GitHub yet, a branch, an earlier version or a proposal; diagrams and tables mark what changed. In a project kept only in this browser, **Mark as reviewed** sets the version later changes are compared with.'
+					'**Review changes** in the project menu says what changed in the model, in plain words: requirements, design, behaviour, verification and risk, with the checks and budgets the change affects first. A changed or removed requirement or risk control names what relies on it: what satisfies it, its mitigations, the tests that verify it, the requirements derived from it and the FMEA lines that name it. Compare with what is not on GitHub yet, a branch, an earlier version or a proposal; diagrams and tables mark what changed. In a project kept only in this browser, **Mark as reviewed** sets the version later changes are compared with.'
 				],
 				action: { action: 'save-github', label: 'Save to GitHub' }
 			},

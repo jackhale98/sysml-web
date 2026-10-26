@@ -40,8 +40,13 @@ is under **Next** and **Not doing, or later** below.
   `docs/table-rendering.md`), editable in place, with column filters, quick
   reviews and **Save as a view**; requirements tables, gaps, bill of
   materials, interfaces, trace and verification matrices; a specification and
-  an interface control document (print or PDF, HTML, Markdown); Excel and CSV
-  export; requirements imported from Excel, CSV or pasted cells.
+  an interface control document (print or PDF, HTML, Markdown) that names the
+  commit it was made from; Excel and CSV export; requirements imported from
+  Excel, CSV or pasted cells. One coverage rule (through derived
+  requirements) for the home page, tables and reports; verification results
+  recorded on cases (`@VerificationResult`, out of date once the model
+  changes since their commit); circular derivations and a project's own
+  conventions (`@Convention` views) under Problems (`docs/verification.md`).
 - **Guided forms** that write the SysML and show it: new view, add up a value,
   set a limit, trade study, FMEA, FMEA line, hazard, risk policy, dependency
   matrix, saved review; drawing state machines and action flows.
@@ -60,7 +65,9 @@ is under **Next** and **Not doing, or later** below.
   branch, an earlier version, a pull request) and says what changed in plain
   language, grouped as Requirements, Design, Behaviour, Verification, Risk and
   Other, with the checks and budgets it changes first; diagrams and tables
-  mark the changes (`docs/engine.md`, "Comparing versions").
+  mark the changes (`docs/engine.md`, "Comparing versions"). A changed
+  requirement or risk control names what relies on it: its satisfiers,
+  mitigations, tests, derived requirements and FMEA lines.
 - **Projects and collaboration.** Projects kept in the browser (IndexedDB);
   starting points (blank, requirements first, a small system) with next steps
   and a tour; local folders (File System Access, saved back with Ctrl S);
@@ -86,7 +93,11 @@ is under **Next** and **Not doing, or later** below.
 - **Document perspective** (§8.1): the model read as a living specification.
 - **Editing sequence diagrams** on the canvas.
 - More starting points (product architecture, safety-critical).
-- Requirement quality checks and quality gates as SysML libraries.
+- Requirement quality checks and quality gates as SysML libraries; the
+  `@Convention` views checked in CI, failing a pull request.
+- **Shared libraries** referenced by version (a `.kpar` or a repository) with
+  an "update available" notice, instead of a copy per project
+  (`docs/verification.md`, "Libraries across projects").
 - PDF export of diagrams (reports already print to PDF).
 - GitLab and other git hosts (Settings says "GitLab is planned").
 - A high-contrast theme.
@@ -107,8 +118,9 @@ is under **Next** and **Not doing, or later** below.
 - **Geometry view**: no plans.
 - **Real-time co-editing**: git's asynchronous review fits engineering; the
   text-patch edits leave room for it later.
-- **Operational records** (test runs, NCRs, CAPAs, inspections): deferred
-  (decision #2).
+- **Operational records** (NCRs, CAPAs, inspections): deferred (decision
+  #2). Test results are the exception: a verification case's latest result
+  is model content (`docs/verification.md`).
 
 ### Engine migration (decision #16)
 

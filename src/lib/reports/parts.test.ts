@@ -48,7 +48,10 @@ describe('text the engine does not model yet', () => {
 			{
 				original: "Needs::'Parcel delivery'",
 				derived: ["'Flight endurance'", 'Range'],
-				file: 'r.sysml'
+				file: 'r.sysml',
+				// Where the connection is written, for a problem about it.
+				from: text.indexOf('#derivation connection {\n'),
+				to: text.indexOf('}', text.indexOf('#derivation connection {\n')) + 1
 			}
 		]);
 	});
@@ -110,6 +113,7 @@ describe('documents', () => {
 			status: null,
 			author: null,
 			date: '21 October 2026',
+			revision: 'Not committed',
 			scope: [],
 			summary: [],
 			sections: numberSections([

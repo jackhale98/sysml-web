@@ -11,13 +11,15 @@
  * name from where it is written, as the language resolves a feature chain
  * (the toolkit's own resolved ends cost a pass over the whole model). An end
  * on a port stands for the part the port is on, as a general view draws it.
+ * FMEA lines come from the caller (`views/impact.ts`): an `@Fmea about x`
+ * line relates x to the risk controls, mitigations and hazard it names.
  * Indexed once per analysis, in a few milliseconds on the demo.
  */
 import type { RelatedElement, RelationKind } from '../../types';
 import type { ElementRecord } from '../model';
 import type { DiagramContext } from './context';
 
-interface Relation {
+export interface Relation {
 	from: string;
 	to: string;
 	kind: RelationKind;
@@ -28,9 +30,10 @@ export class Relations {
 	private readonly ctx: DiagramContext;
 	private readonly byElement = new Map<string, Relation[]>();
 
-	constructor(ctx: DiagramContext) {
+	constructor(ctx: DiagramContext, more: readonly Relation[] = []) {
 		this.ctx = ctx;
 		for (const r of ctx.records) this.collect(r);
+		for (const r of more) this.add(r);
 		for (const t of ctx.input.model.traces) {
 			if (t.byId && t.requirementId)
 				this.add({

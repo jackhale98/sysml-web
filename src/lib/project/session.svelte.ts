@@ -8,6 +8,7 @@ import type { Resolution } from '#lib/git/sync.ts';
 import { noteDownloaded } from '#lib/workbench/home/nextSteps.ts';
 import { demoProject } from './demo.ts';
 import { planFolderSave, sameConflicts, settleFolderSave, type FolderPlan } from './folderSync.ts';
+import { ProjectRevision } from './revision.svelte.ts';
 import { leaveRisk, type LeaveRisk } from './pending.ts';
 import { download, readFolder, writeToFolder } from './sources.ts';
 import { NEWER_FORMAT, loadProject, saveProject, timestamp, type StoredProject } from './store.ts';
@@ -62,6 +63,13 @@ export class ProjectSession {
 
 	constructor(private workspace: Workspace) {
 		this.git = new GitConnection(this, workspace);
+		// The project's version, as verification results and reports name it.
+		workspace.revision = new ProjectRevision({
+			git: () => this.record?.git ?? null,
+			files: () => workspace.files,
+			provider: () => (this.git.account ? this.git.provider() : null),
+			login: () => this.git.account?.user.login ?? null
+		});
 	}
 
 	/** Whether the project is connected to a git repository. */

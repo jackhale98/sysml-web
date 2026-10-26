@@ -420,7 +420,7 @@ export class Evaluation {
 		const temperature =
 			check.values.some((v) => v.value.kind === 'number' && isAffine(v.value.unit)) ||
 			constraints.some((text) =>
-				[...text.matchAll(/\[\s*'?([^\]']+?)'?\s*\]/g)].some((m) => isAffine(m[1]))
+				[...text.matchAll(/\[\s*'?([^\]']+?)'?\s*\]/g)].some((m) => isAffine(m[1] ?? null))
 			);
 		if (temperature) reasons.push("the app compared temperatures from their scale's zero");
 		else if (check.status !== 'undecided') return;

@@ -7,10 +7,9 @@
  * relationships; until then the scan is deliberately narrow.
  */
 
-/** The text with comments blanked out (same length, so offsets still match). */
-export function withoutComments(text: string): string {
-	return text.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, (m) => m.replace(/[^\n]/g, ' '));
-}
+import { withoutComments } from '#lib/project/derivations.ts';
+
+export { readDerivations, withoutComments, type Derivation } from '#lib/project/derivations.ts';
 
 /** A name as written, without the spaces around `::`, `.` and `~`. */
 function compact(reference: string): string {
@@ -20,40 +19,6 @@ function compact(reference: string): string {
 const NAME = String.raw`(?:'(?:[^'\\]|\\.)*'|[\w$]+)`;
 const QUALIFIED = String.raw`${NAME}(?:\s*::\s*${NAME})*`;
 const CHAIN = String.raw`${NAME}(?:\s*(?:::|\.)\s*${NAME})*`;
-
-export interface Derivation {
-	/** The requirement derived from, as written. */
-	original: string;
-	/** The requirements derived from it, as written. */
-	derived: string[];
-	file: string;
-}
-
-/**
- * `#derivation connection { end #original ::> A; end #derive ::> B; … }`
- * (also `@Derivation` and `derivation connection` spellings).
- */
-export function readDerivations(file: string, source: string): Derivation[] {
-	const text = withoutComments(source);
-	const out: Derivation[] = [];
-	const block = /(?:#|@)?\s*derivation\s+connection\b[^{;]*\{([\s\S]*?)\}/gi;
-	for (const match of text.matchAll(block)) {
-		const body = match[1]!;
-		const end = (role: string) =>
-			[
-				...body.matchAll(
-					new RegExp(
-						String.raw`end\s+#${role}\s+(?:${NAME}\s*)?(?:::>|references)\s*(${QUALIFIED})\s*;`,
-						'g'
-					)
-				)
-			].map((m) => compact(m[1]!));
-		const original = end('original')[0];
-		const derived = end('derive');
-		if (original && derived.length) out.push({ original, derived, file });
-	}
-	return out;
-}
 
 export interface InterfaceEnd {
 	name: string;

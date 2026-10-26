@@ -244,7 +244,11 @@ export function cluster(m: DependencyMatrix, kinds: readonly DependencyKind[]): 
 	};
 }
 
-/** What to review: links with no interface definition, and elements with no links at all. */
+/**
+ * What to review: links with no interface definition, and elements with no
+ * links of the counted kinds at all, in the matrix or to elements outside it
+ * (a step allocated to a part is linked, though the matrix lists only steps).
+ */
 export function reviewFlags(
 	m: DependencyMatrix,
 	kinds: readonly DependencyKind[]
@@ -253,7 +257,10 @@ export function reviewFlags(
 		? m.links.filter((l) => l.kind === 'connection' && !l.definition)
 		: [];
 	const { out, in: inn } = neighbours(m, kinds);
-	const unlinked = m.items.flatMap((_, i) => (out[i]!.size || inn[i]!.size ? [] : [i]));
+	const outside = new Set(m.outside.filter((o) => kinds.includes(o.kind)).map((o) => o.item));
+	const unlinked = m.items.flatMap((_, i) =>
+		out[i]!.size || inn[i]!.size || outside.has(i) ? [] : [i]
+	);
 	return { untyped, unlinked };
 }
 

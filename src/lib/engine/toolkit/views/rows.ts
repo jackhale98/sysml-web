@@ -6,6 +6,8 @@
  * Rows come from the project's files only; the bundled libraries and
  * everything else in the session are resolution context.
  */
+import { coverageRule } from '#lib/project/coverage.ts';
+import { outcomeOf, readResult, type RecordedResult } from '#lib/project/verification.ts';
 import type { ElementRecord } from '../model';
 import { connectionEnds, isReference, multiplicityOf } from '../model';
 import type { LineControl, LineMitigation, TradeStudy } from '../../types';
@@ -451,11 +453,59 @@ const isRequirementUsage = (r: ElementRecord) =>
 const isRequirementDef = (r: ElementRecord) => r.metaclass === 'RequirementDefinition' && !!r.name;
 
 /**
+ * `#derivation connection { end #original ::> a; end #derive ::> b; }`:
+ * the requirements derived from each, by element id ('' for an end that
+ * doesn't resolve: it covers nothing).
+ */
+export function derivedInto(ctx: ViewContext): Map<string, string[]> {
+	const out = new Map<string, string[]>();
+	for (const r of ctx.records) {
+		if (!/#\s*derivation\b/.test(r.header) || !/Connection/.test(r.metaclass)) continue;
+		const at = (e: ElementRecord) =>
+			ctx.resolveIn(r.ownerId, e.specializes[0]!) ?? ctx.resolveIn(r.id, e.specializes[0]!);
+		const ends = ctx.ownedBy(r.id).filter((e) => e.end && e.specializes[0]);
+		const original = ends.find((e) => !/#\s*derive\b/.test(e.header));
+		const from = original ? at(original) : null;
+		if (!from) continue;
+		for (const e of ends) {
+			if (e === original || !/#\s*derive\b/.test(e.header)) continue;
+			const to = at(e) ?? '';
+			if (to === from) continue;
+			const list = out.get(from) ?? [];
+			if (!list.includes(to)) list.push(to);
+			out.set(from, list);
+		}
+	}
+	return out;
+}
+
+/** A verification case's recorded result (`@VerificationResult`), its latest by date. */
+export function caseResult(ctx: ViewContext, caseId: string): RecordedResult | null {
+	let found: RecordedResult | null = null;
+	for (const a of ctx.metadataOf(caseId)) {
+		if (unquoteName(simpleName(a.metadata_type)) !== 'VerificationResult') continue;
+		const record = ctx.byId.get(caseId);
+		const result: RecordedResult = {
+			...readResult(a.values),
+			caseId,
+			caseName: record?.name ?? '',
+			file: a.path,
+			span: a.span
+		};
+		if (!found || (result.date ?? '') >= (found.date ?? '')) found = result;
+	}
+	return found;
+}
+
+/**
  * One row per requirement: every named requirement usage, and every
  * requirement def that is not merely the type (or a supertype of the type)
  * of requirement usages. Trace links match by the toolkit's resolved
  * requirement, and satisfying a usage counts for its definition and that
- * definition's supertypes.
+ * definition's supertypes. `satisfied` and `verified` follow the coverage
+ * rule (`#lib/project/coverage.ts`): directly, or through every requirement
+ * derived from it. `result` is how its verification went: the worst of its
+ * verification cases' recorded results.
  */
 export function requirementRows(ctx: ViewContext): Row[] {
 	const byOf = (links: Link[]) => {
@@ -478,8 +528,30 @@ export function requirementRows(ctx: ViewContext): Row[] {
 		}
 		return set;
 	};
-	const satisfied = closure(satisfiedBy);
-	const verified = closure(verifiedBy);
+	const satisfiedOwn = closure(satisfiedBy);
+	const verifiedOwn = closure(verifiedBy);
+	const into = derivedInto(ctx);
+	const records = (id: string) => (into.get(id) ?? []).map((d) => ctx.byId.get(d) ?? null);
+	const requirementRecords = ctx.records.filter(
+		(r) => isRequirementUsage(r) || isRequirementDef(r)
+	);
+	const satisfiedRule = coverageRule(
+		requirementRecords,
+		(r) => satisfiedOwn.has(r.id),
+		(r) => records(r.id)
+	);
+	const verifiedRule = coverageRule(
+		requirementRecords,
+		(r) => verifiedOwn.has(r.id),
+		(r) => records(r.id)
+	);
+	const casesOf = new Map<string, string[]>();
+	for (const link of ctx.verifications) {
+		if (!link.requirement_id || !link.by_id) continue;
+		const list = casesOf.get(link.requirement_id) ?? [];
+		if (!list.includes(link.by_id)) list.push(link.by_id);
+		casesOf.set(link.requirement_id, list);
+	}
 	const classifiers = new Set<string>();
 	for (const u of ctx.records) {
 		const typeId = typeOf(u);
@@ -536,8 +608,15 @@ export function requirementRows(ctx: ViewContext): Row[] {
 				['satisfiedBy', sat.join(', ')],
 				['verifiedBy', ver.join(', ')],
 				['check', verdicts.get(r.id) ?? ''],
-				['satisfied', sat.length || satisfied.has(r.id) ? '1' : '0'],
-				['verified', ver.length || verified.has(r.id) ? '1' : '0'],
+				['satisfied', satisfiedRule.get(r) ? '1' : '0'],
+				['verified', verifiedRule.get(r) ? '1' : '0'],
+				[
+					'result',
+					outcomeOf(
+						(casesOf.get(r.id) ?? []).map((c) => caseResult(ctx, c)),
+						null
+					) ?? ''
+				],
 				['file', r.path],
 				['line', line(r)]
 			],
@@ -561,7 +640,10 @@ export function requirementRows(ctx: ViewContext): Row[] {
 	return rows;
 }
 
-/** Requirement coverage: requirement rows with the title as `requirement` and yes/no flags. */
+/**
+ * Requirement coverage: requirement rows with the title as `requirement` and
+ * yes/no flags (yes also when covered through derived requirements).
+ */
 function traceRows(ctx: ViewContext): Row[] {
 	return requirementRows(ctx).map((r) => {
 		const fields = new Map<string, string>([['requirement', r.fields.get('title') ?? '']]);

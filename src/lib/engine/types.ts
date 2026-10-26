@@ -909,7 +909,9 @@ export type RelationKind =
 	| 'binds'
 	| 'flows'
 	| 'allocates'
-	| 'derives';
+	| 'derives'
+	/** An FMEA line about the element names the other (a risk control, a mitigation, a hazard). */
+	| 'fmea';
 
 /** An element related to another, and how (`EngineApi.related`). */
 export interface RelatedElement {

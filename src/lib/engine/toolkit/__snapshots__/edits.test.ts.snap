@@ -66,7 +66,7 @@ exports[`edits > changes a value 1`] = `
 `;
 
 exports[`edits > chooses the columns of a view def 1`] = `
-"-             columns = "id; title; text; kind; priority; verificationMethod; status; owner; satisfiedBy; check; verifiedBy";
+"-             columns = "id; title; text; kind; priority; verificationMethod; status; owner; satisfiedBy; check; verifiedBy; result";
 +             columns = "id; title; status";"
 `;
 

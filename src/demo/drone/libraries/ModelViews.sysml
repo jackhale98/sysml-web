@@ -27,10 +27,10 @@ library package ModelViews {
     private import Reporting::*;
 
     view def RequirementsTable {
-        doc /* Every requirement with its ID, statement, classification, status, trace links and whether the design meets it. */
+        doc /* Every requirement with its ID, statement, classification, status, trace links, whether the design meets it and how its verification went. */
         @TableRendering {
             rows = "requirements";
-            columns = "id; title; text; kind; priority; verificationMethod; status; owner; satisfiedBy; check; verifiedBy";
+            columns = "id; title; text; kind; priority; verificationMethod; status; owner; satisfiedBy; check; verifiedBy; result";
             sortBy = "id";
         }
     }

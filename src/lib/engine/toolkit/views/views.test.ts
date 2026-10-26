@@ -743,7 +743,11 @@ describe('the demo’s tables', () => {
 
 	it('requirements: the same rows, cells, sources and editing', () => {
 		const t = table('ModelViews::RequirementsTable');
-		expect(shape(t)).toEqual([24, 11]);
+		// The columns end with how each requirement's verification went.
+		expect(shape(t)).toEqual([24, 12]);
+		expect(t.columns.at(-1)).toBe('result');
+		expect(col(t, 'result')[col(t, 'id').indexOf('SYS-001')]).toBe('not run');
+		expect(col(t, 'result')[col(t, 'id').indexOf('SYS-005')]).toBe('');
 		expect(col(t, 'id').slice(0, 8)).toEqual([
 			'RC-001',
 			'RC-002',
@@ -766,7 +770,9 @@ describe('the demo’s tables', () => {
 			satisfiedBy: 'drone',
 			// The verdict of the claims that satisfy it (`drone.endurance >= 25 [min]`).
 			check: 'satisfied',
-			verifiedBy: 'enduranceFlightTest'
+			verifiedBy: 'enduranceFlightTest',
+			// Planned, with no result recorded yet.
+			result: 'not run'
 		});
 		expect(record(t, 0)).toMatchObject({
 			satisfiedBy: 'batteryManagementSystem',
@@ -788,6 +794,7 @@ describe('the demo’s tables', () => {
 			'metadata:StatusInfo.owner',
 			null,
 			null,
+			null,
 			null
 		]);
 		expect(t.editable?.[5]).toEqual({
@@ -799,7 +806,10 @@ describe('the demo’s tables', () => {
 	});
 
 	it('gaps, coverage and the trace and verification matrices', () => {
-		expect(shape(table('RequirementGaps'))).toEqual([11, 8]);
+		// By the coverage rule: three stakeholder needs whose derived requirements are all
+		// satisfied and verified are not gaps (STK-001, STK-002, STK-004).
+		expect(shape(table('RequirementGaps'))).toEqual([8, 8]);
+		expect(col(table('RequirementGaps'), 'id')).not.toContain('STK-001');
 		const gaps = table('RequirementGaps');
 		expect(col(gaps, 'id').filter((id) => id.startsWith('SYS'))).toEqual([
 			'SYS-005',
@@ -1105,16 +1115,16 @@ describe('the demo’s tables', () => {
 		const row = (kind: string) => stats.rows.find((r) => r[0] === kind);
 		expect(row('part def')).toEqual(['part def', '19', '0']);
 		expect(row('requirement')).toEqual(['requirement', '0', '24']);
-		// The dependency matrices' metadata def has five.
-		expect(row('attribute')).toEqual(['attribute', '0', '233']);
-		// Enum literals count as usages, metadata annotations are anonymous.
-		expect(row('enum')).toEqual(['enum', '0', '43']);
+		// The dependency matrices' metadata def has five; the reporting library's convention two.
+		expect(row('attribute')).toEqual(['attribute', '0', '235']);
+		// Enum literals count as usages (the convention severities, three), metadata annotations are anonymous.
+		expect(row('enum')).toEqual(['enum', '0', '46']);
 		expect(row('metadata')).toBeUndefined();
 	});
 
 	it('report chapters render from the library’s subviews', () => {
 		expect(shape(table('ModelViews::SpecificationDocument::requirementsChapter'))).toEqual([
-			24, 11
+			24, 12
 		]);
 		expect(shape(table('ModelViews::InterfaceControlDocument::connectionsChapter'))).toEqual([
 			21, 2

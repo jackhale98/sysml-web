@@ -86,7 +86,8 @@ export function toMarkdown(doc: ReportDocument): string {
 		doc.version && `Version ${doc.version}`,
 		doc.status,
 		doc.author && `Author ${doc.author}`,
-		doc.date
+		doc.date,
+		doc.revision
 	].filter(Boolean) as string[];
 	const parts = [
 		`# ${escape(doc.title)}`,

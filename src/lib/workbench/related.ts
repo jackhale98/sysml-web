@@ -15,7 +15,8 @@ export const RELATION_WORDS: Record<RelationKind, { out: string; in: string }> =
 	connects: { out: 'Connected to', in: 'Connected from' },
 	binds: { out: 'Bound to', in: 'Bound from' },
 	flows: { out: 'Sends to', in: 'Receives from' },
-	allocates: { out: 'Allocated to', in: 'Has allocated to it' }
+	allocates: { out: 'Allocated to', in: 'Has allocated to it' },
+	fmea: { out: 'Its FMEA names', in: 'Named in the FMEA of' }
 };
 
 const ORDER: RelationKind[] = [
@@ -27,7 +28,8 @@ const ORDER: RelationKind[] = [
 	'connects',
 	'binds',
 	'flows',
-	'allocates'
+	'allocates',
+	'fmea'
 ];
 
 export interface RelatedRow {

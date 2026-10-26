@@ -50,9 +50,20 @@ Row providers (the `rows` value):
   "relation:satisfy"      satisfy relationships (requirement, by)
   "relation:verify"       verify relationships (requirement, by)
   "relation:connection"   connections (source, target)
+  "requirements"          one row per requirement (id, title, text,
+                          type, status, owner, rationale, issues,
+                          kind, priority, verificationMethod,
+                          satisfiedBy, verifiedBy, check); satisfied
+                          and verified as 1/0 by the coverage rule
+                          (directly, or through every requirement
+                          derived from it); result: how its
+                          verification cases' recorded results went
+                          (passed, failed, inconclusive or not run,
+                          from @VerificationResult; see
+                          verification.md)
   "trace"                 requirement coverage (requirement, id,
-                          satisfied, verified as yes/no, satisfiedBy,
-                          verifiedBy)
+                          satisfied, verified as yes/no by the
+                          coverage rule, satisfiedBy, verifiedBy)
   "kindcounts"            model statistics (kind, definitions,
                           usages)
   "budget:mass"           a budget of one attribute (here `mass`)

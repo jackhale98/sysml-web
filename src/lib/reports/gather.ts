@@ -10,6 +10,7 @@ import type { Analysis, ViewInfo } from '#lib/engine/types.ts';
 import type { TreeNode } from '#lib/project/elements.ts';
 import { stringValue } from '#lib/project/names.ts';
 import type { RequirementRow } from '#lib/project/requirements.ts';
+import type { RevisionInfo } from '#lib/project/verification.ts';
 import { describingPackage, docSummary } from '#lib/workbench/home/model.ts';
 import { viewTitle } from '#lib/workbench/views.ts';
 import { chapterKind, STANDARD_CHAPTERS } from './build.ts';
@@ -17,7 +18,7 @@ import type { Chapter, DocumentMeta, ReportContext } from './context.ts';
 import { diagramScope } from './icd.ts';
 import { reportKindOf, standardReport, STANDARD_REPORTS } from './kinds.ts';
 import { indexModel, parseExpose } from './model.ts';
-import { readDerivations } from './text.ts';
+import { projectDerivations } from '#lib/project/derivations.ts';
 
 export interface ReportSource {
 	views: ViewInfo[];
@@ -28,6 +29,12 @@ export interface ReportSource {
 	requirements: RequirementRow[];
 	project: { name: string; description?: string; version?: string } | null;
 	isLibrary: (path: string) => boolean;
+	/**
+	 * The version of the model: how the report names it (`Commit 3f2a9c1 of
+	 * owner/repo (main)`) and what results are compared with. Without one,
+	 * the report says it is not committed.
+	 */
+	revision?: { stamp: string; info: RevisionInfo | null } | null;
 }
 
 /** How analysis lists a view (`Model.views`), for its `filter` conditions. */
@@ -127,14 +134,14 @@ export function prepareReport(
 		chapters,
 		index: indexModel(source.tree, source.isLibrary),
 		requirements: source.requirements,
-		derivations: Object.entries(source.texts)
-			.filter(([path]) => /\.(sysml|kerml)$/.test(path) && !source.isLibrary(path))
-			.flatMap(([path, text]) => readDerivations(path, text)),
+		derivations: projectDerivations(source.texts, (path) => !source.isLibrary(path)),
 		analyses: source.analyses,
 		texts: source.texts,
 		tables: {},
 		diagram: null,
-		date
+		date,
+		revision: source.revision?.stamp ?? 'Not committed',
+		revisionInfo: source.revision?.info ?? null
 	};
 }
 
