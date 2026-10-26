@@ -15,11 +15,23 @@
  * gets `limit`, `margin` and `check` when a `satisfy` claim's constraint
  * compares the row's value with a limit (`drone.takeOffMass <= 4 [kg]`).
  * Rows whose type has no such attribute, and rows with quantity 0, are left
- * out.
+ * out, except a part with a value whose number can vary (`[0..1]`, `[*]`):
+ * it is counted at its least, shown, and every total that includes it says so. Values
+ * that don't add up (g and m, a plain number, °C) give no sum and say why;
+ * a value not in the total's unit has no share.
  *
  * **Checks.** One row per check of `Evaluation.checks()`.
  */
-import { convert, formatMagnitude, formatQuantity, readable, type Quantity } from '../../quantity';
+import {
+	convert,
+	formatMagnitude,
+	formatQuantity,
+	isAffine,
+	readable,
+	sumQuantities,
+	whyNoSum,
+	type Quantity
+} from '../../quantity';
 import type { Check, ColumnKind, Evaluated } from '../../types';
 import { multiplicityOf, type ElementRecord } from '../model';
 import { referencesIn } from '../evaluation';
@@ -57,6 +69,8 @@ interface BudgetLine {
 	rolledUp: boolean;
 	/** The sibling collection this part is one of (`m1 :> motors`): counted there. */
 	memberOf?: string | null;
+	/** Parts in this sum whose number can vary, by path from here, counted at their least. */
+	variable?: { path: string; range: string; count: number }[];
 }
 
 export function budgetRows(ctx: ViewContext, attribute: string): Row[] {
@@ -90,10 +104,13 @@ export function budgetRows(ctx: ViewContext, attribute: string): Row[] {
 
 	// Children before parents: a parent without a value adds up its parts.
 	const declares = new Map<string, 'required' | 'optional' | null>();
+	// What adds up into a parent; shown are those of these whose number isn't 0 at its least, and
+	// parts with a value whose number can vary (`o : Opt[0..1]`, `[*]`), counted at their least (0).
+	const summable = new Set<BudgetLine>();
 	const included = new Set<BudgetLine>();
 	for (const line of [...order].reverse()) {
 		const own = valueRecord(ctx, line.record, line.row.typeId ?? null, name);
-		const children = childrenOf(line).filter((c) => included.has(c));
+		const children = childrenOf(line).filter((c) => summable.has(c));
 		if (own) {
 			let value = evaluation?.valueOf(own.id) ?? null;
 			// Inherited as an expression (`mass = cells * cellMass`): with this part's values, not its type's.
@@ -116,7 +133,11 @@ export function budgetRows(ctx: ViewContext, attribute: string): Row[] {
 		if (!line.each && children.length) {
 			const counted = children.filter((c) => !c.memberOf);
 			const parts = counted.filter((c) => c.each);
-			const sum = sumOf(parts.map((c) => scaled(c.each!, c.quantity)));
+			const items = parts.map((c) => scaled(c.each!, c.quantity));
+			const sum = sumQuantities(items);
+			// Values that don't add up (grams and metres, a plain number, °C): no total, and why.
+			if (!sum && items.length)
+				line.note = `no total: the parts' ${name} values ${whyNoSum(items)}`;
 			if (sum) {
 				line.each = sum;
 				line.rolledUp = true;
@@ -124,19 +145,28 @@ export function budgetRows(ctx: ViewContext, attribute: string): Row[] {
 				line.note = missing
 					? `adds up the parts that have a ${name}; ${missing} ${missing === 1 ? 'has' : 'have'} none`
 					: `the sum of its parts`;
-				// Parts whose number may vary (`[0..1]`, `[2..4]`) are counted at their least.
-				const variable = childrenOf(line).filter(
-					(c) => (c.each || included.has(c)) && !c.memberOf && rangeOf(c.record.header)
-				);
-				if (variable.length)
-					line.note += `; counts ${variable.map((c) => `\`${c.record.name}\` (${rangeOf(c.record.header)}) as ${c.quantity}`).join(' and ')}, whose number can vary`;
+				// Parts whose number may vary (`[0..1]`, `[2..4]`, `[*]`), here or further down, are
+				// counted at their least, and the total says so.
+				line.variable = parts.flatMap((c) => {
+					const range = rangeOf(c.record.header);
+					const own = range ? [{ path: c.record.name ?? '', range, count: c.quantity }] : [];
+					const nested = (c.variable ?? []).map((v) => ({
+						...v,
+						path: `${c.record.name}.${v.path}`
+					}));
+					return [...own, ...nested];
+				});
+				if (line.variable.length)
+					line.note += `; counts ${line.variable.map((v) => `\`${v.path}\` (${v.range}) as ${v.count}`).join(' and ')}, whose number can vary: the total is the least it can be`;
 			}
 		}
 		// A part whose type declares the attribute belongs in the budget, without a value too
 		// (it is missing one) — unless the attribute is optional (`powerDraw [0..1]`).
 		const declared = declaresAttribute(ctx, line.record, line.row.typeId ?? null, name, declares);
-		if (line.extended > 0 && ((declared === 'required' && !own) || children.length || line.each))
-			included.add(line);
+		if ((declared === 'required' && !own) || children.length || line.each) {
+			summable.add(line);
+			if (line.extended > 0 || (line.each && rangeOf(line.record.header))) included.add(line);
+		}
 		if (!line.each && !line.note) line.note = `no ${name} is given`;
 	}
 
@@ -153,10 +183,14 @@ export function budgetRows(ctx: ViewContext, attribute: string): Row[] {
 		const shown = (q: Quantity | null) => (q ? formatQuantity(inUnit(q, unit)) : '');
 		fields.set('each', shown(line.each));
 		fields.set('total', shown(total));
-		fields.set('share', total && rootTotal ? percent(ratio(total, rootTotal)) : '');
+		const share = total && rootTotal ? ratio(total, rootTotal) : null;
+		fields.set('share', share !== null ? percent(share) : '');
 		const notes: Record<string, string> = {};
 		if (line.note && (!line.each || line.rolledUp)) notes.each = line.note;
 		if (line.memberOf) notes.total = `one of \`${line.memberOf}\`, counted there`;
+		const range = rangeOf(line.record.header);
+		if (range)
+			notes.quantity = `its number can vary (${range}): counted at its least, ${line.quantity}`;
 		const row: Row = {
 			...line.row,
 			fields,
@@ -378,21 +412,13 @@ function noteOf(value: Evaluated | null | undefined): string | null {
 
 const scaled = (q: Quantity, n: number): Quantity => ({ value: q.value * n, unit: q.unit });
 
-function sumOf(items: Quantity[]): Quantity | null {
-	if (!items.length) return null;
-	const unit = items[0]!.unit;
-	let total = 0;
-	for (const q of items) {
-		const v = q.unit === unit ? q.value : q.unit && unit ? convert(q.value, q.unit, unit) : null;
-		if (v === null) return null;
-		total += v;
-	}
-	return { value: total, unit };
-}
-
-function ratio(part: Quantity, whole: Quantity): number {
-	const p = part.unit && whole.unit ? convert(part.value, part.unit, whole.unit) : part.value;
-	return p !== null && whole.value ? p / whole.value : 0;
+/** `part`'s share of `whole`; null when it isn't in the whole's unit nor converts to it. */
+function ratio(part: Quantity, whole: Quantity): number | null {
+	if (!whole.value || isAffine(part.unit) || isAffine(whole.unit)) return null;
+	if (part.unit === whole.unit) return part.value / whole.value;
+	if (!part.unit || !whole.unit) return null;
+	const p = convert(part.value, part.unit, whole.unit);
+	return p === null ? null : p / whole.value;
 }
 
 /** The unit most of the values are given in (they read alike down the column). */

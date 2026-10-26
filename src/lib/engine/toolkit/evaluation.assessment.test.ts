@@ -316,8 +316,9 @@ describe('6.2 missing values and mixed, unknown or incompatible units', () => {
 		const { rows, notes } = budget(host.renderView(files, 'U::unitsBudget'));
 		// 500 g + 1.5 kg = 2000 g.
 		expect(rows.get('sys.box')?.slice(1, 3)).toEqual(['2000 g', '2000 g']);
-		// 500 g + 2 lb: the table doesn't convert pounds, so no total (not 502 g).
-		expect(rows.get('sys.boxLb')?.[1]).toBe('');
+		// 500 g + 2 lb = 500 g + 2 × 453.5924 g (the library's pound) = 1407.1848 g (not 502 g).
+		expect(rows.get('sys.boxLb')?.slice(1, 3)).toEqual(['1407 g', '1407 g']);
+		expect(rows.get('sys.boxLb.l')?.[1]).toBe('907.2 g');
 		// 500 g + 3 (no unit), 500 g + 5 m: no total.
 		expect(rows.get('sys.boxBare')?.[1]).toBe('');
 		expect(rows.get('sys.boxLen')?.[1]).toBe('');
@@ -325,26 +326,32 @@ describe('6.2 missing values and mixed, unknown or incompatible units', () => {
 		expect(rows.get('sys.boxMissing')?.[1]).toBe('500 g');
 		expect(notes.get('sys.boxMissing')).toBe('adds up the parts that have a mass; 1 has none');
 		expect(notes.get('sys.boxMissing.m')).toBe('no mass is given');
-		// The system adds what it can (2000 + 500 = 2500 g) and says 3 parts are left out.
-		expect(rows.get('sys')?.[1]).toBe('2500 g');
-		expect(notes.get('sys')).toBe('adds up the parts that have a mass; 3 have none');
+		// The system adds what it can (2000 + 1407.18 + 500 = 3907.18 g) and says 2 parts are left out.
+		expect(rows.get('sys')?.[1]).toBe('3907 g');
+		expect(notes.get('sys')).toBe('adds up the parts that have a mass; 2 have none');
 	});
 
-	// Known gap: a parent whose parts' units don't add up says "no mass is given" instead of why.
-	it.fails('says why parts in units that do not add up have no total', () => {
+	// A parent whose parts' values don't add up says why (it said "no mass is given").
+	it('says why parts in units that do not add up have no total', () => {
 		const files = analyse(UNITS);
 		const { notes } = budget(host.renderView(files, 'U::unitsBudget'));
-		expect(notes.get('sys.boxLb')).toMatch(/lb/);
-		expect(notes.get('sys.boxLen')).toMatch(/\bm\b/);
+		expect(notes.get('sys.boxLen')).toBe(
+			"no total: the parts' mass values are in g and m, which don't convert to one another"
+		);
+		expect(notes.get('sys.boxBare')).toBe(
+			"no total: the parts' mass values are in g and plain numbers (no unit), which don't add up"
+		);
 	});
 
-	// Known gap: a value in a unit the table can't convert (2 lb) shows a share of 0 %; a plain
-	// number (3) a share as if it were grams (0.1 %). Neither has a share of the total in grams.
-	it.fails('gives no share to a value that is not in the total’s unit', () => {
+	// A value in a unit that doesn't convert to the total's (5 m) showed a share of 0 %, and a plain
+	// number (3) a share as if it were grams (0.1 %). Neither has a share of a total in grams.
+	it('gives no share to a value that is not in the total’s unit', () => {
 		const files = analyse(UNITS);
 		const { rows } = budget(host.renderView(files, 'U::unitsBudget'));
-		expect(rows.get('sys.boxLb.l')?.[3]).toBe('');
+		expect(rows.get('sys.boxLen.l')?.[3]).toBe('');
 		expect(rows.get('sys.boxBare.b')?.[3]).toBe('');
+		// Pounds convert: 2 lb = 907.18 g of 3907.18 g = 23 %.
+		expect(rows.get('sys.boxLb.l')?.[3]).toBe('23 %');
 	});
 });
 
@@ -410,8 +417,38 @@ describe('6.2 parts named out of a collection, and parts of variable number', ()
 		// The total is not presented as simply "the sum of its parts": the note names the variable ones.
 		expect(notes.get('kit')).toMatch(/`o` \(0\.\.1\)/);
 		expect(notes.get('kit')).toMatch(/`r` \(2\.\.4\)/);
+		expect(notes.get('kit')).toMatch(/the total is the least it can be$/);
+	});
+
+	it('counts every range at its least, `[*]` as `[0..*]`, and says so up to the top', () => {
+		const files = analyse(RANGES);
+		const { rows, notes } = budget(host.renderView(files, 'R::rigBudget'));
+		// base 100 g; spare [*] and extra [0..*] at 0 (`[*]` counted 1 before: 400 g);
+		// each pod's arms [1..*] at 1: 100 g a pod, 2 pods = 200 g. rig = 100 + 0 + 0 + 200 = 300 g.
+		expect(rows.get('rig')?.slice(1, 3)).toEqual(['300 g', '300 g']);
+		expect(rows.get('rig.spare')).toEqual(['0', '100 g', '0 g', '0 %']);
+		expect(rows.get('rig.extra')).toEqual(['0', '100 g', '0 g', '0 %']);
+		expect(notes.get('rig.spare')).toBe('its number can vary (*): counted at its least, 0');
+		expect(rows.get('rig.pods')?.slice(1, 3)).toEqual(['100 g', '200 g']);
+		expect(notes.get('rig.pods')).toBe(
+			'the sum of its parts; counts `arms` (1..*) as 1, whose number can vary: the total is the least it can be'
+		);
+		// The top names the variable parts further down too.
+		expect(notes.get('rig')).toBe(
+			'the sum of its parts; counts `spare` (*) as 0 and `extra` (0..*) as 0 and `pods.arms` (1..*) as 1, whose number can vary: the total is the least it can be'
+		);
 	});
 });
+
+const RANGES = `package R {
+  private import SI::*;
+  part def Opt { attribute mass :> ISQ::mass = 100 [g]; }
+  part def Pod { part arms : Opt[1..*]; }
+  part def Rig { part base : Opt; part spare : Opt[*]; part extra : Opt[0..*]; part pods : Pod[2]; }
+  part rig : Rig;
+  view rigBudget : ModelViews::MassBudget { expose rig::**; }
+}
+`;
 
 // ---- 6.3 Constraints in their scope -----------------------------------------------------
 

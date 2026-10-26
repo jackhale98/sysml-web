@@ -53,4 +53,27 @@ describe('6.1 the app’s evaluator', () => {
 		// The same unknown unit adds up with itself.
 		expect(run('1 [furlong] + 2 [furlong]')).toEqual(new Quantity(3, 'furlong'));
 	});
+
+	it('converts the library’s units: pounds, grains, feet', () => {
+		// 7000 gr + 100 g = 7000 gr + 100 / 0.06479891 gr = 8543.2358 gr; 1 lb + 1 kg = 1 + 1 / 0.4535924 lb.
+		expect((run('7000 [USCustomaryUnits::gr] + 100 [g]') as Quantity).value).toBeCloseTo(
+			7000 + 100 / 0.06479891,
+			9
+		);
+		expect((run('1 [lb] + 1 [kg]') as Quantity).value).toBeCloseTo(1 + 1 / 0.4535924, 12);
+		expect((run('1 [ft] + 1 [m]') as Quantity).value).toBeCloseTo(1 + 1 / 0.3048, 12);
+	});
+
+	it('compares temperatures across units, and never adds them across units', () => {
+		// 20 °C = 293.15 K > 250 K; 50 °F = 283.15 K > 280 K.
+		expect(run("20 ['°C'] > 250 [K]")).toBe(true);
+		expect(run("50 ['°F'] > 280 [K]")).toBe(true);
+		expect(run("max(20 ['°C'], 300 [K])")).toEqual(new Quantity(300 - 273.15, '°C'));
+		// 20 °C + 1 K: 21 °C if the kelvin is a difference, -252.15 °C if a temperature. Refused.
+		expect(fails("20 ['°C'] + 1 [K]") ?? 'no error').toMatch(/temperature/);
+		expect(fails("1 ['°C'] - 1 ['°F']") ?? 'no error').toMatch(/temperature/);
+		expect(fails("sum(20 ['°C'], 1 [K])") ?? 'no error').toMatch(/temperature/);
+		// In one unit the result is the same whether a value is a temperature or a difference.
+		expect(run("20 ['°C'] + 5 ['°C']")).toEqual(new Quantity(25, '°C'));
+	});
 });

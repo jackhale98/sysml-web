@@ -96,7 +96,7 @@ export function provideRows(ctx: ViewContext, spec: string, warnings: string[]):
 			return hazardRows(ctx);
 		case 'uncertainty':
 			warnings.push(
-				'uncertainty analyses are not evaluated by this engine yet; the table is empty'
+				'uncertainty analyses are not worked out yet (planned: worst-case and RSS ranges over tolerances), so the table is empty'
 			);
 			return [];
 		default:
@@ -706,12 +706,15 @@ function compositionChildren(ctx: ViewContext, node: ElementRecord): ElementReco
 	return out;
 }
 
-/** `[4]` → 4; a range → its lower bound; none → 1. */
+/**
+ * `[4]` → 4; a range → its lower bound, the least the part can number
+ * (`[2..4]` → 2, `[0..*]` and `[*]` alike → 0); none → 1.
+ */
 function quantityOf(usage: ElementRecord): number {
 	const text = multiplicityOf(usage.header);
 	if (!text) return 1;
 	const [lower, upper] = text.split('..').map((s) => s.trim());
-	if (upper === undefined) return /^\d+$/.test(lower!) ? Number(lower) : 1;
+	if (upper === undefined && lower === '*') return 0;
 	return /^\d+$/.test(lower!) ? Number(lower) : 1;
 }
 

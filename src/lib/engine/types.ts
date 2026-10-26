@@ -565,9 +565,13 @@ export interface TradeStudy {
 	line: number;
 	/** What the objective asks for: the highest score, the lowest, or unknown (another objective). */
 	objective: 'maximize' | 'minimize' | null;
+	/** The score as the evaluation function's result writes it (`0.6 * massScore + 0.4 * priceScore`). */
+	scoreText: string | null;
 	alternatives: TradeAlternative[];
 	/** The evaluation function's attributes, in declaration order. */
 	criteria: TradeCriterion[];
+	/** Each alternative's own attribute values (`mass`, `price`, `cells`): the inputs the criteria read. */
+	inputs: TradeInput[];
 	/** The alternative the objective selects; null on a tie, with scores missing, or without an objective. */
 	selected: number | null;
 	/** The alternatives with the best score (several on a tie). */
@@ -606,6 +610,8 @@ export interface TradeCriterion {
 	values: Evaluated[];
 	/** The values as shown, in one unit (empty when unknown). */
 	shown: string[];
+	/** The unit `shown` is in; null for plain numbers or values that don't convert to one unit. */
+	unit: string | null;
 	/** The weight the score gives it (0.5 for half), when the score is a weighted sum. */
 	weight: number | null;
 	/** Each alternative's score on this criterion before weighting, when the score has one. */
@@ -614,6 +620,12 @@ export interface TradeCriterion {
 	better: 'higher' | 'lower' | null;
 	/** The alternatives with the best value (empty when all are equal or `better` is unknown). */
 	best: number[];
+}
+
+export interface TradeInput {
+	name: string;
+	/** Each alternative's value, in the order of `alternatives`. */
+	values: Evaluated[];
 }
 
 /** Editor language services (all offsets are UTF-16 into the given file). */

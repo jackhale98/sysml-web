@@ -61,7 +61,15 @@ Row providers (the `rows` value):
                           each = the attribute's evaluated value for
                           one of the part, or the sum of its parts'
                           when it has none; total = each x extended;
-                          share = total / the root's total. After a
+                          share = total / the root's total. Units of
+                          one quantity are converted (the standard
+                          library's: SI and US customary); values
+                          that don't add up (g and m, a plain number,
+                          temperatures in °C or °F) give no sum, with
+                          the reason, and no share. A part whose
+                          number can vary ([0..1], [2..4], [*] as
+                          [0..*]) counts at its least, and every
+                          total that includes one says so. After a
                           root's parts come its own attributes of
                           the same quantity (`emptyMass :> mass`).
                           limit, margin, check and requirement come
@@ -92,10 +100,16 @@ Row providers (the `rows` value):
                           selects (MaximizeObjective: the highest
                           score) and the one the design uses are
                           marked. A view shows the first study it
-                          exposes.
-  "uncertainty"           evaluated uncertainty analyses (case,
-                          critical, target limits, worst-case
-                          range, margin, cp, cpk, result)
+                          exposes. Exported (CSV, Excel), the study
+                          is data: its objective and score, each
+                          criterion's unit, weight and direction,
+                          scores, ranks, selection and the
+                          alternatives' own values, every digit.
+  "uncertainty"           reserved for uncertainty analyses
+                          (planned: worst-case and RSS ranges over
+                          tolerances, margins, cp and cpk). Not
+                          worked out yet: the table is empty and
+                          its warning says so.
   "hazards"               one row per occurrence typed by
                           HazardAnalysis::Hazard (element,
                           description, type, parent, file, line)
