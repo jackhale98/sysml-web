@@ -130,9 +130,18 @@ test('the inspector sums a trade study up, and the table exports as CSV', async 
 		.getByRole('menuitem', { name: 'CSV' })
 		.click();
 	const csv = readFileSync(await (await download).path(), 'utf8');
+	// The study as data: the objective, each criterion's unit and weight, every digit, the inputs.
 	expect(
-		csv.startsWith('﻿Criterion,Weight,drone.battery,lithiumPolymer,lithiumIon3P,semiSolidState')
+		csv.startsWith(
+			'﻿Kind,Name,Unit,Weight,Better,drone.battery,lithiumPolymer,lithiumIon3P,semiSolidState'
+		)
 	).toBe(true);
-	expect(csv).toContain('\r\nendurance,50 %,27.54 min,25.13 min,35.77 min,36.54 min\r\n');
-	expect(csv).toContain('\r\nrank,,2,3,4,1');
+	expect(csv).toContain(
+		'\r\nobjective,"maximize score = BatteryScore(endurance, massMargin, price)"'
+	);
+	expect(csv).toContain(
+		'\r\ncriterion,endurance,min,0.5,higher,27.54,25.1256407152485,35.768034455437,36.5443334848328\r\n'
+	);
+	expect(csv).toContain('\r\nrank,rank,,,,2,3,4,1\r\n');
+	expect(csv).toContain('\r\ninput,price,,,,420,260,560,1150');
 });

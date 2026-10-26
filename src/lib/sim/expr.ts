@@ -318,6 +318,9 @@ function asBool(value: Value): boolean | null {
  * Bring two numbers to a common unit. A bare number takes the other side's
  * unit; units that measure different things are an error; unknown units
  * compare by magnitude, but don't add up (`1 [furlong] + 1 [m]` is no 2 furlongs).
+ * A temperature in `°C` or `°F` compares with one in another unit (with its
+ * zero shift), but doesn't add to it: `20 [°C] + 1 [K]` is 21 °C if the
+ * kelvin is a difference and -252.15 °C if it is a temperature.
  */
 function align(op: string, a: Value, b: Value): { x: number; y: number; unit: string | null } {
 	const x = magnitude(a)!;
@@ -332,10 +335,16 @@ function align(op: string, a: Value, b: Value): { x: number; y: number; unit: st
 		return { x, y, unit: ua };
 	}
 	if (!sameDimension(pa, pb)) throw cannot(op, a, b);
+	if ((pa.offset || pb.offset) && !ORDERS.has(op))
+		throw new EvalError(
+			`${cannot(op, a, b).message}: a temperature in \`${pa.offset ? ua : ub}\` doesn't add to a value in another unit`
+		);
 	return { x, y: convert(y, ub, ua), unit: ua };
 }
 
 const COMPARISONS = new Set(['<', '>', '<=', '>=', '==']);
+/** What only orders values, so a temperature converts with its zero shift. */
+const ORDERS = new Set([...COMPARISONS, 'min', 'max', 'clamp']);
 
 function withUnit(n: number, unit: string | null): Value {
 	return unit ? new Quantity(n, unit) : n;

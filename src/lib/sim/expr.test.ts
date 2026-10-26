@@ -183,10 +183,14 @@ describe('units', () => {
 		expect(convert(1, 'm', 'ft')).toBeCloseTo(3.28084, 5);
 		expect(convert(1, 'g', 'lb')).toBeCloseTo(0.00220462, 7);
 		expect(convert(100, '°C', 'K')).toBeCloseTo(373.15, 9);
-		expect(convert(212, 'degF', '°C')).toBeCloseTo(100, 9);
-		expect(convert(Math.PI, 'rad', 'deg')).toBeCloseTo(180, 9);
-		expect(convert(1, 'kWh', 'MJ')).toBeCloseTo(3.6, 9);
+		expect(convert(212, '°F', '°C')).toBeCloseTo(100, 9);
+		// The library's degree is 0.01745329 rad (π/180 rounded): π rad is 180.000005°.
+		expect(convert(Math.PI, 'rad', '°')).toBeCloseTo(Math.PI / 0.01745329, 9);
+		expect(convert(1, 'kW*h', 'MJ')).toBeCloseTo(3.6, 9);
 		expect(convert(101325, 'Pa', 'psi')).toBeCloseTo(14.696, 3);
+		// Spellings the library doesn't have are unknown, as they are in the model.
+		expect(parseUnit('degF')).toBeNull();
+		expect(parseUnit('kWh')).toBeNull();
 		expect(() => convert(1, 'kg', 'm')).toThrow('no conversion from `kg` to `m`');
 	});
 });

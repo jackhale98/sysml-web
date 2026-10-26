@@ -6,6 +6,7 @@
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { SourceFile } from '../protocol';
+import { tradeExport } from '../tradeExport';
 import type { TradeStudy } from '../types';
 import { fromJson } from './evaluation';
 import type { ToolkitHost } from './host';
@@ -134,6 +135,73 @@ describe('the demo’s battery trade study', () => {
 		expect(study!.selected).toBe(0);
 		expect(study!.selected).toBe(study!.current);
 		host.analyzeProject(files);
+	});
+
+	it('exports as data: the objective, the packs’ own values, every digit', () => {
+		const [study] = host.tradeStudies(files);
+		const { header, rows } = tradeExport(study!);
+		expect(header).toEqual([
+			'Kind',
+			'Name',
+			'Unit',
+			'Weight',
+			'Better',
+			'drone.battery',
+			'lithiumPolymer',
+			'lithiumIon3P',
+			'semiSolidState'
+		]);
+		const row = (name: string) => rows.find((r) => r[1] === name)!;
+		expect(rows[0]).toEqual([
+			'objective',
+			'maximize score = BatteryScore(endurance, massMargin, price)',
+			'',
+			'',
+			'higher',
+			'',
+			'',
+			'',
+			''
+		]);
+		// The table shows 25.13 min, 35.77 min…; the export has every digit (15 significant).
+		expect(row('endurance')).toEqual([
+			'criterion',
+			'endurance',
+			'min',
+			'0.5',
+			'higher',
+			'27.54',
+			'25.1256407152485',
+			'35.768034455437',
+			'36.5443334848328'
+		]);
+		expect(row('score').slice(5)).toEqual([
+			'0.392666666666667',
+			'0.284188023841617',
+			'0',
+			'0.586811116161092'
+		]);
+		expect(row('rank')).toEqual(['rank', 'rank', '', '', '', '2', '3', '4', '1']);
+		expect(row('selected')).toEqual([
+			'selection',
+			'selected',
+			'',
+			'',
+			'',
+			'in the design',
+			'',
+			'',
+			'selected'
+		]);
+		// The inputs: each pack's own values, as its definition orders them.
+		expect(rows.filter((r) => r[0] === 'input')).toEqual([
+			['input', 'mass', 'g', '', '', '1100', '1250', '1480', '1000'],
+			['input', 'nominalVoltage', 'V', '', '', '21.6', '22.2', '21.6', '21.6'],
+			['input', 'capacity', 'W·h', '', '', '216', '222', '324', '260'],
+			['input', 'usableFraction', '', '', '', '0.85', '0.8', '0.85', '0.9'],
+			['input', 'usableEnergy', 'W·h', '', '', '183.6', '177.6', '275.4', '234'],
+			['input', 'price', '', '', '', '420', '260', '560', '1150']
+		]);
 	});
 
 	it('renders as a table: a row per criterion, a column per alternative', () => {

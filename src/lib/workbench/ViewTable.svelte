@@ -27,6 +27,7 @@
 	} from '@lucide/svelte';
 	import ExportMenu from '#lib/dataio/ExportMenu.svelte';
 	import type { ExportTable } from '#lib/dataio/export.ts';
+	import { tradeExport } from '#lib/engine/tradeExport.ts';
 	import type { Engine } from '#lib/engine/client.ts';
 	import type { CheckStatus, RenderedTable, RowInfo, ViewInfo } from '#lib/engine/types.ts';
 	import { byteToUtf16, elementAt, type ModelElement } from '#lib/project/elements.ts';
@@ -200,13 +201,19 @@
 				rows.map((r) => r.index),
 				{ title, project: workspace.info?.name ?? 'Project', doc: info?.doc }
 			);
+		// A trade study exports as data: its objective, inputs and every digit of its values.
+		if (table?.trade)
+			return {
+				title,
+				project: workspace.info?.name ?? 'Project',
+				doc: info?.doc,
+				...tradeExport(table.trade)
+			};
 		return {
 			title,
 			project: workspace.info?.name ?? 'Project',
 			doc: info?.doc,
-			header: (table?.columns ?? []).map((c, i) =>
-				(isPivot && i > 0) || table?.trade?.alternatives.some((a) => a.name === c) ? c : heading(c)
-			),
+			header: (table?.columns ?? []).map((c, i) => (isPivot && i > 0 ? c : heading(c))),
 			rows: rows.map((r) => r.cells)
 		};
 	}

@@ -47,10 +47,10 @@ import {
 	formatMagnitude,
 	formatQuantity,
 	parseUnit,
-	readable,
-	type Quantity
+	qualifiedUnit,
+	readable
 } from '../quantity';
-import type { Evaluated, TradeAlternative, TradeCriterion, TradeStudy } from '../types';
+import type { Evaluated, TradeAlternative, TradeCriterion, TradeInput, TradeStudy } from '../types';
 import type { Evaluation } from './evaluation';
 import { referencesIn } from './evaluation';
 import type { ElementRecord } from './model';
@@ -204,7 +204,7 @@ export class TradeStudies {
 			line: c.span.start_row,
 			doc: c.docs.length ? c.docs.join(' ').replace(/\s+/g, ' ').trim() : null,
 			values: values[i]!,
-			shown: shownInOneUnit(values[i]!),
+			...shownInOneUnit(values[i]!),
 			weight: null,
 			scores: null,
 			better: null,
@@ -219,13 +219,9 @@ export class TradeStudies {
 		);
 
 		// The ranking and the selection, with the scores in one unit (0.6 kg is more than 500 g).
-		const scoreUnit = scores.find((s) => s.kind === 'number')?.unit ?? null;
-		const numbers = scores.map((s) => {
-			if (s.kind !== 'number') return null;
-			if (s.unit === scoreUnit) return s.value;
-			return s.unit && scoreUnit ? convert(s.value, s.unit, scoreUnit) : null;
-		});
-		const apart = scores.some((s, i) => s.kind === 'number' && numbers[i] === null);
+		const common = inOneUnit(scores);
+		const numbers = common?.numbers ?? scores.map(() => null);
+		const apart = !common;
 		const ranked = numbers
 			.map((n, i) => ({ n, i }))
 			.filter((x): x is { n: number; i: number } => x.n !== null)
@@ -260,6 +256,7 @@ export class TradeStudies {
 			file: record.path,
 			line: record.span.start_row,
 			objective: goal,
+			scoreText: result?.value ? result.value.replace(/\s+/g, ' ').trim() : null,
 			alternatives: alternatives.map((a, i) => ({
 				...a.shown,
 				name: names[i]!,
@@ -267,6 +264,7 @@ export class TradeStudies {
 				rank: ranks[i]!
 			})),
 			criteria,
+			inputs: this.inputs(alternatives),
 			selected,
 			best,
 			current: this.current(alternatives),
@@ -276,6 +274,30 @@ export class TradeStudies {
 	}
 
 	// ---- The study's parts ----
+
+	/**
+	 * Each alternative's own attribute values (`mass`, `price`, `cells`), in
+	 * the order their definitions declare them; those no alternative has a
+	 * value for are left out.
+	 */
+	private inputs(alternatives: Candidate[]): TradeInput[] {
+		const records = new Map<string, ElementRecord>();
+		for (const a of alternatives) {
+			if (!a.record) continue;
+			for (const id of [...this.ctx.supers(a.record.id).toReversed(), a.record.id])
+				for (const m of this.ctx.ownedBy(id))
+					if (m.kind === 'attribute' && m.name && !m.isDefinition && m.direction === null)
+						if (!records.has(m.name)) records.set(m.name, m);
+		}
+		return [...records]
+			.map(([name, record]) => ({
+				name,
+				values: alternatives.map((a) =>
+					this.evaluated(() => this.feature(a.qualifiedName, name), record)
+				)
+			}))
+			.filter((i) => i.values.some((v) => v.kind === 'number' || v.kind === 'text'));
+	}
 
 	/** The members of an analysis and of the analysis defs it is typed by (its own first). */
 	private membersWithInherited(record: ElementRecord): ElementRecord[] {
@@ -516,8 +538,9 @@ export class TradeStudies {
 				else down++;
 			});
 			criterion.better = up && !down ? 'higher' : down && !up ? 'lower' : null;
-			const known = criterion.values
-				.map((v, i) => ({ v: v.kind === 'number' ? inBase(v) : null, i }))
+			// Compared in one unit; values that don't convert to one another have no best.
+			const known = (inOneUnit(criterion.values)?.numbers ?? [])
+				.map((v, i) => ({ v, i }))
 				.filter((x): x is { v: number; i: number } => x.v !== null);
 			if (criterion.better && known.length > 1) {
 				const pick = criterion.better === 'higher' ? Math.max : Math.min;
@@ -905,8 +928,9 @@ function literalText(value: AppValue): string | null {
 	if (typeof value === 'number') return Number.isFinite(value) ? String(value) : null;
 	if (typeof value === 'boolean') return String(value);
 	if (value instanceof ExprQuantity) {
-		if (!/^[A-Za-z_][\w]*(?:\s*[*/]\s*[A-Za-z_][\w]*)*$/.test(value.unit)) return null;
-		return `${value.value} [${value.unit.replace(/[A-Za-z_]\w*/g, (u) => `SI::${u}`)}]`;
+		// Qualified by the library package that declares each unit (`SI::kg`, `USCustomaryUnits::lb`).
+		const unit = qualifiedUnit(value.unit);
+		return unit ? `${value.value} [${unit}]` : null;
 	}
 	return null;
 }
@@ -967,42 +991,46 @@ function weightedTerms(ast: Expr): { weight: number; name: string }[] | null {
 	return out;
 }
 
-/** A row's values in one unit a person reads easily (the largest value decides it). */
-function shownInOneUnit(values: Evaluated[]): string[] {
-	const numbers = values.filter(
-		(v): v is Extract<Evaluated, { kind: 'number' }> => v.kind === 'number'
-	);
-	const largest = numbers.toSorted(
-		(a, b) => Math.abs(inBase(b) ?? 0) - Math.abs(inBase(a) ?? 0)
-	)[0];
-	const unit = largest?.unit ? readable({ value: largest.value, unit: largest.unit }).unit : null;
-	return values.map((v) => {
+/**
+ * Number values in one unit (the first's), null for each that isn't a
+ * number; null when one doesn't convert (a plain number among masses, a
+ * unit outside the library's).
+ */
+export function inOneUnit(
+	values: Evaluated[]
+): { numbers: (number | null)[]; unit: string | null } | null {
+	const unit = values.find((v) => v.kind === 'number')?.unit ?? null;
+	const numbers = values.map((v) => {
+		if (v.kind !== 'number') return null;
+		if (v.unit === unit) return v.value;
+		return v.unit && unit ? convert(v.value, v.unit, unit) : null;
+	});
+	return values.some((v, i) => v.kind === 'number' && numbers[i] === null)
+		? null
+		: { numbers, unit };
+}
+
+/**
+ * A row's values in one unit a person reads easily (the largest value
+ * decides it), and that unit; each in its own unit when they don't convert.
+ */
+function shownInOneUnit(values: Evaluated[]): { shown: string[]; unit: string | null } {
+	const common = inOneUnit(values);
+	let unit: string | null = null;
+	if (common?.unit) {
+		const largest = Math.max(...common.numbers.map((n) => Math.abs(n ?? 0)));
+		unit = readable({ value: largest, unit: common.unit }).unit;
+	}
+	const shown = values.map((v) => {
 		if (v.kind === 'number') {
-			const q: Quantity = { value: v.value, unit: v.unit };
-			if (unit && v.unit && v.unit !== unit) {
-				const converted = convert(v.value, v.unit, unit);
-				if (converted !== null) return formatQuantity({ value: converted, unit });
-			}
-			return v.unit ? formatQuantity(q) : formatMagnitude(v.value);
+			const converted = unit && v.unit ? convert(v.value, v.unit, unit) : null;
+			if (converted !== null) return formatQuantity({ value: converted, unit: unit! });
+			return v.unit ? formatQuantity({ value: v.value, unit: v.unit }) : formatMagnitude(v.value);
 		}
 		if (v.kind === 'text') return v.text;
 		return '';
 	});
-}
-
-/** A number value in its unit's SI base (to compare values given in different units). */
-function inBase(v: Evaluated): number | null {
-	if (v.kind !== 'number') return null;
-	if (!v.unit) return v.value;
-	const si = convert(v.value, v.unit, siOf(v.unit));
-	return si ?? v.value;
-}
-
-/** A coherent unit of the same dimension (`g` → `kg`, `min` → `s`); the unit itself otherwise. */
-function siOf(unit: string): string {
-	for (const candidate of ['kg', 's', 'W', 'J', 'm', 'V', 'A', 'N', 'Pa'])
-		if (convert(1, unit, candidate) !== null) return candidate;
-	return unit;
+	return { shown, unit: common ? (unit ?? common.unit) : null };
 }
 
 const same = (a: number, b: number) =>

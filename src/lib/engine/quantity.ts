@@ -1,117 +1,126 @@
 /**
  * Quantities as the engine evaluates them — a number and a unit symbol as
- * SysML writes it (`kg`, `W*h`, `m/s^2`) — converted between units of the
- * same dimension and written for people to read. Shared by the engine's
- * tables and checks (in the worker) and the inspector (on the page).
+ * SysML writes it (`kg`, `W*h`, `m/s^2`, `'°C'`) — converted between units
+ * of the same dimension and written for people to read. Shared by the
+ * engine's tables and checks (in the worker), the inspector and forms (on
+ * the page) and the app's evaluator (`sim/expr.ts`).
  *
- * Only the SI units and the common non-SI ones the ISQ library defines are
- * known; a unit outside them is shown as written and never converted.
+ * The units are the bundled standard library's (`SI`, `USCustomaryUnits`),
+ * with the factors its definitions give (`unitTable.ts`, generated from it):
+ * products, quotients and powers of them convert too (`km/h`, `lb/ft^3`).
+ * A unit outside them is shown as written and never converted.
+ *
+ * A temperature in `°C` or `°F` is on a scale with a zero shift: a lone
+ * value converts with it (20 °C is 293.15 K), and such values are never
+ * added to values in another unit, nor summed (`sumQuantities`): whether
+ * one is a temperature or a difference of two decides the answer.
  */
+import { ALIASES, UNITS } from './unitTable';
 
-/** Exponents of length, mass, time, current, temperature, amount, luminous intensity. */
-type Dimension = readonly [number, number, number, number, number, number, number];
+/** Exponents of length, mass, time, current, temperature, amount, luminous intensity, angle, solid angle. */
+type Dimension = readonly number[];
 
-interface UnitInfo {
+export interface UnitInfo {
 	/** Factor to the coherent SI unit of the dimension (g → 0.001 kg). */
 	factor: number;
 	dimension: Dimension;
+	/** Kelvin at the scale's zero, for a lone `°C` or `°F`; 0 otherwise. */
+	offset: number;
 }
 
-const D = (l = 0, m = 0, t = 0, i = 0, th = 0, n = 0, j = 0): Dimension => [l, m, t, i, th, n, j];
+const DIMS = 9;
+const D = (...exponents: number[]): Dimension =>
+	Array.from({ length: DIMS }, (_, i) => exponents[i] ?? 0);
 const LENGTH = D(1);
 const MASS = D(0, 1);
 const TIME = D(0, 0, 1);
-const CURRENT = D(0, 0, 0, 1);
 const POWER = D(2, 1, -3);
 const ENERGY = D(2, 1, -2);
-const VOLTAGE = D(2, 1, -3, -1);
+const NONE = D();
 
-const BASE: Record<string, UnitInfo> = {
-	m: { factor: 1, dimension: LENGTH },
-	g: { factor: 1e-3, dimension: MASS },
-	t: { factor: 1e3, dimension: MASS },
-	s: { factor: 1, dimension: TIME },
-	min: { factor: 60, dimension: TIME },
-	h: { factor: 3600, dimension: TIME },
-	d: { factor: 86400, dimension: TIME },
-	A: { factor: 1, dimension: CURRENT },
-	K: { factor: 1, dimension: D(0, 0, 0, 0, 1) },
-	mol: { factor: 1, dimension: D(0, 0, 0, 0, 0, 1) },
-	cd: { factor: 1, dimension: D(0, 0, 0, 0, 0, 0, 1) },
-	N: { factor: 1, dimension: D(1, 1, -2) },
-	J: { factor: 1, dimension: ENERGY },
-	W: { factor: 1, dimension: POWER },
-	V: { factor: 1, dimension: VOLTAGE },
-	Pa: { factor: 1, dimension: D(-1, 1, -2) },
-	bar: { factor: 1e5, dimension: D(-1, 1, -2) },
-	Hz: { factor: 1, dimension: D(0, 0, -1) },
-	C: { factor: 1, dimension: D(0, 0, 1, 1) },
-	F: { factor: 1, dimension: D(-2, -1, 4, 2) },
-	ohm: { factor: 1, dimension: D(2, 1, -3, -2) },
-	Ω: { factor: 1, dimension: D(2, 1, -3, -2) },
-	L: { factor: 1e-3, dimension: D(3) }
-};
-
-const PREFIXES: Record<string, number> = {
-	G: 1e9,
-	M: 1e6,
-	k: 1e3,
-	c: 1e-2,
-	m: 1e-3,
-	u: 1e-6,
-	μ: 1e-6,
-	n: 1e-9
-};
-
-/** Units that take prefixes (`kg` is `k` + `g`; `min` and `h` don't). */
-const PREFIXABLE = new Set([
-	'm',
-	'g',
-	's',
-	'A',
-	'N',
-	'J',
-	'W',
-	'V',
-	'Pa',
-	'Hz',
-	'C',
-	'F',
-	'ohm',
-	'Ω',
-	'L'
-]);
-
-function symbol(name: string): UnitInfo | null {
-	const base = BASE[name];
-	if (base) return base;
-	for (const [prefix, factor] of Object.entries(PREFIXES)) {
-		if (!name.startsWith(prefix)) continue;
-		const rest = name.slice(prefix.length);
-		const unit = BASE[rest];
-		if (unit && PREFIXABLE.has(rest))
-			return { factor: unit.factor * factor, dimension: unit.dimension };
-	}
-	return null;
+/**
+ * A unit symbol as typed in brackets, in the form the table is keyed by:
+ * no qualifier, quotes or spaces, `·`/`⋅` as `*`, `**` and superscripts as
+ * `^` (`SI::'m⋅s⁻²'` → `m*s^-2`).
+ */
+export function normalizeUnit(text: string): string {
+	return text
+		.replace(/(?:[A-Za-z_]\w*::)+/g, '')
+		.replace(/'/g, '')
+		.replace(/\s+/g, '')
+		.replace(/[·⋅]/g, '*')
+		.replace(/\*\*/g, '^')
+		.replace(/[⁻⁰¹²³⁴⁵⁶⁷⁸⁹]+/g, (sup) => `^${[...sup].map((c) => SUPERSCRIPT[c]).join('')}`);
 }
+
+const SUPERSCRIPT: Record<string, string> = {
+	'⁻': '-',
+	'⁰': '0',
+	'¹': '1',
+	'²': '2',
+	'³': '3',
+	'⁴': '4',
+	'⁵': '5',
+	'⁶': '6',
+	'⁷': '7',
+	'⁸': '8',
+	'⁹': '9'
+};
+
+/** The table by normalized symbol (`m*s^-2` for the library's `m⋅s⁻²`), with the library's other spellings. */
+const BY_SYMBOL = (() => {
+	const out = new Map<string, { info: UnitInfo; symbol: string; pkg: string }>();
+	for (const [symbol, [factor, dims, pkg, offset]] of Object.entries(UNITS))
+		out.set(normalizeUnit(symbol), {
+			info: { factor, dimension: D(...dims), offset: offset ?? 0 },
+			symbol,
+			pkg
+		});
+	for (const [alias, symbol] of Object.entries(ALIASES)) {
+		const target = out.get(normalizeUnit(symbol));
+		if (target && !out.has(alias)) out.set(alias, target);
+	}
+	return out;
+})();
 
 const cache = new Map<string, UnitInfo | null>();
 
 /**
- * A unit symbol as SysML writes it — products, quotients and powers of named
- * units, optionally qualified (`SI::kg`) — or null when it isn't known.
+ * A unit symbol as SysML writes it — a library unit, or products, quotients
+ * and powers of them, optionally qualified (`SI::kg`) — or null when it
+ * isn't known. Only a unit on its own keeps a zero shift (`°C`); in a
+ * product it is a difference (`J/(kg*°C)`).
  */
 export function parseUnit(unit: string): UnitInfo | null {
-	const key = unit.trim();
+	const key = normalizeUnit(unit);
 	if (cache.has(key)) return cache.get(key)!;
 	let result: UnitInfo | null;
 	try {
-		result = new UnitParser(key.replace(/\b[A-Za-z_]\w*::/g, '')).parse();
+		result = BY_SYMBOL.get(key)?.info ?? new UnitParser(key).parse();
 	} catch {
 		result = null;
 	}
 	cache.set(key, result);
 	return result;
+}
+
+/**
+ * The unit as the library qualifies it in text (`SI::kg`,
+ * `USCustomaryUnits::lb`, `SI::km/SI::h`), or null when a part of it isn't
+ * a library unit.
+ */
+export function qualifiedUnit(unit: string): string | null {
+	const key = normalizeUnit(unit);
+	const whole = BY_SYMBOL.get(key);
+	const quote = (s: string) => (/^[A-Za-z_]\w*$/.test(s) ? s : `'${s}'`);
+	if (whole) return `${whole.pkg}::${quote(whole.symbol)}`;
+	let ok = true;
+	const text = key.replace(/[^*/^()\d-]+/g, (atom) => {
+		const hit = BY_SYMBOL.get(atom);
+		if (!hit) ok = false;
+		return hit ? `${hit.pkg}::${quote(hit.symbol)}` : atom;
+	});
+	return ok ? text : null;
 }
 
 class UnitParser {
@@ -120,20 +129,14 @@ class UnitParser {
 
 	parse(): UnitInfo | null {
 		const unit = this.product();
-		this.space();
-		return unit && this.at === this.text.length ? unit : null;
-	}
-
-	private space() {
-		while (this.text[this.at] === ' ') this.at++;
+		return unit && this.at === this.text.length ? { ...unit, offset: 0 } : null;
 	}
 
 	private product(): UnitInfo | null {
 		let unit = this.power();
 		for (;;) {
-			this.space();
 			const op = this.text[this.at];
-			if (op !== '*' && op !== '/' && op !== '·') return unit;
+			if (op !== '*' && op !== '/') return unit;
 			this.at++;
 			const next = this.power();
 			if (!unit || !next) return null;
@@ -143,43 +146,43 @@ class UnitParser {
 
 	private power(): UnitInfo | null {
 		const unit = this.atom();
-		this.space();
 		if (this.text[this.at] !== '^') return unit;
 		this.at++;
-		const m = /^\(?\s*(-?\d+)\s*\)?/.exec(this.text.slice(this.at));
+		const m = /^(?:\((-?\d+)\)|(-?\d+))/.exec(this.text.slice(this.at));
 		if (!m || !unit) return null;
 		this.at += m[0].length;
-		return scale(unit, Number(m[1]));
+		return scale(unit, Number(m[1] ?? m[2]));
 	}
 
 	private atom(): UnitInfo | null {
-		this.space();
 		if (this.text[this.at] === '(') {
 			this.at++;
 			const inner = this.product();
-			this.space();
 			if (this.text[this.at] !== ')') return null;
 			this.at++;
 			return inner;
 		}
-		const m = /^(?:[A-Za-zΩμ]+|1)/.exec(this.text.slice(this.at));
+		const m = /^[^*/^()]+/.exec(this.text.slice(this.at));
 		if (!m) return null;
 		this.at += m[0].length;
-		return m[0] === '1' ? { factor: 1, dimension: D() } : symbol(m[0]);
+		if (m[0] === '1') return { factor: 1, dimension: NONE, offset: 0 };
+		return BY_SYMBOL.get(m[0])?.info ?? null;
 	}
 }
 
 function combine(a: UnitInfo, b: UnitInfo, sign: 1 | -1): UnitInfo {
 	return {
 		factor: a.factor * b.factor ** sign,
-		dimension: a.dimension.map((x, i) => x + sign * b.dimension[i]!) as unknown as Dimension
+		dimension: a.dimension.map((x, i) => x + sign * b.dimension[i]!),
+		offset: 0
 	};
 }
 
 function scale(a: UnitInfo, power: number): UnitInfo {
 	return {
 		factor: a.factor ** power,
-		dimension: a.dimension.map((x) => x * power) as unknown as Dimension
+		dimension: a.dimension.map((x) => x * power),
+		offset: 0
 	};
 }
 
@@ -192,13 +195,22 @@ export function sameDimension(a: string, b: string): boolean {
 	return !!x && !!y && same(x.dimension, y.dimension);
 }
 
-/** `value` in `from` expressed in `to`, or null when they don't convert. */
+/** Whether the unit is a temperature scale with a zero shift (`°C`, `°F`), whose values never add up. */
+export function isAffine(unit: string | null): boolean {
+	return !!unit && !!parseUnit(unit)?.offset;
+}
+
+/**
+ * `value` in `from` expressed in `to`, or null when they don't convert. A
+ * temperature converts with its scale's zero shift (20 °C → 293.15 K).
+ */
 export function convert(value: number, from: string, to: string): number | null {
 	if (from === to) return value;
 	const x = parseUnit(from);
 	const y = parseUnit(to);
 	if (!x || !y || !same(x.dimension, y.dimension)) return null;
-	return (value * x.factor) / y.factor;
+	if (!x.offset && !y.offset) return (value * x.factor) / y.factor;
+	return (value * x.factor + x.offset - y.offset) / y.factor;
 }
 
 export interface Quantity {
@@ -209,7 +221,7 @@ export interface Quantity {
 
 /**
  * The unit a person would read a value in: grams up to a kilogram, then
- * kilograms; seconds up to two minutes, then minutes up to two hours, then
+ * kilograms (the library has no symbol for the tonne); seconds up to two minutes, then minutes up to two hours, then
  * hours; watts up to a kilowatt; watt-hours or joules as the value was
  * given; millimetres below a metre, kilometres from a thousand metres.
  */
@@ -219,7 +231,7 @@ export function readableUnit(q: Quantity): string | null {
 	if (!info) return q.unit;
 	const si = Math.abs(q.value * info.factor);
 	const d = info.dimension;
-	if (same(d, MASS)) return si < 1 ? 'g' : si >= 1e4 ? 't' : 'kg';
+	if (same(d, MASS)) return si < 1 ? 'g' : 'kg';
 	if (same(d, TIME)) return si < 120 ? 's' : si < 7200 ? 'min' : 'h';
 	if (same(d, POWER)) return si < 1e3 ? 'W' : 'kW';
 	if (same(d, ENERGY)) {
@@ -264,9 +276,13 @@ export function formatQuantity(q: Quantity): string {
 	return q.unit ? `${magnitude} ${displayUnit(q.unit)}` : magnitude;
 }
 
-/** Sum quantities of one dimension, in the unit of the first; null when they don't add up. */
+/**
+ * Sum quantities of one dimension, in the unit of the first; null when they
+ * don't add up (`whyNoSum` says why). Temperatures on a scale with a zero
+ * shift (`°C`) never add up, in one unit or across.
+ */
 export function sumQuantities(items: Quantity[]): Quantity | null {
-	if (!items.length) return null;
+	if (!items.length || items.some((q) => isAffine(q.unit))) return null;
 	const unit = items[0]!.unit;
 	let total = 0;
 	for (const q of items) {
@@ -280,6 +296,35 @@ export function sumQuantities(items: Quantity[]): Quantity | null {
 		total += v;
 	}
 	return { value: total, unit };
+}
+
+/**
+ * Why quantities don't add up, as the rest of a sentence about them ("are
+ * in g and m, which don't convert to one another"); null when they do.
+ */
+export function whyNoSum(items: Quantity[]): string | null {
+	if (!items.length || sumQuantities(items)) return null;
+	const and = (xs: string[]) =>
+		xs.length > 1 ? `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}` : (xs[0] ?? '');
+	const affine = [
+		...new Set(items.flatMap((q) => (isAffine(q.unit) ? [displayUnit(q.unit!)] : [])))
+	];
+	if (affine.length) return `are temperatures (${and(affine)}), which don't add up`;
+	const units = [...new Set(items.flatMap((q) => (q.unit ? [displayUnit(q.unit)] : [])))];
+	if (items.some((q) => q.unit === null))
+		return `are in ${and(units)} and plain numbers (no unit), which don't add up`;
+	return `are in ${and(units)}, which don't convert to one another`;
+}
+
+/**
+ * A number for a data export: every digit a double carries that a
+ * conversion didn't make up (15 significant digits, so 0.7 kg in grams is
+ * 700, not 700.0000000000001).
+ */
+export function exactMagnitude(value: number): string {
+	if (!Number.isFinite(value)) return String(value);
+	const n = Number(value.toPrecision(15));
+	return n === 0 ? '0' : String(n);
 }
 
 /** A literal as SysML writes it: `25 [min]`, `4 [SI::kg]`, `0.85`. */

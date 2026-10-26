@@ -9,6 +9,7 @@
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 import { analysed, openWorkspace } from '#lib/create/testing.ts';
+import { tradeExport } from '../tradeExport';
 import type { TradeStudy } from '../types';
 import type { ToolkitHost } from './host';
 import { loadHost } from './testing';
@@ -88,11 +89,15 @@ describe('6.3 alternatives whose values come in different units', () => {
 		else expect(c.kind).toBe('undecided');
 	});
 
-	// Known gap: the grain (and other library units outside the table's list) don't convert, so
-	// such a study selects nothing rather than the lightest pack.
-	it.fails('selects the lightest pack when one mass is given in grains', () => {
+	// The grain converts as the library defines it (6.479891e-5 kg), so the lightest pack is selected:
+	// 7000 gr = 453.59 g < 500 g < 600 g.
+	it('selects the lightest pack when one mass is given in grains', () => {
 		const s = studyOf(MASSES('7000 [USCustomaryUnits::gr]'));
 		expect(s.selected).toBe(2);
+		expect(s.alternatives.map((a) => a.rank)).toEqual([3, 2, 1]);
+		// withCase for c: 7000 gr + 100 g = 553.59 g, shown with the others in one unit.
+		const withCase = s.criteria.find((c) => c.name === 'withCase')!;
+		expect(withCase.shown).toEqual(['700 g', '600 g', '553.6 g']);
 	});
 });
 
@@ -153,6 +158,45 @@ describe('6.3 alternatives with different parameter values', () => {
 			weight: 0.4,
 			better: 'higher'
 		});
+	});
+
+	it('exports the objective, the inputs and every digit of the values', () => {
+		const s = studyOf(DERIVED);
+		const { header, rows } = tradeExport(s);
+		expect(header).toEqual(['Kind', 'Name', 'Unit', 'Weight', 'Better', 'four', 'six', 'light']);
+		expect(rows).toEqual([
+			[
+				'objective',
+				'maximize score = 0.6 * massScore + 0.4 * priceScore',
+				'',
+				'',
+				'higher',
+				'',
+				'',
+				''
+			],
+			['criterion', 'packMass', 'g', '', '', '200', '300', '180'],
+			['criterion', 'massScore', '', '0.6', 'higher', '0.5', '0.25', '0.55'],
+			['criterion', 'priceScore', '', '0.4', 'higher', '0.8', '0.8', '0.2'],
+			['score', 'score', '', '', 'higher', '0.62', '0.47', '0.41'],
+			['rank', 'rank', '', '', '', '1', '2', '3'],
+			['selection', 'selected', '', '', '', 'selected', '', ''],
+			// The alternatives' own values, which the criteria read: 4 × 50 g, 6 × 50 g, 6 × 30 g.
+			['input', 'cells', '', '', '', '4', '6', '6'],
+			['input', 'cellMass', 'g', '', '', '50', '50', '30'],
+			['input', 'mass', 'g', '', '', '200', '300', '180'],
+			['input', 'price', '', '', '', '100', '100', '400']
+		]);
+		// Not rounded for reading: a third of a gram stays 0.333333333333333 (the table shows 0.3333).
+		const third = tradeExport(
+			studyOf(
+				DERIVED.replace(
+					'attribute :>> cellMass = 30 [g];',
+					'attribute :>> cellMass = 30.0 [g] + 1 [g] / 3;'
+				)
+			)
+		);
+		expect(third.rows.find((r) => r[1] === 'cellMass')?.[7]).toBe('30.3333333333333');
 	});
 
 	it('gives the same study from a fresh analysis (reproducible)', () => {

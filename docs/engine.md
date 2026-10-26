@@ -452,10 +452,26 @@ ask and cached with it):
   positions and element ids stay the same. `#` prefix keywords are kept
   (they can carry semantics, `#derivation`). No annotations: the analysed
   session is used.
-- **Units** (`src/lib/engine/quantity.ts`): conversion between the SI units
-  and the ISQ library's common others, the unit a person reads a value in
-  (2770 g reads 2.77 kg, 1652.4 s reads 27.54 min), four significant
-  digits. Shared by the worker and the page.
+- **Units** (`src/lib/engine/quantity.ts`): one list for the tables, the
+  inspector, the forms and the app's evaluator (`sim/units.ts` uses it):
+  the units the bundled library declares in `SI` and `USCustomaryUnits`
+  (`unitTable.ts`, generated from the library's own definitions by
+  `unitTable.test.ts`, which fails when they drift apart:
+  `UPDATE_UNITS=1` regenerates it), and products, quotients and powers of
+  them. The factors are the library's, also where it rounds (the pound is
+  0.4535924 kg, the degree 0.01745329 rad; upstream below). Left out:
+  units defined as `one` (byte, bit, decibel…), which would convert to one
+  another and to plain numbers, and prefixed units the library doesn't
+  declare (`mg`, `kN`): the engine doesn't convert those either. A lone
+  `°C` or `°F` converts as a temperature, with the zero shift of the
+  library's `°C_abs`/`°F_abs` scales (20 °C is 293.15 K); in a product it
+  is a difference (`J/(kg*°C)`). Temperatures are never summed, nor added
+  to a value in another unit (`20 [°C] + 1 [K]` is 21 °C if the kelvin is
+  a difference, −252.15 °C if a temperature): budgets leave such a sum
+  empty and say why, the app's evaluator refuses it; comparisons convert.
+  Also the unit a person reads a value in (2770 g reads 2.77 kg, 1652.4 s
+  reads 27.54 min), four significant digits for reading; exports keep
+  every digit (`exactMagnitude`). Shared by the worker and the page.
 - **Where they show.** The workspace asks for the checks after each
   analysis (once "Model ready" shows; on a model whose analysis takes more
   than 2 s, after a pause in typing — `docs/performance.md`); a violated check is a warning (`code: 'check'`) at its claim in
@@ -475,8 +491,14 @@ ask and cached with it):
   (request 9); a part without one adds up its parts; totals are quantity ×
   value; a part that is one of a sibling collection (`m1 :> motors`) is
   counted in the collection, not again; parts whose number can vary
-  (`[0..1]`, `[2..4]`) count at their least, and the sum's note says so;
-  values whose units don't convert are not added (the sum is left empty).
+  (`[0..1]`, `[2..4]`, `[1..*]`, and `[*]` like `[0..*]`) count at their
+  least: one with a value is listed (with 0 when that is its least), its row says
+  so, and so does every total that includes one, up to the top ("the total
+  is the least it can be") — a range has no single count, and the least
+  is the one total that is never made up; values whose units don't
+  convert are not added: the sum is left empty and its note says why
+  ("the parts' mass values are in g and m, which don't convert to one
+  another"), and a value not in the total's unit has no share.
   The root's own values of the same quantity (`emptyMass :> mass`) follow,
   with the limit and margin a claim's constraint sets on them. An attribute
   declared optional (`powerDraw [0..1]`) leaves the parts without a value out.
@@ -535,8 +557,9 @@ toolkit's `conforms`).
 - **Selection.** The toolkit doesn't evaluate `TradeStudy::selectedAlternative`
   nor `TradeStudyObjective::best` (request 7), so the app ranks the scores
   by the objective's kind and selects the best, the scores converted to one
-  unit (0.6 kg ranks above 500 g); scores in units that don't convert
-  select nothing and say so; a tie selects nothing and says so. `trade.test.ts` fails when the toolkit evaluates
+  unit (0.6 kg ranks above 500 g, 7000 gr below 500 g); scores in units
+  that don't convert select nothing and say so, and a criterion whose
+  values don't convert to one unit has no best mark; a tie selects nothing and says so. `trade.test.ts` fails when the toolkit evaluates
   `selectedAlternative`, so the selection can be taken from it.
 - **The design's choice**: an alternative that is a part of the design (owned
   by a part usage that isn't a variation, `drone.battery`), or one a part of
@@ -547,7 +570,12 @@ toolkit's `conforms`).
   (a row provider's column group, `Row.groups`). A view shows one study, the
   first it exposes (a warning names the others). The rendered table carries
   the study (`RenderedTable.trade`), which `TradeMatrix.svelte` shows as the
-  comparison; CSV/XLSX export the rows as they are.
+  comparison. CSV/XLSX export the study as data (`engine/tradeExport.ts`):
+  the objective and the score as written, each criterion with its unit,
+  weight and direction, the scores, ranks and selection, and the
+  alternatives' own attribute values (`TradeStudy.inputs`: `mass`,
+  `price`, `cells`), every number with all its digits; the table rounds to
+  four for reading.
 - **The demo** (`analysis/BatteryTrade.sysml`): today's battery against
   three variants of `batteryOptions`; `Battery`'s datasheet values are
   `default`s so a variant can give its own (a bound value can't be
@@ -984,6 +1012,28 @@ implementation as the reference (`docs/interop-tools.md`):
   `Safety::level` in `toCompactJson`; the pilot and SysON write the
   redefinition. The app adds it (`redefineMetadataValues` in
   `interchange.ts`).
+- **Unit names an import brings in don't convert.** With `private import
+  SI::*; private import USCustomaryUnits::*;`, `1 [lb] + 1 [kg]`, `1 [d] +
+  1 [h]` and `1 [L] + 1 [mL]` are "cannot combine quantities"; qualified
+  (`[USCustomaryUnits::lb]`, `[SI::d]`, `[SI::L]`) they give 3.2046 lb,
+  1.0417 d and 1.001 L. `kg`, `g`, `km/h`, `W*h` convert unqualified. The
+  app's tables and evaluator convert both.
+- **`°C` and `°F` compare and add as differences.** `20 ['°C'] > 250 [K]`
+  is false, `20 ['°C'] + 1 [K]` is 21 °C and `1 ['°C'] + 1 ['°F']` is
+  1.556 °C: the evaluator applies the library's `°C` (a temperature
+  *difference* unit, factor 1 to K), never the zero shift of its
+  `°C_abs` scale, so a requirement `t <= 330 [K]` with `t = 60 ['°C']`
+  (333.15 K) is met. The app compares a lone `°C` as a temperature and
+  never adds one across units; the checks are the engine's.
+- **The library's units, where they are off** (the bundled `SI` and
+  `USCustomaryUnits`, which NIST SP 811's rounded factors generated): the
+  pound is `4.535924E-01` kg (exactly 0.45359237 kg, a relative error of
+  7 × 10⁻⁸), the ounce `2.834952E-02` kg, the degree `1.745329E-02` rad
+  (its own comment says it should become π/180); `tonne` converts to kg by
+  `1.0e-3` (it is 1000 kg), so `1 [SI::tonne] + 1 [SI::kg]` is 1001 tonne;
+  `byte` and `bit` are both `= one`, so `1 [B] + 1 [bit]` is 2 B. The app
+  follows the library's factors (one list, the model's), leaves the tonne
+  out (it has no symbol) and the `one` units too.
 - **An edit that rebinds a redefinition is not refused.** `replaceMember`
   refuses an edit that would rebind a reference, but not one that makes an
   untouched `:>> mass` redefine another feature (the library's `ISQ::mass`
