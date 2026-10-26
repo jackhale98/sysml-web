@@ -122,6 +122,28 @@ function savedView(workspace: Workspace, definition: string) {
 	);
 }
 
+/**
+ * The requirement "Set a limit" starts with: the one selected, else the
+ * latest one written that has no limit yet (new ones go after the others),
+ * else the last. The form offers the others.
+ */
+export function limitTarget(
+	workspace: Pick<Workspace, 'elements' | 'checks'>,
+	selected: string | null
+): ModelElement | undefined {
+	const requirements = workspace.elements.filter(
+		(e) => e.kind === 'requirement' && !e.isDefinition && !isLibraryFile(e.file)
+	);
+	const chosen = requirements.find((e) => e.key === selected);
+	if (chosen) return chosen;
+	const limited = new Set(
+		(workspace.checks?.checks ?? [])
+			.filter((c) => c.checkable && c.kind !== 'assert')
+			.flatMap((c) => (c.requirement?.elementId ? [c.requirement.elementId] : []))
+	);
+	return requirements.findLast((e) => !(e.id && limited.has(e.id))) ?? requirements.at(-1);
+}
+
 /** Add up a value of the top part: its mass, or the first number it has. */
 async function rollup({ ui, workspace, engine }: GuideContext) {
 	const top = topPart(workspace);
@@ -206,8 +228,8 @@ export async function runGuideAction(action: GuideAction, context: GuideContext)
 			await rollup(context);
 			return;
 		case 'limit': {
-			const first = own(workspace).find((e) => e.kind === 'requirement' && !e.isDefinition);
-			if (first) ui.create = { kind: 'limit', element: first.key };
+			const target = limitTarget(workspace, ui.selection?.key ?? null);
+			if (target) ui.create = { kind: 'limit', element: target.key, choose: true };
 			else toasts.show('Add a requirement first; a limit is written into one.');
 			return;
 		}

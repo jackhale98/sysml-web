@@ -701,21 +701,25 @@
 		color: var(--text);
 		box-shadow: var(--shadow-sm);
 	}
+	/* The field itself carries the border, so its focus ring is the global one. */
 	.search {
+		position: relative;
 		display: flex;
 		align-items: center;
-		gap: var(--space-2);
-		height: 2rem;
-		padding: 0 var(--space-2);
-		border: 1px solid var(--border);
-		border-radius: var(--radius-sm);
 		color: var(--text-3);
+	}
+	.search :global(svg) {
+		position: absolute;
+		left: var(--space-2);
+		pointer-events: none;
 	}
 	.search input {
 		flex: 1;
 		min-width: 0;
-		border: 0;
-		outline: 0;
+		height: 2rem;
+		padding: 0 var(--space-2) 0 calc(14px + 2 * var(--space-2));
+		border: 1px solid var(--border);
+		border-radius: var(--radius-sm);
 		background: transparent;
 		color: var(--text);
 	}
@@ -801,6 +805,13 @@
 	.item.selected {
 		background: var(--accent-weak);
 		color: var(--accent);
+	}
+	@media (forced-colors: active) {
+		.item.selected {
+			forced-color-adjust: none;
+			background: SelectedItem;
+			color: SelectedItemText;
+		}
 	}
 	.label {
 		flex: 1;
@@ -937,12 +948,17 @@
 	}
 	.phone .search {
 		flex: none;
+	}
+	.phone .search :global(svg) {
+		left: var(--space-3);
+	}
+	.phone .search input {
 		height: 2.75rem;
-		padding: 0 var(--space-3);
+		padding: 0 var(--space-3) 0 calc(14px + var(--space-3) + var(--space-2));
 		border-radius: 999px;
 		background: var(--surface-2);
 	}
-	.phone .search:focus-within {
+	.phone .search input:focus {
 		border-color: var(--accent);
 	}
 	.phone .item {

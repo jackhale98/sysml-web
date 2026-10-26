@@ -321,6 +321,29 @@ pre,
 	border: 0;
 }
 
+/*
+ * Forced colours (Windows High Contrast, and the like) replace every colour
+ * with a few system ones, so a state drawn by a background alone — the open
+ * tab, the chosen option, a pressed toggle — would vanish. Draw those in the
+ * system's own selection colours.
+ */
+@media (forced-colors: active) {
+	[role='tab'][aria-selected='true'],
+	[role='option'][aria-selected='true'],
+	[aria-pressed='true'],
+	[aria-current='true'],
+	[aria-current='page'] {
+		forced-color-adjust: none;
+		background: SelectedItem;
+		color: SelectedItemText;
+	}
+	/* A choice made with a hidden radio button (segmented controls, tiles). */
+	label:has(> input[type='radio']:checked) {
+		outline: 2px solid SelectedItem;
+		outline-offset: -2px;
+	}
+}
+
 @media (prefers-reduced-motion: reduce) {
 	*,
 	*::before,

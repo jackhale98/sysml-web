@@ -291,6 +291,33 @@ describe('checks on small models', () => {
 		host.analyzeProject(demoFiles());
 	});
 
+	it('says to give a value when a limit reads one that has none', () => {
+		const text = [
+			'package P {',
+			'    private import SI::*;',
+			'    part def System { attribute mass :> ISQ::mass; }',
+			'    part system : System;',
+			"    requirement <'REQ-002'> 'Light enough to carry' {",
+			'        subject system : System;',
+			'        require constraint { system.mass <= 12 [kg] }',
+			'    }',
+			"    satisfy 'Light enough to carry' by system;",
+			'}',
+			''
+		].join('\n');
+		const files = model(text);
+		host.analyzeProject(files);
+		const check = byId(host.checks(files).checks, 'REQ-002');
+		expect(check).toMatchObject({
+			status: 'undecided',
+			values: [{ feature: 'system.mass', value: { kind: 'undecided', reason: 'it has no value' } }]
+		});
+		expect(check.explanation).toBe(
+			'system.mass has no value yet: give it one and the check will say whether it is met.'
+		);
+		host.analyzeProject(demoFiles());
+	});
+
 	it('maps an assertion’s byte positions to UTF-16 after multi-byte text', () => {
 		const text =
 			"package P { private import SI::*; part def 'Wärmeöäü' { attribute x :> ISQ::mass = 1 [kg]; assert constraint light { x <= 0.5 [kg] } } }\n";

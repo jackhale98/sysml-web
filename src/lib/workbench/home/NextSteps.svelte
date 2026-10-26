@@ -8,6 +8,7 @@
 	import {
 		countModel,
 		doneSteps,
+		missingValue,
 		readNextSteps,
 		STEP_ORDER,
 		writeNextSteps,
@@ -140,6 +141,19 @@
 	function run(action: GuideAction) {
 		void runGuideAction(action, { ui, workspace, engine, session });
 	}
+
+	/** After a limit: the value it checks, when that has none yet (the check can't say). */
+	const unset = $derived(done?.numbers ? missingValue(workspace.checks, workspace.elements) : null);
+
+	/** The part's details, with the value's editor open. */
+	function giveValue() {
+		const part = unset?.part;
+		if (!unset || !part) return;
+		ui.select(part.key, 'explorer');
+		ui.valueRequest = { element: part.key, name: unset.attribute };
+		if (ui.phone) ui.showDetails('full');
+		else ui.inspectorOpen = true;
+	}
 </script>
 
 {#if shown && done}
@@ -186,7 +200,23 @@
 							>{step.title}<span class="visually-hidden">{ticked ? ', done' : ''}</span></strong
 						>
 						<span class="hint">{step.hint}</span>
+						{#if step.id === 'numbers' && ticked && unset}
+							<span class="follow-up">
+								Give {unset.part ? `${unset.part.label}’s` : 'the part’s'}
+								{unset.attribute} a value{unset.unit
+									? ` (a number and its unit, such as 5 [${unset.unit}])`
+									: ''}, so the checks can say whether
+								{unset.requirement || 'the requirement'} is met.
+							</span>
+						{/if}
 					</span>
+					{#if step.id === 'numbers' && ticked && unset?.part}
+						<span class="actions">
+							<button type="button" class="action primary" onclick={giveValue}
+								>Give {unset.attribute} a value</button
+							>
+						</span>
+					{/if}
 					{#if !ticked}
 						<span class="actions">
 							{#each step.actions as a (a.action)}
@@ -280,6 +310,16 @@
 		background: var(--ok);
 		transition: width 300ms var(--ease, ease);
 	}
+	/* Forced colours drop backgrounds: draw the bar in the text colour. */
+	@media (forced-colors: active) {
+		.meter {
+			border: 1px solid CanvasText;
+		}
+		.meter span {
+			forced-color-adjust: none;
+			background: CanvasText;
+		}
+	}
 	.steps {
 		display: grid;
 		gap: 0;
@@ -330,6 +370,10 @@
 	}
 	.ticked .hint {
 		display: none;
+	}
+	.follow-up {
+		color: var(--text);
+		font-size: var(--text-xs);
 	}
 	/* Narrow: one line a step, and only the next step explained. */
 	@container (max-width: 40rem) {

@@ -952,7 +952,7 @@ export class Evaluation {
 				? { kind: 'number', value: literal.value, unit: literal.unit }
 				: { kind: 'text', text: bound.value };
 		else if (!value) value = { kind: 'undecided', reason: 'its value is not known' };
-		else if (value.kind === 'none') value = { kind: 'undecided', reason: 'it has no value' };
+		else if (value.kind === 'none') value = { kind: 'undecided', reason: NO_VALUE };
 		const from = path ? this.sourceOf(path, 0, { left: MAX_INPUTS }) : undefined;
 		return { feature: chain, value, ...(from ? { from } : {}) };
 	}
@@ -1280,6 +1280,12 @@ function explain(check: Check, vacuous: boolean): string {
 				return `\`${unresolved[1]}\` is not a feature of ${check.by ?? 'what the constraint is evaluated for'}, so the constraint cannot be evaluated.`;
 			const unsupported = /unsupported for evaluation: ([^;)]+)/.exec(check.detail);
 			const first = unknown[0];
+			// Declared but never given a value (`attribute mass :> ISQ::mass;`): say what to do.
+			const unset = unknown.filter(
+				(v) => v.value.kind === 'undecided' && v.value.reason === NO_VALUE
+			);
+			if (unset.length && unset.length === unknown.length && !unsupported)
+				return `${unset.map((v) => v.feature).join(', ')} ${unset.length === 1 ? 'has' : 'have'} no value yet: give ${unset.length === 1 ? 'it one' : 'them one'} and the check will say whether it is met.`;
 			if (first?.value.kind === 'undecided' && /`/.test(first.value.reason))
 				return `${first.feature} cannot be worked out: ${first.value.reason}.`;
 			// The verdict's own reason, when it says what is wrong (`division by zero`).
@@ -1295,6 +1301,9 @@ function explain(check: Check, vacuous: boolean): string {
 		}
 	}
 }
+
+/** Why a value a check reads is not known, when it simply has none. */
+const NO_VALUE = 'it has no value';
 
 const SYMBOL: Record<string, string> = { '<=': '≤', '>=': '≥', '<': '<', '>': '>', '==': '=' };
 

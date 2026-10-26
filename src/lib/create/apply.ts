@@ -187,32 +187,19 @@ export function viewWrite(
 	};
 }
 
-/** Wait until the analysis has the view (to open it as what it is: a table or a diagram). */
-export async function viewReady(
-	workspace: Workspace,
-	name: string,
-	timeout = 8000
-): Promise<boolean> {
-	const started = Date.now();
-	while (Date.now() - started < timeout) {
-		if (workspace.views.some((v) => v.name === name && v.isUsage)) return true;
-		await new Promise((r) => setTimeout(r, 80));
-	}
-	return false;
-}
-
 /**
- * Open a new view once the analysis has it. Called before the form closes:
- * the workspace and the UI are taken now, while the form still has them.
+ * Open a new view at once: its tab says it is opening until the analysis
+ * has it, then shows it as what it is (a table or a diagram). Opening it
+ * later would replace whatever the person had gone on to meanwhile.
  */
 export function openView(
+	// Kept for the callers; the tab waits for the analysis itself.
 	workspace: Workspace,
 	ui: { open(tab: { kind: 'view'; name: string; title: string }): void },
 	view: { name: string; title: string }
 ): Promise<void> {
-	return viewReady(workspace, view.name).then(() =>
-		ui.open({ kind: 'view', name: view.name, title: view.title })
-	);
+	ui.open({ kind: 'view', name: view.name, title: view.title });
+	return Promise.resolve();
 }
 
 /** Combine writes into one. */

@@ -12,7 +12,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import { generateLines } from '../perf/generate';
-import { analyze } from './axe';
+import { analyze, settled } from './axe';
 
 test.describe.configure({ timeout: 300_000 });
 
@@ -20,19 +20,6 @@ function measure(name: string, value: number | string) {
 	const v = typeof value === 'number' ? Math.round(value) : value;
 	test.info().annotations.push({ type: 'measure', description: `${name}: ${v}` });
 	console.log(`measure ${test.info().title} | ${name}: ${v}`);
-}
-
-/** Wait for running CSS animations (a dialog's entrance) to finish. */
-async function settled(page: Page) {
-	// Only animations that end (a spinner's never does).
-	await page.evaluate(() =>
-		Promise.all(
-			document
-				.getAnimations()
-				.filter((a) => a.effect?.getComputedTiming().endTime !== Infinity)
-				.map((a) => a.finished.catch(() => undefined))
-		)
-	);
 }
 
 async function violations(page: Page, where: string) {
@@ -403,8 +390,36 @@ test('the exchange dialog contrast failure is axe catching the dialog mid-fade',
 	expect(after.violations).toEqual([]);
 });
 
-// Known gap: the explorer's "Filter the model" box sets `outline: 0` and shows no focus on a computer (Explorer.svelte `.search input`).
-test.fail('every tab stop from the top of the workbench shows a focus ring', async ({ page }) => {
+/**
+ * The shared helper (tests/e2e/axe.ts) waits for the fade: the same dialog,
+ * its entrance slowed to seconds and caught 20 ms in, is checked once it has
+ * finished, so no contrast failure is reported.
+ */
+test('the shared accessibility check waits for a dialog to finish fading in', async ({ page }) => {
+	await page.setViewportSize({ width: 1440, height: 900 });
+	await openDemo(page);
+	await page
+		.locator('.project-menu')
+		.getByRole('button', { name: 'Drone UAV', exact: true })
+		.click();
+	await page.getByRole('menuitem', { name: 'Download as SysML v2 JSON…' }).click();
+	const dialog = page.getByRole('dialog', { name: 'Download as SysML v2 JSON' });
+	await expect(dialog.getByRole('button', { name: 'Download .json' })).toBeAttached();
+	// 20 ms in, and the remaining 160 ms played over 3.2 s.
+	await page.evaluate(() =>
+		document.getAnimations().forEach((a) => {
+			if (a.effect?.getComputedTiming().endTime === Infinity) return;
+			a.currentTime = 20;
+			a.playbackRate = 0.05;
+		})
+	);
+	expect(await dialog.evaluate((d) => Number(getComputedStyle(d).opacity))).toBeLessThan(0.5);
+	const results = await analyze(page);
+	expect(results.violations.map((v) => v.id)).toEqual([]);
+	expect(await dialog.evaluate((d) => Number(getComputedStyle(d).opacity))).toBe(1);
+});
+
+test('every tab stop from the top of the workbench shows a focus ring', async ({ page }) => {
 	await page.setViewportSize({ width: 1440, height: 900 });
 	await openDemo(page);
 
@@ -502,31 +517,28 @@ test('keyboard only: search, select, open a dialog and get focus back', async ({
 	measure('focus after closing the download dialog', back || '(body)');
 });
 
-// Known gap: a dialog opened from the project menu returns focus to the page body, not to the menu button, when it closes.
-test.fail(
-	'closing a dialog opened from the project menu puts focus back on the menu button',
-	async ({ page }) => {
-		await page.setViewportSize({ width: 1440, height: 900 });
-		await openDemo(page);
-		const menu = page
-			.locator('.project-menu')
-			.getByRole('button', { name: 'Drone UAV', exact: true });
-		await menu.focus();
-		await page.keyboard.press('Enter');
-		const item = page.getByRole('menuitem', { name: 'Download as SysML v2 JSON…' });
-		for (let i = 0; i < 30 && !(await item.evaluate((el) => el === document.activeElement)); i++)
-			await page.keyboard.press('Tab');
-		await page.keyboard.press('Enter');
-		const download = page.getByRole('dialog', { name: 'Download as SysML v2 JSON' });
-		await expect(download).toBeVisible();
-		await page.keyboard.press('Escape');
-		await expect(download).toBeHidden();
-		await expect(menu).toBeFocused({ timeout: 2000 });
-	}
-);
+test('closing a dialog opened from the project menu puts focus back on the menu button', async ({
+	page
+}) => {
+	await page.setViewportSize({ width: 1440, height: 900 });
+	await openDemo(page);
+	const menu = page
+		.locator('.project-menu')
+		.getByRole('button', { name: 'Drone UAV', exact: true });
+	await menu.focus();
+	await page.keyboard.press('Enter');
+	const item = page.getByRole('menuitem', { name: 'Download as SysML v2 JSON…' });
+	for (let i = 0; i < 30 && !(await item.evaluate((el) => el === document.activeElement)); i++)
+		await page.keyboard.press('Tab');
+	await page.keyboard.press('Enter');
+	const download = page.getByRole('dialog', { name: 'Download as SysML v2 JSON' });
+	await expect(download).toBeVisible();
+	await page.keyboard.press('Escape');
+	await expect(download).toBeHidden();
+	await expect(menu).toBeFocused({ timeout: 2000 });
+});
 
-// Known gap: the project menu (role="menu") doesn't move between its items with the arrow keys; Tab does.
-test.fail('the project menu moves between its items with the arrow keys', async ({ page }) => {
+test('the project menu moves between its items with the arrow keys', async ({ page }) => {
 	await page.setViewportSize({ width: 1440, height: 900 });
 	await openDemo(page);
 	const menu = page
@@ -537,6 +549,63 @@ test.fail('the project menu moves between its items with the arrow keys', async 
 	await expect(page.getByRole('menu', { name: 'Project' })).toBeVisible();
 	await page.keyboard.press('ArrowDown');
 	await expect(page.getByRole('menuitem').first()).toBeFocused({ timeout: 2000 });
+	const items = page.getByRole('menu', { name: 'Project' }).getByRole('menuitem');
+	await page.keyboard.press('ArrowDown');
+	await expect(items.nth(1)).toBeFocused();
+	await page.keyboard.press('End');
+	await expect(items.last()).toBeFocused();
+	await page.keyboard.press('ArrowDown');
+	await expect(items.first()).toBeFocused();
+	await page.keyboard.press('ArrowUp');
+	await expect(items.last()).toBeFocused();
+	await page.keyboard.press('Home');
+	await expect(items.first()).toBeFocused();
+	// Escape closes it and gives focus back to its button.
+	await page.keyboard.press('Escape');
+	await expect(page.getByRole('menu', { name: 'Project' })).toBeHidden();
+	await expect(menu).toBeFocused();
+	// ArrowUp on the button opens it at its last item.
+	await page.keyboard.press('ArrowUp');
+	await expect(items.last()).toBeFocused();
+});
+
+test('the first tab stop skips to the model, and the next to the open view', async ({ page }) => {
+	await page.setViewportSize({ width: 1440, height: 900 });
+	await openDemo(page);
+	// As after the address bar: nothing focused, the page's start the place to go on from.
+	const fromTop = () =>
+		page.evaluate(() => {
+			(document.activeElement as HTMLElement | null)?.blur();
+			const start = document.createRange();
+			start.setStart(document.body, 0);
+			getSelection()?.removeAllRanges();
+			getSelection()?.addRange(start);
+		});
+	await fromTop();
+	await page.keyboard.press('Tab');
+	const skip = page.getByRole('link', { name: 'Skip to the model' });
+	await expect(skip).toBeFocused();
+	// Out of sight until focused, then on screen.
+	const box = await skip.boundingBox();
+	expect(box && box.y >= 0 && box.height > 0).toBe(true);
+	await page.keyboard.press('Enter');
+	// The next tab stop is in the explorer, past the top bar.
+	await page.keyboard.press('Tab');
+	expect(await page.evaluate(() => !!document.activeElement?.closest('#workbench-model'))).toBe(
+		true
+	);
+
+	await page.reload();
+	await ready(page);
+	await fromTop();
+	await page.keyboard.press('Tab');
+	await page.keyboard.press('Tab');
+	await expect(page.getByRole('link', { name: 'Skip to the open view' })).toBeFocused();
+	await page.keyboard.press('Enter');
+	await page.keyboard.press('Tab');
+	expect(await page.evaluate(() => !!document.activeElement?.closest('#workbench-view'))).toBe(
+		true
+	);
 });
 
 /** A machine whose two states hand over to each other with no trigger: it never settles. */
@@ -754,12 +823,14 @@ test('a first-time user completes a modelling task with the guided workflow alon
 	await form.getByRole('button', { name: 'Next' }).click();
 	await form.getByRole('button', { name: 'Create' }).click();
 	await expect(form).toBeHidden();
-	// The new view opens once it is written; then back to the overview.
+	// The new view opens at once; going back to the overview straight away, it stays there.
+	await page.getByRole('button', { name: 'Project overview' }).click();
 	await expect(page.getByRole('button', { name: /^Close Requirements/ })).toBeVisible({
 		timeout: 20_000
 	});
-	await page.getByRole('button', { name: 'Project overview' }).click();
 	await expect(steps).toContainText('3 of 6 done', { timeout: 20_000 });
+	await page.waitForTimeout(1000);
+	await expect(steps).toBeVisible();
 
 	// 4. Link: what satisfies the requirement.
 	await step('link').getByRole('button', { name: 'Show me' }).click();
@@ -768,10 +839,17 @@ test('a first-time user completes a modelling task with the guided workflow alon
 	await page.getByRole('button', { name: 'Project overview' }).click();
 	await expect(steps).toContainText('4 of 6 done', { timeout: 20_000 });
 
-	// 5. A limit, with the form only.
+	// 5. A limit, with the form only: on the requirement just written, the others offered.
 	await step('numbers').getByRole('button', { name: 'Set a limit' }).click();
 	const limit = page.getByRole('dialog', { name: 'Set a limit' });
 	await expect(limit).toBeVisible();
+	await expect(limit.getByLabel('Requirement').locator('option:checked')).toHaveText(
+		'Light enough to carry'
+	);
+	await expect(limit.getByLabel('Requirement').locator('option')).toHaveText([
+		'REQ-001 First requirement',
+		'Light enough to carry'
+	]);
 	measure('limit form says', (await limit.innerText()).replace(/\s+/g, ' ').slice(0, 400));
 	const value = limit.getByLabel(/^Limit|value|At most/i).last();
 	await value.fill('12');
@@ -783,6 +861,21 @@ test('a first-time user completes a modelling task with the guided workflow alon
 	await page.getByRole('button', { name: 'Project overview' }).click();
 	await expect(steps).toContainText('5 of 6 done', { timeout: 20_000 });
 
+	// The check can't say yet: the steps say which value to give, and open it.
+	await expect(step('numbers')).toContainText(
+		'Give system’s mass a value (a number and its unit, such as 5 [kg]), so the checks can say whether Light enough to carry is met.',
+		{ timeout: 20_000 }
+	);
+	await step('numbers').getByRole('button', { name: 'Give mass a value' }).click();
+	const mass = page
+		.getByRole('complementary', { name: 'Inspector' })
+		.getByRole('textbox', { name: 'mass of system' });
+	await expect(mass).toBeFocused({ timeout: 20_000 });
+	await mass.fill('10 [kg]');
+	await mass.press('Enter');
+	await page.getByRole('button', { name: 'Project overview' }).click();
+	await expect(step('numbers')).not.toContainText('Give system’s mass', { timeout: 20_000 });
+
 	// 6. Keep a copy.
 	const downloading = page.waitForEvent('download');
 	await step('keep').getByRole('button', { name: 'Download' }).click();
@@ -791,4 +884,128 @@ test('a first-time user completes a modelling task with the guided workflow alon
 
 	// The result is a model with no problems, whose design check says something about the limit.
 	await expect(page.getByRole('button', { name: /^Problems: 0 errors/ })).toBeVisible();
+});
+
+/**
+ * On a phone the text opens for reading: a tap on it opens no keyboard. The
+ * tap says how to type, beside the button that turns typing on.
+ */
+test('on a phone, a tap on the text says to choose Edit text to type', async ({ browser }) => {
+	const context = await browser.newContext({
+		viewport: { width: 390, height: 844 },
+		isMobile: true,
+		hasTouch: true
+	});
+	const page = await context.newPage();
+	await openDemo(page);
+	await page
+		.getByRole('navigation', { name: 'Sections' })
+		.getByRole('button', { name: 'Model' })
+		.click();
+	await page.getByRole('tab', { name: 'Files' }).click();
+	await page.getByRole('button', { name: /^DroneArchitecture\.sysml/ }).click();
+	await page
+		.getByRole('group', { name: 'Show the model as' })
+		.getByRole('button', { name: /Text/ })
+		.click();
+	const text = page.locator('.cm-content');
+	await expect(text).toHaveAttribute('contenteditable', 'false');
+	await text.tap({ position: { x: 60, y: 80 } });
+	await expect(
+		page.getByRole('status').filter({ hasText: 'The text is for reading here.' })
+	).toHaveText('The text is for reading here. Tap Edit text to type.');
+	await page.getByRole('button', { name: 'Edit text' }).click();
+	await expect(text).toHaveAttribute('contenteditable', 'true');
+	expect(await violations(page, 'phone text')).toEqual([]);
+	await context.close();
+});
+
+/**
+ * 200 % zoom on 1280×720 and 1920×1080 screens: the page is 640×360 and
+ * 960×540 CSS pixels at twice the scale. The phone layout takes over on the
+ * first; on both, nothing scrolls sideways and axe finds nothing.
+ */
+for (const size of [
+	{ width: 640, height: 360 },
+	{ width: 960, height: 540 }
+])
+	test(`at 200 % zoom (${size.width}×${size.height} at scale 2) the main screens reflow and pass axe`, async ({
+		browser
+	}) => {
+		const context = await browser.newContext({ viewport: size, deviceScaleFactor: 2 });
+		const page = await context.newPage();
+		const found: string[] = [];
+		const check = async (where: string) => {
+			const overflow = await page.evaluate(
+				() => document.documentElement.scrollWidth - document.documentElement.clientWidth
+			);
+			if (overflow > 0) found.push(`${where}: scrolls sideways by ${overflow}px`);
+			found.push(...(await violations(page, where)));
+		};
+		await page.goto('/');
+		await check('landing');
+		await page.goto('/projects');
+		await check('projects');
+		await openDemo(page);
+		await check('overview');
+		if (await page.locator('.workbench.phone').count()) {
+			const nav = page.getByRole('navigation', { name: 'Sections' });
+			await nav.getByRole('button', { name: 'Model' }).click();
+			await check('model');
+			await nav.getByRole('button', { name: 'Views' }).click();
+			await check('views');
+		} else {
+			await page.getByRole('tab', { name: 'Model' }).click();
+			await check('model');
+			const views = page.locator('section[aria-labelledby="views-heading"]');
+			await views.getByRole('button', { name: 'Drone interconnection', exact: true }).click();
+			await expect(page.locator('.svelte-flow__node').first()).toBeVisible({ timeout: 30_000 });
+			await check('diagram');
+			await views.getByRole('button', { name: 'Drone mass budget', exact: true }).click();
+			await expect(page.locator('tbody tr').first()).toBeVisible({ timeout: 30_000 });
+			await check('budget');
+			await page.getByRole('button', { name: 'Settings' }).click();
+			await check('settings');
+			await page.keyboard.press('Escape');
+		}
+		expect(found).toEqual([]);
+		await context.close();
+	});
+
+/**
+ * Forced colours (Windows High Contrast): colours become a few system ones,
+ * so a state shown by a background alone vanished — the open explorer tab,
+ * the chosen settings. They are drawn in the system's selection colours.
+ */
+test('in forced colours the open tab and the chosen settings still show', async ({ page }) => {
+	await page.setViewportSize({ width: 1440, height: 900 });
+	await page.emulateMedia({ forcedColors: 'active' });
+	await openDemo(page);
+	const background = (name: string) =>
+		page
+			.getByRole('tab', { name, exact: true })
+			.evaluate((el) => getComputedStyle(el).backgroundColor);
+	expect(await background('Model')).not.toBe(await background('Files'));
+
+	await page.getByRole('button', { name: 'Settings' }).click();
+	const settings = page.getByRole('dialog', { name: /Settings/ });
+	await expect(settings).toBeVisible();
+	const appearance = settings.getByRole('tab', { name: 'Appearance' });
+	const editor = settings.getByRole('tab', { name: 'Editor' });
+	expect(await appearance.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe(
+		await editor.evaluate((el) => getComputedStyle(el).backgroundColor)
+	);
+	// The chosen density, a hidden radio button's label, is outlined.
+	const chosen = settings.locator('label:has(> input[type=radio]:checked)').first();
+	expect(await chosen.evaluate((el) => getComputedStyle(el).outlineStyle)).not.toBe('none');
+	// Contrast is the system's own colours here; axe measures the page's colours instead
+	// (dark text on the forced black background, where white is drawn), so it is left out.
+	const rest = async () => {
+		await settled(page);
+		const results = await new AxeBuilder({ page }).disableRules(['color-contrast']).analyze();
+		return results.violations.map((v) => v.id);
+	};
+	expect(await rest()).toEqual([]);
+	await page.keyboard.press('Escape');
+	expect(await rest()).toEqual([]);
 });

@@ -27,7 +27,13 @@ export type Tab =
 export type CreateRequest =
 	| { kind: 'view'; viewKind?: string; target?: string }
 	| { kind: 'rollup'; element: string; attribute: string }
-	| { kind: 'limit'; element: string; attribute?: string }
+	| {
+			kind: 'limit';
+			element: string;
+			attribute?: string;
+			/** Offer the other requirements too (the guide's "Set a limit" chose this one). */
+			choose?: boolean;
+	  }
 	| { kind: 'trade'; alternatives?: string[] }
 	| { kind: 'fmea'; fmeaKind?: string }
 	| { kind: 'fmeaLine'; view: string }
@@ -157,6 +163,8 @@ export class WorkbenchUi {
 	helpTopic = $state<string | null>(null);
 	/** A requirement (`ModelElement.key`) whose "Add what satisfies it" picker should open. */
 	satisfyRequest = $state<string | null>(null);
+	/** A value of an element (`ModelElement.key`) to start editing in its details. */
+	valueRequest = $state.raw<{ element: string; name: string } | null>(null);
 
 	/** Open the help, at a topic (`add-part`) or at the start. */
 	showHelp(topic: string | null = null) {

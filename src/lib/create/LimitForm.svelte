@@ -33,17 +33,22 @@
 		open = $bindable(false),
 		workspace,
 		engine,
-		element: key,
-		attribute: attributeName
+		element: asked,
+		attribute: attributeName,
+		choose = false
 	}: {
 		open?: boolean;
 		workspace: Workspace;
 		engine: Engine;
 		element: string;
 		attribute?: string | undefined;
+		/** Offer the project's other requirements, starting from `element`. */
+		choose?: boolean;
 	} = $props();
 
 	const uid = $props.id();
+	/** The element limited: the one asked for, or another requirement chosen here. */
+	let key = $state(untrack(() => asked));
 	const element = $derived(workspace.elements.find((e) => e.key === key));
 	const onRequirement = $derived(element?.kind === 'requirement');
 	const requirementRow = $derived(workspace.requirements.find((r) => r.key === key));
@@ -84,25 +89,46 @@
 		)
 	);
 
+	/** Counts loads, so that one for a requirement no longer chosen is dropped. */
+	let loads = 0;
 	$effect(() => {
 		const eid = element?.id;
 		if (!eid) return;
+		const load = ++loads;
+		const read = async (id: string) => {
+			const found = (await engine.elementFeatures(files(), [id]))[id] ?? null;
+			if (load !== loads) throw new Error('superseded');
+			return found;
+		};
 		void (async () => {
-			const own = (await engine.elementFeatures(files(), [eid]))[eid] ?? null;
+			const own = await read(eid);
 			features = own;
 			const s = own?.features.find((f) => f.kind === 'subject');
 			if (onRequirement) {
-				about = s?.typeId
-					? ((await engine.elementFeatures(files(), [s.typeId]))[s.typeId] ?? null)
-					: null;
+				about = s?.typeId ? await read(s.typeId) : null;
 				const by = requirementRow?.satisfiedBy[0];
 
 				const byId = by ? requirementRow?.linkIds[by] : undefined;
-				if (byId) satisfier = (await engine.elementFeatures(files(), [byId]))[byId] ?? null;
+				if (byId) satisfier = await read(byId);
 			} else about = own;
 			loading = false;
-		})();
+		})().catch(() => undefined);
 	});
+
+	/** The guide's "Set a limit" chose a requirement; the person may choose another. */
+	const requirementChoices = $derived(
+		choose ? workspace.requirements.filter((r) => !isLibraryFile(r.file)) : []
+	);
+	function chooseRequirement(next: string) {
+		if (next === key) return;
+		features = null;
+		about = null;
+		satisfier = null;
+		partChoice = '';
+		partFeatures = null;
+		loading = true;
+		key = next;
+	}
 
 	// The part chosen to meet the requirement.
 	$effect(() => {
@@ -121,7 +147,7 @@
 		(source?.features ?? []).filter((f) => f.kind === 'attribute' && f.numeric)
 	);
 	$effect(() => {
-		if (!chosen && numbers.length) chosen = numbers[0]!.name;
+		if (numbers.length && !numbers.some((f) => f.name === chosen)) chosen = numbers[0]!.name;
 	});
 	const attribute = $derived(numbers.find((f) => f.name === chosen));
 	/** The value now, in the part that must meet it (when known). */
@@ -152,6 +178,15 @@
 		};
 	});
 
+	/** The part whose value the check reads, when it has no value yet (the check can't say). */
+	const unvalued = $derived.by(() => {
+		if (!onRequirement || !attribute) return null;
+		const from = partFeatures ?? satisfier;
+		if (!from) return null;
+		const value = from.features.find((f) => f.name === chosen)?.evaluated;
+		return !value || value.kind === 'none' ? from.name : null;
+	});
+
 	/** Whether today's value meets the limit, for the person to see before writing. */
 	const verdict = $derived.by(() => {
 		if (!limit || current?.kind !== 'number') return null;
@@ -176,6 +211,12 @@
 	});
 	$effect(() => {
 		if (!id) id = nextRequirementId(workspace.requirements.map((r) => r.id));
+	});
+
+	/** A requirement without a subject that something satisfies already: start from that part. */
+	$effect(() => {
+		if (!onRequirement || subject || partChoice || !satisfier) return;
+		if (partOptions.includes(satisfier.qualifiedName)) partChoice = satisfier.qualifiedName;
 	});
 
 	/** For a definition: which of its uses must meet the new requirement. */
@@ -222,7 +263,8 @@
 				limit,
 				requirement: { element, features },
 				subject: s,
-				satisfyBy: needsPart && pf ? pf : null
+				// Not again when the part chosen satisfies it already.
+				satisfyBy: needsPart && pf && pf.id !== satisfier?.id ? pf : null
 			};
 		}
 		const pkg = requirementsPackage(workspace) ?? enclosingPackage(workspace.tree, element.key);
@@ -305,6 +347,16 @@
 	finishLabel={onRequirement ? 'Set the limit' : 'Create the requirement'}
 	onfinish={finish}
 >
+	{#if requirementChoices.length > 1 && steps[step]?.id === 'limit'}
+		<label class="field">
+			<span class="name">Requirement</span>
+			<select value={key} onchange={(e) => chooseRequirement(e.currentTarget.value)}>
+				{#each requirementChoices as r (r.key)}
+					<option value={r.key}>{r.id ? `${r.id} ${r.title}` : r.title}</option>
+				{/each}
+			</select>
+		</label>
+	{/if}
 	{#if loading}
 		<p class="note">Reading the model…</p>
 	{:else if steps[step]?.id === 'limit'}
@@ -365,6 +417,11 @@
 				<p class="verdict" class:met={verdict.met}>
 					Now {verdict.now}: {verdict.met ? 'it meets' : 'it does not meet'}
 					{limit ? limitWords(limit) : ''}.
+				</p>
+			{:else if unvalued}
+				<p class="note">
+					{unvalued} has no {words(chosen)} yet: give it one (in its details) and the checks will say
+					whether it meets the limit.
 				</p>
 			{/if}
 		{:else if !onRequirement || subject || partChoice}

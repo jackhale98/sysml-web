@@ -59,6 +59,14 @@ formatting, lint, type checks, unit tests, build and end-to-end tests;
 `lighthouse.yml` runs the Lighthouse budgets. The conformance runner needs
 `scripts/fetch-conformance.sh` first (CONTRIBUTING.md).
 
+**Browsers.** The end-to-end suite runs in Chromium. `browsers.yml` runs a
+smoke set (`smoke`, `landing`, `onboarding`, `phone-layout` and `editor` specs)
+in Firefox and WebKit, Safari's engine, not blocking yet; locally,
+`PW_BROWSERS=firefox,webkit npx playwright test --project=firefox --project=webkit`
+once those browsers are installed (`npx playwright install firefox webkit`).
+Firefox has no phone emulation, so it leaves out the phone tests. Opening a
+folder works only in Chrome and Edge, as the app says.
+
 ## Deploying
 
 Each push to `main` whose CI passes is built and published to GitHub Pages

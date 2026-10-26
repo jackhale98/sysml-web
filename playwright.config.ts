@@ -45,6 +45,37 @@ export const SIGN_IN_TEST =
 				PUBLIC_SYNC_WORKER: 'https://sync.example.test'
 			};
 
+/**
+ * Firefox and WebKit (Safari's engine) run a smoke set when PW_BROWSERS
+ * names them (`PW_BROWSERS=firefox,webkit`, as .github/workflows/browsers.yml
+ * does); otherwise only Chromium runs, as on a machine with only Chromium.
+ * Firefox has no mobile emulation (`isMobile`), so it leaves out the phone tests.
+ */
+const SMOKE = [
+	'smoke.spec.ts',
+	'landing.spec.ts',
+	'onboarding.spec.ts',
+	'phone-layout.spec.ts',
+	'editor.spec.ts'
+];
+const BROWSERS = (process.env.PW_BROWSERS ?? '').split(',').map((b) => b.trim());
+const otherBrowsers = [
+	...(BROWSERS.includes('firefox')
+		? [
+				{
+					name: 'firefox',
+					testMatch: SMOKE,
+					testIgnore: 'phone-layout.spec.ts',
+					grepInvert: /on a phone|on an iPhone/,
+					use: { ...devices['Desktop Firefox'] }
+				}
+			]
+		: []),
+	...(BROWSERS.includes('webkit')
+		? [{ name: 'webkit', testMatch: SMOKE, use: { ...devices['Desktop Safari'] } }]
+		: [])
+];
+
 export default defineConfig({
 	testDir: 'tests/e2e',
 	fullyParallel: true,
@@ -62,7 +93,8 @@ export default defineConfig({
 				...devices['Desktop Chrome'],
 				launchOptions: executablePath ? { executablePath } : {}
 			}
-		}
+		},
+		...otherBrowsers
 	],
 	webServer: {
 		command: `npm run build && npm run preview -- --port ${PORT} --strictPort`,

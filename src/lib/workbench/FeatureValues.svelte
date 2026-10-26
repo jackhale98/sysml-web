@@ -54,6 +54,16 @@
 			});
 	});
 
+	// Asked to give a value (the next steps, after a limit): open its editor.
+	$effect(() => {
+		const request = ui.valueRequest;
+		if (!request || request.element !== element.key) return;
+		const v = values.find((v) => v.name === request.name && v.edit);
+		if (!v) return;
+		editing = v.name;
+		ui.valueRequest = null;
+	});
+
 	/** A value as people read it: a string without its quotes, an enum literal by its name. */
 	function shown(v: FeatureValue): string {
 		const text = v.value?.trim() ?? '';
