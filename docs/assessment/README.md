@@ -19,6 +19,10 @@ Scores are capped at 3 unless another tool checks the result automatically
 [the interop tools](../interop-tools.md)). Averages are not used: a critical
 failure is listed on its own, whatever the rest scores.
 
+The section reports and the one-line summaries below are as assessed; what
+changed after is under [the findings and what became of them](#critical-findings-and-what-became-of-them)
+and [the roadmap](#roadmap-and-what-was-done).
+
 | Section | Report | In one line |
 | --- | --- | --- |
 | 1. Language coverage | [01-language](01-language.md) | 309/309 official example files parse; 99.4–99.8 % of references resolve; the engine and the pilot agree on 249 of 251 SysML files (`npm run assess:conformance`). |
@@ -35,20 +39,24 @@ failure is listed on its own, whatever the rest scores.
 ## Scores
 
 Fairtide's own scores; each report also gives the engine's where they differ.
+**Assessed** is the score the section reports give. **After the fixes** is the
+lead's estimate once every finding below was dealt with; it was not
+re-assessed independently, and stays under 4 wherever no other tool checks
+the result automatically.
 
-| Category | Score | Critical gaps (open) | Evidence |
-| --- | --- | --- | --- |
-| SysML v2 / KerML correctness | 3 (engine 2) | None open; the engine's satisfy resolution is mitigated in the app | §1: conformance runner, pilot comparison, construct matrix |
-| Text/diagram round-trip fidelity | 3 | None | §2: 55 edit kinds on a hostile fixture, byte comparisons, undo |
-| Import/export interoperability | 3 with itself, 1 with SysON | None open; SysON's API is unusable from Fairtide (reported, not silent) | §3: acceptance model compared by meaning, live SysON and pilot runs |
-| MBSE modelling coverage | 2 | None | §4 |
-| State-machine simulation | 2 | None open | §5: 13 reference traces from the specification |
-| Calculations and trade studies | 2 | A definition's `assert constraint` is checked only for the definition's own values | §6: hand-calculated known answers |
-| Requirements and verification | 2 | None; pass/fail results and revision-stamped reports don't exist (not claimed) | §7: identity across rename/move/merge, AIAG-VDA table |
-| Data integrity and Git collaboration | 3 | None open | §8: crash, tab, folder, merge and archive tests |
-| Software quality and maintainability | 2 | None | §9: test inventory, coverage, CI history |
-| Performance and usability | 2 | None | §10: measured distributions, phone emulation |
-| Security and deployment | 2 | None | §8, §9, §10: tokens, static hosting under a strict CSP, no telemetry |
+| Category | Assessed | After the fixes | Critical gaps (open) | Evidence |
+| --- | --- | --- | --- | --- |
+| SysML v2 / KerML correctness | 3 (engine 2) | 3 | None; the engine's satisfy resolution and °C/°F comparisons are worked around in the app | §1: conformance runner, pilot comparison, construct matrix |
+| Text/diagram round-trip fidelity | 3 | 3 | None | §2: 55 edit kinds on a hostile fixture, byte comparisons, undo; line endings and encodings kept |
+| Import/export interoperability | 3 with itself, 1 with SysON | 3 with itself, 2 with SysON | None; SysON keeps only some kinds of change, and the read-back after saving names what it dropped | §3: acceptance model compared by meaning; SysON v2026.9.3 checked live |
+| MBSE modelling coverage | 2 | 3 | None | §4; conventions, circular derivations, one coverage rule |
+| State-machine simulation | 2 | 3 | None | §5: 13 reference traces; action steps now run; reachability |
+| Calculations and trade studies | 2 | 3 | None | §6: hand-calculated known answers; per-part assertion checks; one unit list |
+| Requirements and verification | 2 | 3 | None | §7; recorded results tied to commits, reports stamped with their commit, change impact |
+| Data integrity and Git collaboration | 3 | 3 | None | §8: crash, tab, folder, merge and archive tests |
+| Software quality and maintainability | 2 | 3 | None | §9; deploys wait for CI; versioned releases and formats |
+| Performance and usability | 2 | 2 | None | §10; keyboard fixes; Firefox and Safari run in CI but don't block it yet |
+| Security and deployment | 2 | 3 | None | Tokens stay on their own server; archive paths and sizes checked; Content-Security-Policy; dependency audit |
 
 ## Critical findings and what became of them
 
@@ -75,21 +83,45 @@ fails without it and passes with it, re-run by the lead before merging.
 | An event was taken from a state the machine was about to leave. | 5 | **Fixed** (events wait for what is ready). |
 | Signals with the same simple name were one signal. | 5 | **Fixed.** |
 | Steps inside actions (`if`, `send`, successions) were dropped silently. | 5 | **Fixed** (named in the simulator's notes; they still don't run). |
-| A definition's `assert constraint` is checked only against the definition's own values: a subtype that breaks it reads "Met". | 6 | **Open.** Engine and app; kept as a failing test; first on the roadmap. |
+| A definition's `assert constraint` is checked only against the definition's own values: a subtype that breaks it reads "Met". | 6 | **Fixed.** Checked for each part that has it, with that part's values. |
+| A value in `°C` or `°F` against a limit in kelvin read "Met" when it wasn't (60 °C within 330 K): the engine compares them as differences. | 6 | **Fixed** in the app, which decides such checks itself; reported upstream. |
+| A save to SysON could delete the server's model when none of its elements matched ours (found while fixing §3, against a test server). | 3 | **Fixed.** Removals are sent only after the additions are seen kept, and elements match without root namespaces. |
+| An API token was sent to whatever host a server's "next page" link named. | 3, 8 | **Fixed.** Tokens go only to their own server; such a link isn't followed. |
 
-## Roadmap, by engineering impact
+## Roadmap and what was done
 
-1. **The open critical:** check a definition's constraints for each part and subtype that has it.
-2. **Deploy only what passed CI** (5 of the last 40 deploys published a commit whose CI had failed).
-3. **Engine calls that never answer:** time them out and say so (today the model stops updating silently).
-4. **Checks at 50k lines are 1.8–2× slower than before** (the app's metadata checks grow quadratically; `views/domains.ts` `metadataDefinition`, cache per view context).
-5. **Verification results:** pass/fail outcomes on verification cases, tied to the commit they were run against; reports that name their commit.
-6. **Save to server:** read the server back after saving before making Fairtide's requests fit SysON's API.
-7. **Change impact:** a changed requirement or risk control names the designs, tests, mitigations and FMEA lines that depend on it; circular derivations.
-8. **Security:** the API client must not send its token to another host named by a server's link; check archive paths; ship a Content-Security-Policy; dependency audit in CI.
-9. **Keyboard:** focus ring in the explorer filter, arrow keys in the project menu, focus back after its dialogs, a skip link; the accessibility check to wait for animations (the flaky contrast failure is a race).
-10. **Browsers:** Firefox and Safari in CI.
-11. **Smaller:** unresolved names as errors; line endings and encodings kept; the review's change summary; one unit list matching the library; FMEA ratings must be whole numbers; versioned storage formats and releases.
+Every finding in the section reports was taken up by one of eight fix
+agents (simulation, checks, text, platform, units, usability, exchange,
+traceability) or by the lead. Each fix came with a test that fails without
+it and passes with it, run both ways; the known-gap tests turned into plain
+ones.
+
+| Roadmap item | Outcome |
+| --- | --- |
+| 1. A definition's constraints for each part and subtype | **Done.** Undecided checks are shown in Problems with what's missing. |
+| 2. Deploy only what passed CI | **Done.** Deploys run after CI succeeds on the same commit. |
+| 3. Engine calls that never answer | **Done.** Calls time out and say so; a memory warning before the tab gives out. |
+| 4. Checks at 50k lines | **Done.** The metadata checks are cached per view: 2,946 → 13 ms at 50k. |
+| 5. Verification results | **Done (core).** Results are recorded on verification cases as SysML metadata (verdict, date, who, commit, evidence), shown in tables, matrices, the home view and the report, and marked out of date once the model changes after their commit ([verification](../verification.md)). Simulator runs export with their commit but aren't results. |
+| 6. Save to server | **Done.** The server is read back after saving and anything it didn't keep is named. Requests now fit SysON's API, checked live: creating and opening projects and changing names and values work; SysON ignores changed references and new elements, and Fairtide says so. |
+| 7. Change impact | **Done.** A review names what relies on a changed requirement or risk control (designs, tests, mitigations, derived requirements, FMEA lines); circular derivations are problems. |
+| 8. Security | **Done.** Token origin, archive paths, duplicates, checksums and sizes; a Content-Security-Policy; a dependency audit in CI. GitHub Enterprise Server works with access tokens. |
+| 9. Keyboard | **Done.** Focus ring, menu arrow keys, focus return, skip links; the accessibility checks wait for animations and hold notifications. |
+| 10. Browsers | **Started.** Firefox and Safari (WebKit) run in CI without blocking it, until their first results are reviewed. |
+| 11. Smaller | **Done.** Unresolved names are errors; line endings, BOMs and encodings kept; the review's change summary; one unit list from the library, temperature scales, ranges and totals; whole-number FMEA ratings; versioned formats, releases and a changelog. |
+
+### Still open
+
+- **Identity through JSON:** element ids don't survive export, import and
+  export again; designed in [interchange](../interchange.md#identity), not built.
+- **SysON:** its text export and its loss of `total <= limit` in its own
+  element JSON are reported to SysON; Fairtide opens the rest.
+- **Libraries across projects:** a design note in [verification](../verification.md);
+  replacing a library from the template would overwrite a project's own policy.
+- **Conventions in CI:** conventions show in Problems but don't fail a build.
+- **Simulator runs as results:** a run can't yet be recorded against a
+  requirement or verification case.
+- **Signed commits:** not started.
 
 ## The final question
 
@@ -105,20 +137,22 @@ information or producing misleading results?*
   undo, folder saves, tabs, GitHub merges and archive imports were each
   found able to lose work silently and each now refuses or asks instead,
   proven by tests that failed before.
-- **Analyse:** budgets, trade studies and the simulator each gave confident
-  wrong answers in specific cases; eight are fixed with known-answer tests.
-  One remains (inherited constraints), and analysis outside budgets, checks,
-  trade studies, FMEA and the simulator is not claimed.
+- **Analyse:** budgets, trade studies, checks and the simulator each gave
+  confident wrong answers in specific cases; all found are fixed with
+  known-answer tests, including inherited constraints and temperatures.
+  Analysis outside budgets, checks, trade studies, FMEA and the simulator
+  is not claimed.
 - **Exchange:** Fairtide's own formats round-trip by meaning, and its text
-  passes the reference implementation; exchange with SysON is not
-  trustworthy today, mostly through SysON's own faults, and Fairtide says
-  when it fails rather than reporting success.
+  passes the reference implementation. With SysON, text works one way and
+  its API keeps only some kinds of change; Fairtide reads the server back
+  and names what was not kept rather than reporting success.
 
-So: trustworthy for representing and modifying models, with the evidence in
-the reports; trustworthy for the analyses it offers once the open constraint
-gap is closed; not yet for exchange with SysON, or for regulated workflows
-that need recorded verification results, approvals or e-signatures, which
-it does not claim.
+So: trustworthy for representing, modifying and analysing models within
+what it offers, with the evidence in the reports and the tests; for
+exchange with SysON, only with the read-back's word on what arrived.
+Verification results are recorded against the commit they were run on;
+approvals and e-signatures, which regulated workflows need, are not
+claimed.
 
 ## Reproducing
 
