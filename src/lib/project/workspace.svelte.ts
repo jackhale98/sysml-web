@@ -354,7 +354,7 @@ export class Workspace {
 	 * the transaction it is part of (`warnings`).
 	 */
 	async edit(path: string, request: EditRequest): Promise<string | null> {
-		if (!this.engine) return 'The engine is not ready yet.';
+		if (!this.engine) return 'The model is still loading.';
 		const files = this.sourceFiles().map((f) =>
 			f.path === path ? { path, text: request.source } : f
 		);

@@ -119,7 +119,7 @@ saving it back changes nothing.
 - **Elements the toolkit doesn't know** (an unknown `@type`, a dangling
   owner) are left out and listed.
 - **Implied relationships** (`isImplied: true`, in full-form files) are not
-  written out: the text implies them and the engine works them out again.
+  written out: the text implies them and they are worked out from it again.
 - **Unresolved references** in the project are left out of the export and
   listed (fix the model's problems first to keep them).
 - **Files with syntax errors** export what parses of them, and the dialog

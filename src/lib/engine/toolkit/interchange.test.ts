@@ -238,7 +238,7 @@ describe('import', () => {
 		const said = result.notes.map((n) => `${n.kind}: ${n.message} ${n.element ?? ''}`).join('\n');
 		// Once each, in plain words: the widget (with its membership), and the value that changed.
 		expect(said.split('\n')).toEqual([
-			'left-out: Left out: a fancy widget, which isn’t a SysML element the engine knows. Garage::gizmo (FancyWidget)',
+			'left-out: Left out: a fancy widget, which isn’t a known SysML element. Garage::gizmo (FancyWidget)',
 			'changed: A part usage reads differently from the file: isComposite true → false. Garage::car (PartUsage)'
 		]);
 		expect(result.files[0]!.text).toContain('part def Vehicle');

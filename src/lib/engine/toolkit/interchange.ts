@@ -545,7 +545,7 @@ export function importModel(tk: Toolkit, library: TkLibrary, text: string): Inte
 	if (implied)
 		notes.push({
 			kind: 'implied',
-			message: `${count(implied, 'implied relationship')} not written out: the text implies ${implied === 1 ? 'it' : 'them'}, and the engine works ${implied === 1 ? 'it' : 'them'} out again.`
+			message: `${count(implied, 'implied relationship')} not written out: the text implies ${implied === 1 ? 'it' : 'them'}, and ${implied === 1 ? 'it is' : 'they are'} worked out from it again.`
 		});
 
 	let lifted: TkSession;
@@ -557,7 +557,7 @@ export function importModel(tk: Toolkit, library: TkLibrary, text: string): Inte
 		);
 	} catch (error) {
 		throw new InterchangeError(
-			`The engine could not read these elements: ${error instanceof Error ? error.message : String(error)}`
+			`These elements couldn’t be read: ${error instanceof Error ? error.message : String(error)}`
 		);
 	}
 	let liftedElements: ElementJson[];
@@ -845,7 +845,7 @@ function leftOutNotes(
 		notes.push({
 			kind: 'left-out',
 			message: unknown.has(e['@type'])
-				? `Left out: ${article(e['@type'])}, which isn’t a SysML element the engine knows.`
+				? `Left out: ${article(e['@type'])}, which isn’t a known SysML element.`
 				: `Not carried over: ${article(e['@type'])}.`,
 			element: elementLabel(e, byId)
 		});
@@ -892,7 +892,6 @@ function plainWarning(warning: string): string {
 	if (ids)
 		return `${count(Number(ids[1]), 'element')} of the file had no place in the text, so ${ids[1] === '1' ? 'its id' : 'their ids'} could not be kept.`;
 	const type = /^unsupported owned element @type (\w+)/.exec(warning);
-	if (type)
-		return `${article(type[1]!, true)} isn’t a SysML element the engine knows, so it was left out.`;
+	if (type) return `${article(type[1]!, true)} isn’t a known SysML element, so it was left out.`;
 	return warning.charAt(0).toUpperCase() + warning.slice(1) + (/[.!?]$/.test(warning) ? '' : '.');
 }
