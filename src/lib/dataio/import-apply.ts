@@ -6,6 +6,7 @@
  * inside `workspace.transact`, so the whole import is one undoable change.
  */
 import type { EditRequest } from '#lib/engine/types.ts';
+import { lineBreakOf } from '#lib/project/lineBreaks.ts';
 import type { ImportOptions, ImportPlan } from './import-plan';
 import { derivationText, docComment, requirementText, sysmlName } from './sysml-text';
 
@@ -38,7 +39,8 @@ export function hasImport(text: string, wanted: string): boolean {
 export function withImports(text: string, line: number, imports: string[]): string {
 	const missing = imports.filter((imp) => !hasImport(text, imp));
 	if (!missing.length) return text;
-	const lines = text.split('\n');
+	const lineBreak = lineBreakOf(text);
+	const lines = text.split(lineBreak);
 	let open = line - 1;
 	while (open < lines.length && !lines[open]!.includes('{')) open++;
 	if (open >= lines.length) return text;
@@ -71,7 +73,7 @@ export function withImports(text: string, line: number, imports: string[]): stri
 		const next = lines[after]?.trim() ?? '';
 		lines.splice(after, 0, ...before, ...block, ...(next && next !== '}' ? [''] : []));
 	}
-	return lines.join('\n');
+	return lines.join(lineBreak);
 }
 
 /** The members to add: each requirement, then the derivations, separated by blank lines. */

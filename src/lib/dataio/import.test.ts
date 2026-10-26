@@ -535,6 +535,16 @@ describe('import text helpers', () => {
 		);
 	});
 
+	it("adds imports in the file's own line endings", () => {
+		const crlf = (t: string) => t.replace(/\n/g, '\r\n');
+		expect(withImports(crlf('package P {\n    part x;\n}\n'), 1, ['A::*', 'B::*'])).toBe(
+			crlf('package P {\n    private import A::*;\n    private import B::*;\n\n    part x;\n}\n')
+		);
+		expect(withImports(crlf('package P {\n    import Q::*;\n    part x;\n}\n'), 1, ['A::*'])).toBe(
+			crlf('package P {\n    import Q::*;\n    private import A::*;\n    part x;\n}\n')
+		);
+	});
+
 	it('emits members separated by blank lines', () => {
 		const context = contextFor(demo);
 		const rows = [
