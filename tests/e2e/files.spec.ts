@@ -153,8 +153,8 @@ test('make a file in a new folder, use it, rename it, delete it and undo', async
 	await expect(deleted).toContainText(/no longer resolve/);
 	await expect(files(page).getByRole('button', { name: /^PowerSupply\.sysml/ })).toHaveCount(0);
 	await expect(tabs(page).getByRole('button', { name: /^PowerSupply\.sysml/ })).toHaveCount(0);
-	// References that no longer resolve are warnings.
-	await expect(page.getByRole('button', { name: /^Problems: .*[1-9]\d* warning/ })).toBeVisible({
+	// References that no longer resolve are errors (the toast warned before).
+	await expect(page.getByRole('button', { name: /^Problems: [1-9]\d* error/ })).toBeVisible({
 		timeout: 20_000
 	});
 

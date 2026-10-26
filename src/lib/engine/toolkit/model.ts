@@ -28,6 +28,7 @@ import type {
 } from '../types';
 import type { TkElement, TkRef, TkSession, TkSite, Toolkit } from './api';
 import type { TextIndex } from './offsets';
+import { BOM_BYTES_MORE } from './bom';
 import type { RepairMap } from './repair';
 
 /** One user unit of the session, with what is needed to map positions back. */
@@ -35,9 +36,17 @@ export interface UnitInfo {
 	path: string;
 	/** The text the person edits. */
 	original: TextIndex;
-	/** The text the session parsed (differs from `original` when repaired). */
+	/** The text the session parsed (differs from `original` when repaired, or with a byte-order mark). */
 	repaired: TextIndex;
 	repair?: RepairMap;
+	/** The person's text starts with a byte-order mark, a space in the session's (`bom.ts`). */
+	bom?: boolean;
+}
+
+/** A byte offset in the session's text → the same place in the person's text. */
+export function toOriginalByte(unit: UnitInfo, byte: number): number {
+	const at = unit.repair ? unit.repair.toOriginal(byte) : byte;
+	return unit.bom && at > 0 ? at + BOM_BYTES_MORE : at;
 }
 
 /** One element of the user's model, as the adapter read it. */
@@ -617,8 +626,7 @@ function unquote(text: string): string {
 
 /** A site in the session's (maybe repaired) text → a byte range in the person's text. */
 function mapSite(unit: UnitInfo, site: TkSite): { start: number; end: number } {
-	if (!unit.repair) return { start: site.start, end: site.end };
-	return { start: unit.repair.toOriginal(site.start), end: unit.repair.toOriginal(site.end) };
+	return { start: toOriginalByte(unit, site.start), end: toOriginalByte(unit, site.end) };
 }
 
 const ref = (value: unknown): string | null =>
@@ -810,14 +818,18 @@ export function isReference(r: ElementRecord): boolean {
 }
 
 export function multiplicityOf(header: string): string | null {
-	// Only before the value: `= 650 [g]` has a unit in brackets, not a multiplicity.
-	const declaration = header.split(/\s(?:=|:=|default)\s/)[0] ?? header;
-	const masked = declaration.replace(/'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"/g, (s) =>
+	const masked = header.replace(/'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"/g, (s) =>
 		' '.repeat(s.length)
 	);
-	const match = /\[([^\]]*)\]/.exec(masked);
+	// Only before the value, however it is spaced: `= 650 [g]` and `=40[kg]` have a unit in
+	// brackets, not a multiplicity.
+	const valueAt = masked.search(/:=|(?<![=<>!])=(?!=)|\bdefault\b/);
+	const declaration = valueAt < 0 ? masked : masked.slice(0, valueAt);
+	const match = /\[([^\]]*)\]/.exec(declaration);
 	if (!match) return null;
-	return declaration.slice(match.index + 1, match.index + 1 + match[1]!.length).trim() || null;
+	// After a number or an expression it is a unit too (`accept after 5 [s]`).
+	if (/[\d.)]\s*$/.test(declaration.slice(0, match.index))) return null;
+	return header.slice(match.index + 1, match.index + 1 + match[1]!.length).trim() || null;
 }
 
 /** The element's editable declaration parts, for the inspector. */

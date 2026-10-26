@@ -2,7 +2,9 @@
  * SysML language services in the text editor, answered by the engine (the
  * same logic as the SysML language server): completion with snippets,
  * hover documentation, go to definition, find references, rename, format
- * and quick fixes. Offsets are UTF-16, like CodeMirror's.
+ * and quick fixes. Offsets are UTF-16 in the file's text, turned into
+ * editor positions and back (`lineBreaks.ts`) where a file ends its lines
+ * with `\r\n`.
  */
 import {
 	autocompletion,
@@ -24,6 +26,8 @@ import {
 import type { Engine } from '#lib/engine/client.ts';
 import type { CodeAction, DefinitionTarget, FileChange, FileRange } from '#lib/engine/types.ts';
 import { parseBlocks, type Inline } from '#lib/markdown/markdown.ts';
+import { inLineBreaksOf, withLineBreak, type LineBreak } from '#lib/project/lineBreaks.ts';
+import { fileText, toDoc, toFile } from './lineBreaks';
 
 export interface LanguageContext {
 	engine: Engine;
@@ -59,10 +63,11 @@ function completionSource(ctx: LanguageContext) {
 		const after = context.state.sliceDoc(Math.max(0, context.pos - 2), context.pos);
 		// Ask while typing a name, after `:`/`:>`/`::`/`.`, or when explicitly asked.
 		if (!context.explicit && !word?.text && !/[:.>]\s?$/.test(after)) return null;
+		const { state } = context;
 		const files = ctx
 			.files()
-			.map((f) => (f.path === ctx.path ? { path: f.path, text: context.state.doc.toString() } : f));
-		const result = await ctx.engine.complete(files, ctx.path, context.pos);
+			.map((f) => (f.path === ctx.path ? { path: f.path, text: fileText(state) } : f));
+		const result = await ctx.engine.complete(files, ctx.path, toFile(state, context.pos));
 		if (context.aborted || !result.items.length) return null;
 		const options: CmCompletion[] = result.items.map((item) => {
 			const base: CmCompletion = {
@@ -75,9 +80,16 @@ function completionSource(ctx: LanguageContext) {
 			if (item.isSnippet && item.insertText) {
 				return { ...base, apply: snippet(toSnippet(item.insertText)) };
 			}
-			return item.insertText ? { ...base, apply: item.insertText } : base;
+			return item.insertText
+				? { ...base, apply: withLineBreak(item.insertText, state.lineBreak as LineBreak) }
+				: base;
 		});
-		return { from: result.from, to: result.to, options, validFor: /^[\w']*$/ };
+		return {
+			from: toDoc(state, result.from),
+			to: toDoc(state, result.to),
+			options,
+			validFor: /^[\w']*$/
+		};
 	};
 }
 
@@ -131,14 +143,15 @@ export function renderMarkdown(markdown: string): HTMLElement {
 function hover(ctx: LanguageContext) {
 	return hoverTooltip(
 		async (view, pos): Promise<Tooltip | null> => {
+			const { state } = view;
 			const files = ctx
 				.files()
-				.map((f) => (f.path === ctx.path ? { path: f.path, text: view.state.doc.toString() } : f));
-			const info = await ctx.engine.hover(files, ctx.path, pos);
+				.map((f) => (f.path === ctx.path ? { path: f.path, text: fileText(state) } : f));
+			const info = await ctx.engine.hover(files, ctx.path, toFile(state, pos));
 			if (!info) return null;
 			return {
-				pos: info.from,
-				end: info.to,
+				pos: toDoc(state, info.from),
+				end: toDoc(state, info.to),
 				above: true,
 				create: () => ({ dom: renderMarkdown(info.markdown) })
 			};
@@ -303,7 +316,7 @@ function fixesField(ctx: LanguageContext) {
 
 function commands(ctx: LanguageContext, open: (state: EditorView['state']) => boolean) {
 	const definition = (view: EditorView, pos = view.state.selection.main.head) => {
-		void ctx.engine.definition(ctx.files(), ctx.path, pos).then((target) => {
+		void ctx.engine.definition(ctx.files(), ctx.path, toFile(view.state, pos)).then((target) => {
 			if (target) ctx.goto(target);
 		});
 		return true;
@@ -311,7 +324,7 @@ function commands(ctx: LanguageContext, open: (state: EditorView['state']) => bo
 	const references = (view: EditorView) => {
 		const pos = view.state.selection.main.head;
 		const name = wordAt(view, pos);
-		void ctx.engine.references(ctx.files(), ctx.path, pos).then((ranges) => {
+		void ctx.engine.references(ctx.files(), ctx.path, toFile(view.state, pos)).then((ranges) => {
 			const files = Object.fromEntries(ctx.files().map((f) => [f.path, f.text]));
 			const items = ranges.map((r) => {
 				const text = files[r.path] ?? '';
@@ -326,19 +339,31 @@ function commands(ctx: LanguageContext, open: (state: EditorView['state']) => bo
 		const pos = view.state.selection.main.head;
 		const from = wordAt(view, pos);
 		if (!from) return false;
-		view.dispatch({ effects: setPanel.of({ kind: 'rename', from, offset: pos }) });
+		view.dispatch({
+			effects: setPanel.of({ kind: 'rename', from, offset: toFile(view.state, pos) })
+		});
 		return true;
 	};
 	const format = (view: EditorView) => {
-		const text = view.state.doc.toString();
+		const text = fileText(view.state);
 		void ctx.engine.format(text).then(({ changes }) => {
-			if (view.state.doc.toString() === text && changes.length) view.dispatch({ changes });
+			const { state } = view;
+			if (fileText(state) !== text || !changes.length) return;
+			view.dispatch({
+				changes: inLineBreaksOf(text, changes).map((c) => ({
+					from: toDoc(state, c.from),
+					to: toDoc(state, c.to),
+					insert: c.insert
+				}))
+			});
 		});
 		return true;
 	};
 	const quickFix = (view: EditorView) => {
-		const { from, to } = view.state.selection.main;
-		void ctx.engine.codeActions(ctx.files(), ctx.path, from, to).then((actions) => {
+		const { state } = view;
+		const { from, to } = state.selection.main;
+		const range = [toFile(state, from), toFile(state, to)] as const;
+		void ctx.engine.codeActions(ctx.files(), ctx.path, ...range).then((actions) => {
 			view.dispatch({ effects: setFixes.of({ pos: from, actions }) });
 		});
 		return true;

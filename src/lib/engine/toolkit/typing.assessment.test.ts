@@ -64,43 +64,35 @@ describe('typing a declaration into the demo', () => {
 		);
 	}, 120_000);
 
-	// Known gap: while `part spareCamera … {` is unclosed, the repair moves the rest of
-	// `part drone`, and a model check reports "connector end references `commandLink`, which
-	// is featured in `DeliveryDrone` …" on an untouched line (62); only unresolved names are
-	// hidden as follow-on problems (diagnostics.ts). The syntax error itself is reported at the
-	// end of the file, where the parser runs out of text, which is right for an open brace.
-	it.fails(
-		'while typing, no model problem appears away from the typing',
-		() => {
-			const typedLines = TYPED.split('\n').length;
-			const far: string[] = [];
-			for (let k = 1; k <= TYPED.length; k++) {
-				const own = typedTo(k).find((a) => a.model.file === PATH)!;
-				for (const p of own.diagnostics)
-					if (p.span.start_row < lineOfAt - 1 || p.span.start_row > lineOfAt + typedLines + 1)
-						far.push(`${k}: line ${p.span.start_row} ${p.message}`);
-			}
-			expect(far).toEqual([]);
-		},
-		120_000
-	);
+	// While `part spareCamera … {` is unclosed, the toolkit's repair moved the rest of `part
+	// drone`, and a model check reported "connector end references `commandLink`, which is
+	// featured in `DeliveryDrone` …" on an untouched line (62). The file is now repaired from its
+	// text as it last parsed (host.ts, `fromLastParsed`). The syntax error itself is reported at
+	// the end of the file, where the parser runs out of text, which is right for an open brace.
+	it('while typing, no model problem appears away from the typing', () => {
+		const typedLines = TYPED.split('\n').length;
+		const far: string[] = [];
+		for (let k = 1; k <= TYPED.length; k++) {
+			const own = typedTo(k).find((a) => a.model.file === PATH)!;
+			for (const p of own.diagnostics)
+				if (p.span.start_row < lineOfAt - 1 || p.span.start_row > lineOfAt + typedLines + 1)
+					far.push(`${k}: line ${p.span.start_row} ${p.message}`);
+		}
+		expect(far).toEqual([]);
+	}, 120_000);
 
-	// Known gap: while the declaration is unfinished, the repair cuts out the whole enclosing
-	// `part drone { … }`, so up to 28 of the file's elements leave the explorer and diagrams
-	// until the text parses again (the text itself is untouched).
-	it.fails(
-		'every keystroke keeps the edited file’s other elements in the model',
-		() => {
-			const before = names(baseline.find((a) => a.model.file === PATH)!);
-			const lost = new Set<string>();
-			for (let k = 1; k <= TYPED.length; k++) {
-				const now = names(typedTo(k).find((a) => a.model.file === PATH)!);
-				for (const n of before) if (!now.has(n)) lost.add(n!);
-			}
-			expect([...lost]).toEqual([]);
-		},
-		120_000
-	);
+	// The toolkit's repair cut out the whole enclosing `part drone { … }`, so up to 28 of the
+	// file's elements left the explorer and diagrams until the text parsed again; repaired from
+	// its text as it last parsed, the file keeps them.
+	it('every keystroke keeps the edited file’s other elements in the model', () => {
+		const before = names(baseline.find((a) => a.model.file === PATH)!);
+		const lost = new Set<string>();
+		for (let k = 1; k <= TYPED.length; k++) {
+			const now = names(typedTo(k).find((a) => a.model.file === PATH)!);
+			for (const n of before) if (!now.has(n)) lost.add(n!);
+		}
+		expect([...lost]).toEqual([]);
+	}, 120_000);
 
 	it('a file cut off anywhere analyses, with a syntax error inside the text', () => {
 		const step = Math.ceil(original.length / 40);

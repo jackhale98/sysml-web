@@ -49,6 +49,7 @@ import type {
 	ViewInfo
 } from '../types';
 import type {
+	TkDropped,
 	TkFinding,
 	TkLenient,
 	TkLibrary,
@@ -57,7 +58,9 @@ import type {
 	TkSource,
 	Toolkit
 } from './api';
+import { filesWithoutBom, withBomOf, withoutBom } from './bom';
 import { toProblems } from './diagnostics';
+import { diffTexts, type TextChange } from './diff';
 import { buildDiagram } from './diagrams';
 import { DiagramContext } from './diagrams/context';
 import { Relations } from './diagrams/related';
@@ -117,6 +120,8 @@ export class ToolkitHost {
 	private pending: Prepared | null = null;
 	private settled: TkSettledOutcomes | undefined;
 	private readonly texts = new TextIndexCache();
+	/** Each file's latest text that parsed, as analysed (`fromLastParsed`), as the toolkit is given it. */
+	private readonly lastParsed = new Map<string, string>();
 	/** Snapshots of versions other than the analysed one (a base to compare with), newest first. */
 	private apart: { files: SourceFile[]; snapshot: ModelSnapshot }[] = [];
 	/** Timings of the latest version analysed apart, for measurements. */
@@ -151,27 +156,33 @@ export class ToolkitHost {
 	}
 
 	highlight(source: string): Highlights {
-		return this.syntax.highlight(source);
+		return this.syntax.highlight(withoutBom(source));
 	}
 
 	format(source: string): { changes: { from: number; to: number; insert: string }[] } {
-		return this.syntax.format(source);
+		const given = withoutBom(source);
+		const { changes } = this.syntax.format(given);
+		if (given === source || !changes.length) return { changes };
+		// The byte-order mark stays where it is.
+		return { changes: diffTexts(source, withBomOf(source, applyChanges(given, changes))) };
 	}
 
+	// The language server is given byte-order marks as spaces (`bom.ts`): offsets are the same.
+
 	complete(files: SourceFile[], path: string, offset: number): Completion {
-		return this.language.complete(files, path, offset);
+		return this.language.complete(filesWithoutBom(files), path, offset);
 	}
 
 	hover(files: SourceFile[], path: string, offset: number): Hover | null {
-		return this.language.hover(files, path, offset);
+		return this.language.hover(filesWithoutBom(files), path, offset);
 	}
 
 	definition(files: SourceFile[], path: string, offset: number): DefinitionTarget | null {
-		return this.language.definition(files, path, offset);
+		return this.language.definition(filesWithoutBom(files), path, offset);
 	}
 
 	references(files: SourceFile[], path: string, offset: number): FileRange[] {
-		return this.language.references(files, path, offset);
+		return this.language.references(filesWithoutBom(files), path, offset);
 	}
 
 	renameSymbol(
@@ -180,11 +191,11 @@ export class ToolkitHost {
 		offset: number,
 		newName: string
 	): { changes: FileChange[] } | { error: string } {
-		return this.language.rename(files, path, offset, newName);
+		return this.language.rename(filesWithoutBom(files), path, offset, newName);
 	}
 
 	outline(files: SourceFile[], path: string): OutlineItem[] {
-		return this.language.outline(files, path);
+		return this.language.outline(filesWithoutBom(files), path);
 	}
 
 	/** Quick fixes, for the problems the analysis found where the selection is. */
@@ -205,7 +216,7 @@ export class ToolkitHost {
 					...analysis.diagnostics
 				]
 			: [];
-		return this.language.codeActions(files, path, from, to, problems);
+		return this.language.codeActions(filesWithoutBom(files), path, from, to, problems);
 	}
 
 	version(): string {
@@ -213,7 +224,17 @@ export class ToolkitHost {
 	}
 
 	analyzeProject(files: SourceFile[]): Analysis[] {
-		return this.build(files).analyses;
+		const built = this.build(files);
+		// The project's texts that parse, for repairing them while someone types (`fromLastParsed`).
+		// Only from here: an edit's or a check's texts (with elements blanked out) are not the files.
+		const paths = new Set(files.map((f) => f.path));
+		for (const path of this.lastParsed.keys()) if (!paths.has(path)) this.lastParsed.delete(path);
+		const broken = new Set(
+			built.analyses.filter((a) => a.model.syntax_errors.length).map((a) => a.model.file)
+		);
+		for (const file of files)
+			if (!broken.has(file.path)) this.lastParsed.set(file.path, withoutBom(file.text));
+		return built.analyses;
 	}
 
 	/** One file on its own (names in other files don't resolve). */
@@ -520,7 +541,7 @@ export class ToolkitHost {
 		const session = this.build(files).session;
 		if (!session) throw new Error('The model could not be read, so nothing can be merged into it.');
 		const rename = (path: string, offset: number, name: string) => {
-			const result = this.language.rename(files, path, offset, name);
+			const result = this.language.rename(filesWithoutBom(files), path, offset, name);
 			return 'changes' in result ? result.changes : null;
 		};
 		return weaveModel(this.tk, this.library, session, files, ours, merged, rename);
@@ -566,7 +587,7 @@ export class ToolkitHost {
 		const started = performance.now();
 		const all = [...files, ...views.missingViewLibraries(files)];
 		// Its own text indexes: the analysed project's stay cached.
-		const { repaired, units, parse } = this.repair(all, new TextIndexCache());
+		const { repaired, units, parse } = this.repair(all, new TextIndexCache(), false);
 		const json = JSON.stringify(repaired);
 		// Settled outcomes of the analysed project are a head start (most of the text is the same).
 		let session: TkSession | null = null;
@@ -656,7 +677,7 @@ export class ToolkitHost {
 		this.built = null;
 		previous?.evaluation?.free();
 		previous?.session?.free();
-		if (withViewLibraries) this.language.textsChanged(files);
+		if (withViewLibraries) this.language.textsChanged(filesWithoutBom(files));
 		const { session, units, parse, lenient } = this.prepare(files, withViewLibraries);
 		const prepared = performance.now();
 		const findings = session ? (JSON.parse(session.check()) as TkFinding[]) : [];
@@ -672,7 +693,16 @@ export class ToolkitHost {
 		}
 		const extracted = session ? extractModel(this.tk, session, byIndex) : null;
 		const adapted = performance.now();
-		const problems = toProblems(parse, findings, units);
+		const problems = toProblems(parse, findings, units, (id) => {
+			// An element a message names by its id: by its qualified name, or as it is referred to.
+			const element = session?.elementById(id);
+			if (!element) return null;
+			try {
+				return session!.qualifiedName(element) ?? session!.referenceSpelling(element) ?? null;
+			} finally {
+				element.free();
+			}
+		});
 
 		const analyses = files.map((file): Analysis => {
 			const model = extracted?.models.get(file.path) ?? {
@@ -721,25 +751,47 @@ export class ToolkitHost {
 		return { files, all, session, units, parse, lenient };
 	}
 
-	/** Units that don't parse are repaired first: a session can't be built over them. */
+	/**
+	 * Units that don't parse are repaired first: a session can't be built over
+	 * them. For the project being edited (`current`), a unit is repaired from
+	 * its latest text that parsed where it can be (`fromLastParsed`), else by
+	 * the toolkit (`lenientSources`).
+	 */
 	private repair(
 		all: SourceFile[],
-		texts = this.texts
+		texts = this.texts,
+		current = true
 	): {
 		repaired: TkSource[];
 		units: Map<string, UnitInfo>;
 		parse: TkFinding[];
 		lenient: boolean;
 	} {
-		const sources: TkSource[] = all.map((f) => ({ name: f.path, text: f.text }));
+		const sources: TkSource[] = all.map((f) => ({ name: f.path, text: withoutBom(f.text) }));
 		const json = JSON.stringify(sources);
 		const parse = (JSON.parse(this.tk.checkSyntax(json)) as TkFinding[]).filter(
 			(f) => f.stage === 'parse'
 		);
 		let repaired = sources;
 		let lenient: TkLenient | null = null;
+		const broken = new Set(parse.map((f) => f.unit));
 		if (parse.length) {
 			lenient = JSON.parse(this.tk.lenientSources(json)) as TkLenient;
+			if (current)
+				for (const source of sources) {
+					if (!broken.has(source.name)) continue;
+					const better = this.fromLastParsed(source.name, source.text);
+					if (!better) continue;
+					const at = lenient.sources.findIndex((s) => s.name === source.name);
+					const fixed = { name: source.name, text: better.text };
+					if (at >= 0) lenient.sources[at] = fixed;
+					else lenient.sources.push(fixed);
+					lenient.dropped = [
+						...lenient.dropped.filter((d) => d.unit !== source.name),
+						...better.dropped
+					];
+					lenient.unrepaired = lenient.unrepaired.filter((u) => u.unit !== source.name);
+				}
 			const stillBroken = new Set(lenient.unrepaired.map((u) => u.unit));
 			repaired = lenient.sources.filter((s) => !stillBroken.has(s.name));
 		}
@@ -750,6 +802,49 @@ export class ToolkitHost {
 			texts
 		);
 		return { repaired, units, parse, lenient: !!lenient };
+	}
+
+	/**
+	 * A unit that doesn't parse, repaired from its latest text that parsed:
+	 * the changes since then are undone, the fewest that make it parse (one
+	 * of them, else all). Typing an unclosed `{` then keeps the file's model
+	 * as it was (the toolkit's repair cuts out the element the brace is in),
+	 * and no finding comes from a half-repaired text. Null when there is no
+	 * such text, or when it differs too much from this one to stand in for
+	 * it (another file of the same name, or most of it rewritten).
+	 */
+	private fromLastParsed(
+		path: string,
+		text: string
+	): { text: string; dropped: TkDropped[] } | null {
+		const last = this.lastParsed.get(path);
+		if (last === undefined || last === text) return null;
+		const changes = diffTexts(text, last);
+		if (!changes.length) return null;
+		const parses = (candidate: string) =>
+			!(
+				JSON.parse(
+					this.tk.checkSyntax(JSON.stringify([{ name: path, text: candidate }]))
+				) as TkFinding[]
+			).some((f) => f.stage === 'parse');
+		let undone: TextChange[] = changes;
+		if (changes.length > 1)
+			for (const change of changes)
+				if (parses(applyChanges(text, [change]))) {
+					undone = [change];
+					break;
+				}
+		const kept = text.length - undone.reduce((n, c) => n + c.to - c.from, 0);
+		const taken = undone.reduce((n, c) => n + c.insert.length, 0);
+		if (taken > LAST_PARSED_MAX_TAKEN || kept < text.length / 2) return null;
+		const repaired = applyChanges(text, undone);
+		const index = this.texts.get(path, text);
+		const dropped = undone.map((c) => {
+			const start = index.utf16ToByte(c.from);
+			const end = index.utf16ToByte(c.to);
+			return { unit: path, start, end, text: text.slice(c.from, c.to), inserted: c.insert };
+		}) as TkDropped[];
+		return { text: repaired, dropped };
 	}
 
 	/** How each file maps to the text its session parsed (`repaired`, the same when it parses). */
@@ -764,13 +859,17 @@ export class ToolkitHost {
 			const original = texts.get(file.path, file.text);
 			const fixed = repaired.find((s) => s.path === file.path);
 			const unit: UnitInfo = { path: file.path, original, repaired: original };
+			// What the toolkit was given: a byte-order mark as a space (`bom.ts`).
+			const given = withoutBom(file.text);
+			if (given !== file.text) unit.bom = true;
 			if (fixed && fixed.text !== file.text) {
 				unit.repaired = texts.get(`repaired:${file.path}`, fixed.text);
-				unit.repair = RepairMap.build(
-					file.text,
-					fixed.text,
-					lenient?.dropped.filter((d) => d.unit === file.path) ?? []
-				);
+				if (fixed.text !== given)
+					unit.repair = RepairMap.build(
+						given,
+						fixed.text,
+						lenient?.dropped.filter((d) => d.unit === file.path) ?? []
+					);
 			}
 			units.set(file.path, unit);
 		}
@@ -851,4 +950,15 @@ function reboundRedefinitions(before: Map<string, string>, after: Map<string, st
 	if (!moved.length) return null;
 	const shown = moved.slice(0, 3).join('; ');
 	return `${shown}${moved.length > 3 ? `; and ${moved.length - 3} more` : ''}.`;
+}
+
+/** Text taken back from a file's latest text that parsed, at most (`fromLastParsed`). */
+const LAST_PARSED_MAX_TAKEN = 4000;
+
+/** Non-overlapping changes (UTF-16 offsets) applied to a text. */
+function applyChanges(text: string, changes: TextChange[]): string {
+	let out = text;
+	for (const c of [...changes].sort((a, b) => b.from - a.from))
+		out = out.slice(0, c.from) + c.insert + out.slice(c.to);
+	return out;
 }

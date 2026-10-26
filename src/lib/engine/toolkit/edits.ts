@@ -21,6 +21,7 @@
  */
 import type { DeclarationSet, EditRequest, EditResult, FileChange } from '../types';
 import type { TkElement, TkSession, TkSite, Toolkit } from './api';
+import { withBomOf } from './bom';
 import { diffTexts } from './diff';
 import {
 	applyTextChanges,
@@ -950,7 +951,7 @@ export class ModelEditing {
 			const list =
 				touched.length === 1
 					? minimize(unit.original.text, touched[0]!.get(file)!)
-					: diffTexts(unit.original.text, final);
+					: diffTexts(unit.original.text, withBomOf(unit.original.text, final));
 			if (file === path) changes.push(...list);
 			else otherFiles.push(...list.map((c) => ({ path: file, ...c })));
 		}

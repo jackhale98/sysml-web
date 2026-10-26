@@ -52,7 +52,8 @@ describe('the demo, analysed by the toolkit', () => {
 		);
 		const [first, second] = result.find((a) => a.model.file === path)!.diagnostics;
 		expect(first).toMatchObject({
-			severity: 'warning',
+			// A name that doesn't resolve is an error (KerML 8.2.3.5.1), though the toolkit says warning.
+			severity: 'error',
 			code: 'referential',
 			message: 'unresolved reference `takeOffMass`',
 			span: { start_row: 30 }
@@ -248,13 +249,65 @@ describe('broken text', () => {
 	});
 
 	it('keeps the real error and hides the follow-on noise of an unclosed brace', () => {
-		// Without the policy, the repair re-nests every later definition and 40 references break.
+		// Opened broken (no text of it parsed before): the toolkit's repair re-nests every later
+		// definition and, without the policy, 40 references break.
+		const moved = 'system/Components-opened-broken.sysml';
 		const { syntax, diagnostics } = problemsOf(
-			analyse(original.slice(0, batteryEnd) + original.slice(batteryEnd + 6))
+			host.analyzeProject([
+				...files.filter((f) => f.path !== path),
+				{ path: moved, text: original.slice(0, batteryEnd) + original.slice(batteryEnd + 6) }
+			])
 		);
 		expect(syntax).toHaveLength(1);
 		expect(syntax[0]!.message).toMatch(/expected `}`.*\(\d+ follow-on problems are hidden/);
 		expect(diagnostics).toEqual([]);
+	});
+
+	it('while a file doesn’t parse, keeps its model as it last parsed', () => {
+		const before = collectElements(analyse(original)).filter((e) => e.file === path);
+		// An unclosed brace typed in the middle: the toolkit's repair would cut out what it is in.
+		const at = original.indexOf('\n', original.indexOf('part def Battery')) + 1;
+		const typed = '        part spare : Battery {\n';
+		const result = analyse(original.slice(0, at) + typed + original.slice(at));
+		const { syntax, diagnostics } = problemsOf(result);
+		expect(syntax).toHaveLength(1);
+		expect(diagnostics).toEqual([]);
+		const after = collectElements(result).filter((e) => e.file === path);
+		expect(after.map((e) => e.id)).toEqual(before.map((e) => e.id));
+		// In the text as it is now: past the typing, everything moved by what was typed.
+		const shift = (e: ModelElement) => (e.span.from! >= at ? typed.length : 0);
+		expect(after.map((e) => e.span.from)).toEqual(before.map((e) => e.span.from! + shift(e)));
+		host.analyzeProject(files);
+	});
+
+	it('reads a file that starts with a byte-order mark, and keeps the mark through an edit', () => {
+		const unit = '\uFEFFpackage B {\n    part def A;\n    part a : A;\n    part n : Nope;\n}\n';
+		const result = host.analyzeProject([{ path: 'b.sysml', text: unit }]);
+		expect(result[0]!.model.syntax_errors).toEqual([]);
+		const [finding] = result[0]!.diagnostics;
+		expect(finding?.message).toBe('unresolved reference `Nope`');
+		expect(unit.slice(finding!.span.from, finding!.span.to)).toBe('Nope');
+		expect(new TextIndex(unit).sliceBytes(finding!.span.start_byte, finding!.span.end_byte)).toBe(
+			'Nope'
+		);
+		const a = collectElements(result).find((e) => e.name === 'a')!;
+		expect(unit.slice(a.span.from, a.span.to)).toBe('part a : A;');
+		// An edit of the model: the mark stays, nothing else moves.
+		const edited = host.edit({
+			op: 'rename',
+			path: 'b.sysml',
+			source: unit,
+			id: collectElements(result).find((e) => e.name === 'A')!.id,
+			from: 'A',
+			to: 'Axle',
+			line: 2,
+			files: [{ path: 'b.sysml', text: unit }]
+		});
+		let text = unit;
+		for (const c of [...edited.changes].sort((x, y) => y.from - x.from))
+			text = text.slice(0, c.from) + c.insert + text.slice(c.to);
+		expect(text).toBe(unit.replace('part def A;', 'part def Axle;').replace(': A;', ': Axle;'));
+		host.analyzeProject(files);
 	});
 
 	it('shows only the first of a burst of parse errors, at the right place', () => {

@@ -228,3 +228,79 @@ describe('the toolkit’s element ids', () => {
 		expect(now).toHaveLength(was.length + 1);
 	});
 });
+
+describe('what the semantic diff sees', () => {
+	const P = 'model/P.sysml';
+	/** The diff between two versions of one file, as `kind name {property: before -> after}` lines. */
+	const diffOf = (before: string, after: string) => {
+		const { diff } = host.compareModels([{ path: P, text: before }], [{ path: P, text: after }]);
+		return [
+			...diff.elements.map(
+				(e) =>
+					`${e.change} ${(e.after ?? e.before)!.qualifiedName} {${e.properties
+						.map((p) => `${p.property}: ${p.before ?? '-'} -> ${p.after ?? '-'}`)
+						.join('; ')}}`
+			),
+			...diff.relations.map((r) => `${r.change} ${r.relation} ${r.text}`)
+		];
+	};
+	const model = (body: string) =>
+		`package P {\n\tprivate import ScalarValues::*;\n\tprivate import SI::*;\n${body}\n}\n`;
+
+	it('a value made a default, or bound again', () => {
+		const bound = model('\tpart def E { attribute rpm : Real = 3000.0; }');
+		const fallback = model('\tpart def E { attribute rpm : Real default = 3000.0; }');
+		expect(diffOf(bound, fallback)).toEqual(['changed P::E::rpm {valueKind: - -> default}']);
+		expect(diffOf(fallback, bound)).toEqual(['changed P::E::rpm {valueKind: default -> -}']);
+		// `default 3000.0` and `default = 3000.0` are the same.
+		expect(diffOf(fallback, fallback.replace('default =', 'default'))).toEqual([]);
+	});
+
+	it('a value made derived', () => {
+		const plain = model('\tpart def E { attribute m : Real; attribute t : Real = m * 2; }');
+		const derived = plain.replace('attribute t', 'derived attribute t');
+		expect(diffOf(plain, derived)).toEqual(['changed P::E::t {derived: - -> derived}']);
+	});
+
+	it('what a view exposes', () => {
+		const view = model('\tpart a;\n\tpart b;\n\tview v { expose a; }');
+		expect(diffOf(view, view.replace('expose a;', 'expose a; expose b;'))).toEqual([
+			'changed P::v {exposes: a -> a; b}'
+		]);
+	});
+
+	it('a unit in brackets is not a multiplicity, however it is spaced', () => {
+		const spaced = model('\tpart def T { attribute mass :> ISQ::mass = 40 [kg]; }');
+		const tight = model('\tpart def T{attribute mass:>ISQ::mass=40[kg];}');
+		expect(diffOf(spaced, tight)).toEqual([]);
+	});
+
+	it('a dependency written with or without `from` is the same', () => {
+		const from = model('\tpart def A;\n\tpart def B;\n\tdependency from A to B;');
+		expect(diffOf(from, from.replace('dependency from A to B;', 'dependency  A  to B ;'))).toEqual(
+			[]
+		);
+	});
+
+	it('a transition’s trigger, written either way', () => {
+		const machine = model(
+			'\titem def Go;\n\tstate def S {\n\t\tentry; then off;\n\t\tstate off;\n\t\tstate on;\n\t\ttransition t first off accept Go then on;\n\t}'
+		);
+		expect(diffOf(machine, machine.replace('accept Go', 'accept after 5 [s]'))).toEqual([
+			'changed P::S::t {trigger: Go -> after 5 s}'
+		]);
+		expect(diffOf(machine, machine.replace('accept Go', 'accept : Go'))).toEqual([]);
+	});
+
+	it('a comment about an element is not its description', () => {
+		const text = model(
+			'\tpart def E { doc /* The engine. */ }\n\tcomment note about E /* Check the mounts. */'
+		);
+		expect(diffOf(text, text.replace('Check the mounts.', 'Check the bolts.'))).toEqual([
+			'changed P::E {comments: Check the mounts. -> Check the bolts.}'
+		]);
+		expect(diffOf(text, text.replace('The engine.', 'The motor.'))).toEqual([
+			'changed P::E {doc: The engine. -> The motor.}'
+		]);
+	});
+});

@@ -63,6 +63,33 @@ export interface OpenedFolder {
 	name: string;
 	handle: FileSystemDirectoryHandle;
 	files: ProjectFile[];
+	/** Files left out because they aren't UTF-8 text (`readText`). */
+	refused: string[];
+}
+
+/**
+ * A file's text, read as UTF-8. A byte-order mark stays at the start of the
+ * text (U+FEFF), so the file is written back with it. Null when the file
+ * isn't UTF-8: read anyway, its other bytes would become U+FFFD and be
+ * written back so, which changes the file.
+ */
+export async function readText(file: Blob): Promise<string | null> {
+	const bytes = new Uint8Array(await file.arrayBuffer());
+	try {
+		return new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
+	} catch {
+		return null;
+	}
+}
+
+/** What to tell the person about files left out because they aren't UTF-8. */
+export function refusedNote(refused: string[]): string {
+	const names = refused.slice(0, 3).map((p) => `“${p}”`);
+	const more = refused.length > 3 ? ` and ${refused.length - 3} more` : '';
+	const list = names.join(', ') + more;
+	return refused.length === 1
+		? `${list} wasn't opened: it isn't UTF-8 text. Save it as UTF-8 and open the folder again.`
+		: `${list} weren't opened: they aren't UTF-8 text. Save them as UTF-8 and open the folder again.`;
 }
 
 /** Let the person pick a folder and read its SysML, Markdown and project files. */
@@ -74,18 +101,31 @@ export async function pickFolder(): Promise<OpenedFolder> {
 	).showDirectoryPicker;
 	const handle = await picker.call(window, { mode: 'readwrite' });
 	const files: ProjectFile[] = [];
-	await readDirectory(handle, '', files);
-	return { name: handle.name, handle: handle as unknown as FileSystemDirectoryHandle, files };
+	const refused: string[] = [];
+	await readDirectory(handle, '', files, refused);
+	return {
+		name: handle.name,
+		handle: handle as unknown as FileSystemDirectoryHandle,
+		files,
+		refused
+	};
 }
 
-async function readDirectory(dir: DirectoryHandle, prefix: string, out: ProjectFile[]) {
+async function readDirectory(
+	dir: DirectoryHandle,
+	prefix: string,
+	out: ProjectFile[],
+	refused: string[]
+) {
 	for await (const entry of dir.values()) {
 		if (out.length >= MAX_FILES) return;
 		const path = prefix + entry.name;
 		if (entry.kind === 'directory') {
-			if (!SKIP_DIR.test(entry.name)) await readDirectory(entry, `${path}/`, out);
+			if (!SKIP_DIR.test(entry.name)) await readDirectory(entry, `${path}/`, out, refused);
 		} else if (isProjectFile(path)) {
-			out.push({ path, text: await (await entry.getFile()).text() });
+			const text = await readText(await entry.getFile());
+			if (text === null) refused.push(path);
+			else out.push({ path, text });
 		}
 	}
 }
@@ -102,7 +142,9 @@ async function allowWriting(root: DirectoryHandle): Promise<void> {
  * What the folder holds now, path → text: its project files as `pickFolder`
  * reads them, and each of `paths` wherever it is (a path not there is left
  * out). Names match exactly, so on a disk that ignores case `power.sysml`
- * is not taken for `Power.sysml`.
+ * is not taken for `Power.sysml`. A file that isn't UTF-8 is left out, as
+ * when the folder was opened; one at a path the project has is an error,
+ * so a save doesn't write over it.
  */
 export async function readFolder(
 	folder: FileSystemDirectoryHandle,
@@ -111,7 +153,8 @@ export async function readFolder(
 	const root = folder as unknown as DirectoryHandle;
 	await allowWriting(root);
 	const found: ProjectFile[] = [];
-	await readDirectory(root, '', found);
+	const refused: string[] = [];
+	await readDirectory(root, '', found, refused);
 	const texts: Record<string, string> = Object.fromEntries(found.map((f) => [f.path, f.text]));
 	// Paths the walk didn't reach (a skipped folder, past the limit): looked up one by one.
 	const listings = new Map<string, Promise<Map<string, DirectoryHandle | FileHandle> | null>>();
@@ -124,8 +167,16 @@ export async function readFolder(
 		if (path in texts) continue;
 		const slash = path.lastIndexOf('/');
 		const entry = (await listing(path.slice(0, slash + 1)))?.get(path.slice(slash + 1));
-		if (entry?.kind === 'file') texts[path] = await (await entry.getFile()).text();
+		if (entry?.kind !== 'file') continue;
+		const text = await readText(await entry.getFile());
+		if (text === null) refused.push(path);
+		else texts[path] = text;
 	}
+	const clash = refused.find((path) => paths.includes(path));
+	if (clash)
+		throw new Error(
+			`“${clash}” in the folder isn't UTF-8 text, so nothing was saved. Save it as UTF-8, or move it out of the folder, and save again.`
+		);
 	return texts;
 }
 
@@ -203,18 +254,21 @@ async function removeFromFolder(root: DirectoryHandle, path: string): Promise<vo
 /** Files chosen with `<input type="file" webkitdirectory>` (browsers without folder access). */
 export async function readUploadedFolder(
 	list: FileList
-): Promise<{ name: string; files: ProjectFile[] }> {
+): Promise<{ name: string; files: ProjectFile[]; refused: string[] }> {
 	const all = [...list];
 	const first = all[0]?.webkitRelativePath ?? '';
 	const top = first.includes('/') ? first.slice(0, first.indexOf('/') + 1) : '';
 	const files: ProjectFile[] = [];
+	const refused: string[] = [];
 	for (const file of all) {
 		const path = (file.webkitRelativePath || file.name).slice(top.length);
 		if (path.split('/').some((p) => SKIP_DIR.test(p)) || !isProjectFile(path)) continue;
-		files.push({ path, text: await file.text() });
+		const text = await readText(file);
+		if (text === null) refused.push(path);
+		else files.push({ path, text });
 		if (files.length >= MAX_FILES) break;
 	}
-	return { name: top.replace(/\/$/, '') || 'Uploaded project', files };
+	return { name: top.replace(/\/$/, '') || 'Uploaded project', files, refused };
 }
 
 /** `.project.json` from the files, if present. */

@@ -20,7 +20,7 @@ import type {
 import type { Evaluation } from './evaluation';
 import { multiplicityOf, type ElementRecord, type ExtractedModel, type UnitInfo } from './model';
 import { listViews, renderView, type ViewContext } from './views';
-import { findView, tableSpec } from './views/catalog';
+import { findView, tableSpec, viewClauses } from './views/catalog';
 import { collapseWhitespace, displayValue, splitPath, unquoteName } from './views/text';
 
 export interface SnapshotSource {
@@ -158,7 +158,7 @@ export function buildSnapshot(source: SnapshotSource): ModelSnapshot {
 				isDefinition: r.isDefinition,
 				ownerId: r.parentId,
 				category: categoryOf(r),
-				props: { ...propsOf(r), ...metadata.get(r.id) },
+				props: { ...propsOf(r, text), ...metadata.get(r.id) },
 				body: bodyOf(text, r.written ?? r.name)
 			};
 			elements.push(element);
@@ -185,17 +185,17 @@ export function buildSnapshot(source: SnapshotSource): ModelSnapshot {
 		const ownerId = kind === 'verify' && trace?.byId ? trace.byId : r.parentId;
 		const ownerRecord = ownerId ? byId.get(ownerId) : undefined;
 		const refs = trace?.requirementId ? [trace.requirementId] : [];
-		const key = collapseWhitespace(text).replace(/;$/, '');
+		const written = collapseWhitespace(text).replace(/;$/, '');
 		relations.push({
 			...at,
 			kind,
 			ownerId,
 			refs,
-			key,
+			key: relationKey(text),
 			text: relationText(
 				kind,
 				r,
-				key,
+				written,
 				trace?.requirementId ? byId.get(trace.requirementId) : undefined,
 				labelOf
 			),
@@ -336,27 +336,86 @@ function relationText(
 	}
 }
 
+/** Tokens of written SysML: notes (`//` to the line's end, and `//*` blocks), comments, names, numbers, operators. */
+const KEY_TOKEN =
+	/\/\/\*[\s\S]*?\*\/|\/\*[\s\S]*?\*\/|\/\/[^\n]*|'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|[\p{L}_][\p{L}\p{N}_]*|\d[\d.eE]*|::>|:>>|::|:>|:=|->|\.\.|[=!<>]=|\S/gu;
+
+/**
+ * What an unnamed relationship says, however it is laid out: its tokens one
+ * space apart (a comment's text with its spacing collapsed), without notes
+ * (`//`, which are not part of the model), and `dependency from A to B` the
+ * same as `dependency A to B`.
+ */
+function relationKey(text: string): string {
+	const tokens: string[] = [];
+	for (const [token] of text.matchAll(KEY_TOKEN)) {
+		if (token.startsWith('//')) continue;
+		tokens.push(token.startsWith('/*') ? collapseWhitespace(token) : token);
+	}
+	return tokens
+		.join(' ')
+		.replace(/\bdependency from\b/, 'dependency')
+		.replace(/ ;$/, '');
+}
+
 const stripKeyword = (text: string) =>
 	text.replace(
 		/^(satisfy|allocate|connect|connection|interface|flow|bind|then|first|verify)\s+/,
 		''
 	);
 
-function propsOf(r: ElementRecord): Record<string, string> {
+function propsOf(r: ElementRecord, text: string): Record<string, string> {
 	const props: Record<string, string> = {};
 	if (r.shortName) props.shortName = unquoteName(r.shortName);
 	if (r.type) props.type = `${r.conjugated ? '~' : ''}${r.type}`;
 	const multiplicity = multiplicityOf(r.header);
 	if (multiplicity) props.multiplicity = multiplicity;
 	if (r.value !== null) props.value = readableValue(r.value);
+	// A value bound with `=` is the usual kind; `default` and `:=` are said.
+	if (r.value !== null && r.valueIsDefault) props.valueKind = 'default';
+	else if (r.value !== null && /:=/.test(r.header)) props.valueKind = 'initial';
+	if (r.derived) props.derived = 'derived';
+	if (r.readonly) props.readonly = 'readonly';
+	if (r.kind === 'transition') Object.assign(props, transitionParts(r.header));
+	if (r.kind === 'view') {
+		const clauses = viewClauses(text);
+		if (clauses.expose.length) props.exposes = clauses.expose.map(collapseWhitespace).join('; ');
+		if (clauses.filter.length) props.filters = clauses.filter.map(collapseWhitespace).join('; ');
+	}
 	if (r.specializes.length) props.specializes = r.specializes.join(', ');
 	if (r.redefines && r.redefines !== r.name) props.redefines = r.redefines;
 	if (r.direction && r.kind !== 'subject') props.direction = r.direction;
 	if (r.abstract) props.abstract = 'abstract';
-	const doc = r.docs.map(collapseWhitespace).join(' ').trim();
+	// The toolkit's docs include comments about the element written elsewhere (`comment about
+	// X`): those are its comments, not its description.
+	const own: string[] = [];
+	const about: string[] = [];
+	const written = ` ${wordsOf(text)} `;
+	for (const d of r.docs) (written.includes(` ${wordsOf(d)} `) ? own : about).push(d);
+	const doc = own.map(collapseWhitespace).join(' ').trim();
 	if (doc) props.doc = doc;
+	const comments = about.map(collapseWhitespace).join(' ').trim();
+	if (comments) props.comments = comments;
 	return props;
 }
+
+/** A transition's trigger, guard and effect as people read them (`accept after 5 [s]` → `after 5 s`). */
+function transitionParts(header: string): Record<string, string> {
+	const h = collapseWhitespace(header);
+	const part = (re: RegExp) => re.exec(h)?.[1]?.trim();
+	const out: Record<string, string> = {};
+	const trigger = part(/\baccept\s+(.+?)(?=\s+(?:if|do|then)\b|$)/);
+	const guard = part(/\bif\s+(.+?)(?=\s+(?:do|then)\b|$)/);
+	const effect = part(/\bdo\s+(.+?)(?=\s+then\b|$)/);
+	// `accept Go` and `accept : Go` are the same.
+	if (trigger) out.trigger = readableValue(trigger.replace(/^:\s*/, ''));
+	if (guard) out.guard = readableValue(guard);
+	if (effect) out.effect = readableValue(effect);
+	return out;
+}
+
+/** The words and numbers of a text, one space apart. */
+const wordsOf = (text: string) => (text.match(/[\p{L}\p{N}_]+/gu) ?? []).join(' ');
 
 /** A value as people read it: `120 g`, `high`, `Thermal runaway`, `esc.mass + motor.mass`. */
 export function readableValue(value: string): string {

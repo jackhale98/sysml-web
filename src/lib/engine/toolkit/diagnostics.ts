@@ -12,12 +12,22 @@
  *   can move or drop declarations: other files then report their names as
  *   unresolved (an unclosed `{` gave 40 such warnings on the demo). While any
  *   file has a syntax error, an "unresolved reference" to a name written in
- *   a file with a syntax error is hidden, and the first syntax error says how
- *   many were hidden.
+ *   a file with a syntax error is hidden, and so is a finding in text the
+ *   repair put in (`host.ts` repairs a file from its text as it last parsed
+ *   where it can); the first syntax error says how many were hidden.
+ * - **Severities.** A name that doesn't resolve is an error (KerML 8.2.3.5.1:
+ *   the text "fails with a name resolution error"), though the toolkit calls
+ *   it a warning: a model with dangling names doesn't read "0 errors". A
+ *   circular specialization is allowed (KerML 7.3.2.3, "Specialization
+ *   relationships can form cycles"; 8.2.3.5.1) and not shown, though the
+ *   toolkit reports it as an error.
+ * - **Names.** An element the toolkit names by its id (`@1c0f…`) is named as
+ *   people write it (`nameOf`).
  */
 import type { Diagnostic, Severity, SyntaxError } from '../types';
 import type { TkFinding } from './api';
-import type { UnitInfo } from './model';
+import { BOM_BYTES_MORE } from './bom';
+import { toOriginalByte, type UnitInfo } from './model';
 
 export interface Problems {
 	syntaxErrors: Map<string, SyntaxError[]>;
@@ -32,7 +42,8 @@ const ECHO_LINES = 2;
 export function toProblems(
 	parse: TkFinding[],
 	session: TkFinding[],
-	units: Map<string, UnitInfo>
+	units: Map<string, UnitInfo>,
+	nameOf: (id: string) => string | null = () => null
 ): Problems {
 	const syntaxErrors = new Map<string, SyntaxError[]>();
 	const diagnostics = new Map<string, Diagnostic[]>();
@@ -75,12 +86,18 @@ export function toProblems(
 			hidden++;
 			continue;
 		}
+		// About text the repair put in, not the person's: hidden too.
+		if (unit.repair?.isInserted(unit.repaired.byteOfLineCol(f.line, f.col))) {
+			hidden++;
+			continue;
+		}
+		if (CIRCULAR.test(f.message)) continue;
 		const diagnostic: Diagnostic = {
 			file: unit.path,
 			span: spanIn(unit, f, true),
-			severity: severityOf(f.severity),
+			severity: UNRESOLVED.test(f.message) ? 'error' : severityOf(f.severity),
 			code: f.stage,
-			message: f.message
+			message: named(f.message, nameOf)
 		};
 		const list = diagnostics.get(unit.path) ?? [];
 		list.push(diagnostic);
@@ -97,14 +114,32 @@ export function toProblems(
 
 /** A finding's range in the person's text; `repaired` when it is in the session's text. */
 function spanIn(unit: UnitInfo, f: TkFinding, repaired: boolean) {
-	const index = repaired ? unit.repaired : unit.original;
-	let start = index.byteOfLineCol(f.line, f.col);
-	let end = index.byteOfLineCol(f.endLine, f.endCol);
-	if (repaired && unit.repair) {
-		start = unit.repair.toOriginal(start);
-		end = unit.repair.toOriginal(end);
+	if (repaired) {
+		const start = toOriginalByte(unit, unit.repaired.byteOfLineCol(f.line, f.col));
+		const end = toOriginalByte(unit, unit.repaired.byteOfLineCol(f.endLine, f.endCol));
+		return unit.original.spanOfBytes(start, Math.max(start, end));
 	}
+	// Parse errors are in the text as given (a byte-order mark as a space: two bytes fewer on line 1).
+	const more = (line: number) => (unit.bom && line === 1 ? BOM_BYTES_MORE : 0);
+	const start = unit.original.byteOfLineCol(f.line, f.col + more(f.line));
+	const end = unit.original.byteOfLineCol(f.endLine, f.endCol + more(f.endLine));
 	return unit.original.spanOfBytes(start, Math.max(start, end));
+}
+
+/** A name that doesn't resolve (`unresolved reference \`Nope\``). */
+const UNRESOLVED = /^unresolved reference `/;
+/** A specialization cycle, which KerML allows. */
+const CIRCULAR = /circular specialization/i;
+
+/** `@<id>` in a message, as the element's name. */
+function named(message: string, nameOf: (id: string) => string | null): string {
+	return message.replace(
+		/@([0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12})/g,
+		(written, id: string) => {
+			const name = nameOf(id);
+			return name ?? written;
+		}
+	);
 }
 
 function severityOf(severity: string): Severity {

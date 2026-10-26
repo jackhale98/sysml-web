@@ -300,19 +300,40 @@ export function propertyChanges(
 }
 
 /** Properties that refer to other elements by name. */
-const REFERS = new Set(['type', 'value', 'constraint', 'specializes', 'redefines', 'multiplicity']);
+const REFERS = new Set([
+	'type',
+	'value',
+	'constraint',
+	'specializes',
+	'redefines',
+	'multiplicity',
+	'exposes',
+	'filters',
+	'trigger',
+	'guard',
+	'effect'
+]);
 
 const PROPERTY_ORDER = [
 	'shortName',
 	'type',
 	'multiplicity',
 	'value',
+	'valueKind',
 	'constraint',
 	'specializes',
 	'redefines',
 	'direction',
 	'abstract',
-	'doc'
+	'derived',
+	'readonly',
+	'trigger',
+	'guard',
+	'effect',
+	'exposes',
+	'filters',
+	'doc',
+	'comments'
 ];
 const propertyRank = (key: string) => {
 	const i = PROPERTY_ORDER.indexOf(key);

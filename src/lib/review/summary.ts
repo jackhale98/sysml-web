@@ -224,7 +224,10 @@ export function propertyWord(property: string): string {
 			redefines: 'redefines',
 			direction: 'direction',
 			abstract: 'abstract',
+			exposes: 'shows',
+			filters: 'filter',
 			doc: 'description',
+			comments: 'comment',
 			kind: 'kind'
 		}[property] ?? property
 	);
@@ -237,12 +240,14 @@ const shorten = (text: string, max = 80) =>
 export function propertyPhrase(p: PropertyChange): string {
 	const word = propertyWord(p.property);
 	if (p.property === 'abstract') return p.after ? 'now abstract' : 'no longer abstract';
-	if (p.property === 'doc')
-		return p.before && p.after
-			? 'description reworded'
-			: p.after
-				? 'description added'
-				: 'description removed';
+	if (p.property === 'derived' || p.property === 'readonly')
+		return p.after ? `now ${p.property}` : `no longer ${p.property}`;
+	if (p.property === 'valueKind') {
+		const kind = (k: string | null) => (k === 'default' ? 'a default' : 'an initial value');
+		return p.after ? `value now ${kind(p.after)}` : `value no longer ${kind(p.before)}`;
+	}
+	if (p.property === 'doc' || p.property === 'comments')
+		return p.before && p.after ? `${word} reworded` : p.after ? `${word} added` : `${word} removed`;
 	if (p.before === null) return `${word} set to ${code(shorten(p.after ?? ''))}`;
 	if (p.after === null) return `${word} removed (was ${shorten(p.before)})`;
 	return `${word} ${shorten(p.before, 60)} → ${code(shorten(p.after, 60))}`;

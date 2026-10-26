@@ -9,21 +9,17 @@
  * should not alter a file the person did not edit.
  */
 import { describe, expect, it } from 'vitest';
-import { readUploadedFolder, writeToFolder } from './sources.ts';
-
-/**
- * A known gap: expected to fail until it is fixed (then it fails here, to
- * be turned into a plain test). ASSESS_SHOW_GAPS=1 runs it as a plain test,
- * to see why it fails.
- */
-const gap = process.env.ASSESS_SHOW_GAPS ? it : it.fails;
+import { readFolder, readUploadedFolder, refusedNote, writeToFolder } from './sources.ts';
 
 /** An in-memory folder: what the app writes, as the bytes a browser would store. */
 class Folder {
 	readonly kind = 'directory';
 	files = new Map<string, Uint8Array>();
 	constructor(readonly name = 'Rig') {}
-	async *values() {}
+	async *values() {
+		for (const [name, data] of this.files)
+			yield { kind: 'file', name, getFile: async () => new File([data as BlobPart], name) };
+	}
 	async getDirectoryHandle() {
 		return this;
 	}
@@ -80,18 +76,39 @@ describe('reading and writing a model file keeps its bytes', () => {
 		expect([...written]).toEqual([...bytes]);
 	});
 
-	// Known gap: File.text() drops a UTF-8 byte-order mark, so a file that had one is written back without it.
-	gap('a UTF-8 file with a byte-order mark', async () => {
+	it('a UTF-8 file with a byte-order mark', async () => {
 		const bytes = new Uint8Array([0xef, 0xbb, 0xbf, ...utf8(MODEL)]);
 		const { written } = await roundTrip(bytes);
 		expect([...written]).toEqual([...bytes]);
 	});
 
-	// Known gap: a file that is not UTF-8 (here Latin-1 `µ`) is read with U+FFFD in place of the byte and, once edited, written back so; it is neither refused nor reported.
-	gap('a file that is not UTF-8 is refused or kept as it was', async () => {
-		const bytes = new Uint8Array([...utf8('package P { doc /* '), 0xb5, ...utf8(' */ }\n')]);
-		const { text, written } = await roundTrip(bytes);
-		expect(text).not.toContain('�');
-		expect([...written]).toEqual([...bytes]);
+	// Read as UTF-8, its bytes would become U+FFFD and be written back so: it is left out, and named.
+	const LATIN1 = new Uint8Array([...utf8('package P { doc /* '), 0xb5, ...utf8(' */ }\n')]);
+
+	it('a file that is not UTF-8 is refused, and named', async () => {
+		const file = new File([LATIN1 as BlobPart], 'Model.sysml');
+		Object.defineProperty(file, 'webkitRelativePath', { value: 'Rig/model/Model.sysml' });
+		const other = new File([utf8(MODEL) as BlobPart], 'Other.sysml');
+		Object.defineProperty(other, 'webkitRelativePath', { value: 'Rig/model/Other.sysml' });
+		const { files, refused } = await readUploadedFolder([file, other] as unknown as FileList);
+		expect(files.map((f) => f.path)).toEqual(['model/Other.sysml']);
+		expect(refused).toEqual(['model/Model.sysml']);
+		expect(refusedNote(refused)).toBe(
+			"“model/Model.sysml” wasn't opened: it isn't UTF-8 text. Save it as UTF-8 and open the folder again."
+		);
+	});
+
+	it('a save does not write over a file there that is not UTF-8', async () => {
+		const folder = new Folder();
+		folder.files.set('Model.sysml', LATIN1);
+		folder.files.set('Other.sysml', utf8(MODEL));
+		const handle = folder as unknown as FileSystemDirectoryHandle;
+		// Not one of the project's files: left out, as when the folder was opened.
+		expect(await readFolder(handle, ['Other.sysml'])).toEqual({ 'Other.sysml': MODEL });
+		// One the project has (made here since): refused, with its name.
+		await expect(readFolder(handle, ['Model.sysml', 'Other.sysml'])).rejects.toThrow(
+			/“Model\.sysml” in the folder isn't UTF-8 text, so nothing was saved/
+		);
+		expect([...folder.files.get('Model.sysml')!]).toEqual([...LATIN1]);
 	});
 });

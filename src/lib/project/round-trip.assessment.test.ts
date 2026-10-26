@@ -60,13 +60,6 @@ import {
 import type { ModelElement } from './elements.ts';
 import { applyChanges, type ProjectFile, type Workspace } from './workspace.svelte.ts';
 
-/**
- * A known gap: expected to fail until it is fixed (then it fails here, to
- * be turned into a plain test). ASSESS_SHOW_GAPS=1 runs it as a plain test,
- * to see why it fails.
- */
-const gap = process.env.ASSESS_SHOW_GAPS ? it : it.fails;
-
 const DIR = join(import.meta.dirname, 'fixtures/round-trip');
 const H = 'model/Hostile.sysml';
 const U = 'model/Uses.sysml';
@@ -181,8 +174,6 @@ interface Case {
 	/** The edit leaves problems (pinned in the snapshot); `warns`: the toast says what no longer resolves. */
 	breaks?: boolean;
 	warns?: boolean;
-	/** The semantic diff does not report what this edit changes (see "the semantic diff" below). */
-	unseen?: boolean;
 }
 
 /** Run a case on a fresh workspace and check it (see the module comment). */
@@ -233,8 +224,7 @@ async function check(c: Case, files: Record<string, string> = FILES) {
 			`${name} changed (${c.name})`
 		).toBe(true);
 	const seen = diff.elements.length + diff.relations.length;
-	if (c.unseen) expect(seen, 'the semantic diff does not see this edit').toBe(0);
-	else expect(seen, 'the edit changed the model').toBeGreaterThan(0);
+	expect(seen, 'the edit changed the model').toBeGreaterThan(0);
 
 	// No new problems, unless the edit says what it broke.
 	const problems = problemsOf(ws);
@@ -419,8 +409,7 @@ const CASES: Case[] = [
 	{
 		name: 'change a value to a default',
 		run: (t) => inspector(t, t.el('rpm'), { valueKind: 'default' }),
-		touches: ['Hostile::Engine::rpm'],
-		unseen: true
+		touches: ['Hostile::Engine::rpm']
 	},
 	{
 		name: 'change a type',
@@ -445,8 +434,7 @@ const CASES: Case[] = [
 	{
 		name: 'make a value derived',
 		run: (t) => inspector(t, t.el('totalMass', 'Vehicle'), { derived: true }),
-		touches: ['Hostile::Vehicle::totalMass'],
-		unseen: true
+		touches: ['Hostile::Vehicle::totalMass']
 	},
 	{
 		name: 'change a redefinition’s value in another file',
@@ -625,8 +613,7 @@ const CASES: Case[] = [
 			const p = planExpose(t.el('vehicleParts'), [t.el('car')], modelContext(t.ws));
 			return p ? applySteps(t.ws, 'Exposed', p.steps) : Promise.resolve('nothing to expose');
 		},
-		touches: ['HostileViews::vehicleParts'],
-		unseen: true
+		touches: ['HostileViews::vehicleParts']
 	},
 	{
 		name: 'show a view as another kind',
@@ -692,8 +679,7 @@ describe('the formatter', () => {
 		}).toMatchSnapshot();
 	});
 
-	// Known gap: the review's semantic diff reports a reformatted model as changed (`40[kg]` read as a multiplicity, a `dependency` matched by its text).
-	gap('the semantic diff sees no change in a reformatted model', () => {
+	it('the semantic diff sees no change in a reformatted model', () => {
 		expect(semanticLines(host.compareModels(list(FILES), list(format())).diff)).toEqual([]);
 	});
 });
@@ -741,7 +727,7 @@ describe('Windows line endings', { timeout: 60_000 }, () => {
 			Object.entries(ws.files).map(([p, t]) => [p, t.replace(/\r\n/g, '\n')])
 		);
 		const diff = host.compareModels(list(FILES), list(lf)).diff;
-		if (!c.unseen) expect(semanticLines(diff).length).toBeGreaterThan(0);
+		expect(semanticLines(diff).length).toBeGreaterThan(0);
 		const mixed = changed.filter((p) => lone(ws.files[p]!));
 		ws.undo();
 		expect(ws.files).toEqual(crlf);
@@ -763,8 +749,7 @@ describe('Windows line endings', { timeout: 60_000 }, () => {
 		'draw a transition',
 		'add an element to a view (expose)'
 	]))
-		// Known gap: edits that add lines write them with LF line endings into a CRLF file (mixed line endings).
-		gap(`${c.name}: the lines it adds end in CRLF like the rest`, () => crlfCase(c));
+		it(`${c.name}: the lines it adds end in CRLF like the rest`, () => crlfCase(c));
 });
 
 describe(
