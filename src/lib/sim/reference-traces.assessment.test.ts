@@ -606,9 +606,9 @@ describe('signals (fixed in this assessment)', () => {
 	});
 });
 
-describe('where the simulator departs from the semantics', () => {
-	// Known gap: a change signal that comes while the guard is false is kept, not lost (the simulator loses time signals in that case).
-	it.fails('a change signal that comes while the guard is false is not taken later', () => {
+describe('constructs the simulator once departed on (fixed)', () => {
+	// Before the fix the change signal was kept and taken once the guard held (time signals were already lost).
+	it('a change signal that comes while the guard is false is not taken later', () => {
 		// Observation::ObserveChange sends the change signal once; a transfer
 		// not accepted while the guard is false is not accepted later (it is
 		// not deferrable). The simulator applies this to time signals already.
@@ -623,11 +623,19 @@ describe('where the simulator departs from the semantics', () => {
 			'G4'
 		).play([STEP, { step: true, vars: { ok: true } }]);
 		expect(run.session.current).toEqual(['a']);
+		// It says why: the signal came while the guard was false.
+		expect(run.session.enabled[0]!.reason).toBe(
+			'`when x > 0` came at 0 s while guard `ok` is false'
+		);
+		// The condition turning false and true again sends a new one, which the guard now lets through.
+		run.play([
+			{ step: true, vars: { x: 0 } },
+			{ step: true, vars: { x: 2 } }
+		]);
+		expect(run.session.current).toEqual(['b']);
 	});
 
-	// Known gap: conditional initial transitions (`entry; if c then x;`) are not followed.
-	it.fails('a conditional initial transition enters the state its guard selects', () => {
-		const source = `state def G5 {
+	const G5 = `state def G5 {
             attribute startOn : Boolean = true;
             entry;
             if startOn then on;
@@ -635,51 +643,118 @@ describe('where the simulator departs from the semantics', () => {
             state off;
             state on;
         }`;
-		expect(new Run(source, 'G5').session.current).toEqual(['on']);
-		expect(new Run(source, 'G5', { startOn: false }).session.current).toEqual(['off']);
+
+	// Before the fix the first state was entered whatever the guards said.
+	it('a conditional initial transition enters the state its guard selects', () => {
+		expect(new Run(G5, 'G5').session.current).toEqual(['on']);
+		expect(new Run(G5, 'G5', { startOn: false }).session.current).toEqual(['off']);
+		const first = new Run(G5, 'G5', { startOn: false }).session.trace[0]!;
+		expect(first).toMatchObject({
+			to_state: 'off',
+			guard_result: true,
+			cause: 'start: guard `not startOn` is true',
+			reads: { startOn: false }
+		});
 	});
 
-	it('…and the machine carries a note that its initial transition was not understood', () => {
-		const m = machineOf(
-			`state def G5n {
-                attribute startOn : Boolean = true;
-                entry;
-                if startOn then on;
-                if not startOn then off;
-                state off;
-                state on;
-            }`,
-			'G5n'
-		);
-		expect(m.warnings?.length ?? 0).toBeGreaterThan(0);
+	it('…the machine reads them as guarded initial transitions, with no note', () => {
+		const m = machineOf(G5, 'G5');
+		expect(m.warnings).toBeUndefined();
+		expect(m.transitions.filter((t) => t.from === 'entry')).toMatchObject([
+			{ to: 'on', guard: 'startOn' },
+			{ to: 'off', guard: 'not startOn' }
+		]);
 	});
 
-	// Known gap: `terminate` is not supported.
-	it.fails('a transition to a terminate action ends the machine', () => {
+	it('…and when no guard holds, nothing is entered and the start says so', () => {
 		const run = new Run(
-			`state def G6 {
-                entry; then on;
-                state on;
-                accept Abort then stop;
-                action stop terminate;
+			`state def G5b {
+                attribute mode : Integer = 3;
+                entry;
+                if mode == 1 then a;
+                if mode == 2 then b;
+                state a; state b;
             }`,
-			'G6'
-		).fire('Abort');
+			'G5b'
+		);
+		expect(run.session.current).toEqual([]);
+		expect(run.session.status).toBe('deadlocked');
+		expect(run.session.trace[0]!.notes).toEqual([
+			'no initial transition of the machine can be taken (guard `mode == 1` is false; guard `mode == 2` is false), so no state in it is entered'
+		]);
+	});
+
+	it('a conditional initial transition of a composite state reads what its entry action set', () => {
+		// StatePerformance: `entry then middle`: the substates come after the entry action.
+		const run = new Run(
+			`state def G5c {
+                attribute fast : Boolean = false;
+                entry; then on;
+                state on {
+                    entry action { assign fast := true; }
+                    entry;
+                    if fast then quick;
+                    if not fast then slow;
+                    state slow; state quick;
+                }
+            }`,
+			'G5c'
+		);
+		expect(run.session.current).toEqual(['on.quick']);
+	});
+
+	const G6 = `state def G6 {
+            attribute log : String = "";
+            entry; then on;
+            state on { exit action { assign log := log + "on- "; } }
+            accept Abort do assign log := log + "eff " then stop;
+            action stop terminate;
+        }`;
+
+	// Before the fix `stop` was an unknown state, and the run stayed in it.
+	it('a transition to a terminate action ends the machine', () => {
+		const run = new Run(G6, 'G6').fire('Abort');
 		expect(run.session.status).toBe('completed');
 		expect(run.session.current).not.toContain('stop');
+		expect(run.session.current).toEqual([]);
+		// 7.18.3: the source is exited and the effect runs; then the terminate action ends the performance.
+		expect(run.log).toBe('on- eff ');
+		expect(run.trace).toEqual(['0: entry -> on', '0: on -> stop']);
+		expect(run.fire('Abort').session.messages).toEqual([
+			'the machine has finished; restart it to run again'
+		]);
 	});
 
-	it('…and the machine carries a note about the terminate target', () => {
-		const m = machineOf(
-			`state def G6n {
-                entry; then on;
-                state on;
-                accept Abort then stop;
-                action stop terminate;
+	it('…with no note, and the other regions stop without their exit actions', () => {
+		// `stop` is in r1, so the transition leaves only x; y, in the other region, is never exited.
+		expect(machineOf(G6, 'G6').warnings).toBeUndefined();
+		const run = new Run(
+			`state def G6p {
+                attribute log : String = "";
+                entry; then p;
+                state p parallel {
+                    state r1 {
+                        entry; then x;
+                        state x;
+                        transition first x accept Abort then stop;
+                        action stop terminate;
+                    }
+                    state r2 {
+                        entry; then y;
+                        state y { exit action { assign log := log + "y- "; } do monitor; }
+                    }
+                }
+                action monitor;
             }`,
-			'G6n'
-		);
-		expect(m.warnings?.length ?? 0).toBeGreaterThan(0);
+			'G6p'
+		).fire('Abort');
+		expect(run.session).toMatchObject({ status: 'completed', current: [], doing: [] });
+		expect(run.log).toBe('');
+		expect(run.session.trace.at(-1)).toMatchObject({
+			to_state: 'p.r1.stop',
+			do_stopped: 'monitor',
+			notes: ['`stop` terminates the machine']
+		});
 	});
 
 	const SEND = `package G7 {
@@ -694,20 +769,87 @@ describe('where the simulator departs from the semantics', () => {
         }
     }`;
 
-	it('…and the machine carries a note that the send is not run (fixed in this assessment)', () => {
-		expect(machineOf(SEND, 'm').warnings).toEqual([
-			'entry action of `a`: `send new Ping() to ctl` is not run; only assignments are'
-		]);
+	it('a send to the machine’s own part is run, so the machine has no note', () => {
+		expect(machineOf(SEND, 'm').warnings).toBeUndefined();
+		expect(machineOf(SEND, 'm').owner).toBe('ctl');
 	});
 
-	// Known gap: a signal a state's entry action sends to its own part is not delivered.
-	it.fails(
-		'a signal sent to the machine’s own part by an entry action triggers its transition',
-		() => {
-			const run = new Run(SEND, 'm').fire(null);
-			expect(run.session.current).toEqual(['b']);
-		}
-	);
+	// Before the fix the signal was not delivered.
+	it('a signal sent to the machine’s own part by an entry action triggers its transition', () => {
+		const run = new Run(SEND, 'm');
+		expect(run.session.queue).toEqual([{ signal: 'Ping', from: 'the entry action of `a`' }]);
+		run.fire(null);
+		expect(run.session.current).toEqual(['b']);
+		expect(run.session.trace.at(-1)!.cause).toBe('`Ping`, sent by the entry action of `a`');
+	});
+
+	it('signals the machine sends itself wait for what is ready now, and come before events sent after them', () => {
+		// UML 14.2.3.9.1: completion events first, then the event pool in order; events are taken one per step.
+		const run = new Run(
+			`state def G7b {
+                attribute log : String = "";
+                entry; then a;
+                state a { entry action { send new One() to self; then send new Two() to self; } }
+                state b { entry action { assign log := log + "b "; } }
+                state c { entry action { assign log := log + "c "; } }
+                state d;
+                transition first a then b;
+                transition first b accept One then c;
+                transition first c accept Two then d;
+                transition first c accept Go then a;
+            }`,
+			'G7b'
+		);
+		expect(run.session.queue?.map((q) => q.signal)).toEqual(['One', 'Two']);
+		// Go waits: the untriggered transition, then One and Two, come first.
+		expect(run.fire('Go').session.messages).toEqual(['`a -> b` fires first: Step, then send `Go`']);
+		run.fire(null);
+		expect(run.fire('Go').session.messages).toEqual([
+			'`One`, sent by the machine, comes first: Step, then send `Go`'
+		]);
+		run.fire(null).fire(null);
+		expect(run.trace).toEqual(['0: entry -> a', '0: a -> b', '0: b -> c', '0: c -> d']);
+		expect(run.session.queue).toBeUndefined();
+	});
+
+	it('a signal the machine sent itself that nothing accepts is dropped, with a message', () => {
+		const run = new Run(
+			`state def G7c {
+                entry; then a;
+                state a { entry send new Lost() to self; }
+                state b;
+                transition first a accept Go then b;
+            }`,
+			'G7c'
+		).fire(null);
+		expect(run.session.messages).toEqual([
+			'`Lost`, sent by the entry action of `a`, fires no transition from a: it is dropped'
+		]);
+		expect(run.session.queue).toBeUndefined();
+		run.fire('Go');
+		expect(run.session.current).toEqual(['b']);
+	});
+
+	it('a Wait takes the signals the machine sends itself on the way', () => {
+		const run = new Run(
+			`state def G7d {
+                attribute n : Integer = 0;
+                entry; then a;
+                state a;
+                transition first a accept after 5 [s] do send new Tick() to self then a;
+                transition first a accept Tick do assign n := n + 1 then a;
+            }`,
+			'G7d'
+		).play([{ wait: 12 }]);
+		expect(run.session.variables.n).toBe(2);
+		expect(run.trace).toEqual([
+			'0: entry -> a',
+			'5: a -> a',
+			'5: a -> a',
+			'10: a -> a',
+			'10: a -> a'
+		]);
+	});
 
 	const IF = `state def G8 {
         attribute x : Integer = 10;
@@ -721,49 +863,75 @@ describe('where the simulator departs from the semantics', () => {
         state a { entry action { assign n := 1; then assign n := n + 10; } }
     }`;
 
-	// Before the fix only `assign y := 5` ran, the trace showed only it, and nothing said the `if` was left out.
-	it('an `if` or a succession inside an action is noted on the machine as not run (fixed in this assessment)', () => {
-		expect(machineOf(IF, 'G8').warnings).toEqual([
-			'entry action of `a`: `if x > 5 { assign y := 7; }` is not run; only assignments are'
-		]);
-		expect(machineOf(THEN, 'G9').warnings).toEqual([
-			'entry action of `a`: `then assign n := n + 10` is not run; only assignments are'
-		]);
+	it('an `if` or a succession inside an action runs, so the machine has no note', () => {
+		expect(machineOf(IF, 'G8').warnings).toBeUndefined();
+		expect(machineOf(THEN, 'G9').warnings).toBeUndefined();
+		// The timeline shows the whole action, not only its assignments.
+		expect(machineOf(IF, 'G8').states.find((s) => s.name === 'a')!.entry).toBe(
+			'assign y := 5; if x > 5 { assign y := 7; }'
+		);
 	});
 
-	it('a transition effect that sends is noted too; assignments and named actions are not', () => {
+	it('a step the simulator does not run is still noted: a send elsewhere, a loop', () => {
 		const m = machineOf(
 			`package G9b {
                 item def Timeout;
                 action def PowerUp;
+                part ground;
                 state def M {
                     attribute n : Integer = 0;
                     entry; then a;
                     state a { do action { assign n := n + 1; } exit action powerUp : PowerUp; }
                     state b { entry assign n := 0; do monitor; }
+                    state c { entry action { while n < 3 { assign n := n + 1; } } }
                     action monitor;
                     transition t1 first a accept Go do send new Timeout() to self then b;
                     transition t2 first b accept Back do assign n := 2 then a;
+                    transition t3 first b accept Report do send new Timeout() to ground then c;
                 }
             }`,
 			'M'
 		);
 		expect(m.warnings).toEqual([
-			'effect of transition t1: `send new Timeout() to self` is not run; only assignments are'
+			'entry action of `c`: `while n < 3 { assign n := n + 1; }` is not run',
+			'effect of transition t3: `send new Timeout() to ground` is not run; only signals sent to the machine itself are'
 		]);
 	});
 
-	// Known gap: the steps of an action other than assignments (if, successions) are not run.
-	it.fails('an `if` inside an entry action runs', () => {
+	// Before the fix only `assign y := 5` ran.
+	it('an `if` inside an entry action runs', () => {
 		expect(new Run(IF, 'G8').session.variables.y).toBe(7);
+		expect(new Run(IF, 'G8', { x: 1 }).session.variables.y).toBe(5);
 	});
 
-	// Known gap: as above, for `then` successions inside an action.
-	it.fails('a succession inside an entry action runs in order', () => {
+	// Before the fix only `assign n := 1` ran.
+	it('a succession inside an entry action runs in order', () => {
 		expect(new Run(THEN, 'G9').session.variables.n).toBe(11);
 	});
 
-	it('a guard that reads the trigger’s payload blocks, with a reason, rather than firing', () => {
+	it('`else if` and `else` take the first branch that holds; effects and exit actions run their steps too', () => {
+		const source = `state def G9c {
+            attribute x : Integer = 0;
+            attribute log : String = "";
+            entry; then a;
+            state a {
+                exit action {
+                    if x > 10 { assign log := log + "big "; }
+                    else if x > 5 { assign log := log + "mid "; }
+                    else { assign log := log + "small "; }
+                }
+            }
+            state b;
+            transition first a accept Go do action { if x == 7 { assign log := log + "seven "; } then assign x := 0; } then b;
+        }`;
+		expect(new Run(source, 'G9c', { x: 20 }).fire('Go').log).toBe('big ');
+		expect(new Run(source, 'G9c', { x: 7 }).fire('Go').log).toBe('mid seven ');
+		const small = new Run(source, 'G9c', { x: 1 }).fire('Go');
+		expect(small.log).toBe('small ');
+		expect(small.session.variables.x).toBe(0);
+	});
+
+	it('a guard that reads the trigger’s payload blocks, with a reason, when the model gives the signal no value', () => {
 		const run = new Run(
 			`package G10 {
                 item def Reading { attribute v : Integer; }
@@ -776,10 +944,127 @@ describe('where the simulator departs from the semantics', () => {
 		);
 		const t = run.session.enabled[0]!;
 		expect(t.ready).toBe(false);
-		expect(t.reason).toBeTruthy();
+		expect(t.reason).toBe('guard `r.v > 3`: `Reading` carries no value for `v`');
+	});
+
+	// Before the fix every guard reading a payload stayed blocked ("r.v has no value yet").
+	it('a guard and an effect read the values a signal carries: its defaults, or what it was sent with', () => {
+		const source = `package G10b {
+            item def Reading { attribute v : Integer = 5; attribute unit : String = "C"; }
+            state def M {
+                attribute last : Integer = 0;
+                attribute level : Integer = 2;
+                entry; then a;
+                state a { entry send new Reading(level) to self; }
+                state b;
+                state c;
+                transition first a accept r : Reading if r.v > 3 do assign last := r.v then b;
+                transition first a accept s : Reading if s.v <= 3 do assign last := 100 + s.v then c;
+                transition first b accept r : Reading if r.v > 3 do assign last := r.v then a;
+            }
+        }`;
+		const sent = new Run(source, 'M');
+		expect(sent.session.queue).toEqual([
+			{ signal: 'Reading', values: { v: 2, unit: 'C' }, from: 'the entry action of `a`' }
+		]);
+		sent.fire(null);
+		// Sent with level = 2: the second transition takes it.
+		expect(sent.session).toMatchObject({ current: ['c'], variables: { last: 102 } });
+		expect(sent.session.trace.at(-1)!.reads).toEqual({ 's.v': 2 });
+
+		const run = new Run(source, 'M', { level: 9 }).fire(null);
+		expect(run.session).toMatchObject({ current: ['b'], variables: { last: 9 } });
+		// Sent from the event buttons: the definition's default (5).
+		expect(run.session.enabled.find((e) => e.from === 'b')).toMatchObject({ ready: true });
+		run.fire('Reading');
+		expect(run.session).toMatchObject({ current: ['a'], variables: { last: 5 } });
+		// …or values given with it.
+		const given = plain(step(run.machine, run.session, { event: null }));
+		expect(given.current).toEqual(['b']);
+		const low = plain(step(run.machine, given, { event: 'Reading', payload: { v: 1 } }));
+		expect(low.current).toEqual(['b']);
+		expect(low.messages).toEqual(['`Reading` fires no transition from b']);
 	});
 });
 
+describe('concurrent regions', () => {
+	it('two regions setting one variable in one step: noted on the step (the order is open in SysML)', () => {
+		const run = new Run(
+			`state def P1 {
+                attribute x : Integer = 0;
+                entry; then p;
+                state p parallel {
+                    state r1 { entry; then a; state a; state a2; transition t1 first a accept Go do assign x := 1 then a2; }
+                    state r2 { entry; then b; state b; state b2; transition t2 first b accept Go do assign x := 2 then b2; }
+                }
+            }`,
+			'P1'
+		).fire('Go');
+		expect(run.session.variables.x).toBe(2);
+		const [first, second] = run.session.trace.slice(-2);
+		expect(first!.notes).toBeUndefined();
+		expect(second!.notes).toEqual([
+			'`x` is also set by `t1` in this step: the regions run at the same time, so the result depends on an order SysML leaves open (the simulator runs them in the order written)'
+		]);
+	});
+
+	it('regions setting different variables are not noted', () => {
+		const run = new Run(
+			`state def P2 {
+                attribute x : Integer = 0;
+                attribute y : Integer = 0;
+                entry; then p;
+                state p parallel {
+                    state r1 { entry; then a; state a; state a2; transition first a accept Go do assign x := 1 then a2; }
+                    state r2 { entry; then b; state b; state b2; transition first b accept Go do assign y := 2 then b2; }
+                }
+            }`,
+			'P2'
+		).fire('Go');
+		expect(run.session.trace.some((s) => s.notes)).toBe(false);
+	});
+});
+
+describe('why each step fired', () => {
+	it('each step records its cause, the values its guard read and the transitions it went before', () => {
+		const run = new Run(
+			`state def W1 {
+                attribute x : Integer = 3;
+                attribute ok : Boolean = true;
+                entry; then a;
+                state a; state b; state c; state d; state e;
+                transition ta first a accept Go if x > 2 and ok then b;
+                transition tb first a accept Go if x < 5 then c;
+                transition first b accept when x > 4 then c;
+                transition first c accept after 30 [s] then d;
+                transition first d then e;
+            }`,
+			'W1'
+		)
+			.fire('Go')
+			.play([{ step: true, vars: { x: 5 } }, { wait: 'next' }, STEP]);
+		const steps = run.session.trace.map(({ step: n, cause, reads, preempted, time }) => ({
+			n,
+			cause,
+			reads,
+			preempted,
+			time
+		}));
+		expect(steps).toEqual([
+			{ n: 0, cause: 'start', reads: undefined, preempted: undefined, time: 0 },
+			{ n: 1, cause: 'event `Go`', reads: { x: 3, ok: true }, preempted: ['tb'], time: 0 },
+			{ n: 2, cause: '`when x > 4` turned true', reads: { x: 5 }, preempted: undefined, time: 0 },
+			{
+				n: 3,
+				cause: '`after 30 [s]` came due at 30 s',
+				reads: undefined,
+				preempted: undefined,
+				time: 30
+			},
+			{ n: 4, cause: 'completion of `d`', reads: undefined, preempted: undefined, time: 30 }
+		]);
+	});
+});
 describe('machines that never let time pass', () => {
 	const CYCLE = `state def L1 {
         entry; then a;
@@ -820,25 +1105,33 @@ describe('machines that never let time pass', () => {
 });
 
 describe('auto-run', () => {
-	it('breaks ties between ready events at random, so two auto-runs may differ', () => {
+	// Before the fix ties were broken with Math.random, so two auto-runs of one machine could differ.
+	it('is reproducible: the same machine and steps give the same moves, without chance', () => {
 		const run = new Run(
 			`state def A1 {
                 entry; then s; state s; state x; state y;
                 transition first s accept X then x;
                 transition first s accept Y then y;
+                transition first x accept Back then s;
+                transition first y accept Back then s;
             }`,
 			'A1'
 		);
 		const spy = vi.spyOn(Math, 'random');
 		try {
-			spy.mockReturnValue(0);
-			const first = autoMove(run.session.enabled, run.session.trace);
 			spy.mockReturnValue(0.99);
-			const second = autoMove(run.session.enabled, run.session.trace);
-			expect(first).toEqual({ event: 'X' });
-			expect(second).toEqual({ event: 'Y' });
+			expect(autoMove(run.session.enabled, run.session.trace)).toEqual({ event: 'X' });
+			expect(spy).not.toHaveBeenCalled();
 		} finally {
 			spy.mockRestore();
 		}
+		// A tour: X first (written first), back, then Y (sent fewer times), back.
+		const moves: (string | null)[] = [];
+		for (let i = 0; i < 4; i++) {
+			const move = autoMove(run.session.enabled, run.session.trace)!;
+			moves.push(move.event);
+			run.fire(move.event);
+		}
+		expect(moves).toEqual(['X', 'Back', 'Y', 'Back']);
 	});
 });

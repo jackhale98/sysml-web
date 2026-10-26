@@ -76,7 +76,8 @@ describe('start', () => {
 				entry_action: null,
 				time: 0,
 				do_action: null,
-				do_stopped: null
+				do_stopped: null,
+				cause: 'start'
 			}
 		]);
 		expect(s.enabled).toEqual([
@@ -169,7 +170,10 @@ describe('step', () => {
 			entry_action: null,
 			time: 0,
 			do_action: null,
-			do_stopped: null
+			do_stopped: null,
+			// Why it fired, and what its guard read.
+			cause: 'event `ArmCommand`',
+			reads: { preflightChecksPassed: true }
 		});
 		s = step(flightModes, s, { event: 'TakeOffCommand' });
 		expect(s.current).toEqual(['flying.cruising']);

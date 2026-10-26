@@ -28,11 +28,15 @@ export interface EventOption {
 	reasons: string[];
 }
 
-/** One option per event trigger, in the order the engine lists them. */
+/**
+ * One option per event trigger, in the order the engine lists them. A
+ * transition whose signal the machine sent itself is the Step's, not an
+ * event to send.
+ */
 export function eventOptions(enabled: Enabled[]): EventOption[] {
 	const options = new Map<string, EventOption>();
 	for (const e of enabled) {
-		if (!isEventTrigger(e.trigger)) continue;
+		if (!isEventTrigger(e.trigger) || e.queued) continue;
 		const option = options.get(e.trigger) ?? {
 			trigger: e.trigger,
 			ready: false,
@@ -55,16 +59,22 @@ export interface StepOption {
 	reasons: string[];
 	/** When nothing is ready now: the next timer (seconds since the start) and what it fires. */
 	next?: { due: number; transitions: Enabled[] };
+	/** The oldest signal the machine sent itself, which a Step takes when nothing else is ready. */
+	queued?: string;
 }
 
-/** What a Step (null event) would do: what is ready now, else let time pass to the next timer. */
-export function stepOption(enabled: Enabled[]): StepOption {
-	const transitions = enabled.filter((e) => !isEventTrigger(e.trigger));
+/**
+ * What a Step (null event) would do: what is ready now, else take the oldest
+ * signal the machine sent itself (`queue`), else let time pass to the next timer.
+ */
+export function stepOption(enabled: Enabled[], queue: StateSession['queue'] = []): StepOption {
+	const transitions = enabled.filter((e) => !isEventTrigger(e.trigger) || e.queued);
 	const out: StepOption = {
-		ready: transitions.some((e) => e.ready),
+		ready: transitions.some((e) => e.ready) || !!queue?.length,
 		transitions,
 		reasons: transitions.filter((e) => !e.ready && e.reason).map((e) => e.reason!)
 	};
+	if (queue?.length) out.queued = queue[0]!.signal;
 	const timers = transitions.filter((e) => !e.ready && e.due !== undefined);
 	if (!out.ready && timers.length) {
 		const due = Math.min(...timers.map((e) => e.due!));
@@ -312,25 +322,34 @@ export function sessionAt(history: History, step: number): number {
 
 /**
  * Auto-run's next move: a Step whenever one can happen (what is ready now,
- * else time passing to the next timer), else the ready event whose targets
- * were visited least (so a run tours the machine), ties broken at random.
+ * a signal the machine sent itself, else time passing to the next timer),
+ * else the ready event whose targets were visited least (so a run tours the
+ * machine); of those, the one sent least often so far, then the first
+ * listed. Nothing is left to chance: the same machine and the same steps
+ * give the same move, so an auto-run can be repeated exactly.
  */
 export function autoMove(
 	enabled: Enabled[],
 	trace: SimStep[] = [],
-	random: () => number = Math.random
+	queue: StateSession['queue'] = []
 ): { event: string | null } | null {
-	const step = stepOption(enabled);
+	const step = stepOption(enabled, queue);
 	if (step.ready || step.next) return { event: null };
 	const ready = eventOptions(enabled).filter((o) => o.ready);
 	if (!ready.length) return null;
 	const visits = new Map<string, number>();
-	for (const s of trace) visits.set(s.to_state, (visits.get(s.to_state) ?? 0) + 1);
+	const sent = new Map<string, number>();
+	for (const s of trace) {
+		visits.set(s.to_state, (visits.get(s.to_state) ?? 0) + 1);
+		if (s.trigger) sent.set(s.trigger, (sent.get(s.trigger) ?? 0) + 1);
+	}
 	const score = (o: EventOption) =>
 		Math.min(...o.transitions.filter((t) => t.ready).map((t) => visits.get(t.to) ?? 0));
 	const best = Math.min(...ready.map(score));
 	const choices = ready.filter((o) => score(o) === best);
-	return { event: choices[Math.floor(random() * choices.length) % choices.length]!.trigger };
+	const times = (o: EventOption) => sent.get(o.trigger) ?? 0;
+	const fewest = Math.min(...choices.map(times));
+	return { event: choices.find((o) => times(o) === fewest)!.trigger };
 }
 
 /** Values as the engine wants them: numbers parsed, empty text as unset. */

@@ -88,9 +88,10 @@ async function chargeCycle(page: Page) {
 	await emulator.getByRole('button', { name: 'Wait', exact: true }).click();
 	await expect(emulator.getByText('Now in charging after addCharge, at 35 min')).toBeVisible();
 	await step.click();
-	await expect(emulator.getByText(/at 45 min/)).toBeVisible();
+	// (The Timeline also says when each timer came due: match the announcement.)
+	await expect(emulator.getByText('Now in charging after addCharge, at 45 min')).toBeVisible();
 	await step.click();
-	await expect(emulator.getByText(/at 55 min/)).toBeVisible();
+	await expect(emulator.getByText('Now in charging after addCharge, at 55 min')).toBeVisible();
 	await step.click();
 	await expect(emulator.getByText('Now in idle after charged, at 55 min')).toBeVisible();
 	await expect(clock).toContainText('55 min');

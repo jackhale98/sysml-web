@@ -257,7 +257,9 @@ export const HELP: HelpSection[] = [
 					concept('transition'),
 					'Run any state machine from **Simulations** in the explorer: send it events and watch it move. **Step** takes what happens without an event: a transition with no trigger, an `accept when …` whose condition is true, or a timer that is due; if nothing is ready, time passes to the next timer. **Wait** lets time pass by an amount, and everything due on the way happens in order.',
 					'Time is simulated: the clock starts at 0 and moves only when you Step or Wait. `accept after 5 [SI::min]` fires 5 minutes after its state was entered, counting again each time the state is entered; `accept at 2 [SI::h]` fires 2 hours after the start. The **Timeline** shows when each step happened.',
-					'Something that changes over time, like a battery running down, is a timed transition that changes a value: `accept after 5 [SI::min] do assign charge := charge - 0.1`. A state’s `do` action starts once the state is entered and stops when it is left.'
+					'Something that changes over time, like a battery running down, is a timed transition that changes a value: `accept after 5 [SI::min] do assign charge := charge - 0.1`. A state’s `do` action starts once the state is entered and stops when it is left.',
+					'Actions run step by step, in the order written: `assign`, `if … { } else { }`, `then`, and signals a machine sends itself (`send new Ping() to self`), which the next **Step** takes. A transition to `terminate` ends the run.',
+					'Before a run, the simulator lists states that no transition can reach and transitions that can never fire. The **Timeline** says why each step happened (the event, the condition, the timer) and what its guard read; save it as CSV or JSON to keep the run with your evidence.'
 				],
 				action: { action: 'state-machine', label: 'Draw a state machine' }
 			},

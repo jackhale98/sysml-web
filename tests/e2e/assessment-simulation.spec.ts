@@ -53,6 +53,15 @@ const MACHINES = `
         state a; state b;
         transition first a then b;
         transition first b then a;
+    }
+    state def Looping {
+        attribute n : Integer = 0;
+        entry; then on;
+        state on { entry action { while n < 3 { assign n := n + 1; } } }
+        state off;
+        state island;
+        transition first on accept Stop then off;
+        transition first island accept Go then off;
     }`;
 
 test('an event waits while a transition without a trigger is ready: Step first', async ({
@@ -68,21 +77,59 @@ test('an event waits while a transition without a trigger is ready: Step first',
 	await expect(emulator.getByText(/Now in d after Go/)).toBeVisible();
 });
 
-test('a machine with a construct the simulator cannot run says so before it runs', async ({
+test('a machine with a construct the simulator cannot run says so before it runs, and what it can never reach', async ({
 	page
 }) => {
-	const emulator = await runTyped(page, MACHINES, 'Aborting');
+	const emulator = await runTyped(page, MACHINES, 'Looping');
 	await expect(emulator.getByText(/may not run as written/)).toBeVisible();
+	const reach = emulator.getByText(/1 state can never be reached; 1 transition can never fire/);
+	await expect(reach).toBeVisible();
+	await reach.click();
+	await expect(emulator.getByText('state island: no transition can reach it')).toBeVisible();
 });
 
-test('a machine that never lets time pass stops a Wait and says why', async ({ page }) => {
-	// The 200 steps are animated one by one before the message shows (about 1.5 min).
-	test.setTimeout(240_000);
+test('a transition to a terminate action ends the machine', async ({ page }) => {
+	const emulator = await runTyped(page, MACHINES, 'Aborting');
+	await expect(emulator.getByText(/may not run as written/)).toHaveCount(0);
+	await emulator.getByRole('button', { name: /^Abort to/ }).click();
+	await expect(emulator.getByText('Completed', { exact: true })).toBeVisible();
+});
+
+test('a machine that never lets time pass stops a Wait and says why at once', async ({ page }) => {
 	const emulator = await runTyped(page, MACHINES, 'Spinning');
 	await emulator.getByLabel('How long to wait').selectOption('10');
 	await emulator.getByRole('button', { name: 'Wait' }).click();
-	await expect(emulator.getByText(/Step 200/).first()).toBeVisible({ timeout: 30_000 });
+	// The 200 steps are not animated one by one (that took about 1.5 min): the reason shows now.
 	await expect(emulator.getByText(/stopped after 200 steps/).first()).toBeVisible({
-		timeout: 180_000
+		timeout: 10_000
 	});
+	await expect(emulator.getByText(/Step 200/).first()).toBeVisible();
+});
+
+test('the Timeline says why each step fired and saves the run', async ({ page }) => {
+	const emulator = await runTyped(page, MACHINES, 'Pending step');
+	await emulator.getByRole('button', { name: /^Step/ }).click();
+	await emulator.getByRole('button', { name: 'Go to d' }).click();
+	await expect(emulator.getByText(/Now in d after Go/)).toBeVisible();
+	// The Timeline starts folded where the emulator is narrow.
+	const timeline = emulator.locator('details.section', { hasText: 'Timeline' });
+	await timeline.evaluate((d) => ((d as HTMLDetailsElement).open = true));
+	await expect(emulator.getByText('completion of a')).toBeVisible();
+	await expect(emulator.getByText('event Go')).toBeVisible();
+	const [csv] = await Promise.all([
+		page.waitForEvent('download'),
+		emulator.getByRole('button', { name: 'CSV' }).click()
+	]);
+	expect(csv.suggestedFilename()).toBe('PendingStep run.csv');
+	const [json] = await Promise.all([
+		page.waitForEvent('download'),
+		emulator.getByRole('button', { name: 'JSON' }).click()
+	]);
+	const { readFile } = await import('node:fs/promises');
+	const run = JSON.parse(await readFile((await json.path())!, 'utf8')) as {
+		machine: { qualifiedName: string };
+		trace: unknown[];
+	};
+	expect(run.machine.qualifiedName).toMatch(/PendingStep$/);
+	expect(run.trace).toHaveLength(3);
 });

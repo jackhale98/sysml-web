@@ -659,7 +659,7 @@
 						{#await loadEmulator()}
 							<p class="empty">Loading the emulator…</p>
 						{:then StateEmulator}
-							<StateEmulator machine={tab.machine} {workspace} {ui} {engine} />
+							<StateEmulator machine={tab.machine} {workspace} {ui} {engine} git={session?.git} />
 						{/await}
 					{/key}
 				{:else if tab.kind === 'review'}

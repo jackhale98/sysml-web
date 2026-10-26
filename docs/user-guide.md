@@ -235,6 +235,10 @@ Time is simulated: the clock starts at 0 and moves only when you Step or Wait. `
 
 Something that changes over time, like a battery running down, is a timed transition that changes a value: `accept after 5 [SI::min] do assign charge := charge - 0.1`. A state’s `do` action starts once the state is entered and stops when it is left.
 
+Actions run step by step, in the order written: `assign`, `if … { } else { }`, `then`, and signals a machine sends itself (`send new Ping() to self`), which the next **Step** takes. A transition to `terminate` ends the run.
+
+Before a run, the simulator lists states that no transition can reach and transitions that can never fire. The **Timeline** says why each step happened (the event, the condition, the timer) and what its guard read; save it as CSV or JSON to keep the run with your evidence.
+
 In the app: **Draw a state machine**.
 
 ### Action flow

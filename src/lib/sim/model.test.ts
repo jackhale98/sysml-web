@@ -123,10 +123,11 @@ describe('controls', () => {
 	it('auto-run prefers a ready Step, then a ready event, then stops', () => {
 		const ready = flyingEnabled.map((e) => ({ ...e, ready: true }));
 		expect(autoMove(ready)).toEqual({ event: null });
-		expect(autoMove(flyingEnabled, [], () => 0.99)).toEqual({ event: 'FaultDetected' });
+		// Of two ready events leading nowhere visited yet, the first listed.
+		expect(autoMove(flyingEnabled)).toEqual({ event: 'ReturnHomeCommand' });
 		// Prefers the event leading somewhere new.
 		const visited = [step({ step: 1, from_state: 'flying', to_state: 'returningHome' })];
-		expect(autoMove(flyingEnabled, visited, () => 0)).toEqual({ event: 'FaultDetected' });
+		expect(autoMove(flyingEnabled, visited)).toEqual({ event: 'FaultDetected' });
 		expect(autoMove(flyingEnabled.map((e) => ({ ...e, ready: false })))).toBeNull();
 	});
 
