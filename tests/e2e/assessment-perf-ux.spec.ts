@@ -572,7 +572,16 @@ test('the project menu moves between its items with the arrow keys', async ({ pa
 test('the first tab stop skips to the model, and the next to the open view', async ({ page }) => {
 	await page.setViewportSize({ width: 1440, height: 900 });
 	await openDemo(page);
-	await page.locator('body').click({ position: { x: 1, y: 1 } });
+	// As after the address bar: nothing focused, the page's start the place to go on from.
+	const fromTop = () =>
+		page.evaluate(() => {
+			(document.activeElement as HTMLElement | null)?.blur();
+			const start = document.createRange();
+			start.setStart(document.body, 0);
+			getSelection()?.removeAllRanges();
+			getSelection()?.addRange(start);
+		});
+	await fromTop();
 	await page.keyboard.press('Tab');
 	const skip = page.getByRole('link', { name: 'Skip to the model' });
 	await expect(skip).toBeFocused();
@@ -586,7 +595,9 @@ test('the first tab stop skips to the model, and the next to the open view', asy
 		true
 	);
 
-	await page.locator('body').click({ position: { x: 1, y: 1 } });
+	await page.reload();
+	await ready(page);
+	await fromTop();
 	await page.keyboard.press('Tab');
 	await page.keyboard.press('Tab');
 	await expect(page.getByRole('link', { name: 'Skip to the open view' })).toBeFocused();
@@ -983,7 +994,14 @@ test('in forced colours the open tab and the chosen settings still show', async 
 	// The chosen density, a hidden radio button's label, is outlined.
 	const chosen = settings.locator('label:has(> input[type=radio]:checked)').first();
 	expect(await chosen.evaluate((el) => getComputedStyle(el).outlineStyle)).not.toBe('none');
-	expect(await violations(page, 'forced colours: settings')).toEqual([]);
+	// Contrast is the system's own colours here; axe measures the page's colours instead
+	// (dark text on the forced black background, where white is drawn), so it is left out.
+	const rest = async () => {
+		await settled(page);
+		const results = await new AxeBuilder({ page }).disableRules(['color-contrast']).analyze();
+		return results.violations.map((v) => v.id);
+	};
+	expect(await rest()).toEqual([]);
 	await page.keyboard.press('Escape');
-	expect(await violations(page, 'forced colours: overview')).toEqual([]);
+	expect(await rest()).toEqual([]);
 });
