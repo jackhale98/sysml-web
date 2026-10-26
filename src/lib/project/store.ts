@@ -9,6 +9,8 @@ import { changesNotInFolder, changesNotOnGitHub } from './pending.ts';
 import type { ProjectFile, ProjectInfo } from './workspace.svelte.ts';
 
 export interface StoredProject {
+	/** The record's format version (`PROJECT_FORMAT`); records kept before it was are version 1. */
+	format?: number;
 	id: string;
 	info: ProjectInfo;
 	files: ProjectFile[];
@@ -42,6 +44,26 @@ export type ProjectSummary = Omit<StoredProject, 'files'> & {
 	/** Files changed here and not saved to the folder yet (folder projects). */
 	notInFolder: number;
 };
+
+/**
+ * The stored project record's format version. Fields added later are
+ * optional and read as absent by older code, so they keep the number; a
+ * change an older version would misread raises it, and that version then
+ * refuses the record rather than saving over it.
+ */
+export const PROJECT_FORMAT = 1;
+
+/** Why a stored project can't be opened: a newer version of Fairtide saved it. */
+export const NEWER_FORMAT =
+	'This project was saved by a newer version of Fairtide. Reload the page to get the newer version.';
+
+/** A record as this version reads it: one without a version is version 1; a newer one is refused. */
+export function readStored(record: StoredProject | undefined): StoredProject | undefined {
+	if (!record) return record;
+	const format = record.format ?? 1;
+	if (format > PROJECT_FORMAT) throw new Error(NEWER_FORMAT);
+	return { ...record, format };
+}
 
 const DB = 'sysml-web';
 const STORE = 'projects';
@@ -85,8 +107,8 @@ export async function listProjects(): Promise<ProjectSummary[]> {
 		.sort((a, b) => b.updated.localeCompare(a.updated));
 }
 
-export function loadProject(id: string): Promise<StoredProject | undefined> {
-	return run<StoredProject | undefined>('readonly', (s) => s.get(id));
+export async function loadProject(id: string): Promise<StoredProject | undefined> {
+	return readStored(await run<StoredProject | undefined>('readonly', (s) => s.get(id)));
 }
 
 /** Why a save was refused: the project was saved from another tab or window meanwhile. */
@@ -121,7 +143,7 @@ export async function saveProject(
 				}
 			};
 		}
-		store.put({ ...project, updated });
+		store.put({ ...project, format: PROJECT_FORMAT, updated });
 		transaction.oncomplete = () => resolve();
 		transaction.onerror = transaction.onabort = () =>
 			reject(transaction.error ?? new Error('Browser storage failed.'));

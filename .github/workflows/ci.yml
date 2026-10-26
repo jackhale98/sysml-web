@@ -25,6 +25,11 @@ jobs:
 
       - run: npm ci
 
+      # Fails only on high or critical advisories in code the site ships (the
+      # bundle's packages and their dependencies); build and test tools are listed.
+      - name: Audit shipped dependencies
+        run: node scripts/audit-shipped.mjs --audit-level=high
+
       # The sysml-toolkit engine (pinned in toolkit.json): the app's engine, and the unit tests'.
       - name: Cache toolkit download
         uses: actions/cache@v4

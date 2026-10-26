@@ -232,10 +232,17 @@ async function call(message: ToolkitCall) {
 			ms: Math.round(performance.now() - at)
 		});
 		if (calls.length > 200) calls.shift();
-		post({ type: 'result', id: message.id, ok: true, result });
+		post({ type: 'result', id: message.id, ok: true, result, memoryMiB: memoryMiB() });
 	} catch (error) {
 		const fatal = isFatal(error);
-		post({ type: 'result', id: message.id, ok: false, error: String(error), fatal });
+		post({
+			type: 'result',
+			id: message.id,
+			ok: false,
+			error: String(error),
+			fatal,
+			memoryMiB: memoryMiB()
+		});
 	}
 }
 

@@ -16,7 +16,7 @@ import { expect, it } from 'vitest';
 import type { SourceFile } from '#lib/engine/protocol.ts';
 import { demoFiles, loadHost, toolkitMemoryMiB } from '#lib/engine/toolkit/testing.ts';
 import { annotationChecks } from '#lib/engine/toolkit/views/annotationChecks.ts';
-import type { ViewContext } from '#lib/engine/toolkit/views/context.ts';
+import { ViewContext } from '#lib/engine/toolkit/views/context.ts';
 import { generateLines, lineCount } from './generate';
 import { measureOnce, type Scenario, type Timings } from './measure';
 
@@ -61,10 +61,20 @@ it('measures the engine for the assessment', async () => {
 				host.checks(files);
 				t['checks.repeat'] = performance.now() - at;
 				// The app's own metadata checks (`annotationChecks`, part of the checks since the
-				// risk libraries), timed alone on the analysis' cached view context.
-				const ctx = (host as unknown as { viewContext(f: SourceFile[]): ViewContext }).viewContext(
-					files
-				);
+				// risk libraries), timed alone on a fresh view context of the same analysis: the
+				// checks above filled the cached one's caches, as they would not be after an edit.
+				const cached = (
+					host as unknown as { viewContext(f: SourceFile[]): ViewContext }
+				).viewContext(files);
+				const ctx = new ViewContext({
+					session: cached.session,
+					extracted: (host as unknown as { build(f: SourceFile[]): { extracted: never } }).build(
+						files
+					).extracted,
+					content: cached.content,
+					texts: cached.texts,
+					evaluation: () => cached.evaluation
+				});
 				at = performance.now();
 				const extra = annotationChecks(ctx);
 				t['checks.annotationChecksOnly'] = performance.now() - at;

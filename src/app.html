@@ -2,6 +2,15 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
+		<!-- Content-Security-Policy (SECURITY.md). Scripts only from the site: 'unsafe-inline' is for
+		     SvelteKit's start-up script, 'wasm-unsafe-eval' for the SysML engine (WebAssembly).
+		     connect-src allows any https host because people connect to Systems Modeling API servers
+		     of their choosing (GitHub's API and the sign-in worker are https too); localhost for one
+		     run on the same machine. Images: GitHub avatars, and data/blob URLs for diagram export. -->
+		<meta
+			http-equiv="Content-Security-Policy"
+			content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://avatars.githubusercontent.com; font-src 'self' data:; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
+		/>
 		<meta
 			name="viewport"
 			content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"

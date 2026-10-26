@@ -28,6 +28,9 @@ What each document is for, and who it is for. New to Fairtide? Start with the
 
 ## For developers
 
+- [Contributing](../CONTRIBUTING.md): setting up, the tests and their
+  conventions, making a change and cutting a release; the
+  [changelog](../CHANGELOG.md) and [security policy](../SECURITY.md).
 - [Plan](PLAN.md): product principles, architecture, what is built, what is
   next and the decision log.
 - [The engine](engine.md): how the app uses the Open-MBEE sysml-toolkit, piece

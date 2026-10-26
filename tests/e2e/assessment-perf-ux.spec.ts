@@ -690,12 +690,16 @@ for (const [name, size] of [
 		await context.close();
 	});
 
-test('Settings → About names the app version and the engine release', async ({ page }) => {
+test('Settings → About names the app version, its build and the engine release', async ({
+	page
+}) => {
 	await openDemo(page);
 	await page.getByRole('button', { name: 'Settings' }).click();
 	await page.getByRole('tab', { name: 'About' }).click();
 	const about = page.getByRole('dialog', { name: /Settings/ });
 	await expect(about.getByText(/^Version \d+\.\d+\.\d+/)).toBeVisible();
+	// Which build: the commit it was made from and the day.
+	await expect(about.getByText(/^commit [0-9a-f]{7,}, built \d{4}-\d{2}-\d{2}$/)).toBeVisible();
 	await expect(about.getByRole('link', { name: /sysml-toolkit \d+\.\d+\.\d+/ })).toBeVisible();
 	// The running engine reports its own version beside the pinned release.
 	await expect(about.getByText(/^\((toolkit )?\d+\.\d+\.\d+\)$/)).toBeVisible({ timeout: 30_000 });

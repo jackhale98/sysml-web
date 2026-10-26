@@ -873,7 +873,7 @@ function describe(value: Evaluated): string {
 function plainReason(message: string): string {
 	return message
 		.replace(/^(Error: )?/, '')
-		.replace(/^unsupported for evaluation: /, 'the engine cannot evaluate this yet: ');
+		.replace(/^unsupported for evaluation: /, 'this kind of expression isn’t supported yet: ');
 }
 
 /**
@@ -944,8 +944,8 @@ function explain(check: Check, vacuous: boolean): string {
 			if (first?.value.kind === 'undecided' && /`/.test(first.value.reason))
 				return `${first.feature} cannot be worked out: ${first.value.reason}.`;
 			if (unknown.length)
-				return `The engine could not work out ${unknown.map((v) => v.feature).join(', ')}${unsupported ? ` (${unsupported[1]!.trim()})` : ' from the model: a value it depends on is not known'}.`;
-			if (unsupported) return `The engine cannot evaluate this yet: ${unsupported[1]!.trim()}.`;
+				return `Fairtide could not work out ${unknown.map((v) => v.feature).join(', ')}${unsupported ? ` (${unsupported[1]!.trim()})` : ' from the model: a value it depends on is not known'}.`;
+			if (unsupported) return `Fairtide cannot work this out yet: ${unsupported[1]!.trim()}.`;
 			return 'Some values the constraint depends on are not known.';
 		}
 	}

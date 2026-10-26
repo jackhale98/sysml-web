@@ -611,8 +611,8 @@
 						<summary>
 							<TriangleAlert size={16} aria-hidden="true" />
 							<span
-								>The engine has {def.warnings.length} note{def.warnings.length > 1 ? 's' : ''} on this
-								machine; it may not run as written.</span
+								>{def.warnings.length} note{def.warnings.length > 1 ? 's' : ''} on reading this machine;
+								it may not run as written.</span
 							>
 							<ChevronDown size={14} aria-hidden="true" />
 						</summary>

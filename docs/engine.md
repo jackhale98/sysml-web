@@ -679,8 +679,27 @@ A toolkit defect traps the WebAssembly instance (`RuntimeError: unreachable`);
 running out of memory fails a `memory.grow`. Either way the worker is useless.
 `startToolkit` (`toolkit/client.ts`) then starts a new worker once and sends
 the calls in flight again. If that fails too, every toolkit call fails from
-then on: a toast says so once, the status bar shows "Engine error" and the
+then on: a toast says once "Fairtide stopped reading the model. Reload the
+page to try again.", the status bar shows "Model can't be read" and the
 problems list says why. There is no other engine to fall back to.
+
+A call the worker doesn't answer in time (a toolkit stuck in a loop) fails
+instead of waiting for ever. The worker does one call at a time, so a call's
+clock starts when the one before it is answered, and only once the library
+has loaded. The limits (`CALL_LIMITS`) are generous, from the 100k-line
+measurements with the whole browser slowed 4× (`docs/performance.md`): one
+minute for calls that don't read the model (highlighting, formatting), five
+for anything that does, ten for comparing two models and for SysML v2 JSON in
+or out. The call fails with a plain reason ("Reading the model took longer
+than 5 minutes, so Fairtide stopped it and started again. …", shown in a
+toast and, for an analysis, in the status bar and problems), the worker is
+replaced, and the calls that were waiting behind it go to the new worker.
+This doesn't use up the crash restart.
+
+Every answer carries the worker's WebAssembly memory. Once it passes
+`MEMORY_WARNING_MIB` (1,600 MiB of the 2 GiB the instance can grow to; 100k
+lines opens at about 1,760) a toast says, once, that the project is close to
+the most Fairtide can hold in a browser tab and what to do about it.
 
 ## Upstream requests
 

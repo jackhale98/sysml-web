@@ -1,12 +1,21 @@
 name: Deploy to GitHub Pages
 
+# Publishes only a commit that passed CI: this runs when the CI workflow
+# finishes for a push to main, and deploys that run's commit if it succeeded.
+# A run that failed or was cancelled (superseded by a newer push) deploys
+# nothing. Run it by hand (Actions → Deploy to GitHub Pages → Run workflow) to
+# redeploy main; it checks that main's latest commit passed CI first.
+
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
+  actions: read
   pages: write
   id-token: write
 
@@ -16,9 +25,29 @@ concurrency:
 
 jobs:
   build:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The commit CI passed, not whatever main is now.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Check that CI passed for this commit (manual runs)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+        run: |
+          conclusion=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${SHA}&event=push&per_page=1" \
+            --jq '.workflow_runs[0].conclusion // "none"')
+          if [ "$conclusion" != "success" ]; then
+            echo "::error::CI has not passed for ${SHA} (latest run: ${conclusion}); not deploying."
+            exit 1
+          fi
 
       - uses: actions/setup-node@v4
         with:
