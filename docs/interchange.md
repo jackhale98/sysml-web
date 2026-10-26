@@ -342,7 +342,14 @@ Run with `tools/interop/syson-roundtrip.sh` (SysON in Docker) and
 | Open from server (acceptance model, 807 elements) | refused (conjugated ports, `entry; then`, unresolved names) | opens; meaning identical but for `total <= limit` in `MassBudget`, which SysON couldn't resolve (named in a note) |
 | Save a change to an element SysON has (minimal payload) | fails | kept (rename, `visibility`, `isComposite`; checked by read-back) |
 | Save new elements | fails | answered 201, dropped by SysON; the read-back names them, nothing removed |
-| Reorder an element's members | — | answered 201, ignored by SysON; named by the read-back |
+| Change a reference (`ownedRelationship`, `memberElement`, `owningRelationship`) | — | answered 201, ignored by SysON; named by the read-back |
+| Change a feature's `direction` | — | empty 200, nothing kept; named by the read-back |
+
+Of the 174 changes a save of a renamed acceptance model sends, sent one kind
+at a time: every scalar property (`declaredName`, `isComposite`,
+`isConstant`, `visibility`, `isAbstract`, `operator`, a comment's `body`)
+was kept; every change to a reference was answered 201 and ignored; a
+`direction` change made SysON answer with nothing.
 
 Saving the unchanged acceptance model to SysON still reports what SysON
 can't hold: its own readings that differ from ours (an `entry; then` held
@@ -359,10 +366,12 @@ For Eclipse SysON (found with v2026.9.3; the fixtures in
    with a `DataVersion` whose payload is a new element (owner given or not,
    whole or minimal) answers `201 Created` and the element is not there
    afterwards. Expected: created, or an error.
-2. **A commit with whole elements fails silently.** The same endpoint with
-   payloads carrying every property answers `200` with an empty body and
-   changes nothing; a reordered `ownedRelationship` answers `201` and is
-   ignored. Expected: applied, or a 4xx naming the property.
+2. **Commits fail or are ignored silently.** The same endpoint with
+   payloads carrying every property, or changing a feature's `direction`,
+   answers `200` with an empty body and changes nothing; a change to any
+   reference-valued property (`ownedRelationship`, also only reordered,
+   `memberElement`, `owningRelationship`) answers `201` and is ignored.
+   Expected: applied, or a 4xx naming the property.
 3. **An untyped identity or a project name in the body answer with the web
    app.** `identity` without `"@type": "DataIdentity"`, and `POST /projects`
    with only a JSON body, answer `200 text/html` (the SPA's index page).
