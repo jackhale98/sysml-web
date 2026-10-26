@@ -117,6 +117,11 @@ test('the checks view says which requirements the design meets, and shows the cl
 	await expect(endurance).toContainText('Satisfied');
 	await expect(endurance).toContainText('2.54 min (10 %)');
 	await expect(endurance).toContainText('Met: drone.endurance = 27.54 min (needs ≥ 25 min).');
+	// What the value is worked out from, and the values that go into it.
+	await expect(endurance).toContainText(
+		'drone.endurance = HoverEndurance(battery.usableEnergy, hoverPower), with battery.usableEnergy = 183.6 W·h'
+	);
+	await expect(endurance).toContainText('and hoverPower = 400 W');
 	await expectAccessible(page);
 
 	await endurance

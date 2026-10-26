@@ -12,7 +12,20 @@
  *   session's text and are mapped to the person's text.
  * - **Values.** `evaluate` on an element's bound value. A check's values are
  *   the feature chains its constraints name (`drone.endurance`), evaluated
- *   with the subject bound to what satisfies the requirement.
+ *   with the subject bound to what satisfies the requirement, each with
+ *   where it comes from (`from`): the expression the model gives it, where
+ *   that is written, and the values it reads, a few levels deep.
+ * - **A definition's assertions, for each part.** `verify` decides an
+ *   `assert constraint` of a definition (`part def Arm { assert constraint
+ *   { mass <= 60 [g] } }`) with the definition's own values only. The app
+ *   decides it again for each specialization and each usage typed by the
+ *   definition whose values for it differ from what it specializes,
+ *   redefines or is typed by (`HeavyArm` with 80 g, `part u : Arm { :>>
+ *   mass = 70 [g]; }`), with the values the app works out for a usage
+ *   (below): one check per such part or type, at the value that changes.
+ * - **Undecided checks.** Why a check has no verdict is noted for the
+ *   problems list: a fault of the model's values (a division by zero, a
+ *   value that depends on itself), or something not given yet.
  * - **The evaluation session.** A part with metadata (`@Fmea about
  *   drone::battery`, or `@M;` in its body) makes the toolkit 0.10 refuse to
  *   evaluate the values the part inherits from its definition ("value
@@ -42,13 +55,22 @@
 import {
 	EvalError,
 	evaluate as evaluateExpr,
+	EnumLiteral,
 	parseExpr,
 	Quantity as ExprQuantity,
 	type Expr,
 	type Value
 } from '#lib/sim/expr.ts';
 import { convert, formatQuantity, parseLiteral, readable, type Quantity } from '../quantity';
-import type { Check, CheckReport, CheckStatus, CheckValue, Evaluated, Span } from '../types';
+import type {
+	Check,
+	CheckReport,
+	CheckStatus,
+	CheckValue,
+	Evaluated,
+	Span,
+	ValueSource
+} from '../types';
 import type { TkElement, TkLibrary, TkSession, TkSite, Toolkit } from './api';
 import {
 	multiplicityOf,
@@ -121,6 +143,8 @@ export class Evaluation {
 	private readonly byQualified = new Map<string, ElementRecord>();
 	private byPath: Map<string, ElementRecord[]> | undefined;
 	private satisfies: Map<string, TraceRecord[]> | undefined;
+	/** The checks of definitions' assertions (`verify` decides them with the definition's values). */
+	private readonly ofDefinitions = new WeakSet<Check>();
 	/** Timings, for measurements. */
 	readonly timings = { sessionMs: 0, verifyMs: 0 };
 
@@ -466,13 +490,24 @@ export class Evaluation {
 			if (c.asserted) {
 				// A type's invariant over every value (`that`) is noise while it holds.
 				if (owner?.metaclass === 'AttributeDefinition' && c.status !== 'violated') continue;
-				checks.push(this.assertion(c, located, owner));
+				const check = this.assertion(c, located, owner);
+				checks.push(check);
+				// A definition's: decided again for each part and type that changes its values.
+				if (owner?.isDefinition && owner.metaclass !== 'AttributeDefinition')
+					checks.push(...this.forEachPart(check, located.text, owner));
 				continue;
 			}
 			// A requirement's own constraint: decided through the claims that satisfy it.
 			const requirement = this.requirementAround(located.unit, located.start);
 			if (!requirement || requirement.isDefinition || claimed.has(requirement.id)) continue;
 			checks.push(this.unclaimed(c, located, requirement));
+		}
+		for (const check of checks) {
+			if (check.status !== 'undecided' || !check.checkable) continue;
+			const why = undecidedKind(check);
+			// A definition's assertion without values of its own: its parts' checks decide it.
+			if (why === 'open' && check.kind === 'assert' && this.ofDefinitions.has(check)) continue;
+			check.undecided = why;
 		}
 		return checks;
 	}
@@ -494,7 +529,7 @@ export class Evaluation {
 			for (const chain of chainsIn(text)) {
 				if (seen.has(chain)) continue;
 				seen.add(chain);
-				values.push({ feature: chain, value: this.chainValue(chain, byRecord, c.bindings) });
+				values.push(this.chainValue(chain, byRecord, c.bindings, true));
 			}
 		}
 		const constraint = constraintTexts.join('; ');
@@ -570,10 +605,13 @@ export class Evaluation {
 	private assertion(c: TkConstraintVerdict, at: Located, owner: ElementRecord | undefined): Check {
 		const values: CheckValue[] = [];
 		const seen = new Set<string>();
-		for (const chain of [...chainsIn(at.text), ...c.bindings.map((b) => b.feature)]) {
+		const named = referencesIn(at.text);
+		for (const chain of [...named, ...c.bindings.map((b) => b.feature)]) {
 			if (seen.has(chain) || chain === 'that') continue;
+			// A part bound on the way to a value (`h` for `h.mass`) is not one of its values.
+			if (named.some((n) => n.startsWith(`${chain}.`))) continue;
 			seen.add(chain);
-			values.push({ feature: chain, value: this.chainValue(chain, owner, c.bindings) });
+			values.push(this.chainValue(chain, owner, c.bindings, false));
 		}
 		const check: Check = {
 			kind: 'assert',
@@ -592,7 +630,264 @@ export class Evaluation {
 		this.decideByApp(check, [at.text]);
 		addMargin(check);
 		check.explanation = explain(check, false);
+		if (owner?.isDefinition) this.ofDefinitions.add(check);
 		return check;
+	}
+
+	/**
+	 * A definition's assertion decided for each specialization and each usage
+	 * typed by it whose values for it differ from those of what it
+	 * specializes, redefines or is typed by (else that one's check stands for
+	 * it). The values are worked out as the app works out a usage's
+	 * (`appValue`): the toolkit's, with an expression a part inherits
+	 * evaluated with the part's own values.
+	 */
+	private forEachPart(check: Check, text: string, definition: ElementRecord): Check[] {
+		const expression = text.replace(/^\{|\}$/g, '').trim();
+		const references = referencesIn(expression).filter((r) => r !== 'that');
+		if (!references.length || !definition.qualifiedName) return [];
+		let expr: Expr | null;
+		try {
+			expr = parseExpr(expression);
+		} catch {
+			expr = null;
+		}
+		const read = new Map<string, Map<string, PartValue>>();
+		const valuesIn = (context: string) => {
+			let values = read.get(context);
+			if (!values) {
+				values = new Map(references.map((r) => [r, this.partValue(context, r)]));
+				read.set(context, values);
+			}
+			return values;
+		};
+		const out: Check[] = [];
+		for (const { part, parent } of this.partsOf(definition)) {
+			const own = valuesIn(part.qualifiedName!);
+			const theirs = valuesIn(parent.qualifiedName!);
+			if (references.every((r) => own.get(r)!.key === theirs.get(r)!.key)) continue;
+			out.push(this.partCheck(check, definition, part, expr, own));
+		}
+		if (out.length) {
+			const names = out.map((c) => c.by!);
+			const one = names.length === 1;
+			const list =
+				names.length > 3
+					? `${names.slice(0, 3).join(', ')} and ${names.length - 3} more`
+					: one
+						? names[0]
+						: `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+			check.explanation += ` That is with ${definition.name ?? 'the definition'}'s own values: ${list} ${one ? 'changes' : 'change'} them and ${one ? 'is' : 'are'} checked on ${one ? 'its' : 'their'} own.`;
+		}
+		return out;
+	}
+
+	/** One part's (or specialization's) check of a definition's assertion. */
+	private partCheck(
+		check: Check,
+		definition: ElementRecord,
+		part: ElementRecord,
+		expr: Expr | null,
+		values: Map<string, PartValue>
+	): Check {
+		let status: CheckStatus = 'undecided';
+		let detail = 'undecided';
+		if (expr) {
+			try {
+				const result = evaluateExpr(expr, { get: (name) => values.get(name)?.value ?? undefined });
+				if (typeof result === 'boolean') detail = status = result ? 'satisfied' : 'violated';
+			} catch (error) {
+				if (!(error instanceof EvalError)) throw error;
+				detail = `undecided (${error.message})`;
+			}
+		}
+		const name = this.partName(part);
+		const out: Check = {
+			kind: 'assert',
+			status,
+			checkable: true,
+			detail,
+			explanation: '',
+			requirement: null,
+			by: name,
+			constraint: check.constraint,
+			name: check.name,
+			values: [...values].map(([feature, v]) => ({
+				feature,
+				value: v.shown,
+				...(v.from ? { from: v.from } : {})
+			})),
+			...this.whereChanged(part, [...values.keys()]),
+			constraintAt: { file: check.file, span: check.span },
+			assertedIn: definition.name ?? definition.qualifiedName ?? '',
+			byApp: `the app checked the assertion of ${definition.name} with the values of ${name}`
+		};
+		addMargin(out);
+		out.explanation = explain(out, false);
+		return out;
+	}
+
+	/**
+	 * The specializations of a definition and the usages it (or one of them)
+	 * types, each with what it is compared with: the definition it
+	 * specializes, the usage it redefines or subsets, else its type.
+	 */
+	private partsOf(definition: ElementRecord): { part: ElementRecord; parent: ElementRecord }[] {
+		const byId = this.source.extracted.byId;
+		const conforming = new Map<string, boolean>([[definition.id, true]]);
+		const conforms = (id: string): boolean => {
+			const known = conforming.get(id);
+			if (known !== undefined) return known;
+			conforming.set(id, false); // (a cycle conforms to nothing)
+			const yes = !!byId.get(id)?.generalIds.some(conforms);
+			conforming.set(id, yes);
+			return yes;
+		};
+		/** A usage's types: its own, else those of what it redefines or subsets. */
+		const typesOf = (r: ElementRecord, depth = 0): string[] => {
+			if (r.typeIds.length || depth > 16) return r.typeIds;
+			const from = this.redefined(r);
+			return from ? typesOf(from, depth + 1) : [];
+		};
+		const out: { part: ElementRecord; parent: ElementRecord }[] = [];
+		for (const r of this.source.extracted.elements) {
+			if (r.id === definition.id || !r.qualifiedName) continue;
+			let parent: ElementRecord | undefined;
+			if (r.isDefinition) {
+				const general = r.generalIds.find(conforms);
+				parent = general ? byId.get(general) : undefined;
+			} else if (!/Constraint|Requirement/.test(r.metaclass)) {
+				const type = typesOf(r).find(conforms);
+				parent = type ? (this.redefined(r) ?? byId.get(type)) : undefined;
+			}
+			if (parent?.qualifiedName) out.push({ part: r, parent });
+		}
+		return out;
+	}
+
+	/** The usage a usage redefines or subsets, when it is one of the model's. */
+	private redefined(r: ElementRecord): ElementRecord | undefined {
+		const redefined = r.redefinesQualified ? this.byQualified.get(r.redefinesQualified) : undefined;
+		if (redefined) return redefined;
+		for (const g of r.generalIds) {
+			const record = this.source.extracted.byId.get(g);
+			if (record && !record.isDefinition) return record;
+		}
+		return undefined;
+	}
+
+	/** `feature`'s value in `context` as the app works it out, as a check shows it, and a key to compare. */
+	private partValue(context: string, feature: string): PartValue {
+		const path = `${context}::${feature.replace(/\./g, '::')}`;
+		const worked = this.appValue(context, feature, 0, { over: [], inherited: false });
+		let shown: Evaluated | null = worked === null ? null : fromValue(worked);
+		let value: Value | null = shown ? worked : null;
+		if (!shown) {
+			const raw = this.valueAt(path);
+			shown =
+				raw && raw.kind !== 'none'
+					? raw
+					: {
+							kind: 'undecided',
+							reason:
+								this.cause(context, feature, 0, new Set()) ??
+								(raw ? 'it has no value' : 'its value is not known')
+						};
+			value = shown.kind === 'text' ? valueOfText(shown.text) : null;
+		}
+		const plain: Evaluated =
+			shown.kind === 'number' ? { kind: 'number', value: shown.value, unit: shown.unit } : shown;
+		const from = this.resolves(path) ? this.sourceOf(path, 0, { left: MAX_INPUTS }) : undefined;
+		return { value, shown: plain, key: JSON.stringify(plain), ...(from ? { from } : {}) };
+	}
+
+	/** Where a part's check goes: the value it changes (`:>> mass = 70 [g]`), else its declaration. */
+	private whereChanged(part: ElementRecord, features: string[]): { file: string; span: Span } {
+		const firsts = new Set(features.map((f) => f.split('.')[0]!));
+		const changed = this.elementsIn(part.path).find(
+			(r) => r.ownerId === part.id && r.name && firsts.has(r.name) && r.redefinesQualified
+		);
+		const at = changed ?? part;
+		return { file: at.path, span: this.declarationSpan(at) };
+	}
+
+	/** A declaration up to its body or `;` (one line, for the problems list). */
+	private declarationSpan(record: ElementRecord): Span {
+		const unit = [...this.source.units.values()].find((u) => u.path === record.path);
+		const { from, to } = record.span;
+		if (!unit || from === undefined || to === undefined) return record.span;
+		const text = unit.original.text.slice(from, to);
+		const end = text.search(/[{;]/);
+		return unit.original.spanOf(
+			from,
+			from + (end < 0 ? text : text.slice(0, end)).trimEnd().length
+		);
+	}
+
+	/** How a part is named in a check: `HeavyArm`, `Craft::u`, `craft.u` (below its package). */
+	private partName(part: ElementRecord): string {
+		const chain: ElementRecord[] = [];
+		for (
+			let r: ElementRecord | undefined = part;
+			r && !/Package|Namespace/.test(r.metaclass) && chain.length < 32;
+			r = r.ownerId ? this.source.extracted.byId.get(r.ownerId) : undefined
+		)
+			chain.unshift(r);
+		return chain
+			.map((r, i) => {
+				const name = r.written ?? r.name ?? '';
+				return i === 0 ? name : `${chain[i - 1]!.isDefinition ? '::' : '.'}${name}`;
+			})
+			.join('');
+	}
+
+	private resolves(qualifiedName: string): boolean {
+		const handle = this.session.resolve(qualifiedName);
+		handle?.free();
+		return !!handle;
+	}
+
+	/**
+	 * Where the value at `path` comes from: the expression its feature is
+	 * given (or the value), where that is written when it is not the element
+	 * the value is for, and the values it reads there, each with where it
+	 * comes from in turn, while `budget` lasts.
+	 */
+	private sourceOf(path: string, depth: number, budget: { left: number }): ValueSource | undefined {
+		const record = this.recordAt(path);
+		if (!record?.value) return undefined;
+		const scope = path.slice(0, path.lastIndexOf('::'));
+		const owner = record.ownerId ? this.source.extracted.byId.get(record.ownerId) : undefined;
+		const writtenIn =
+			owner?.qualifiedName && owner.qualifiedName !== scope ? this.partName(owner) : null;
+		const inputs: CheckValue[] = [];
+		if (depth < MAX_INPUT_DEPTH)
+			for (const reference of referencesIn(record.value)) {
+				if (budget.left <= 0) break;
+				const at = `${scope}::${reference.replace(/\./g, '::')}`;
+				if (!this.resolves(at)) continue;
+				budget.left--;
+				const from = this.sourceOf(at, depth + 1, budget);
+				inputs.push({
+					feature: reference,
+					value: this.inputValue(scope, reference, at),
+					...(from ? { from } : {})
+				});
+			}
+		return {
+			expression: record.value.replace(/\s+/g, ' ').trim(),
+			writtenIn,
+			isDefault: !!record.valueIsDefault,
+			inputs
+		};
+	}
+
+	/** An input's value in `scope` (an expression it inherits worked out with the scope's values). */
+	private inputValue(scope: string, feature: string, path: string): Evaluated {
+		const worked = this.appValue(scope, feature, 0, { over: [], inherited: false });
+		const number = worked === null ? null : fromValue(worked);
+		if (number) return number;
+		return this.valueAt(path) ?? { kind: 'undecided', reason: 'its value is not known' };
 	}
 
 	private unclaimed(c: TkConstraintVerdict, at: Located, requirement: ElementRecord): Check {
@@ -628,29 +923,37 @@ export class Evaluation {
 	private chainValue(
 		chain: string,
 		context: ElementRecord | undefined,
-		bindings: TkBinding[]
-	): Evaluated {
-		const bound = bindings.find((b) => b.feature === chain);
-		if (bound?.value) {
-			const literal = parseLiteral(bound.value);
-			if (literal) return { kind: 'number', value: literal.value, unit: literal.unit };
-			return { kind: 'text', text: bound.value };
-		}
+		bindings: TkBinding[],
+		subject: boolean
+	): CheckValue {
 		const segments = chain.split('.');
 		const candidates: string[] = [];
 		if (context?.qualifiedName) {
 			// `drone.endurance` with drone bound to the satisfying element: its `endurance`.
-			if (segments.length > 1)
+			if (subject && segments.length > 1)
 				candidates.push([context.qualifiedName, ...segments.slice(1)].join('::'));
 			// `battery.mass` inside `drone` (an assert): drone's `battery.mass`.
 			candidates.push([context.qualifiedName, ...segments].join('::'));
 		}
+		let value: Evaluated | null = null;
+		let path: string | null = null;
 		for (const name of candidates) {
-			const value = this.valueAt(name);
-			if (value)
-				return value.kind === 'none' ? { kind: 'undecided', reason: 'it has no value' } : value;
+			value = this.valueAt(name);
+			if (value) {
+				path = name;
+				break;
+			}
 		}
-		return { kind: 'undecided', reason: 'its value is not known' };
+		const bound = bindings.find((b) => b.feature === chain);
+		const literal = bound?.value ? parseLiteral(bound.value) : null;
+		if (bound?.value)
+			value = literal
+				? { kind: 'number', value: literal.value, unit: literal.unit }
+				: { kind: 'text', text: bound.value };
+		else if (!value) value = { kind: 'undecided', reason: 'its value is not known' };
+		else if (value.kind === 'none') value = { kind: 'undecided', reason: 'it has no value' };
+		const from = path ? this.sourceOf(path, 0, { left: MAX_INPUTS }) : undefined;
+		return { feature: chain, value, ...(from ? { from } : {}) };
 	}
 
 	/** A verdict's range in the person's text, with the text it covers. */
@@ -744,6 +1047,45 @@ interface Trace {
 	/** Whether an expression was inherited from a definition. */
 	inherited: boolean;
 }
+
+/** A value of a part that a definition's assertion reads (`forEachPart`). */
+interface PartValue {
+	/** For the app's evaluator, or null when it has none. */
+	value: Value | null;
+	/** As the check shows it. */
+	shown: Evaluated;
+	/** To tell whether two parts' values differ. */
+	key: string;
+	from?: ValueSource;
+}
+
+/** How many values a check's value lists as its inputs at most, and how many levels deep. */
+const MAX_INPUTS = 12;
+const MAX_INPUT_DEPTH = 3;
+
+/** A value the toolkit gave as text, for the app's evaluator: a boolean, a string, an enum literal. */
+function valueOfText(text: string): Value | null {
+	if (text === 'true' || text === 'false') return text === 'true';
+	if (text.startsWith('"')) {
+		try {
+			return JSON.parse(text) as string;
+		} catch {
+			return null;
+		}
+	}
+	return /^[\w']+$/.test(text) ? new EnumLiteral(text) : null;
+}
+
+/** An undecided check's reason: a fault of the model's values, or something not given yet. */
+function undecidedKind(check: Check): 'fault' | 'open' {
+	const reasons = [
+		check.detail,
+		...check.values.map((v) => (v.value.kind === 'undecided' ? v.value.reason : ''))
+	];
+	return reasons.some((r) => FAULT.test(r)) ? 'fault' : 'open';
+}
+
+const FAULT = /division by zero|modulo by zero|cyclic|depends on itself/i;
 
 /** How many parts a usage stands for when it is a collection of a fixed size (`[4]`), else null. */
 function collectionCount(header: string): number | null {
@@ -873,7 +1215,7 @@ function describe(value: Evaluated): string {
 function plainReason(message: string): string {
 	return message
 		.replace(/^(Error: )?/, '')
-		.replace(/^unsupported for evaluation: /, 'the engine cannot evaluate this yet: ');
+		.replace(/^unsupported for evaluation: /, "this can't be evaluated yet: ");
 }
 
 /**
@@ -943,9 +1285,15 @@ function explain(check: Check, vacuous: boolean): string {
 			const first = unknown[0];
 			if (first?.value.kind === 'undecided' && /`/.test(first.value.reason))
 				return `${first.feature} cannot be worked out: ${first.value.reason}.`;
+			// The verdict's own reason, when it says what is wrong (`division by zero`).
+			const why = /^undecided \((.+)\)$/.exec(check.detail)?.[1];
+			if (why && !unsupported && !/indeterminate|unbound/.test(why))
+				return first
+					? `${first.feature} cannot be worked out: ${why}.`
+					: `The constraint cannot be evaluated: ${why}.`;
 			if (unknown.length)
-				return `The engine could not work out ${unknown.map((v) => v.feature).join(', ')}${unsupported ? ` (${unsupported[1]!.trim()})` : ' from the model: a value it depends on is not known'}.`;
-			if (unsupported) return `The engine cannot evaluate this yet: ${unsupported[1]!.trim()}.`;
+				return `${unknown.map((v) => v.feature).join(', ')} could not be worked out${unsupported ? ` (${unsupported[1]!.trim()})` : ' from the model: a value it depends on is not known'}.`;
+			if (unsupported) return `This can't be evaluated yet: ${unsupported[1]!.trim()}.`;
 			return 'Some values the constraint depends on are not known.';
 		}
 	}

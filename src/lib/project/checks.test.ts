@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Check, Span } from '#lib/engine/types.ts';
-import { checkProblems, checkTitle, computedText, valueText } from './checks';
+import { checkProblems, checkTitle, computedText, inputsText, valueText } from './checks';
 
 const span: Span = {
 	start_row: 12,
@@ -49,8 +49,114 @@ describe('checks as problems', () => {
 		]);
 	});
 
-	it('leaves satisfied and undecided checks out', () => {
+	it('leaves satisfied checks out, and undecided ones nobody can act on', () => {
 		expect(checkProblems([check({}), check({ status: 'undecided' })])).toEqual([]);
+		// In words only: nothing to decide.
+		expect(
+			checkProblems([check({ status: 'undecided', checkable: false, undecided: 'open' })])
+		).toEqual([]);
+	});
+
+	it('lists an undecided check with why: a fault of the values as a warning, else a note', () => {
+		const zero = check({
+			status: 'undecided',
+			undecided: 'fault',
+			explanation: 'drone.endurance cannot be worked out: division by zero.',
+			values: [{ feature: 'drone.endurance', value: { kind: 'undecided', reason: 'x' } }]
+		});
+		const missing = check({
+			status: 'undecided',
+			undecided: 'open',
+			explanation: 'drone.endurance cannot be worked out: `hoverPower` has no value in `drone`.'
+		});
+		const unclaimed = check({
+			kind: 'require',
+			status: 'undecided',
+			undecided: 'open',
+			by: null,
+			explanation: 'Nothing in the design claims to satisfy this requirement yet.'
+		});
+		expect(checkProblems([zero, missing, unclaimed]).map((p) => [p.severity, p.message])).toEqual([
+			[
+				'warning',
+				"SYS-001 Flight endurance can't be decided for drone: drone.endurance cannot be worked out: division by zero"
+			],
+			[
+				'note',
+				"SYS-001 Flight endurance can't be decided yet for drone: drone.endurance cannot be worked out: `hoverPower` has no value in `drone`"
+			],
+			[
+				'note',
+				"SYS-001 Flight endurance can't be decided yet: nothing in the design claims to satisfy it"
+			]
+		]);
+	});
+
+	it('says which part breaks a definition’s assertion', () => {
+		const assertion = check({
+			kind: 'assert',
+			status: 'violated',
+			requirement: null,
+			name: 'light',
+			by: 'HeavyArm',
+			assertedIn: 'Arm',
+			constraint: 'mass <= 60 [g]',
+			values: [{ feature: 'mass', value: { kind: 'number', value: 80, unit: 'g' } }],
+			limit: { feature: 'mass', operator: '<=', value: 60, unit: 'g' }
+		});
+		expect(checkProblems([assertion])[0]!.message).toBe(
+			'light (asserted in Arm) does not hold for HeavyArm: mass = 80 g (needs ≤ 60 g)'
+		);
+	});
+
+	it('says what a check’s values come from', () => {
+		const given = (expression: string, writtenIn: string | null = null, isDefault = false) => ({
+			expression,
+			writtenIn,
+			isDefault,
+			inputs: []
+		});
+		const worked = check({
+			values: [
+				{
+					feature: 'drone.takeOffMass',
+					value: { kind: 'number', value: 3770, unit: 'g' },
+					from: {
+						expression: 'emptyMass + payloadCapacity',
+						writtenIn: 'DeliveryDrone',
+						isDefault: false,
+						inputs: [
+							{
+								feature: 'emptyMass',
+								value: { kind: 'number', value: 2770, unit: 'g' },
+								from: {
+									expression: 'airframe.mass + battery.mass',
+									writtenIn: 'DeliveryDrone',
+									isDefault: false,
+									inputs: [
+										{
+											feature: 'airframe.mass',
+											value: { kind: 'number', value: 650, unit: 'g' },
+											from: given('650 [g]', 'Airframe', true)
+										}
+									]
+								}
+							},
+							{
+								feature: 'payloadCapacity',
+								value: { kind: 'number', value: 1, unit: 'kg' },
+								from: given('1 [kg]')
+							}
+						]
+					}
+				},
+				{ feature: 'drone.other', value: { kind: 'number', value: 1, unit: null } }
+			]
+		});
+		expect(inputsText(worked)).toBe(
+			'drone.takeOffMass = emptyMass + payloadCapacity in DeliveryDrone, with emptyMass = 2.77 kg (airframe.mass + battery.mass in DeliveryDrone, with airframe.mass = 650 g (default in Airframe)) and payloadCapacity = 1 kg'
+		);
+		expect(inputsText(check({}))).toBe('');
 	});
 
 	it('names an assertion by its name or its constraint', () => {

@@ -213,6 +213,8 @@ In the app: **New view**.
 
 A constraint is a rule that is true or false, such as “the mass is at most 150 g”. A requirement uses one as its check (`require constraint`); the app works out the values and says whether each holds.
 
+A definition can **assert** one for all its parts (`assert constraint { mass <= 60 [g] }`): it is checked for the definition’s own values, and again for each part or specialization that changes them, where the change is written. **Design checks** shows each check’s values and what they are worked out from; a check that breaks shows under **Problems**, as does one that can’t be decided (a warning for a division by zero, a note when a value or a `satisfy` is still missing).
+
 > **Constraint usage**: A constraint is a rule applied in a specific place, like 'total mass at most 25 kg' for this drone.
 
 > **Constraint definition**: A constraint definition is a reusable rule or equation, like Ohm's law, that is either true or false.
@@ -331,7 +333,7 @@ To review the high risks, use the quick reviews above a worksheet (**High priori
 
 Each line can name the **risk controls** and **mitigations** that address it: choose them when adding a line, or select the line’s part and use **Link a risk control or mitigation** in its details, which also shows whether each control is implemented and verified. The controls already in place stay as words in the line.
 
-A rating outside 1 to 10, a severity that is not the worst harm of the line’s hazard, an unacceptable risk, or a high-priority or unacceptable line without a verified control is flagged in its cell and under **Problems**. The rules come from the risk library in `libraries/RiskAnalysis.sysml`, which the first FMEA adds to the project.
+A rating outside 1 to 10 or not a whole number, a severity that is not the worst harm of the line’s hazard, an unacceptable risk, or a high-priority or unacceptable line without a verified control is flagged in its cell and under **Problems**. The rules come from the risk library in `libraries/RiskAnalysis.sysml`, which the first FMEA adds to the project.
 
 In the app: **New FMEA**.
 

@@ -145,7 +145,9 @@ describe('requirement identity: rename, move, file rename, merge', { timeout: 12
 		expect(problems(ws)).toEqual([
 			`warning ${R}:${lineOf(files, R, "end #derive ::> 'Flight endurance'")} unresolved reference \`Flight endurance\``,
 			`warning ${S}:${lineOf(files, S, "satisfy 'Flight endurance'")} unresolved reference \`Flight endurance\``,
-			`warning ${V}:${lineOf(files, V, "verify 'Flight endurance'")} unresolved reference \`Flight endurance\``
+			`warning ${V}:${lineOf(files, V, "verify 'Flight endurance'")} unresolved reference \`Flight endurance\``,
+			// Its constraint has nothing to be checked against now: a note, at the constraint.
+			`note ${R}:${lineOf(files, R, 'system.endurance >= 25 [min]')} SYS-001 Hover endurance can't be decided yet: nothing in the design claims to satisfy it`
 		]);
 		// Coverage follows the model as it now resolves: SYS-001 has lost both links.
 		expect(row(ws, 'SYS-001')).toMatchObject({ satisfiedBy: [], verifiedBy: [] });
@@ -174,7 +176,8 @@ describe('requirement identity: rename, move, file rename, merge', { timeout: 12
 		expect(problems(ws).map((p) => p.replace(/:\d+ /, ' '))).toEqual([
 			`warning ${R} unresolved reference \`Payload capacity\``,
 			`warning ${S} unresolved reference \`Payload capacity\``,
-			`warning ${V} unresolved reference \`Payload capacity\``
+			`warning ${V} unresolved reference \`Payload capacity\``,
+			`note requirements/Payload.sysml SYS-002 Payload capacity can't be decided yet: nothing in the design claims to satisfy it`
 		]);
 		expect(row(ws, 'SYS-002')).toMatchObject({ satisfiedBy: [], verifiedBy: [] });
 	});

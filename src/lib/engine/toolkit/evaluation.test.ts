@@ -4,6 +4,7 @@
  * budget and checks tables.
  */
 import { beforeAll, describe, expect, it } from 'vitest';
+import { inputsText } from '#lib/project/checks.ts';
 import type { SourceFile } from '../protocol';
 import type { Check } from '../types';
 import { chainsIn, comparisonOf, referencesIn } from './evaluation';
@@ -64,10 +65,54 @@ describe('the demo’s checks', () => {
 			limit: { feature: 'drone.endurance', operator: '>=', value: 25, unit: 'min' },
 			explanation: 'Met: drone.endurance = 27.54 min (needs ≥ 25 min).'
 		});
-		// 216 W·h × 0.85 / 400 W = 0.459 h.
+		// 216 W·h × 0.85 / 400 W = 0.459 h, with what each value is worked out from.
 		expect(endurance.values).toEqual([
-			{ feature: 'drone.endurance', value: { kind: 'number', value: 1652.4, unit: 's' } }
+			{
+				feature: 'drone.endurance',
+				value: { kind: 'number', value: 1652.4, unit: 's' },
+				from: {
+					expression: 'HoverEndurance(battery.usableEnergy, hoverPower)',
+					writtenIn: null,
+					isDefault: false,
+					inputs: [
+						{
+							feature: 'battery.usableEnergy',
+							value: { kind: 'number', value: 183.6, unit: 'W*h' },
+							from: {
+								expression: 'capacity * usableFraction',
+								writtenIn: 'Battery',
+								isDefault: false,
+								inputs: [
+									{
+										feature: 'capacity',
+										value: { kind: 'number', value: 216, unit: 'W*h' },
+										from: {
+											expression: '216 [W*h]',
+											writtenIn: 'Battery',
+											isDefault: true,
+											inputs: []
+										}
+									},
+									{
+										feature: 'usableFraction',
+										value: { kind: 'number', value: 0.85, unit: null },
+										from: { expression: '0.85', writtenIn: 'Battery', isDefault: true, inputs: [] }
+									}
+								]
+							}
+						},
+						{
+							feature: 'hoverPower',
+							value: { kind: 'number', value: 400, unit: 'W' },
+							from: { expression: '400 [W]', writtenIn: null, isDefault: false, inputs: [] }
+						}
+					]
+				}
+			}
 		]);
+		expect(inputsText(endurance)).toBe(
+			'drone.endurance = HoverEndurance(battery.usableEnergy, hoverPower), with battery.usableEnergy = 183.6 W·h (capacity * usableFraction in Battery, with capacity = 216 W·h (default in Battery) and usableFraction = 0.85 (default in Battery)) and hoverPower = 400 W'
+		);
 		expect(endurance.margin!.value).toBeCloseTo(2.54);
 		expect(endurance.margin!.unit).toBe('min');
 		expect(endurance.margin!.ratio).toBeCloseTo(0.1016);
@@ -110,6 +155,22 @@ describe('the demo’s checks', () => {
 		expect(endurance.explanation).toBe('Not met: drone.endurance = 24.48 min (needs ≥ 25 min).');
 		host.analyzeProject(files);
 		expect(byId(host.checks(files).checks, 'SYS-001').status).toBe('satisfied');
+	});
+
+	it('says why a requirement is undecided when its value is a division by zero', () => {
+		const edited = edit(
+			'system/DroneArchitecture.sysml',
+			'attribute :>> hoverPower = 400 [W]',
+			'attribute :>> hoverPower = 0 [W]'
+		);
+		host.analyzeProject(edited);
+		const endurance = byId(host.checks(edited).checks, 'SYS-001');
+		expect(endurance).toMatchObject({
+			status: 'undecided',
+			undecided: 'fault',
+			explanation: 'drone.endurance cannot be worked out: division by zero.'
+		});
+		host.analyzeProject(files);
 	});
 
 	it('lists a requirement constraint nothing claims to satisfy', () => {
@@ -372,7 +433,9 @@ describe('the budget and checks tables', () => {
 			'Flight endurance',
 			'drone',
 			'2.54 min (10 %)',
-			'Met: drone.endurance = 27.54 min (needs ≥ 25 min).'
+			'Met: drone.endurance = 27.54 min (needs ≥ 25 min).',
+			// What the value comes from: the expression, where it's written, the values it reads.
+			'drone.endurance = HoverEndurance(battery.usableEnergy, hoverPower), with battery.usableEnergy = 183.6 W·h (capacity * usableFraction in Battery, with capacity = 216 W·h (default in Battery) and usableFraction = 0.85 (default in Battery)) and hoverPower = 400 W'
 		]);
 		expect(table.sources[2]).toMatchObject({ file: 'system/Satisfaction.sysml', line: 12 });
 		expect(typeof table.sources[2]!.byte).toBe('number');

@@ -102,13 +102,15 @@ library package ModelViews {
         /*
          * Does the design meet its requirements? Every requirement constraint,
          * evaluated against the values of the design element that satisfies
-         * it (`satisfy R by x`), and every `assert constraint`: satisfied,
-         * violated, or undecided with the reason. Requirements stated only in
-         * words are left out: they have nothing to evaluate.
+         * it (`satisfy R by x`), and every `assert constraint` (a definition's
+         * for each part and type that changes its values): satisfied,
+         * violated, or undecided with the reason, and what each value is
+         * worked out from. Requirements stated only in words are left out:
+         * they have nothing to evaluate.
          */
         @TableRendering {
             rows = "checks";
-            columns = "status; id; requirement; by; margin; detail";
+            columns = "status; id; requirement; by; margin; detail; inputs";
             where = "checkable == 1";
             sortBy = "-status";
         }

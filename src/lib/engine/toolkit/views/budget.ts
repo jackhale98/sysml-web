@@ -19,6 +19,7 @@
  *
  * **Checks.** One row per check of `Evaluation.checks()`.
  */
+import { inputsText } from '#lib/project/checks.ts';
 import { convert, formatMagnitude, formatQuantity, readable, type Quantity } from '../../quantity';
 import type { Check, ColumnKind, Evaluated } from '../../types';
 import { multiplicityOf, type ElementRecord } from '../model';
@@ -449,6 +450,7 @@ export function checkRows(ctx: ViewContext): Row[] {
 					: ''
 			],
 			['detail', check.explanation],
+			['inputs', inputsText(check)],
 			['verdict', check.detail],
 			['checkable', check.checkable ? '1' : '0'],
 			['file', check.file],

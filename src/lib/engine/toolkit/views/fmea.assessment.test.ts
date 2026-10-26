@@ -243,11 +243,24 @@ ${ratings.map(([s, o, d], i) => `    part p${i} { @Fmea { failureMode = "m${i}";
 		expect(figures('m3').slice(0, 3)).toEqual(['', '', '']);
 	});
 
-	// Known gap: a fractional rating (likelihood 5.5) is not flagged, though FmeaRating is an
-	// Integer, and the worksheet shows RPN 137.5000, band medium and priority low for it.
-	it.fails('flags a fractional rating and computes no figures from it', () => {
+	// FmeaRating is an Integer: a likelihood of 5.5 is not a rating, and no RPN (137.5), band or
+	// priority is computed from it.
+	it('flags a fractional rating and computes no figures from it', () => {
 		const { t, figures, problems } = sheetOf();
-		expect(problems('m4')[t.columns.indexOf('likelihood')]).toBeDefined();
+		expect(problems('m4')[t.columns.indexOf('likelihood')]).toBe(
+			'Likelihood is 5.5, not a whole number on the scale of 1 to 10.'
+		);
 		expect(figures('m4').slice(0, 3)).toEqual(['', '', '']);
+	});
+
+	it('lists a fractional rating as a problem', () => {
+		const files = project(LINES(RANGE));
+		host.renderView(files, 'sheet');
+		const messages = host.checks(files).checks.map((c) => c.problem ?? '');
+		expect(messages.filter((m) => /5\.5/.test(m))).toEqual([
+			expect.stringMatching(
+				/^Likelihood is 5\.5, not a whole number on the scale of 1 to 10 \(@Fmea/
+			)
+		]);
 	});
 });

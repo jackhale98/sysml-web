@@ -233,9 +233,10 @@ value), and shows in the design checks and in review.
 - **A value its type rejects.** A metadata field's value must meet the
   asserted constraints of the type the field is declared with: an
   `FmeaRating` of 14 is outside `that >= 1 and that <= 10`. The rule is
-  the library's constraint, evaluated with `that` bound to the value; a
-  calc whose argument breaks its parameter's type (the RPN of that line)
-  has no result.
+  the library's constraint, evaluated with `that` bound to the value. A
+  type that is an `Integer` (as `FmeaRating` is) takes whole numbers only:
+  a likelihood of 5.5 is flagged too. A calc whose argument breaks its
+  parameter's type (the RPN of that line) has no result.
 - **Severity from the hazard.** An `@Fmea` line whose `hazard` leads,
   through `Causation` connections, to harms with a severity should have
   the worst of their `SeverityScale` values as its `severity`.

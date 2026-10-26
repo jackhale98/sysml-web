@@ -11,7 +11,8 @@
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 import { analysed, openWorkspace } from '#lib/create/testing.ts';
-import type { Evaluated, RenderedTable } from '../types';
+import { checkProblems, inputsText } from '#lib/project/checks.ts';
+import type { Check, Evaluated, RenderedTable } from '../types';
 import type { ToolkitHost } from './host';
 import { loadHost } from './testing';
 
@@ -439,6 +440,29 @@ const SCOPE = `package C {
 }
 `;
 
+const PARTS = `package P {
+  private import SI::*;
+  part def Pack {
+    attribute cells : ScalarValues::Integer default 4;
+    attribute cellMass :> ISQ::mass default 50 [g];
+    assert constraint light { mass <= 250 [g] }
+    attribute mass :> ISQ::mass = cells * cellMass;
+  }
+  part def Holder {
+    attribute load :> ISQ::mass; assert constraint { load <= 1 [kg] }
+  }
+  part def Rig {
+    part small : Pack;
+    part big : Pack { attribute :>> cells = 6; }
+    part h1 : Holder { attribute :>> load = 2 [kg]; }
+    part h2 : Holder { attribute :>> load default 0.5 [kg]; }
+  }
+  part rig : Rig {
+    part :>> h2 { attribute :>> load = 1.5 [kg]; }
+  }
+}
+`;
+
 describe('6.3 constraints evaluated for what they are about', () => {
 	it('decides each `satisfy` claim with the subject bound to the claimed part', () => {
 		const files = analyse(SCOPE);
@@ -456,24 +480,162 @@ describe('6.3 constraints evaluated for what they are about', () => {
 		const workspace = await openWorkspace(host, project(SCOPE));
 		await checked(workspace);
 		const checks = workspace.problems.filter((p) => p.code === 'check');
+		const claim = 'armReq is not met by craft.h: craft.h.mass = 80 g (needs ≤ 75 g)';
+		// Arm's assertion (≤ 60 g), broken by HeavyArm and Craft's u, at the values that break it.
+		const heavy = 'light (asserted in Arm) does not hold for HeavyArm: mass = 80 g (needs ≤ 60 g)';
+		const u = 'light (asserted in Arm) does not hold for Craft::u: mass = 70 g (needs ≤ 60 g)';
 		expect(checks.map((p) => [p.file, p.span.start_row, p.severity, p.message])).toEqual([
-			['m.sysml', 20, 'warning', 'armReq is not met by craft.h: craft.h.mass = 80 g (needs ≤ 75 g)']
+			['m.sysml', 20, 'warning', claim],
+			['m.sysml', 7, 'warning', heavy],
+			['m.sysml', 11, 'warning', u]
 		]);
 		// The span covers the claim's text, so Problems jumps to it.
 		expect(SCOPE.slice(checks[0]!.span.from, checks[0]!.span.to)).toMatch(/craft\.h/);
-		// Make h light enough: the problem goes, recalculated from the edited text.
+		// Make h light enough for the claim: that problem goes, recalculated from the edited text;
+		// 74 g still breaks Arm's assertion.
 		await analysed(workspace, () =>
 			workspace.setText('m.sysml', SCOPE.replace('mass default 80 [g]', 'mass default 74 [g]'))
 		);
-		expect(workspace.problems.filter((p) => p.code === 'check')).toEqual([]);
+		expect(workspace.problems.filter((p) => p.code === 'check').map((p) => p.message)).toEqual([
+			heavy.replace('80 g', '74 g'),
+			u
+		]);
 	}, 30_000);
 
-	// Known gap (critical, engine and app): an `assert constraint` in a definition is checked for
-	// the definition's own values only. HeavyArm (80 g) and craft.u (70 g) break `mass <= 60 [g]`,
-	// yet the one check reads "Met." for Arm and no violation is reported.
-	it.fails('checks a definition’s assertion for the parts that redefine its values', () => {
+	it('checks a definition’s assertion for the parts and types that change its values', () => {
 		const files = analyse(SCOPE);
 		const asserts = host.checks(files).checks.filter((c) => c.kind === 'assert');
-		expect(asserts.some((c) => c.status === 'violated')).toBe(true);
+		// Arm: 50 g ≤ 60 g, met with its own values. HeavyArm (80 g) and Craft's u (70 g) change
+		// them and break it, by 20 g and 10 g. Craft's a (an Arm), h (a HeavyArm), craft's parts and
+		// ArmMass's subject have the values of their types, whose checks stand for them.
+		expect(
+			asserts.map((c) => [c.by, c.status, c.assertedIn ?? null, c.span.start_row, c.margin?.value])
+		).toEqual([
+			['Arm', 'satisfied', null, 5, 10],
+			['HeavyArm', 'violated', 'Arm', 7, -20],
+			['Craft::u', 'violated', 'Arm', 11, -10]
+		]);
+		const [arm, heavy, u] = asserts as [Check, Check, Check];
+		expect(arm.explanation).toBe(
+			"Met: mass = 50 g (needs ≤ 60 g). That is with Arm's own values: HeavyArm and Craft::u change them and are checked on their own."
+		);
+		expect(heavy.explanation).toBe('Not met: mass = 80 g (needs ≤ 60 g).');
+		// Each at the value that breaks it, with where that value comes from.
+		expect(SCOPE.slice(heavy.span.from, heavy.span.to)).toBe('attribute :>> mass default 80 [g]');
+		expect(SCOPE.slice(u.span.from, u.span.to)).toBe('attribute :>> mass = 70 [g]');
+		expect(heavy.values).toEqual([
+			{
+				feature: 'mass',
+				value: { kind: 'number', value: 80, unit: 'g' },
+				from: { expression: '80 [g]', writtenIn: null, isDefault: true, inputs: [] }
+			}
+		]);
+		expect(heavy.constraintAt).toEqual({ file: 'm.sysml', span: arm.span });
 	});
+
+	it('checks a definition’s assertion with each part’s own inputs, through redefinitions', () => {
+		const files = analyse(PARTS);
+		const asserts = host.checks(files).checks.filter((c) => c.kind === 'assert');
+		// Pack: 4 × 50 g = 200 g ≤ 250 g. Rig's big: 6 × 50 g = 300 g, by its own `cells`.
+		// Holder gives no load (undecided, decided for its parts): h1 2 kg breaks 1 kg, h2 0.5 kg
+		// holds, rig's h2 redefines it as 1.5 kg and breaks it. Rig's small is a Pack as it is.
+		expect(asserts.map((c) => [c.by, c.status, c.assertedIn ?? null, c.span.start_row])).toEqual([
+			['Pack', 'satisfied', null, 6],
+			['Rig::big', 'violated', 'Pack', 14],
+			['Holder', 'undecided', null, 10],
+			['Rig::h1', 'violated', 'Holder', 15],
+			['Rig::h2', 'satisfied', 'Holder', 16],
+			['rig.h2', 'violated', 'Holder', 19]
+		]);
+		const big = asserts[1]!;
+		expect(big.explanation).toBe('Not met: mass = 300 g (needs ≤ 250 g).');
+		expect(inputsText(big)).toBe(
+			'mass = cells * cellMass in Pack, with cells = 6 and cellMass = 50 g (default in Pack)'
+		);
+		// The definition without values of its own is not a problem; its parts that break it are.
+		expect(checkProblems(asserts).map((p) => [p.severity, p.span.start_row, p.message])).toEqual([
+			[
+				'warning',
+				14,
+				'light (asserted in Pack) does not hold for Rig::big: mass = 300 g (needs ≤ 250 g)'
+			],
+			[
+				'warning',
+				15,
+				'the assertion `load <= 1 [kg]` (asserted in Holder) does not hold for Rig::h1: load = 2 kg (needs ≤ 1 kg)'
+			],
+			[
+				'warning',
+				19,
+				'the assertion `load <= 1 [kg]` (asserted in Holder) does not hold for rig.h2: load = 1.5 kg (needs ≤ 1 kg)'
+			]
+		]);
+	});
+});
+
+// ---- Undecided checks in Problems -----------------------------------------------------
+
+const UNDECIDED = `package U {
+  private import SI::*;
+  part def D {
+    attribute p :> ISQ::power;
+    attribute e :> ISQ::energy = 100 [W*h];
+    attribute t :> ISQ::duration = e / p;
+  }
+  part d : D { attribute :>> p = 0 [W]; }
+  part m : D;
+  part ok : D { attribute :>> p = 50 [W]; }
+  requirement def R { subject s : D; require constraint { s.t >= 1 [h] } }
+  requirement r1 : R;
+  requirement r2 : R;
+  requirement r3 : R;
+  satisfy r1 by d;
+  satisfy r2 by m;
+  satisfy r3 by ok;
+  requirement r4 { subject s : D; require constraint { s.t >= 2 [h] } }
+  requirement r5 { doc /* In words only. */ }
+  satisfy r5 by ok;
+}
+`;
+
+describe('6.1 undecided checks in Problems', () => {
+	it('lists an undecided check with why: a fault of the values as a warning, else a note', () => {
+		const files = analyse(UNDECIDED);
+		const checks = host.checks(files).checks;
+		expect(checks.map((c) => [c.requirement?.name, c.status, c.undecided ?? null])).toEqual([
+			['r1', 'undecided', 'fault'],
+			['r2', 'undecided', 'open'],
+			['r3', 'satisfied', null],
+			['r5', 'undecided', null],
+			['r4', 'undecided', 'open']
+		]);
+		// d: 100 W·h / 0 W. m: no power given. r4: nothing claims it. r5 (words only): nothing to say.
+		expect(checkProblems(checks).map((p) => [p.severity, p.span.start_row, p.message])).toEqual([
+			['warning', 15, "r1 can't be decided for d: d.t cannot be worked out: division by zero"],
+			[
+				'note',
+				16,
+				"r2 can't be decided yet for m: m.t cannot be worked out: `p` has no value in `m`"
+			],
+			['note', 18, "r4 can't be decided yet: nothing in the design claims to satisfy it"]
+		]);
+		expect(checks[0]!.explanation).toBe('d.t cannot be worked out: division by zero.');
+	});
+
+	it('lists the division by zero as a warning through the workspace, until fixed', async () => {
+		const workspace = await openWorkspace(host, project(UNDECIDED));
+		await checked(workspace);
+		const problems = () =>
+			workspace.problems.filter((p) => p.code === 'check').map((p) => [p.severity, p.message]);
+		expect(problems()).toContainEqual([
+			'warning',
+			"r1 can't be decided for d: d.t cannot be worked out: division by zero"
+		]);
+		await analysed(workspace, () =>
+			workspace.setText('m.sysml', UNDECIDED.replace('p = 0 [W]', 'p = 200 [W]'))
+		);
+		expect(problems().filter(([severity]) => severity === 'warning')).toEqual([
+			['warning', 'r1 is not met by d: d.t = 30 min (needs ≥ 1 h)']
+		]);
+	}, 30_000);
 });
