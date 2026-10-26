@@ -11,7 +11,13 @@
  * - each transition's source and target as the toolkit resolves them
  *   (`derived:source` / `derived:target`), so `then done` is the library's
  *   `done` (the region's final state) and a qualified target is the state
- *   it names, not a name matched by hand.
+ *   it names, not a name matched by hand;
+ * - conditional initial transitions (`entry; if c then on;`) as guarded
+ *   transitions from the region's initial pseudo-state, and a `terminate`
+ *   action (`action stop terminate;`) as a final state marked `terminate`;
+ * - the part the machine belongs to (a signal sent to it is sent to the
+ *   machine), and the attributes of the signals whose values it reads
+ *   (`accept r : Reading if r.v > 3`) or sends (`send new Reading(5)`).
  *
  * Its texts come from the source, in the emulator's conventions (the model
  * has no source text for expressions): a trigger is the signal, `when …` or
@@ -25,6 +31,7 @@
  * `entry; then x;` target is found by name, as is any end the toolkit could
  * not resolve).
  */
+import { allSteps, notRunSteps, parseAction, statements } from '../../sim/actions';
 import type { StateMachine } from '../types';
 import type { TkRef, TkSession } from './api';
 import type { ElementRecord, ExtractedModel, UnitInfo } from './model';
@@ -101,23 +108,50 @@ export function extractMachines(
 		const { from, to } = record.span;
 		return unit && from !== undefined && to !== undefined ? unit.original.text.slice(from, to) : '';
 	};
+	// Definitions by simple name, for the attributes a signal carries.
+	const definitions = new Map<string, ElementRecord[]>();
+	for (const record of elements) {
+		if (!record.isDefinition || !record.name) continue;
+		const list = definitions.get(record.name) ?? [];
+		list.push(record);
+		definitions.set(record.name, list);
+	}
 	const context: Context = {
 		children: (id) => children.get(id) ?? [],
 		text,
 		isParallel: (id) => parallel.get(id)?.['property:isParallel'] === true,
 		transition: (id) => transitions.get(id),
-		isFinal
+		isFinal,
+		signal(name) {
+			const simple = name
+				.split('::')
+				.pop()!
+				.replace(/^'(.*)'$/, '$1');
+			const found = definitions.get(simple) ?? [];
+			const def = name.includes('::')
+				? found.find((d) => d.qualifiedName?.endsWith(name.replace(/\s+/g, '')))
+				: found[0];
+			if (!def) return [];
+			return (children.get(def.id) ?? []).filter(isVariable).map((a) => {
+				const type = a.type ?? writtenType(a.header);
+				return {
+					name: a.written ?? a.name!,
+					...(type ? { type } : {}),
+					...(a.value !== null ? { value: a.value } : {})
+				};
+			});
+		}
 	};
 
 	const machines: StateMachine[] = [];
 	for (const record of candidates) {
 		const owner = record.ownerId ? byId.get(record.ownerId) : undefined;
 		// A usage sees the attributes of the part (or other usage, definition) it is in.
-		const ownerVariables =
-			record.metaclass !== 'StateDefinition' && owner && owner.kind !== 'package'
-				? context.children(owner.id).filter(isVariable)
-				: [];
-		const machine = new Builder(context, ownerVariables).build(record);
+		const inPart = !!owner && record.metaclass !== 'StateDefinition' && owner.kind !== 'package';
+		const ownerVariables = inPart ? context.children(owner.id).filter(isVariable) : [];
+		// A signal sent to that part is sent to the machine.
+		const ownerName = inPart ? (owner.written ?? owner.name ?? undefined) : undefined;
+		const machine = new Builder(context, ownerVariables, ownerName).build(record);
 		if (machine) machines.push(machine);
 	}
 	return machines;
@@ -129,6 +163,8 @@ interface Context {
 	isParallel(id: string): boolean;
 	transition(id: string): Row | undefined;
 	isFinal(id: string): boolean;
+	/** The attributes of the signal (a definition) a trigger or a `send` names. */
+	signal(name: string): NonNullable<StateMachine['signals']>[string];
 }
 
 const isVariable = (r: ElementRecord) => r.metaclass === 'AttributeUsage' && !!r.name;
@@ -151,6 +187,7 @@ interface Pending {
 	from: { path: string } | { text: string };
 	to: { path: string } | { text: string };
 	trigger?: string;
+	payload?: string;
 	guard?: string;
 	effect?: string;
 }
@@ -163,11 +200,16 @@ class Builder {
 	/** Element id → state path. */
 	private readonly paths = new Map<string, string>();
 
+	/** Names a `send` may use for the machine itself, besides `self`. */
+	private readonly own: string[];
+
 	constructor(
 		private readonly cx: Context,
-		ownerVariables: ElementRecord[]
+		ownerVariables: ElementRecord[],
+		private readonly owner?: string
 	) {
 		for (const v of ownerVariables) this.addVariable(v);
+		this.own = owner ? [owner] : [];
 	}
 
 	build(record: ElementRecord): StateMachine | null {
@@ -176,6 +218,7 @@ class Builder {
 		if (!this.states.length && !this.pending.length) return null;
 		const transitions = this.resolve();
 		const qualified = record.qualifiedName;
+		const signals = this.signals(transitions);
 		return {
 			name: record.written ?? record.name!,
 			...(qualified?.includes('::') ? { qualifiedName: qualified } : {}),
@@ -186,8 +229,32 @@ class Builder {
 			states: this.states,
 			transitions,
 			variables: this.variables,
+			...(this.owner ? { owner: this.owner } : {}),
+			...(Object.keys(signals).length ? { signals } : {}),
 			...(this.warnings.length ? { warnings: this.warnings } : {})
 		};
+	}
+
+	/** The attributes of the signals whose values the machine reads or sends. */
+	private signals(transitions: MachineTransition[]): NonNullable<StateMachine['signals']> {
+		const names = new Set<string>();
+		for (const t of transitions) if (t.payload && t.trigger) names.add(t.trigger);
+		const actions = [
+			...this.states.flatMap((s) => [s.entry, s.do, s.exit]),
+			...transitions.map((t) => t.effect)
+		];
+		for (const text of actions) {
+			if (!text) continue;
+			for (const step of allSteps(parseAction(text))) {
+				if (step.kind === 'send') names.add(step.signal);
+			}
+		}
+		const out: NonNullable<StateMachine['signals']> = {};
+		for (const name of names) {
+			const attributes = this.cx.signal(name);
+			if (attributes.length) out[name] = attributes;
+		}
+		return out;
 	}
 
 	private addVariable(record: ElementRecord) {
@@ -242,8 +309,32 @@ class Builder {
 		let previous: string | undefined;
 		const transitions: ElementRecord[] = [];
 		const previousOf = new Map<string, string | undefined>();
+		// `entry; if c then on;`: conditional initial transitions follow the region's `entry`.
+		let afterEntry: ElementRecord | null = null;
+		const initials = new Map<string, ElementRecord>();
 		for (const member of members) {
+			const written = clean(this.cx.text(member));
+			if (member.membership === 'StateSubactionMembership' && /^entry\b/.test(written)) {
+				afterEntry = member;
+				continue;
+			}
+			if (member.metaclass === 'TerminateActionUsage' && member.name) {
+				// `action stop terminate;`: reaching it ends the machine.
+				const id = path(parent, member.written ?? member.name);
+				this.paths.set(member.id, id);
+				this.states.push({
+					name: id,
+					label: member.written ?? member.name,
+					kind: 'final',
+					terminate: true,
+					...(parent ? { parent } : {}),
+					line: member.span.start_row
+				});
+				afterEntry = null;
+				continue;
+			}
 			if (isState(member)) {
+				afterEntry = null;
 				const id = path(parent, member.written ?? member.name!);
 				this.paths.set(member.id, id);
 				const state: MachineState = {
@@ -262,9 +353,46 @@ class Builder {
 			} else if (member.metaclass === 'TransitionUsage') {
 				transitions.push(member);
 				previousOf.set(member.id, previous);
+				if (afterEntry && /^if\b/.test(written)) initials.set(member.id, afterEntry);
 			}
 		}
-		for (const t of transitions) this.transition(t, parent, previousOf.get(t.id));
+		for (const t of transitions) {
+			const entry = initials.get(t.id);
+			if (entry) this.conditionalInitial(t, entry, parent);
+			else this.transition(t, parent, previousOf.get(t.id));
+		}
+	}
+
+	/** `if c then on;` after the region's `entry`: an initial transition taken when `c` holds. */
+	private conditionalInitial(
+		record: ElementRecord,
+		entry: ElementRecord,
+		parent: string | undefined
+	) {
+		const parts = transitionParts(this.cx.text(record));
+		const row = this.cx.transition(record.id) ?? {};
+		const initial = path(parent, 'entry');
+		if (!this.states.some((s) => s.name === initial)) {
+			this.states.push({
+				name: initial,
+				label: 'entry',
+				kind: 'initial',
+				...(parent ? { parent } : {}),
+				line: entry.span.start_row
+			});
+		}
+		const targetPath = (() => {
+			const id = ref(row['derived:target']);
+			return id ? this.paths.get(id) : undefined;
+		})();
+		this.pending.push({
+			scope: parent,
+			line: record.span.start_row,
+			context: 'initial transition',
+			from: { path: initial },
+			to: targetPath ? { path: targetPath } : { text: parts.target ?? '' },
+			...(parts.guard ? { guard: parts.guard } : {})
+		});
 	}
 
 	/** `entry` / `do` / `exit` actions of a state, as the emulator reads them. */
@@ -283,10 +411,14 @@ class Builder {
 		return out;
 	}
 
-	/** Note the steps of an action the emulator does not run (it runs assignments only). */
+	/** Note the steps of an action the emulator does not run. */
 	private notRun(context: string, action: string) {
-		for (const step of skippedSteps(action)) {
-			this.warnings.push(`${context}: \`${step}\` is not run; only assignments are`);
+		for (const step of skippedSteps(action, this.own)) {
+			this.warnings.push(
+				/^send\b/.test(step)
+					? `${context}: \`${step}\` is not run; only signals sent to the machine itself are`
+					: `${context}: \`${step}\` is not run`
+			);
 		}
 	}
 
@@ -345,11 +477,13 @@ class Builder {
 		else to = { text: parts.target ?? '' };
 
 		if (hasEffect) this.notRun(`effect of ${context}`, parts.effect!);
+		const payload = hasTrigger ? payloadName(parts.trigger!) : undefined;
 		this.pending.push({
 			...base,
 			from,
 			to,
 			...(hasTrigger ? { trigger: triggerText(parts.trigger!) } : {}),
+			...(payload ? { payload } : {}),
 			...(hasGuard ? { guard: parts.guard! } : {}),
 			...(hasEffect && actionText(parts.effect!) ? { effect: actionText(parts.effect!)! } : {})
 		});
@@ -396,6 +530,7 @@ class Builder {
 				from,
 				to,
 				...(p.trigger ? { trigger: p.trigger } : {}),
+				...(p.payload ? { payload: p.payload } : {}),
 				...(p.guard ? { guard: p.guard } : {}),
 				...(p.effect ? { effect: p.effect } : {}),
 				line: p.line
@@ -518,47 +653,49 @@ export function triggerText(trigger: string): string {
 	return (typed ? typed[1]! : payload).trim();
 }
 
+/** The name an accepted signal is given: `r : Reading via p` → `r`; none for `Go`, `when …`, `after …`. */
+export function payloadName(trigger: string): string | undefined {
+	const text = trigger.trim();
+	if (/^(when|after|at)\b/.test(text)) return undefined;
+	return /^((?:'[^']*'|[\w$]+))\s*:(?!:)/.exec(text)?.[1];
+}
+
 /**
  * An action as the emulator reads it: its `assign x := e` statements joined
- * by `; ` (also inside `action { … }`), else a named action's name, else the
- * text as written (`send …`).
+ * by `; ` (also inside `action { … }`), else a named action's name, else its
+ * statements as written, joined by `; ` (`assign y := 5; if x > 5 { … }`,
+ * `send …`).
  */
 export function actionText(action: string): string | undefined {
 	const text = clean(action);
 	if (!text) return undefined;
-	if (/(^|[\s{;])assign\s/.test(text)) {
-		const open = text.indexOf('{');
-		const body = open >= 0 ? text.slice(open + 1, text.lastIndexOf('}')) : text;
-		const assignments: string[] = [];
-		for (const statement of splitTopLevel(body)) {
-			const m = /^(?:action\s+)?assign\s+([\s\S]+?)\s*:=\s*([\s\S]+)$/.exec(statement.trim());
-			if (m) assignments.push(`assign ${m[1]!.trim()} := ${m[2]!.trim()}`);
-		}
-		if (assignments.length) return assignments.join('; ');
+	const steps = parseAction(text);
+	if (steps.length && steps.every((s) => s.kind === 'assign')) {
+		return steps.map((s) => s.text).join('; ');
 	}
 	const bare = text.replace(/^action\b\s*/, '');
 	if (/^[\w'.:]+$/.test(bare)) return bare;
-	return text.replace(/\s+/g, ' ');
+	// Other steps (`if`, `send`, successions): the statements of its body, as written.
+	const open = /^action\b[^{=]*\{/.exec(text);
+	const body = open ? text.slice(open[0].length, text.lastIndexOf('}')) : text;
+	return statements(body)
+		.map((s) => s.replace(/\s+/g, ' ').trim())
+		.join('; ');
 }
 
-/** A step the emulator runs, or that changes nothing it simulates: an assignment, a named action. */
-const RUN = /^(?:action\s+)?(?:assign\s[\s\S]*:=[\s\S]*|[\w'.:]*\s*(?::\s*[\w'.:]+)?)$/;
 /** Steps whose effect on the run is lost if they are not run. */
 const STEPS = /(^|[^\w$'])(send|accept|assign|if|while|loop|for|then|perform|terminate)\b/;
 
 /**
- * The statements of an action the emulator does not run but that would
- * change the run: a `send`, an `accept`, an `if`, a loop, a succession,
- * an assignment inside one of them (`if x > 5 { assign y := 7; }`).
+ * The steps of an action the emulator does not run but that would change
+ * the run: a `send` to anything but the machine itself (`own` names its
+ * part), an `accept`, a loop, a `perform`… (assignments, `if`, successions
+ * and sends to the machine run; see `sim/actions.ts`).
  */
-export function skippedSteps(action: string): string[] {
+export function skippedSteps(action: string, own: readonly string[] = []): string[] {
 	const text = clean(action);
 	if (!text) return [];
-	const open = text.indexOf('{');
-	const body = open >= 0 ? text.slice(open + 1, text.lastIndexOf('}')) : text;
-	return splitTopLevel(body)
-		.map((statement) => statement.trim().replace(/\s+/g, ' '))
-		.filter((statement) => !RUN.test(statement) && STEPS.test(statement));
+	return notRunSteps(parseAction(text), own).filter((step) => STEPS.test(step));
 }
 
 /** `in attribute x : Real = 1` → `Real`. */
@@ -566,23 +703,4 @@ export function writtenType(header: string): string | undefined {
 	return /(?<![:>]):(?![:>=])\s*((?:'[^']*'|[\w$]+)(?:\s*::\s*(?:'[^']*'|[\w$]+))*)/
 		.exec(header)?.[1]
 		?.replace(/\s*::\s*/g, '::');
-}
-
-/** `a; b; { c; }` → its top-level statements. */
-function splitTopLevel(text: string): string[] {
-	const out: string[] = [];
-	let depth = 0;
-	let from = 0;
-	for (let i = 0; i < text.length; i++) {
-		const c = text[i]!;
-		if (c === '"' || c === "'") i = closing(text, i);
-		else if (c === '(' || c === '[' || c === '{') depth++;
-		else if (c === ')' || c === ']' || c === '}') depth--;
-		else if (c === ';' && depth === 0) {
-			out.push(text.slice(from, i));
-			from = i + 1;
-		}
-	}
-	out.push(text.slice(from));
-	return out.filter((s) => s.trim());
 }

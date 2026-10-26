@@ -13,6 +13,7 @@
 	import { onMount, tick, untrack } from 'svelte';
 	import type { Engine } from '#lib/engine/client.ts';
 	import type { SimStep, StateMachine, StateSession } from '#lib/engine/types.ts';
+	import type { GitConnection } from '#lib/git/connection.svelte.ts';
 	import type { Workspace } from '#lib/project/workspace.svelte.ts';
 	import Pill from '#lib/ui/Pill.svelte';
 	import type { WorkbenchUi } from '#lib/workbench/ui.svelte.ts';
@@ -38,20 +39,32 @@
 		within,
 		type History
 	} from './model.ts';
+	import { reachability } from './reachability.ts';
 	import TracePanel from './TracePanel.svelte';
+	import { traceCsv, traceFileName, traceJson, type TraceSource } from './trace-export.ts';
 	import VariablesPanel from './VariablesPanel.svelte';
 
 	let {
 		machine,
 		workspace,
 		ui,
-		engine
-	}: { machine: string; workspace: Workspace; ui: WorkbenchUi; engine: Engine } = $props();
+		engine,
+		git = null
+	}: {
+		machine: string;
+		workspace: Workspace;
+		ui: WorkbenchUi;
+		engine: Engine;
+		/** The project's repository, if it has one: a saved run names the commit. */
+		git?: GitConnection | null;
+	} = $props();
 
 	const SPEEDS = [0.5, 1, 2, 4];
 	/** A run stops after this many steps, so auto-run cannot go on forever. */
 	const LIMITS = { maxSteps: 1000 };
 	const BASE_DELAY = 1100;
+	/** A step that took more transitions than this (a long Wait) is shown at once, not animated. */
+	const MAX_ANIMATED = 8;
 
 	// The machine, kept current as the model is edited.
 	let fetched = $state.raw<StateMachine[] | null>(null);
@@ -186,7 +199,22 @@
 	const view = $derived(preview ?? session);
 	const enabled = $derived(view?.enabled ?? []);
 	const events = $derived(eventOptions(enabled));
-	const step = $derived(stepOption(enabled));
+	const step = $derived(stepOption(enabled, view?.queue));
+	// States no run can reach and transitions that can never fire, from the machine alone.
+	const reach = $derived(def ? reachability(def) : null);
+	const reachCount = $derived((reach?.unreachable.length ?? 0) + (reach?.dead.length ?? 0));
+	const reachSummary = $derived.by(() => {
+		const n = (count: number, one: string, many: string) => `${count} ${count > 1 ? many : one}`;
+		const parts = [
+			...(reach?.unreachable.length
+				? [`${n(reach.unreachable.length, 'state', 'states')} can never be reached`]
+				: []),
+			...(reach?.dead.length
+				? [`${n(reach.dead.length, 'transition', 'transitions')} can never fire`]
+				: [])
+		];
+		return `${parts.join('; ')}, whatever the values and events.`;
+	});
 	const running = $derived(!session || session.status === 'running');
 	const current = $derived(override ?? session?.current ?? []);
 	const active = $derived(activeSet(def, current));
@@ -378,6 +406,15 @@
 				return;
 			}
 			showStage();
+			if (steps.length > MAX_ANIMATED) {
+				// Too many to watch one by one (a Wait through many steps): show where it ended, and why, now.
+				override = null;
+				if (next.messages?.length) flash(next.messages.join(' ').replace(/`/g, ''));
+				const leaf = next.current[0];
+				if (leaf) diagram?.reveal(leaf);
+				announce = announcement(next, steps);
+				return;
+			}
 			await animate(before.current, steps, next);
 			announce = announcement(next, steps);
 			if (next.messages?.length) flash(next.messages.join(' ').replace(/`/g, ''));
@@ -421,7 +458,8 @@
 					s?.status === 'running'
 						? autoMove(
 								untrack(() => enabled),
-								s.trace
+								s.trace,
+								untrack(() => view?.queue)
 							)
 						: null;
 				if (!move) {
@@ -447,6 +485,48 @@
 			history = { ...history, sessions: history.sessions.slice(0, history.cursor + 1) };
 		}
 		auto = !auto;
+	}
+
+	/** Where the model came from, for a saved run. */
+	function source(): TraceSource {
+		const record = git?.record;
+		return {
+			...(workspace.info?.name ? { project: workspace.info.name } : {}),
+			...(record
+				? {
+						repository: `${record.owner}/${record.repo}`,
+						branch: record.branch,
+						commit: record.base,
+						changedFiles: git?.changes.length ?? 0
+					}
+				: {})
+		};
+	}
+
+	/** Save the run shown (up to its latest step) as CSV or JSON. */
+	async function exportRun(format: 'csv' | 'json') {
+		const run = latest;
+		if (!def || !run) return;
+		try {
+			const { saveFile } = await import('#lib/dataio/export.ts');
+			if (format === 'csv') {
+				await saveFile(
+					traceFileName(def, 'csv'),
+					traceCsv(def, run.trace),
+					'text/csv;charset=utf-8',
+					false
+				);
+			} else {
+				await saveFile(
+					traceFileName(def, 'json'),
+					traceJson(def, run, source(), new Date()),
+					'application/json',
+					false
+				);
+			}
+		} catch (error) {
+			flash(`The run could not be saved: ${message(error)}`);
+		}
 	}
 
 	async function setVariable(name: string) {
@@ -507,7 +587,9 @@
 			: ''
 	);
 	const changedCount = $derived(Object.keys(pending).length);
-	const hasNotices = $derived(changed || !!stepError || !!def?.warnings?.length || !!layoutError);
+	const hasNotices = $derived(
+		changed || !!stepError || !!def?.warnings?.length || !!layoutError || reachCount > 0
+	);
 	/** On phones the diagram fills the space above the bottom sheet. */
 	const stageHeight = $derived(
 		wide || !rootHeight
@@ -611,13 +693,30 @@
 						<summary>
 							<TriangleAlert size={16} aria-hidden="true" />
 							<span
-								>The engine has {def.warnings.length} note{def.warnings.length > 1 ? 's' : ''} on this
+								>The simulator has {def.warnings.length} note{def.warnings.length > 1 ? 's' : ''} on this
 								machine; it may not run as written.</span
 							>
 							<ChevronDown size={14} aria-hidden="true" />
 						</summary>
 						<ul>
 							{#each def.warnings as w, i (i)}<li>{w.replace(/`/g, '')}</li>{/each}
+						</ul>
+					</details>
+				{/if}
+				{#if reach && reachCount}
+					<details class="callout warn reach">
+						<summary>
+							<TriangleAlert size={16} aria-hidden="true" />
+							<span>{reachSummary}</span>
+							<ChevronDown size={14} aria-hidden="true" />
+						</summary>
+						<ul>
+							{#each reach.unreachable as s (s)}<li>
+									state {labelOf(s)}: no transition can reach it
+								</li>{/each}
+							{#each reach.dead as d (d.index)}<li>
+									{d.label}: {d.reason.replace(/`/g, '')}
+								</li>{/each}
 						</ul>
 					</details>
 				{/if}
@@ -711,6 +810,7 @@
 						cursor={history.cursor}
 						onstep={(s) => goTo(sessionAt(history, s))}
 						onscrub={goTo}
+						onexport={(format) => void exportRun(format)}
 					/>
 				</div>
 			</details>

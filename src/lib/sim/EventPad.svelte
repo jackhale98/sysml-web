@@ -236,7 +236,7 @@
 			onclick={() => onfire(null)}
 			aria-disabled={busy || !running}
 			aria-keyshortcuts="S"
-			title="Take what is ready now (completion, guard-only, when … and due after … transitions); if nothing is, let time pass to the next timer (S)"
+			title="Take what is ready now (completion, guard-only, when … and due after … transitions), else a signal the machine sent itself; if nothing is, let time pass to the next timer (S)"
 		>
 			<StepForward size={17} aria-hidden="true" />
 			<span class="step-text">
@@ -244,6 +244,8 @@
 				<small>
 					{#if stepTargets.length}
 						{moves(stepTargets)}
+					{:else if step.queued}
+						take {step.queued}, sent by the machine
 					{:else if step.next}
 						in {timeText(step.next.due - time)}: {moves(step.next.transitions)}
 					{:else if step.transitions.length}

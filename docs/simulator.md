@@ -22,11 +22,16 @@ The simulator runs one run-to-completion step at a time:
 - **Step** fires what is ready now: transitions without a trigger,
   guard-only ones, change triggers (`accept when …`) whose condition holds
   and time triggers (`accept after …`, `accept at …`) that are due. If
-  nothing is ready, time passes to the next timer and what comes due then
+  nothing is, it takes the oldest signal the machine sent itself (see
+  [Signals the machine sends itself](#signals-the-machine-sends-itself)). If
+  there is none, time passes to the next timer and what comes due then
   fires.
 - **Wait** lets time pass, by an amount or to the next timer. On the way,
   everything that becomes ready fires at its own time, one step after
-  another, so waiting an hour runs every timer due in that hour.
+  another, so waiting an hour runs every timer due in that hour. A Wait
+  that takes more than a few steps is shown at once, where it ended, rather
+  than animated step by step; one that takes 200 steps without time
+  passing stops there and says so.
 
 Within a step, guards and conditions are all read before anything fires;
 inner states' transitions come before their ancestors'; transitions without
@@ -36,8 +41,72 @@ together, so parallel regions each take their own step. A transition stops
 the `do` actions still running in the states it leaves, runs their exit
 actions innermost first, runs its effect, then enters its target (entry
 actions outermost first, each followed by its `do` action), as in SysML
-7.18.3, Transition Usages. `assign x := e` in actions and effects changes
-variables; other actions are shown in the timeline only.
+7.18.3, Transition Usages.
+
+When transitions in different regions fire in one step and their actions
+set the same variable, the step carries a note: the regions run at the
+same time, SysML leaves the order open, and the simulator runs them in the
+order they are written, so the value left is the last one's.
+
+### Initial states
+
+`entry; then a;` enters `a`. Conditional initial transitions
+(`entry; if startOn then on; if not startOn then off;`, SysML 7.18.2) are
+read when the region is entered, after its state's entry action
+(`entry then middle`): the first written whose guard holds is taken. If
+none holds, no state in that region is entered, and the step says so (a
+machine with nothing entered can do nothing more: it shows as stuck).
+
+### `terminate`
+
+A transition to a terminate action (`accept Abort then stop;` with
+`action stop terminate;`) exits its source and runs its effect as any
+transition, then ends the machine: the states still active in other
+regions are left without their exit actions (their `do` actions stop), and
+the run is complete. This follows UML's terminate pseudostate, which SysML
+v2's terminate action replaces: the performance ends, it is not exited.
+
+## Actions
+
+Entry, `do` and exit actions and transition effects run their steps in the
+order written:
+
+- `assign x := e` changes a variable;
+- `if c { … } else if d { … } else { … }` runs the first branch whose
+  condition holds;
+- `then <step>`, a succession inside the action, runs the step after the
+  one before it;
+- `send new Sig(…) to self` (or to the part that exhibits the machine)
+  sends the machine a signal (below);
+- `action { … }` runs its steps; a named action (`do monitor`) changes
+  nothing the simulator keeps.
+
+SysML performs the actions of a body that no succession orders
+concurrently; the simulator takes the written order, so `assign y := 5;
+if x > 5 { assign y := 7; }` leaves 7 when `x` is above 5. Anything else
+(`accept`, loops, `perform`, a `send` to another part) is not run, and the
+machine says so before it runs.
+
+## Signals the machine sends itself
+
+A `send` to the machine itself (`to self`, or to the part that exhibits it)
+puts the signal in a queue. Signals are taken one per step, in the order
+sent, after what is ready without one (UML's completion events come first,
+14.2.3.9.1): a Step takes the oldest when nothing else is ready, and a
+Wait takes them on the way. Events you send wait for the queue: the event
+buttons say which signal comes first. A queued signal no transition
+accepts is dropped, with a message, as an event would be.
+
+## Signal values
+
+A transition that names the signal it accepts (`accept r : Reading if
+r.v > 3 do assign last := r.v then b;`) reads its values in its guard and
+effect. The values are the ones it was sent with (`send new Reading(7) to
+self`, in the order of the signal's attributes, or `Reading(v = 7)`), else
+the defaults the signal's definition gives (`item def Reading { attribute
+v : Integer = 5; }`). An event sent with the buttons carries the defaults.
+A guard that reads a value the signal does not carry does not hold, and
+says which value is missing.
 
 ## Time
 
@@ -62,9 +131,12 @@ active state was entered. The timeline shows the time of each step.
   passing alone, so a condition is read at the current time before time
   moves on: a condition an assignment makes true is taken before the next
   timer, wherever it is written.
-- A time signal that comes while its transition's guard is false is not
-  taken (the guard is part of whether the transition accepts it) and is
-  lost: that timer does not fire again until its state is entered again.
+- A time or change signal that comes while its transition's guard is false
+  is not taken (the guard is part of whether the transition accepts it)
+  and is lost (no signal is deferred): a timer does not fire again until
+  its state is entered again, and a change trigger not until its condition
+  turns false and then true again (`Observation::ObserveChange` sends the
+  signal once, when the condition becomes true). The transition shows why.
 - Durations and times are numbers with time units, converted with the
   units the simulator knows: `5 [s]`, `2 [SI::min]`, `1.5 [h]`, or a
   variable holding one. A bare number counts seconds. A duration that cannot
@@ -90,13 +162,14 @@ state is active; leaving the state stops it if it is still running, before
 the exit action (SysML 7.18.1, States Overview; 7.18.3, Transition Usages).
 In the simulator:
 
-- A `do` action made only of assignments runs them once, right after the
-  entry action, and completes. Running it again as time passes would not be
-  SysML: an action performs its steps once.
-- Any other `do` action (a named action, `do monitorTemperature`, a `send`)
-  has no steps the simulator can run, so it counts as running until the
-  state is left. The timeline shows it started on entry and stopped on
-  exit.
+- A `do` action with steps the simulator runs (assignments, `if`, sends
+  to the machine itself; see [Actions](#actions)) runs them once, right
+  after the entry action, and completes. Running it again as time passes
+  would not be SysML: an action performs its steps once.
+- Any other `do` action (a named action, `do monitorTemperature`, a `send`
+  to another part) has no steps the simulator can run, so it counts as
+  running until the state is left. The timeline shows it started on entry
+  and stopped on exit.
 - A transition without a trigger waits for the state's substates to finish,
   not for its `do` action: `StateTransitionPerformance` orders the
   transition after the source's `nonDoMiddle` performances (every middle
@@ -117,23 +190,50 @@ transition useCharge first cruising accept after 5 [SI::min]
 Putting the self-transition on a substate keeps the outer state, and its
 running `do` action, active while the charge goes down.
 
+## The Timeline
+
+Each step records why it fired: the event (or the action that sent the
+signal), the condition that turned true, the timer that came due and when,
+or "completion" for a transition without a trigger; the values its guard
+and condition read; and the transitions that were ready too and gave way
+to it. **Save the run as CSV or JSON** writes it out: the CSV has one row per
+step, the JSON the whole run with the machine's qualified name, file and
+line, and, for a project kept in a repository, the repository, branch and
+commit its files are based on, with the number of files changed since (0:
+the run is of that commit's model), so a run can be filed as evidence for
+a requirement or a verification case. Linking a run to them in the model
+is not supported.
+
+## Auto-run
+
+Auto-run takes a Step whenever one can happen, else sends a ready event:
+the one leading to the states visited least, then the one sent least
+often, then the first listed. Nothing is left to chance, so running it
+again from the start gives the same run.
+
+## Reachability
+
+Before a run, the simulator reads the machine for states no transition can
+reach and transitions that can never fire, and lists them above the
+diagram. Guards are taken to be possibly true unless they are constant
+(`if false`), so what it lists is unreachable whatever the values, events
+and timers; something it does not list may still be unreachable because of
+its guards. A transition never fires when its source cannot be reached,
+when its guard or `when` condition is constant and false, or when its
+source is a simple state with a transition that has no trigger and no
+guard: that one is taken as soon as the state is entered, before any
+event, timer or condition, and before later untriggered ones.
+
 ## Not supported
 
 The simulator lists what it cannot run in a note above the diagram ("may
 not run as written") before the run starts.
 
-- The steps inside a `do`, entry or exit action or a transition effect other
-  than assignments (`send`, `accept`, `if`, successions, loops): each one is
-  named in the note.
-- Signals sent by `send` actions to the machine itself: send events with the
-  buttons.
+- Steps of an action other than those under [Actions](#actions)
+  (`accept`, loops, `perform`, a `send` to another part or through a
+  port): each one is named in the note.
 - Change triggers that read the time, and clocks other than the default
   one.
-- `terminate` (the target shows as an unknown state, and the run stops
-  there), conditional initial transitions (`entry; if c then a;`: the first
-  state is entered; noted as a transition with no source state).
 - History states and deferred signals: SysML v2 has no notation for them.
-- A `when` trigger whose guard is false when its condition turns true is
-  taken later, once the guard holds (a time signal is lost in that case).
-- The payload of a signal (`accept r : Reading if r.v > 3`): a guard that
-  reads it stays blocked.
+- Values for a signal sent with the event buttons other than its
+  definition's defaults.

@@ -754,6 +754,8 @@ export interface StateMachine {
 		kind: 'initial' | 'state' | 'final';
 		parent?: string;
 		parallel?: boolean;
+		/** A `terminate` action (`action stop terminate;`): reaching it ends the whole machine. */
+		terminate?: boolean;
 		entry?: string;
 		do?: string;
 		exit?: string;
@@ -765,11 +767,20 @@ export interface StateMachine {
 		from: string;
 		to: string;
 		trigger?: string;
+		/** The name the accepted signal is given (`accept r : Reading` → `r`), for guards and effects that read it. */
+		payload?: string;
 		guard?: string;
 		effect?: string;
 		line: number;
 	}[];
 	variables: { name: string; type?: string; value?: unknown; direction?: string; doc?: string }[];
+	/** The part the machine belongs to (an `exhibit state` in a part): a signal sent to it is sent to the machine. */
+	owner?: string;
+	/**
+	 * The attributes of the signals the machine accepts or sends, by the
+	 * signal's name as written, in declaration order, with their defaults.
+	 */
+	signals?: Record<string, { name: string; type?: string; value?: unknown }[]>;
 	warnings?: string[];
 }
 
@@ -791,6 +802,12 @@ export interface SimStep {
 	do_stopped?: string | null;
 	/** What the step could not do, such as a time trigger whose duration cannot be worked out. */
 	notes?: string[];
+	/** Why it fired, in a sentence: the event, the condition that turned true, the timer that came due. */
+	cause?: string;
+	/** The values the guard and condition read when the step was decided (variables and signal values). */
+	reads?: Record<string, unknown>;
+	/** Transitions that were ready too and gave way to this one. */
+	preempted?: string[];
 }
 
 /** One emulation session: where the machine is and what can happen next. */
@@ -812,6 +829,16 @@ export interface StateSession {
 	timers?: Record<string, number | string>;
 	/** Active states whose `do` action is still running. */
 	doing?: string[];
+	/** Signals the machine sent to itself, waiting to be taken, oldest first. */
+	queue?: { signal: string; values?: Record<string, unknown>; from?: string }[];
+	/**
+	 * The change triggers of the active states, by transition index: `false`
+	 * while the condition is false, `true` once its signal came and waits to
+	 * be taken, or why that signal was lost.
+	 */
+	changes?: Record<string, boolean | string>;
+	/** The machine reached a `terminate` action. */
+	terminated?: boolean;
 	enabled: {
 		transition: string;
 		index: number;
@@ -823,6 +850,8 @@ export interface StateSession {
 		conditionResult?: boolean;
 		/** For a time trigger: when it is due, in seconds since the start. */
 		due?: number;
+		/** Its signal was sent by the machine and waits: a Step takes it. */
+		queued?: boolean;
 		ready: boolean;
 		reason?: string;
 	}[];

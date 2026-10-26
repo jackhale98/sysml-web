@@ -102,9 +102,9 @@ describe('state machines from the toolkit', () => {
 		]);
 		// The initial state is where `entry; then a;` is written.
 		expect(state(m, 'r1.entry')!.line).toBe(11);
-		// The simulator runs assignments only, and says so for the `send`.
+		// The simulator runs sends to the machine itself only, and says so for this one (through a port).
 		expect(m.warnings).toEqual([
-			'do action of `b`: `send Sig() to p` is not run; only assignments are'
+			'do action of `b`: `send Sig() to p` is not run; only signals sent to the machine itself are'
 		]);
 	});
 
@@ -124,7 +124,15 @@ describe('state machines from the toolkit', () => {
 			{ from: 'r1.entry', to: 'r1.a' },
 			// `accept Go then b;` after `state a;` leaves `a`.
 			{ from: 'r1.a', to: 'r1.b', trigger: 'Go' },
-			{ from: 'r1.b', to: 'r1.a', trigger: 'Sig', guard: 'x > 2', effect: 'assign x := 0' },
+			// `s : Sig`: the signal is named `s`, for guards and effects that read its values.
+			{
+				from: 'r1.b',
+				to: 'r1.a',
+				trigger: 'Sig',
+				payload: 's',
+				guard: 'x > 2',
+				effect: 'assign x := 0'
+			},
 			// The shorthand source.
 			{ from: 'r1.b', to: 'r1.c' },
 			{ name: 't2', from: 'r1.c', to: 'r1.a', trigger: 'after 5 [s]' },

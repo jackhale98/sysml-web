@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { Check, CircleDot, TriangleAlert, X } from '@lucide/svelte';
+	import { Check, CircleDot, Download, Info, TriangleAlert, X } from '@lucide/svelte';
 	import type { SimStep } from '#lib/engine/types.ts';
-	import { explain, isChangeTrigger, timeText } from './model.ts';
+	import { explain, isChangeTrigger, timeText, type Part } from './model.ts';
 
 	interface Props {
 		/** The trace of the latest session (steps after the cursor are "future"). */
@@ -14,9 +14,22 @@
 		cursor: number;
 		onstep: (step: number) => void;
 		onscrub: (position: number) => void;
+		/** Save the run as a file. */
+		onexport?: (format: 'csv' | 'json') => void;
 	}
 
-	let { trace, current, labelOf, positions, cursor, onstep, onscrub }: Props = $props();
+	let { trace, current, labelOf, positions, cursor, onstep, onscrub, onexport }: Props = $props();
+
+	/** Why a step fired, with the values its guard and condition read and what it went before. */
+	function why(s: SimStep): Part[] {
+		const parts = explain(s.cause ?? '');
+		const reads = Object.entries(s.reads ?? {})
+			.map(([k, v]) => `${k} = ${typeof v === 'string' ? `"${v}"` : String(v)}`)
+			.join(', ');
+		if (reads) parts.push({ text: `; read ${reads}` });
+		if (s.preempted?.length) parts.push({ text: `; went before ${s.preempted.join(', ')}` });
+		return parts;
+	}
 
 	const uid = $props.id();
 	let list = $state<HTMLOListElement>();
@@ -40,6 +53,15 @@
 		}
 	}
 </script>
+
+{#if onexport && trace.length}
+	<div class="export" role="group" aria-label="Save the run">
+		<Download size={13} aria-hidden="true" />
+		<span>Save the run as</span>
+		<button type="button" onclick={() => onexport('csv')}>CSV</button>
+		<button type="button" onclick={() => onexport('json')}>JSON</button>
+	</div>
+{/if}
 
 {#if positions > 1}
 	<div class="scrub">
@@ -111,6 +133,17 @@
 						{#if s.entry_action}<span class="act"><i>entry</i> {s.entry_action}</span>{/if}
 						{#if s.do_action}<span class="act"><i>started</i> {s.do_action}</span>{/if}
 					</span>
+					{#if s.cause && s.cause !== 'start'}
+						<span class="why">
+							<Info size={12} aria-hidden="true" />
+							<span
+								><span class="visually-hidden"
+									>Why:
+								</span>{#each why(s) as part, p (p)}{#if part.code}<code>{part.text}</code
+										>{:else}{part.text}{/if}{/each}</span
+							>
+						</span>
+					{/if}
 					{#each s.notes ?? [] as note, n (n)}
 						<span class="note">
 							<TriangleAlert size={12} aria-hidden="true" />
@@ -296,6 +329,29 @@
 		font-variant-numeric: tabular-nums;
 		white-space: nowrap;
 	}
+	.export {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		margin-bottom: var(--space-2);
+		color: var(--text-2);
+		font-size: var(--text-xs);
+	}
+	.export button {
+		min-height: 28px;
+		padding: 0 10px;
+		color: var(--text);
+		background: var(--surface);
+		border: 1px solid var(--border-strong);
+		border-radius: var(--radius-sm);
+		font-size: var(--text-xs);
+		font-weight: 600;
+		cursor: pointer;
+	}
+	.export button:hover {
+		background: var(--surface-hover);
+	}
+	.why,
 	.note {
 		display: flex;
 		align-items: flex-start;
@@ -304,11 +360,16 @@
 		font-size: var(--text-xs);
 		line-height: 1.4;
 	}
-	.note :global(svg) {
+	.note :global(svg),
+	.why :global(svg) {
 		flex: none;
 		margin-top: 2px;
 		color: var(--warn);
 	}
+	.why :global(svg) {
+		color: var(--info);
+	}
+	.why code,
 	.note code {
 		padding: 0 3px;
 		color: var(--text);
