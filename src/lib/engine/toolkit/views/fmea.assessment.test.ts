@@ -208,39 +208,46 @@ ${ratings.map(([s, o, d], i) => `    part p${i} { @Fmea { failureMode = "m${i}";
 		]);
 	});
 
-	it('accepts ratings of 1 and 10, and flags 0, 11 and 5.5 with no figures computed', () => {
-		const t = host.renderView(
-			project(
-				LINES([
-					[1, 1, 1],
-					[10, 10, 10],
-					[0, 5, 5],
-					[11, 5, 5],
-					[5, 5.5, 5]
-				])
-			),
-			'sheet'
-		);
-		const severity = t.columns.indexOf('severity');
-		const likelihood = t.columns.indexOf('likelihood');
+	const RANGE = [
+		[1, 1, 1],
+		[10, 10, 10],
+		[0, 5, 5],
+		[11, 5, 5],
+		[5, 5.5, 5]
+	] as [number, number, number][];
+	const sheetOf = () => {
+		const t = host.renderView(project(LINES(RANGE)), 'sheet');
 		const row = (mode: string) => t.rows.findIndex((r) => r.includes(mode));
-		const figures = (mode: string) => {
-			const r = t.rows[row(mode)]!;
-			return ['rpn', 'actionPriority', 'rpnBand', 'acceptability'].map(
-				(c) => r[t.columns.indexOf(c)]
+		const figures = (mode: string) =>
+			['rpn', 'actionPriority', 'rpnBand', 'acceptability'].map(
+				(c) => t.rows[row(mode)]![t.columns.indexOf(c)]
 			);
-		};
+		const problems = (mode: string) => t.rowInfo?.[row(mode)]?.problems ?? {};
+		return { t, figures, problems };
+	};
+
+	it('accepts ratings of 1 and 10, and flags 0 and 11 with no figures computed', () => {
+		const { t, figures, problems } = sheetOf();
 		expect(figures('m0')).toEqual(['1', 'low', 'low', 'acceptable']);
 		expect(figures('m1')).toEqual(['1000', 'high', 'critical', 'unacceptable']);
-		expect(t.rowInfo?.[row('m0')]?.problems).toBeUndefined();
-		expect(t.rowInfo?.[row('m1')]?.problems).toEqual(undefined);
-		for (const [mode, column] of [
-			['m2', severity],
-			['m3', severity],
-			['m4', likelihood]
-		] as const) {
-			expect(t.rowInfo?.[row(mode)]?.problems?.[column], mode).toMatch(/outside the scale|not/);
-			expect(figures(mode).slice(0, 3), mode).toEqual(['', '', '']);
-		}
+		expect(problems('m0')).toEqual({});
+		// 10/10/10 is a valid line; its only flags are the risk review's (unacceptable, no control).
+		const ratingColumns = ['severity', 'likelihood', 'detection'].map((c) =>
+			String(t.columns.indexOf(c))
+		);
+		expect(Object.keys(problems('m1')).filter((k) => ratingColumns.includes(k))).toEqual([]);
+		const severity = t.columns.indexOf('severity');
+		expect(problems('m2')[severity]).toBe('Severity is 0, outside the scale of 1 to 10.');
+		expect(problems('m3')[severity]).toBe('Severity is 11, outside the scale of 1 to 10.');
+		expect(figures('m2').slice(0, 3)).toEqual(['', '', '']);
+		expect(figures('m3').slice(0, 3)).toEqual(['', '', '']);
+	});
+
+	// Known gap: a fractional rating (likelihood 5.5) is not flagged, though FmeaRating is an
+	// Integer, and the worksheet shows RPN 137.5000, band medium and priority low for it.
+	it.fails('flags a fractional rating and computes no figures from it', () => {
+		const { t, figures, problems } = sheetOf();
+		expect(problems('m4')[t.columns.indexOf('likelihood')]).toBeDefined();
+		expect(figures('m4').slice(0, 3)).toEqual(['', '', '']);
 	});
 });

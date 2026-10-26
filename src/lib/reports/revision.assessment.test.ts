@@ -49,7 +49,8 @@ describe('a report regenerated from a revision', { timeout: 60_000 }, () => {
 	});
 
 	it('shows the figures of the revision it is built from', () => {
-		// A later revision closes the SYS-005 gap; the earlier one still has it.
+		// A later revision gives SYS-005 a design element; with it the need SYS-005 derives from
+		// (STK-003, with SYS-004) is satisfied through its derived requirements too: 13 → 15 of 17.
 		const later = {
 			...demo,
 			'system/Satisfaction.sysml': demo['system/Satisfaction.sysml']!.replace(
@@ -58,7 +59,7 @@ describe('a report regenerated from a revision', { timeout: 60_000 }, () => {
 			)
 		};
 		expect(satisfied(demo)).toBe('76 %');
-		expect(satisfied(later)).toBe('82 %');
+		expect(satisfied(later)).toBe('88 %');
 		expect(markdown(later)).not.toBe(markdown(demo));
 	});
 
