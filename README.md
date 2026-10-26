@@ -40,26 +40,40 @@ scripts/fetch-toolkit.sh  # the SysML engine and its standard library into stati
 npm run dev               # http://localhost:5173
 ```
 
+To change Fairtide, see [CONTRIBUTING.md](CONTRIBUTING.md): setup, tests and
+their conventions, and releases.
+
 ## Testing
 
 ```sh
 npm test                  # unit tests (Vitest)
 npm run check && npm run lint && npm run format:check
+npx playwright install chromium   # once, before the first end-to-end run
 npm run test:e2e          # Playwright end to end, with axe accessibility checks (builds first)
 npm run build && npm run lighthouse   # Lighthouse budgets, mobile and desktop
 npm run bench             # performance on generated large models (docs/performance.md)
 ```
 
-CI (`.github/workflows/ci.yml`) runs the formatting, lint, type checks, unit
-tests, build and end-to-end tests; `lighthouse.yml` runs the Lighthouse
-budgets.
+CI (`.github/workflows/ci.yml`) audits the shipped dependencies and runs the
+formatting, lint, type checks, unit tests, build and end-to-end tests;
+`lighthouse.yml` runs the Lighthouse budgets. The conformance runner needs
+`scripts/fetch-conformance.sh` first (CONTRIBUTING.md).
 
 ## Deploying
 
-Every push to `main` builds the static site and publishes it to GitHub Pages
-(`.github/workflows/deploy.yml`, with `BASE_PATH=/sysml-web`). The site is
-plain files, so any static host works: `BASE_PATH=/your/path npm run build` and
-serve `build/`, falling back to `404.html` for unknown paths.
+Each push to `main` whose CI passes is built and published to GitHub Pages
+(`.github/workflows/deploy.yml`, with `BASE_PATH=/sysml-web`); a commit whose CI
+failed is never published. Releases are tagged by hand
+([CONTRIBUTING.md](CONTRIBUTING.md#releases), [CHANGELOG.md](CHANGELOG.md)).
+The site is plain files, so any static host works:
+`BASE_PATH=/your/path npm run build` and serve `build/`, falling back to
+`404.html` for unknown paths.
+
+The pages carry a Content-Security-Policy (`src/app.html`): scripts only from
+the site, any https host for connections (GitHub, the sign-in worker and the
+Systems Modeling API servers people enter). A host that sends its own policy
+header must allow at least the same, including `'wasm-unsafe-eval'` for the
+engine and `'unsafe-inline'` for SvelteKit's start-up script.
 
 **Sign in with GitHub** needs a GitHub App and a small Cloudflare worker
 (`worker/`); see [docs/setup-github-sign-in.md](docs/setup-github-sign-in.md).
@@ -69,6 +83,8 @@ Without them, people connect GitHub with a personal access token.
 
 | Doc | What it is for | Who it is for |
 | --- | --- | --- |
+| [Contributing](CONTRIBUTING.md) | Setting up, running the tests and their conventions, making a change, releases. | Developers |
+| [Changelog](CHANGELOG.md) and [security](SECURITY.md) | What each release changed; how to report a security problem. | Everyone |
 | [User guide](docs/user-guide.md) | Starting a project, the ideas in plain words, how to do the common jobs, shortcuts, where your data is kept. The same text as **Help** in the app. | Users |
 | [Risk analysis](docs/risk-analysis.md) | The FMEA and hazard libraries: each definition, the risk policy, reviews saved as views, how another tool reads them. | Modellers |
 | [Dependency matrices](docs/dsm.md) | The DSM and N² chart views: rows, links, suggested modules, change impact. | Modellers |

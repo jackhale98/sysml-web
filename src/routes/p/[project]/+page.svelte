@@ -117,8 +117,13 @@
 {#if missing}
 	<main class="missing">
 		<Logo size={32} />
-		<h1>Project not found</h1>
-		<p>It isn't stored in this browser. Projects live where you open them.</p>
+		{#if session.loadError}
+			<h1>Project can't be opened here</h1>
+			<p>{session.loadError}</p>
+		{:else}
+			<h1>Project not found</h1>
+			<p>It isn't stored in this browser. Projects live where you open them.</p>
+		{/if}
 		<a href={resolve('/projects')}>See your projects</a>
 	</main>
 {:else if Workbench}

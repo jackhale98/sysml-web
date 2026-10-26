@@ -49,7 +49,7 @@
 	} from '#lib/project/store.ts';
 	import Logo from '#lib/ui/Logo.svelte';
 	import { theme, type ThemeChoice } from '#lib/ui/theme.svelte.ts';
-	import { version } from '#lib/version.ts';
+	import { built, commit, version } from '#lib/version.ts';
 	import toolkitRelease from '../../../toolkit.json';
 	import {
 		editorFontSizeHere,
@@ -747,6 +747,12 @@
 						<dl>
 							<dt>App</dt>
 							<dd>{version}</dd>
+							<dt>Build</dt>
+							<dd>
+								{[commit && `commit ${commit}`, built && `built ${built}`]
+									.filter(Boolean)
+									.join(', ') || '—'}
+							</dd>
 							<dt>Engine</dt>
 							<dd>
 								<!-- eslint-disable svelte/no-navigation-without-resolve -- external links -->

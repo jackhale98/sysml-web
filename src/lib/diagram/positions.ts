@@ -8,9 +8,28 @@
  * off it (`"#hidden": [ids]`) and, for a diagram that is not a saved view,
  * elements added to it (`"#added": [qualified names]`). A saved view says
  * what it shows in its `expose` lines instead, where it can.
+ *
+ * The file says which version of this format it is in (`"#format": 1`);
+ * files written before it did are version 1. Readers ignore keys they
+ * don't know, so an addition keeps the number; a change older readers
+ * would misread raises it.
  */
 
 export const LAYOUT_FILE = 'layout/diagrams.json';
+
+/** The layout file's format version, written as `"#format"`. */
+export const LAYOUT_FORMAT = 1;
+const FORMAT = '#format';
+
+/** The format version a layout file says it is in (1 when it says none, or isn't JSON). */
+export function layoutFormat(text: string | undefined): number {
+	try {
+		const format = (JSON.parse(text ?? '') as Record<string, unknown> | null)?.[FORMAT];
+		return typeof format === 'number' && Number.isInteger(format) && format > 0 ? format : 1;
+	} catch {
+		return 1;
+	}
+}
 
 export type Point = [number, number];
 export type DiagramPositions = Record<string, Point>;
@@ -95,7 +114,10 @@ export function parseShown(text: string | undefined): ShownFile {
 	return file;
 }
 
-/** Stable, diff-friendly JSON: one node per line, keys sorted; what is hidden or added first. */
+/**
+ * Stable, diff-friendly JSON: the format version, then one node per line,
+ * keys sorted; what is hidden or added first. Nothing to keep is `{}`.
+ */
 export function serializeLayout(file: LayoutFile, shown: ShownFile = {}): string {
 	const keys = [...new Set([...Object.keys(file), ...Object.keys(shown)])]
 		.filter(
@@ -119,7 +141,7 @@ export function serializeLayout(file: LayoutFile, shown: ShownFile = {}): string
 		}
 		return `\t${JSON.stringify(key)}: {\n${lines.join(',\n')}\n\t}`;
 	});
-	return `{\n${diagrams.join(',\n')}\n}\n`;
+	return `{\n\t"${FORMAT}": ${LAYOUT_FORMAT},\n${diagrams.join(',\n')}\n}\n`;
 }
 
 /** The file with one diagram's hidden and added elements changed (unknown ids kept as they are). */

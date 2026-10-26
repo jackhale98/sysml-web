@@ -49,6 +49,7 @@ export type ToolkitOutbound =
 	| { type: 'ready'; stats: ToolkitStats }
 	/** Booting failed, or the instance trapped: the worker can't be used again. */
 	| { type: 'fatal'; error: string }
-	| { type: 'result'; id: number; ok: true; result: unknown }
-	| { type: 'result'; id: number; ok: false; error: string; fatal?: boolean }
+	/** `memoryMiB`: the worker's WebAssembly memory once the call is done. */
+	| { type: 'result'; id: number; ok: true; result: unknown; memoryMiB?: number }
+	| { type: 'result'; id: number; ok: false; error: string; fatal?: boolean; memoryMiB?: number }
 	| { type: 'prefetched'; cached: boolean; error?: string };

@@ -10,7 +10,7 @@ import { demoProject } from './demo.ts';
 import { planFolderSave, sameConflicts, settleFolderSave, type FolderPlan } from './folderSync.ts';
 import { leaveRisk, type LeaveRisk } from './pending.ts';
 import { download, readFolder, writeToFolder } from './sources.ts';
-import { loadProject, saveProject, timestamp, type StoredProject } from './store.ts';
+import { NEWER_FORMAT, loadProject, saveProject, timestamp, type StoredProject } from './store.ts';
 import type { ProjectFile, ProjectSource, Workspace } from './workspace.svelte.ts';
 
 const AUTOSAVE_MS = 600;
@@ -33,6 +33,8 @@ export class ProjectSession {
 	record = $state.raw<StoredProject | null>(null);
 	saveState = $state<SaveState>('idle');
 	saveError = $state<string | null>(null);
+	/** Why the stored project couldn't be read (a newer version saved it), when it couldn't. */
+	loadError = $state<string | null>(null);
 	/** Files changed since the folder was last written (folder projects). */
 	unsavedToFolder = $state.raw<string[]>([]);
 	/** A save to the folder waiting for the person to choose, for files changed in the folder too. */
@@ -93,7 +95,11 @@ export class ProjectSession {
 
 	/** The project with this id: stored in the browser, or the bundled demo. */
 	async load(id: string): Promise<ProjectSource | null> {
-		const stored = await loadProject(id).catch(() => undefined);
+		const stored = await loadProject(id).catch((error: unknown) => {
+			if (error instanceof Error && error.message === NEWER_FORMAT) this.loadError = error.message;
+			return undefined;
+		});
+		if (this.loadError) return null;
 		if (stored) {
 			this.record = stored;
 			this.stamp = stored.updated;

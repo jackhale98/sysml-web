@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { copyFile } from 'node:fs/promises';
 import adapter from '@sveltejs/adapter-static';
@@ -26,6 +27,27 @@ function previewFallback(): Plugin {
 	};
 }
 
+/** The commit being built (Settings → About), or '' outside a git checkout. */
+function commit(): string {
+	try {
+		return execFileSync('git', ['rev-parse', '--short=10', 'HEAD'], {
+			stdio: ['ignore', 'pipe', 'ignore']
+		})
+			.toString()
+			.trim();
+	} catch {
+		return process.env.GITHUB_SHA?.slice(0, 10) ?? '';
+	}
+}
+
+/** The build's date (UTC), or the date `SOURCE_DATE_EPOCH` gives, for a reproducible build. */
+function buildDate(): string {
+	const epoch = Number(process.env.SOURCE_DATE_EPOCH);
+	return new Date(Number.isFinite(epoch) && epoch > 0 ? epoch * 1000 : Date.now())
+		.toISOString()
+		.slice(0, 10);
+}
+
 // SvelteKit 3 reads its configuration from the `sveltekit()` plugin (svelte.config.js is unsupported).
 export default defineConfig({
 	plugins: [
@@ -51,6 +73,10 @@ export default defineConfig({
 		}),
 		previewFallback()
 	],
+	define: {
+		__APP_COMMIT__: JSON.stringify(commit()),
+		__APP_BUILT__: JSON.stringify(buildDate())
+	},
 	test: {
 		environment: 'node',
 		include: ['src/**/*.test.ts', 'tests/unit/**/*.test.ts', 'worker/src/**/*.test.ts']

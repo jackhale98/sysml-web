@@ -12,3 +12,4 @@ README.md
 /src/demo/**/*.sysml
 /.lighthouseci
 .wrangler
+/src/lib/project/fixtures/formats

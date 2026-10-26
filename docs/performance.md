@@ -227,14 +227,52 @@ column are the 2026-10-22 figures.
 | WebAssembly memory | 333 | 333 | 1153 | 1153 |
 
 The numbers hold, except the checks at 50k lines: 4.3–4.5 s rather than
-2.8–2.9 s. That one hasn't been looked into yet; treat the 50k and 100k
-checks figures above as optimistic.
+2.8–2.9 s. The cause was found by the assessment (§10) and fixed on
+2026-10-26, below.
+
+## The metadata checks, fixed on 2026-10-26
+
+The app's own checks on metadata values (`views/annotationChecks.ts`, part
+of every checks call since the risk libraries) asked
+`metadataDefinition` (`views/domains.ts`) for each annotation's metadata
+definition, and that scanned every annotation and every element of the model
+each time: quadratic in the number of annotations (44 ms at 10k, 1.4 s at
+50k, 6.4 s at 100k in the assessment's run). It is now worked out once per
+metadata type and analysis, as the types' value ranges already were.
+
+Measured with the assessment's benchmark, before (the commit before the fix)
+and after, in turns on the same machine through the shared test gate (load
+average 1.4–2.2; this machine ran about 1.5× slower than in the
+assessment's run, so read before against after):
+
+```sh
+ASSESS_SIZES=10000,50000 ASSESS_RUNS=3 npx vitest run --config tests/perf/assessment-vitest.config.ts
+```
+
+| ms, median of 3 (max) | 10k before | 10k after | 50k before | 50k after |
+| --- | ---: | ---: | ---: | ---: |
+| metadata checks alone (`checks.annotationChecksOnly`) | 71 (97) | 1.5 (2.1) | 2946 (3070) | 13 (14) |
+| checks, on their own (`checks.fresh`) | 583 (691) | 491 (505) | 6998 (7101) | 3845 (4137) |
+| open: checks | 610 (657) | 519 (621) | 6880 (7007) | 4190 (4412) |
+| keystroke: checks | 591 (732) | 503 (504) | 6647 (6782) | 3985 (4116) |
+| open: analysis (unchanged) | 1282 (1800) | 1223 (1685) | 9127 (9429) | 8057 (9740) |
+
+The metadata checks are timed on a fresh view context of the analysis (as
+after an edit); the 2,122 annotations at 50k (456 at 10k) give no problems
+either way. Against the analysis of the same run, the checks at 50k went
+from 0.75 of its time to 0.52 (0.40 on 2026-10-22); the rest of the
+2026-10-23 increase is not attributed (more checks per analysis since, such
+as requirement IDs). 100k was not re-run. These figures are without the
+change, made beside this one, that has each check look up its own inputs and
+check a definition's assertions for every part that has it; the checks are
+to be measured again with both.
 
 ## Remaining limits
 
 - **Every keystroke re-analyses the whole project** in the toolkit: about
   1.1 s at 10k lines, 7 s at 50k and 16 s at 100k, then the checks (0.5 s,
-  3 s, 5 s; 4.3 s at 50k on 2026-10-23, see above). Session, `check()` and
+  3 s, 5 s; 4.3 s at 50k on 2026-10-23 until the metadata checks were fixed,
+  see above). Session, `check()` and
   the adapter's first reads are each linear in the project; the incremental
   path (`fromSourcesSettled`) saves nothing measurable. Upstream request 12.
   The app keeps it from piling up (one analysis at a time, a longer pause
@@ -245,7 +283,12 @@ checks figures above as optimistic.
 - **Memory.** The instance can't grow past 2 GiB; 100k lines takes about
   1.8 GiB after an edit, the checks and a hover (and on a phone the browser
   may refuse much less). A project much over 100k lines will run out.
-  Upstream request 14.
+  Once the engine's memory passes 1,600 MiB the app says so, once, with
+  what to do (`MEMORY_WARNING_MIB`, `docs/engine.md`). Upstream request 14.
+- **A stuck call.** Each engine call has a time limit (one, five or ten
+  minutes by kind, from the 100k figures on a slowed browser); one that
+  passes it fails with a plain message and the worker is replaced
+  (`docs/engine.md`, "When the toolkit fails").
 - **One worker.** Highlighting, completion and hover wait while an analysis
   or the checks run. A second, syntax-only worker would let highlighting
   through; completion and hover need the analysed model. Upstream request 15.

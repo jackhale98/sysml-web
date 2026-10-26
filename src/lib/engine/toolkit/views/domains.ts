@@ -44,6 +44,7 @@ const MAX_VALUES = 100;
 
 const domains = new WeakMap<ViewContext, Map<string, Domain | null>>();
 const invariantsOf = new WeakMap<ViewContext, Map<string, Invariant[]>>();
+const metadataDefs = new WeakMap<ViewContext, Map<string, string | null>>();
 
 /** The values a field of the rows may take, when its type bounds them. */
 export function fieldDomain(ctx: ViewContext, rowsSpec: string, field: string): Domain | null {
@@ -63,6 +64,16 @@ export function fieldType(ctx: ViewContext, rowsSpec: string, field: string): st
 
 /** The metadata def an annotation type names (`Fmea`, `RiskAnalysis::Fmea`). */
 export function metadataDefinition(ctx: ViewContext, meta: string): string | null {
+	// Asked once per annotation by the checks: without the cache, every annotation scans them all.
+	let cache = metadataDefs.get(ctx);
+	if (!cache) metadataDefs.set(ctx, (cache = new Map()));
+	if (cache.has(meta)) return cache.get(meta)!;
+	const def = findMetadataDefinition(ctx, meta);
+	cache.set(meta, def);
+	return def;
+}
+
+function findMetadataDefinition(ctx: ViewContext, meta: string): string | null {
 	const simple = unquoteName(simpleName(meta));
 	const used = ctx.annotations.find(
 		(a) => unquoteName(simpleName(a.metadata_type)) === simple && a.metadata_qualified_type

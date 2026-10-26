@@ -4,7 +4,7 @@ import { SNAPSHOT_CACHE } from '#lib/offline/caching.ts';
 import { toasts } from '#lib/ui/toasts.svelte.ts';
 import toolkitRelease from '../../../toolkit.json';
 import { toolkitEngine, type Engine } from './client';
-import { startToolkit, type ToolkitClient } from './toolkit/client';
+import { memoryWarning, startToolkit, type ToolkitClient } from './toolkit/client';
 
 let engine: Engine | undefined;
 let toolkit: ToolkitClient | undefined;
@@ -48,7 +48,9 @@ export function getEngine(): Engine {
 			toasts.show('Fairtide stopped reading the model. Reload the page to try again.', {
 				tone: 'error',
 				duration: 0
-			})
+			}),
+		onTooLong: (message) => toasts.show(message, { tone: 'error', duration: 0 }),
+		onMemoryHigh: (mib) => toasts.show(memoryWarning(mib), { tone: 'info', duration: 0 })
 	});
 	engine = toolkitEngine(toolkit);
 	return engine;

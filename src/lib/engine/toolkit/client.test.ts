@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { startToolkit } from './client';
+import { MEMORY_WARNING_MIB, memoryWarning, startToolkit } from './client';
 import type { ToolkitInbound, ToolkitOutbound } from './protocol';
 
 /** A stand-in worker that answers as a script says. */
@@ -137,5 +137,33 @@ describe('startToolkit', () => {
 		client.prefetchSnapshot();
 		await client.call('version');
 		expect(workers[0]!.received.map((m) => m.type)).toContain('prefetch');
+	});
+
+	it('warns once when the engine nears its memory ceiling', async () => {
+		const onMemoryHigh = vi.fn();
+		let used = 1100;
+		const client = startToolkit(init, {
+			onMemoryHigh,
+			createWorker: () =>
+				new FakeWorker((w, m) => {
+					if (m.type === 'init') w.reply({ type: 'ready', stats });
+					if (m.type === 'call')
+						w.reply({ type: 'result', id: m.id, ok: true, result: null, memoryMiB: used });
+				}) as unknown as Worker
+		});
+		await client.call('analyzeProject', []);
+		expect(onMemoryHigh).not.toHaveBeenCalled();
+		used = 1780;
+		await client.call('analyzeProject', []);
+		used = 1950;
+		await client.call('checks', []);
+		expect(onMemoryHigh).toHaveBeenCalledTimes(1);
+		expect(onMemoryHigh).toHaveBeenCalledWith(1780);
+		expect(MEMORY_WARNING_MIB).toBeLessThan(1780);
+		expect(memoryWarning(1780)).toBe(
+			'This project is close to the most Fairtide can hold in a browser tab (1.7 of 2 GB used). ' +
+				'If it grows much more, the model will stop updating. Move parts of it into separate projects; ' +
+				'reloading the page frees some memory for a while.'
+		);
 	});
 });

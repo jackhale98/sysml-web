@@ -1,0 +1,61 @@
+name: Release
+
+# Tags a release by hand: Actions → Release → Run workflow, on main. It takes
+# the version in package.json, checks that CI passed for the commit, that the
+# tag doesn't exist yet and that CHANGELOG.md has a section for the version,
+# then tags the commit `v<version>` and publishes a GitHub release with that
+# section as its notes. See CONTRIBUTING.md, "Releases".
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read the version and its changelog section
+        id: version
+        run: |
+          version=$(node -p "require('./package.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          # The lines under "## <version>" up to the next "## " heading.
+          awk -v v="$version" '
+            $0 ~ "^## " { if (found) exit; if (index($0, "## " v) == 1) { found = 1; next } }
+            found { print }
+          ' CHANGELOG.md > notes.md
+          if ! grep -q '[^[:space:]]' notes.md; then
+            echo "::error::CHANGELOG.md has no section for $version."
+            exit 1
+          fi
+
+      - name: Check the tag is new and CI passed for this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: v${{ steps.version.outputs.version }}
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" > /dev/null; then
+            echo "::error::$TAG exists already; raise the version in package.json first."
+            exit 1
+          fi
+          conclusion=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${GITHUB_SHA}&event=push&per_page=1" \
+            --jq '.workflow_runs[0].conclusion // "none"')
+          if [ "$conclusion" != "success" ]; then
+            echo "::error::CI has not passed for ${GITHUB_SHA} (latest run: ${conclusion})."
+            exit 1
+          fi
+
+      - name: Tag and publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: v${{ steps.version.outputs.version }}
+        run: gh release create "$TAG" --target "$GITHUB_SHA" --title "Fairtide $TAG" --notes-file notes.md
