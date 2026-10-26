@@ -8,11 +8,17 @@
  * - `GET  /projects/{p}/commits/{c}/elements` (paged: the `Link` header's `rel="next"`)
  * - `POST /projects/{p}/commits?branchId={b}` with `{"@type": "Commit", "change": [DataVersion…]}`
  *
+ * SysON (2026.9) departs from the pilot in what it takes: a project's name
+ * as `?name=` (both are sent), an identity typed `"DataIdentity"` (the
+ * specification's type, always sent), and for an element it has, only the
+ * properties that change (`minimalPayloads`, for servers under `/api/rest`).
+ * What a server keeps is checked by reading it back (`sync.ts`, `push`).
+ *
  * The browser calls the server directly (there is no proxy), so the server
  * must allow this page's origin (CORS; see docs/interchange.md). A token, when
  * given, goes only to this server, as `Authorization: Bearer …`.
  */
-import type { ElementJson } from './elements';
+import { changedProperties, type ElementJson } from './elements';
 
 export interface ApiProject {
 	id: string;
@@ -40,7 +46,7 @@ export interface ApiCommit {
 /** A change to one element: its new version, or `payload: null` to delete it. */
 export interface DataVersion {
 	'@type': 'DataVersion';
-	identity: { '@id': string };
+	identity: { '@type': 'DataIdentity'; '@id': string };
 	payload: ElementJson | null;
 }
 
@@ -78,6 +84,15 @@ export function normalizeBase(url: string): string {
 	return parsed.href.replace(/\/+$/, '');
 }
 
+/** Whether two addresses are on the same site (scheme, host and port). */
+export function sameOrigin(a: string, b: string): boolean {
+	try {
+		return new URL(a).origin === new URL(b).origin;
+	} catch {
+		return false;
+	}
+}
+
 /** The `rel="next"` URL of a `Link` header (RFC 8288), resolved against the request. */
 export function nextLink(header: string | null, request: string): string | null {
 	if (!header) return null;
@@ -99,6 +114,16 @@ export class SysmlApi {
 		this.fetcher = fetcher ?? ((...args) => fetch(...args));
 	}
 
+	/**
+	 * Whether a change to an element it has sends only the properties that
+	 * change. SysON (whose API is under `/api/rest`) fails a commit carrying a
+	 * whole element; the pilot replaces an element with its payload, so it
+	 * gets whole elements.
+	 */
+	get minimalPayloads(): boolean {
+		return /\/api\/rest$/.test(new URL(this.base).pathname);
+	}
+
 	/** Where the server is, in words: its host. */
 	get host(): string {
 		return new URL(this.base).host;
@@ -111,7 +136,8 @@ export class SysmlApi {
 	): Promise<{ data: unknown; link: string | null }> {
 		const headers: Record<string, string> = { Accept: 'application/json' };
 		if (body !== undefined) headers['Content-Type'] = 'application/json';
-		if (this.token) headers.Authorization = `Bearer ${this.token}`;
+		// The token is for this server only: never for an address elsewhere.
+		if (this.token && sameOrigin(url, this.base)) headers.Authorization = `Bearer ${this.token}`;
 		let response: Response;
 		try {
 			response = await this.fetcher(url, {
@@ -132,10 +158,7 @@ export class SysmlApi {
 			try {
 				data = JSON.parse(raw);
 			} catch {
-				throw new ApiError(
-					'format',
-					`The server answered with something other than JSON. Is ${this.base} the address of a SysML v2 API (for SysON, it ends in /api/rest)?`
-				);
+				throw notJson(method, this.base, raw);
 			}
 		}
 		return { data, link: nextLink(response.headers.get('Link'), url) };
@@ -151,6 +174,12 @@ export class SysmlApi {
 				throw new ApiError('format', `The server’s answer to ${path} is not a list.`);
 			items.push(...data);
 			onPage?.(items.length);
+			// A next page elsewhere is not followed: the token (and the request) stay with this server.
+			if (link && !sameOrigin(link, this.base))
+				throw new ApiError(
+					'format',
+					`The server sent the next page of ${path} on another site (${new URL(link).host}). It was not read there: only ${this.host} is trusted with this connection.`
+				);
 			url = link;
 		}
 		return items;
@@ -164,12 +193,18 @@ export class SysmlApi {
 		return toProject((await this.request('GET', `${this.base}/projects/${enc(id)}`)).data);
 	}
 
+	/** A new project: its name both in the body (the pilot) and as `?name=` (SysON). */
 	async createProject(name: string, description = ''): Promise<ApiProject> {
-		const { data } = await this.request('POST', `${this.base}/projects`, {
-			'@type': 'Project',
-			name,
-			description
-		});
+		const { data } = await this.request(
+			'POST',
+			`${this.base}/projects?${new URLSearchParams({ name })}`,
+			{ '@type': 'Project', name, description }
+		);
+		if (data === null)
+			throw new ApiError(
+				'server',
+				'The server answered without the project it should have made, so it most likely made none.'
+			);
 		return toProject(data);
 	}
 
@@ -199,20 +234,24 @@ export class SysmlApi {
 		);
 	}
 
-	/** A new commit on a branch (the default branch when `branchId` is null). */
+	/**
+	 * A new commit on a branch (the default branch when `branchId` is null).
+	 * Null when the server answered without one (SysON does, for a commit it
+	 * failed): only reading it back tells what it kept.
+	 */
 	async commit(
 		projectId: string,
 		branchId: string | null,
 		change: DataVersion[],
 		description: string
-	): Promise<ApiCommit> {
+	): Promise<ApiCommit | null> {
 		const query = branchId ? `?branchId=${enc(branchId)}` : '';
 		const { data } = await this.request(
 			'POST',
 			`${this.base}/projects/${enc(projectId)}/commits${query}`,
 			{ '@type': 'Commit', description, change }
 		);
-		return toCommit(data);
+		return data === null ? null : toCommit(data);
 	}
 }
 
@@ -268,6 +307,24 @@ export function unreachable(base: string): string {
 	return `No answer from ${base}. Either the server isn’t reachable at that address, or it doesn’t allow requests from ${origin} (CORS). Ask whoever runs it to allow this origin; the help says which headers it needs.`;
 }
 
+/**
+ * A 2xx answer that isn't JSON. To a read, that is usually a web site's page
+ * at an address that isn't the API's (SysON answers its app for any unknown
+ * path); to a change, a server that didn't take the request.
+ */
+function notJson(method: string, base: string, raw: string): ApiError {
+	const page = /^\s*<(!doctype|html)/i.test(raw);
+	if (method === 'GET')
+		return new ApiError(
+			'format',
+			`The server answered with ${page ? 'a web page' : 'something'} other than JSON. Is ${base} the address of a SysML v2 API (for SysON, it ends in /api/rest)?`
+		);
+	return new ApiError(
+		'format',
+		`The server didn’t take the request: it answered with ${page ? 'a web page' : 'something other than JSON'} instead of the API’s answer, which is what it does for a request it doesn’t understand.`
+	);
+}
+
 function statusError(status: number, method: string, detail: string): ApiError {
 	const said = detail ? ` (${detail.replace(/\s+/g, ' ').slice(0, 160)})` : '';
 	if (status === 401 || status === 403)
@@ -299,24 +356,42 @@ function statusError(status: number, method: string, detail: string): ApiError {
 	);
 }
 
-/** Data versions for a change set: new and changed elements as payloads, removed ones as `null`. */
-export function dataVersions(changes: {
-	created: ElementJson[];
-	updated: ElementJson[];
-	deleted: string[];
-}): DataVersion[] {
+/**
+ * Data versions for a change set: new and changed elements as payloads,
+ * removed ones as `null`. With `minimalAgainst` (the server's elements), a
+ * changed element's payload holds only `@id`, `@type` and the properties
+ * whose value differs from the server's.
+ */
+export function dataVersions(
+	changes: {
+		created: ElementJson[];
+		updated: ElementJson[];
+		deleted: string[];
+	},
+	minimalAgainst?: readonly ElementJson[]
+): DataVersion[] {
+	const theirs = minimalAgainst && new Map(minimalAgainst.map((e) => [e['@id'], e]));
+	const version = (payload: ElementJson | null, id: string): DataVersion => ({
+		'@type': 'DataVersion',
+		identity: { '@type': 'DataIdentity', '@id': id },
+		payload
+	});
 	return [
-		...[...changes.created, ...changes.updated].map((payload): DataVersion => ({
-			'@type': 'DataVersion',
-			identity: { '@id': payload['@id'] },
-			payload
-		})),
-		...changes.deleted.map((id): DataVersion => ({
-			'@type': 'DataVersion',
-			identity: { '@id': id },
-			payload: null
-		}))
+		...changes.created.map((payload) => version(payload, payload['@id'])),
+		...changes.updated.map((payload) => {
+			const old = theirs?.get(payload['@id']);
+			return version(old ? changedOnly(payload, old) : payload, payload['@id']);
+		}),
+		...changes.deleted.map((id) => version(null, id))
 	];
+}
+
+/** `next` cut down to its identity and the properties whose value isn't `old`'s. */
+function changedOnly(next: ElementJson, old: ElementJson): ElementJson {
+	const out: ElementJson = { '@id': next['@id'], '@type': next['@type'] };
+	for (const property of changedProperties(next, old))
+		if (property !== '@type') out[property] = next[property];
+	return out;
 }
 
 /**

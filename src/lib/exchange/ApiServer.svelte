@@ -35,7 +35,6 @@
 	import {
 		ApiError,
 		connectTo,
-		dataVersions,
 		type ApiBranch,
 		type ApiCommit,
 		type ApiProject,
@@ -53,6 +52,7 @@
 		planPush,
 		push,
 		pushPlanAgainst,
+		SaveNotKept,
 		weaveMerge,
 		type MergeOutcome,
 		type MergeSave,
@@ -273,7 +273,7 @@
 		if (!api || !project || !plan) return;
 		const changes = changeCount(plan.changes);
 		await attempt('Saving…', async () => {
-			const commit = await push(api!, project!.id, branch, plan!, description.trim() || 'Saved');
+			const commit = await pushKept(plan!, description.trim() || 'Saved');
 			if (localId) apiServers.setLink(localId, linkFor(commit.id));
 			toasts.show(
 				`Saved to ${project!.name} on ${api!.host}: ${changes} ${changes === 1 ? 'change' : 'changes'}.`,
@@ -338,12 +338,7 @@
 			const message = description.trim() || 'Saved';
 			let commit: { description: string; changes: number } | null = null;
 			if (changes) {
-				const made = await api!.commit(
-					project!.id,
-					branch?.id ?? null,
-					dataVersions(pushing.changes),
-					message
-				);
+				const made = await pushKept(pushing, message);
 				if (localId) apiServers.setLink(localId, linkFor(made.id));
 				commit = { description: message, changes };
 			}
@@ -366,6 +361,22 @@
 			const branchesNow = await api!.branches(project!.id).catch(() => null);
 			if (branchesNow) branches = branchesNow;
 		});
+	}
+
+	/**
+	 * Send a planned change and check the server kept it (`push`). When it
+	 * didn't, this project is linked to what the server holds now (its next
+	 * save compares with that) and the error names what is missing.
+	 */
+	async function pushKept(planned: PushPlan, message: string) {
+		busy = 'Saving, then checking what the server kept…';
+		try {
+			return await push(api!, project!.id, branch, planned, message);
+		} catch (e) {
+			if (e instanceof SaveNotKept && localId && e.head)
+				apiServers.setLink(localId, linkFor(e.head));
+			throw e;
+		}
 	}
 
 	/** Their changes into the project's files, as one undoable step; gives the files after. */

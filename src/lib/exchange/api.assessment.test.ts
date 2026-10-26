@@ -8,8 +8,7 @@ import { describe, expect, it } from 'vitest';
 import { SysmlApi } from './api';
 
 describe('the API token', () => {
-	// Known gap: the token is sent to whatever host a "next page" Link header names, not only to the server it was given for.
-	it.fails('is not sent to another host named by a "next page" link', async () => {
+	it('is not sent to another host named by a "next page" link', async () => {
 		const sent: { host: string; auth: string | null }[] = [];
 		const fetch = (async (input: string | URL | Request, init?: RequestInit) => {
 			const url = new URL(String(input));
@@ -24,9 +23,15 @@ describe('the API token', () => {
 			return new Response('[]', { headers: { 'content-type': 'application/json' } });
 		}) as typeof globalThis.fetch;
 		const api = new SysmlApi('https://sysml.example.org', 'secret-token', fetch);
-		await api.projects().catch(() => undefined);
+		const error = await api.projects().then(
+			() => null,
+			(e: unknown) => e as Error
+		);
 		expect(sent[0]).toEqual({ host: 'sysml.example.org', auth: 'Bearer secret-token' });
 		expect(sent.filter((s) => s.host !== 'sysml.example.org' && s.auth)).toEqual([]);
+		// The page elsewhere is not read (a list cut short would be worse), and that is said.
+		expect(sent.map((s) => s.host)).toEqual(['sysml.example.org']);
+		expect(error?.message).toMatch(/another site \(elsewhere\.example\.net\)/);
 	});
 
 	it('is sent to the server it was given for, and is not part of any address', async () => {

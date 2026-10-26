@@ -10,6 +10,13 @@ export interface ZipEntry {
 	/** Path inside the archive, forward slashes. */
 	path: string;
 	data: Uint8Array;
+	/** Read entries only: the data doesn't match the CRC-32 the archive records for it. */
+	damaged?: boolean;
+}
+
+export interface UnzipOptions {
+	/** Most bytes all entries may unpack to; past it, the archive is refused (a ZIP bomb, or simply too big). */
+	maxTotal?: number;
 }
 
 const LOCAL = 0x04034b50;
@@ -40,11 +47,50 @@ async function transform(data: Uint8Array, stream: CompressionStream | Decompres
 	return new Uint8Array(await new Response(output).arrayBuffer());
 }
 
+/** Inflate `data`, giving up (null) once the output passes `limit` bytes. */
+async function inflate(data: Uint8Array, limit: number): Promise<Uint8Array | null> {
+	const reader = new Blob([data as BlobPart])
+		.stream()
+		.pipeThrough(new DecompressionStream('deflate-raw'))
+		.getReader();
+	const chunks: Uint8Array[] = [];
+	let total = 0;
+	for (;;) {
+		const { done, value } = await reader.read();
+		if (done) break;
+		total += value.length;
+		if (total > limit) {
+			await reader.cancel().catch(() => undefined);
+			return null;
+		}
+		chunks.push(value);
+	}
+	const out = new Uint8Array(total);
+	let at = 0;
+	for (const chunk of chunks) {
+		out.set(chunk, at);
+		at += chunk.length;
+	}
+	return out;
+}
+
+const megabytes = (n: number) => `${Math.round(n / 1e6).toLocaleString('en')} MB`;
+
 /**
  * Read every file in a ZIP archive (folders are left out). Throws a readable
- * error for anything else; `hint` is added to the "not a ZIP" message.
+ * error for anything else; `hint` is added to the "not a ZIP" message. An
+ * entry whose data fails its CRC-32 is kept and marked `damaged`.
  */
-export async function unzip(bytes: Uint8Array, hint = ''): Promise<ZipEntry[]> {
+export async function unzip(
+	bytes: Uint8Array,
+	hint = '',
+	options: UnzipOptions = {}
+): Promise<ZipEntry[]> {
+	const maxTotal = options.maxTotal ?? Infinity;
+	const tooBig = () =>
+		new Error(
+			`This archive unpacks to more than ${megabytes(maxTotal)}, more than this app opens. It was not opened.`
+		);
 	const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 	let end = -1;
 	for (let i = bytes.length - 22; i >= Math.max(0, bytes.length - 22 - 0xffff); i--) {
@@ -58,12 +104,15 @@ export async function unzip(bytes: Uint8Array, hint = ''): Promise<ZipEntry[]> {
 	let at = view.getUint32(end + 16, true);
 	const names = new TextDecoder();
 	const entries: ZipEntry[] = [];
+	let unpacked = 0;
 	for (let i = 0; i < count; i++) {
 		if (at + 46 > bytes.length || view.getUint32(at, true) !== CENTRAL) {
 			throw new Error('The ZIP file is damaged.');
 		}
 		const method = view.getUint16(at + 10, true);
+		const crc = view.getUint32(at + 16, true);
 		const compressed = view.getUint32(at + 20, true);
+		const size = view.getUint32(at + 24, true);
 		const nameLength = view.getUint16(at + 28, true);
 		const extraLength = view.getUint16(at + 30, true);
 		const commentLength = view.getUint16(at + 32, true);
@@ -74,11 +123,18 @@ export async function unzip(bytes: Uint8Array, hint = ''): Promise<ZipEntry[]> {
 		if (view.getUint32(local, true) !== LOCAL) throw new Error('The ZIP file is damaged.');
 		const start = local + 30 + view.getUint16(local + 26, true) + view.getUint16(local + 28, true);
 		const raw = bytes.subarray(start, start + compressed);
+		// What the archive says it unpacks to is checked first; the inflating itself is capped too.
+		if (unpacked + size > maxTotal) throw tooBig();
 		let data: Uint8Array;
 		if (method === 0) data = raw.slice();
-		else if (method === 8) data = await transform(raw, new DecompressionStream('deflate-raw'));
-		else throw new Error(`${path} uses a ZIP compression this app cannot read.`);
-		entries.push({ path, data });
+		else if (method === 8) {
+			const inflated = await inflate(raw, maxTotal - unpacked);
+			if (!inflated) throw tooBig();
+			data = inflated;
+		} else throw new Error(`${path} uses a ZIP compression this app cannot read.`);
+		unpacked += data.length;
+		if (unpacked > maxTotal) throw tooBig();
+		entries.push(crc32(data) === crc ? { path, data } : { path, data, damaged: true });
 	}
 	return entries;
 }

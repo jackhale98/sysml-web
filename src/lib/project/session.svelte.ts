@@ -385,13 +385,19 @@ export class ProjectSession {
 		await this.save();
 	}
 
-	/** Download the project as a `.kpar` (KerML 10.3 project interchange). */
-	async exportKpar() {
+	/**
+	 * Download the project as a `.kpar` (KerML 10.3 project interchange).
+	 * Gives the bundled libraries written in because the project uses them
+	 * without holding them (`ModelViews`, `Reporting`).
+	 */
+	async exportKpar(): Promise<string[]> {
 		const info = this.workspace.info ?? this.record?.info ?? { name: 'project' };
-		const { writeKpar } = await import('#lib/interchange/kpar.ts');
-		const bytes = await writeKpar(info, this.files(), timestamp());
+		const { bundledLibrariesUsed, writeKpar } = await import('#lib/interchange/kpar.ts');
+		const files = this.files();
+		const bytes = await writeKpar(info, files, timestamp());
 		const name = (info.name || 'project').replace(/[^\w.-]+/g, '-');
 		download(`${name}.kpar`, bytes, 'application/zip');
 		if (this.record) noteDownloaded(this.record.id);
+		return bundledLibrariesUsed(files).map((lib) => lib.package);
 	}
 }

@@ -5,14 +5,17 @@
 	 * page, which reopens what the person was doing). Making a fine-grained
 	 * access token, explained step by step for people who have never made
 	 * one, is always available: as the quieter fallback, or on its own when
-	 * sign-in isn't set up.
+	 * sign-in isn't set up. With a GitHub Enterprise Server set in Settings
+	 * (`githubServer`), only the token: it is made on, and sent only to, that
+	 * server ("Sign in with GitHub" is github.com's).
 	 */
 	import { ChevronRight, ExternalLink, Eye, EyeOff, LoaderCircle, Lock } from '@lucide/svelte';
 	import { pwa } from '#lib/offline/pwa.svelte.ts';
+	import { settings } from '#lib/settings/settings.svelte.ts';
 	import { accounts } from './account.svelte.ts';
 	import { messageOf } from './errors.ts';
 	import GitHubMark from './GitHubMark.svelte';
-	import { tokenUrl } from './github.ts';
+	import { GITHUB_API, githubApi, tokenUrl } from './github.ts';
 	import type { Resume } from './oauth.ts';
 	import { SIGN_IN, signInWithGitHub } from './signin.ts';
 	import type { GitUser } from './types.ts';
@@ -37,12 +40,24 @@
 	let leaving = $state(false);
 	let signInError = $state<string | null>(null);
 
+	/** The API the token is for: github.com's, or the Enterprise server's from Settings. */
+	const server = $derived.by(() => {
+		try {
+			return { api: githubApi(settings.githubServer), error: null };
+		} catch (e) {
+			return { api: GITHUB_API, error: messageOf(e) };
+		}
+	});
+	const enterprise = $derived(server.api !== GITHUB_API);
+	const apiHost = $derived(new URL(server.api).host);
+
 	async function connect(event: SubmitEvent) {
 		event.preventDefault();
 		busy = true;
 		error = null;
 		try {
-			const user = await accounts.connect(token);
+			if (server.error) throw new Error(`The GitHub server in Settings: ${server.error}`);
+			const user = await accounts.connect(token, server.api);
 			token = '';
 			onconnected?.(user);
 		} catch (e) {
@@ -85,15 +100,16 @@
 			<li>
 				<span class="n" aria-hidden="true">1</span>
 				<div>
-					<strong>Create a token on GitHub</strong>
+					<strong>Create a token on {enterprise ? apiHost : 'GitHub'}</strong>
 					<p>
 						The permissions are filled in for you: <em>Contents</em> and <em>Pull requests</em>,
 						read and write. Under <em>Repository access</em>, choose
 						<em>Only select repositories</em> and pick the ones with your models.
 					</p>
 					<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- external link -->
-					<a class="button" href={tokenUrl()} target="_blank" rel="noopener noreferrer">
-						Create a token on GitHub <ExternalLink size={14} aria-hidden="true" />
+					<a class="button" href={tokenUrl(server.api)} target="_blank" rel="noopener noreferrer">
+						Create a token on {enterprise ? apiHost : 'GitHub'}
+						<ExternalLink size={14} aria-hidden="true" />
 						<span class="visually-hidden">(opens in a new tab)</span>
 					</a>
 				</div>
@@ -141,8 +157,8 @@
 		<p class="privacy" id="{uid}-privacy">
 			<Lock size={13} aria-hidden="true" />
 			<span>
-				The token stays in this browser and is only ever sent to <code>api.github.com</code>. Sign
-				out any time in Settings → Accounts.
+				The token stays in this browser and is only ever sent to <code>{apiHost}</code>. Sign out
+				any time in Settings → Accounts.
 			</span>
 		</p>
 	</form>
@@ -156,7 +172,7 @@
 	</p>
 {/snippet}
 
-{#if SIGN_IN}
+{#if SIGN_IN && !enterprise}
 	<div class="connect">
 		{#if another}
 			{@render anotherNote()}

@@ -163,8 +163,19 @@ export function nameOf(e: ElementJson | undefined): string | null {
  * holds, a membership by the name of what it owns, an element under its
  * membership, and anything unnamed by its kind and position among its owner's
  * unnamed parts of that kind. Elements whose owner is missing get no key.
+ *
+ * With `transparentRoots`, the root namespaces and their memberships don't
+ * count: what they hold is keyed as top-level (`/Package:A`), as is an
+ * element whose owner is missing. So a
+ * package has the same key whichever file (root namespace) holds it, and in
+ * a file or server that leaves the root namespaces out (SysON's API does).
+ * A named member's membership is then keyed `Membership:name`, whatever its
+ * kind.
  */
-export function ownershipKeys(elements: readonly ElementJson[]): Map<string, string> {
+export function ownershipKeys(
+	elements: readonly ElementJson[],
+	options: { transparentRoots?: boolean } = {}
+): Map<string, string> {
 	const byId = new Map(elements.map((e) => [e['@id'], e]));
 	const keys = new Map<string, string>();
 	const taken = new Set<string>();
@@ -186,32 +197,67 @@ export function ownershipKeys(elements: readonly ElementJson[]): Map<string, str
 		keys.set(e['@id'], unique(`${e['@type']}[${names}]`));
 	}
 
-	const visit = (owner: ElementJson, ownerKey: string) => {
+	const place = (
+		child: ElementJson,
+		named: string | null,
+		ownerKey: string,
+		counts: Map<string, number>
+	) => {
+		const kind = child['@type'];
+		let part: string;
+		// Across tools, a named member's membership kind may differ (`end` as a flag or as the kind).
+		if (named !== null)
+			part = `${options.transparentRoots && kind.endsWith('Membership') ? 'Membership' : kind}:${named}`;
+		else {
+			const n = (counts.get(kind) ?? 0) + 1;
+			counts.set(kind, n);
+			part = `${kind}#${n}`;
+		}
+		const key = unique(`${ownerKey}/${part}`);
+		keys.set(child['@id'], key);
+		visit(child, key);
+	};
+	const visit = (owner: ElementJson, ownerKey: string, shared?: Map<string, number>) => {
 		// Relationships the owner owns, then elements a relationship owns.
-		const counts = new Map<string, number>();
-		const place = (child: ElementJson, named: string | null) => {
-			const kind = child['@type'];
-			let part: string;
-			if (named !== null) part = `${kind}:${named}`;
-			else {
-				const n = (counts.get(kind) ?? 0) + 1;
-				counts.set(kind, n);
-				part = `${kind}#${n}`;
-			}
-			const key = unique(`${ownerKey}/${part}`);
-			keys.set(child['@id'], key);
-			visit(child, key);
-		};
+		const counts = shared ?? new Map<string, number>();
 		for (const id of refIds(owner.ownedRelationship)) {
 			const child = byId.get(id);
-			if (child && !keys.has(id)) place(child, memberName(child));
+			if (child && !keys.has(id)) place(child, memberName(child), ownerKey, counts);
 		}
 		for (const id of refIds(owner.ownedRelatedElement)) {
 			const child = byId.get(id);
-			if (child && !keys.has(id)) place(child, nameOf(child));
+			if (child && !keys.has(id)) place(child, nameOf(child), ownerKey, counts);
 		}
 	};
-	for (const e of elements) if (!ownerOf(e)) visit(e, keys.get(e['@id'])!);
+	if (!options.transparentRoots) {
+		for (const e of elements) if (!ownerOf(e)) visit(e, keys.get(e['@id'])!);
+		return keys;
+	}
+	// A top-level membership is keyed on its own; what it holds as if it had none.
+	const top = new Map<string, number>();
+	const topMembership = (membership: ElementJson) => {
+		const key = unique(`/${membership['@type']}:${memberName(membership) ?? '?'}`);
+		keys.set(membership['@id'], key);
+		for (const id of refIds(membership.ownedRelatedElement)) {
+			const child = byId.get(id);
+			if (child && !keys.has(id)) place(child, nameOf(child), '', top);
+		}
+		visit({ ...membership, ownedRelatedElement: [] }, key);
+	};
+	for (const e of elements) {
+		if (ownerOf(e)) continue;
+		for (const id of refIds(e.ownedRelationship)) {
+			const child = byId.get(id);
+			if (child && !keys.has(id)) topMembership(child);
+		}
+	}
+	// What a file left its owner out of: top-level too.
+	for (const e of elements) {
+		const owner = ownerOf(e);
+		if (!owner || byId.has(owner) || keys.has(e['@id'])) continue;
+		if (isRef(e.owningRelatedElement)) topMembership(e);
+		else place(e, nameOf(e), '', top);
+	}
 	return keys;
 }
 
@@ -287,10 +333,11 @@ export function compareModels(
  */
 export function matchIds(
 	ours: readonly ElementJson[],
-	theirs: readonly ElementJson[]
+	theirs: readonly ElementJson[],
+	options: { transparentRoots?: boolean } = {}
 ): Map<string, string> {
-	const ourKeys = ownershipKeys(ours);
-	const theirKeys = ownershipKeys(theirs);
+	const ourKeys = ownershipKeys(ours, options);
+	const theirKeys = ownershipKeys(theirs, options);
 	const theirByKey = new Map<string, ElementJson>();
 	for (const e of theirs) {
 		const key = theirKeys.get(e['@id']);
@@ -374,14 +421,15 @@ export function withIds(e: ElementJson, map: ReadonlyMap<string, string>): Eleme
  * (`matchIds`), so a change sent to a server that holds `theirs` updates its
  * elements instead of replacing them. Elements of ours that have no
  * counterpart keep their ids, or get a fresh one when theirs already uses
- * that id for another element.
+ * that id for another element. `options` as `ownershipKeys` takes them.
  */
 export function rebaseIds(
 	ours: readonly ElementJson[],
 	theirs: readonly ElementJson[],
-	freshId: () => string = () => crypto.randomUUID()
+	freshId: () => string = () => crypto.randomUUID(),
+	options: { transparentRoots?: boolean } = {}
 ): { elements: ElementJson[]; matched: number } {
-	const map = matchIds(ours, theirs);
+	const map = matchIds(ours, theirs, options);
 	const matched = map.size;
 	const used = new Set(map.values());
 	const theirIds = new Set(theirs.map((e) => e['@id']));
@@ -430,6 +478,15 @@ export function changeSet(base: readonly ElementJson[], next: readonly ElementJs
 const TRUE_BY_DEFAULT = new Set(['isUnique']);
 
 function differs(ours: ElementJson, theirs: ElementJson): boolean {
+	return changedProperties(ours, theirs).length > 0;
+}
+
+/**
+ * The properties `ours` spells with a value other than `theirs`' (a property
+ * `theirs` leaves out counts as its default, as `changeSet` says).
+ */
+export function changedProperties(ours: ElementJson, theirs: ElementJson): string[] {
+	const changed: string[] = [];
 	for (const [property, value] of Object.entries(ours)) {
 		if (IGNORED.has(property)) continue;
 		if (!(property in theirs)) {
@@ -439,12 +496,34 @@ function differs(ours: ElementJson, theirs: ElementJson): boolean {
 				(Array.isArray(value) && value.length === 0) ||
 				(property === 'visibility' && value === 'public') ||
 				(TRUE_BY_DEFAULT.has(property) && value === true);
-			if (!isDefault) return true;
+			if (!isDefault) changed.push(property);
 			continue;
 		}
-		if (JSON.stringify(value) !== JSON.stringify(theirs[property])) return true;
+		if (JSON.stringify(value) === JSON.stringify(theirs[property])) continue;
+		if (unspelled(property, value, theirs[property])) continue;
+		changed.push(property);
 	}
-	return false;
+	return changed;
+}
+
+/** Owned lists: emptied, they are a change (the last member removed). */
+const OWNED_LISTS = new Set(['ownedRelationship', 'ownedRelatedElement']);
+/** Names a membership derives from its member, which the compact form leaves unset. */
+const DERIVED_NAMES = new Set(['memberName', 'memberShortName']);
+
+/**
+ * A value ours leaves empty where theirs has one the compact form doesn't
+ * spell: references a server derives (a relationship's `source`/`target`,
+ * `relatedElement`) or a membership's member names. Not a change: sending
+ * it would erase the server's.
+ */
+function unspelled(property: string, ours: unknown, theirs: unknown): boolean {
+	if (DERIVED_NAMES.has(property)) return ours === null && typeof theirs === 'string';
+	if (OWNED_LISTS.has(property)) return false;
+	const empty = ours === null || (Array.isArray(ours) && ours.length === 0);
+	const references =
+		isRef(theirs) || (Array.isArray(theirs) && theirs.length > 0 && theirs.every(isRef));
+	return empty && references;
 }
 
 /** A readable name for an ownership key: `…/Package:Drone/…/PartUsage:motor` → `Drone::motor`. */

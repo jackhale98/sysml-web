@@ -250,3 +250,15 @@ callback page: a failed request to the worker shows its status and message.
 "Use an access token instead" and paste a fine-grained personal access token
 with "Contents: Read and write" (and "Pull requests: Read and write" to
 propose changes) on the repositories they want.
+
+**GitHub Enterprise Server.** The worker and "Sign in with GitHub" talk to
+github.com only (the worker posts to `https://github.com/login/oauth/…`).
+People on a GitHub Enterprise Server use access tokens instead: in
+**Settings → Accounts → GitHub Enterprise Server** they enter the server's
+address (`https://github.example.com`; the app uses its API at
+`/api/v3`), then connect with a token made on that server. The account
+remembers its server and the token is sent only to it; while a server is
+set, the connect form offers the token only. The server must allow this
+site's origin for cross-origin requests to its API (GitHub Enterprise
+Server does for `/api/v3` by default). No worker is needed for that route.
+

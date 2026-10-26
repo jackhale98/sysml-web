@@ -13,7 +13,9 @@
  *   answer 201 and are dropped.
  *
  * Correct behaviour: Fairtide creates and saves where the server allows it,
- * and never reports a save as done when the server did not keep it.
+ * and never reports a save as done when the server did not keep it. (The
+ * same answers were checked live against SysON v2026.9.3 again on
+ * 2026-10-26: docs/interchange.md.)
  */
 import { describe, expect, it } from 'vitest';
 import { SysmlApi } from './api';
@@ -79,23 +81,33 @@ const part = (id: string, name: string, extra: Record<string, unknown> = {}): El
 });
 
 describe('Fairtide and a SysON server', () => {
-	// Known gap: createProject sends a JSON body; SysON needs ?name= and answers with its web page.
-	it.fails('creates a project there', async () => {
+	it('creates a project there', async () => {
 		const server = sysonLike([]);
 		const api = new SysmlApi(BASE, null, server.fetch);
 		await api.createProject('From Fairtide');
 		expect(server.projects.map((p) => p.name)).toEqual(['From Fairtide']);
 	});
 
-	it('says that creating failed (it does not claim a project was made)', async () => {
+	it('says that creating failed when the server answers with its web page, and why', async () => {
 		const server = sysonLike([]);
-		const api = new SysmlApi(BASE, null, server.fetch);
-		await expect(api.createProject('From Fairtide')).rejects.toMatchObject({ kind: 'format' });
+		// A server that answers every new project with its web page (as SysON does without ?name=).
+		const page = (async (input: string | URL | Request, init?: RequestInit) =>
+			init?.method === 'POST'
+				? new Response(PAGE, { headers: { 'content-type': 'text/html' } })
+				: server.fetch(input, init)) as typeof globalThis.fetch;
+		const api = new SysmlApi(BASE, null, page);
+		const error = await api.createProject('From Fairtide').then(
+			() => new Error('created'),
+			(e: unknown) => e as Error
+		);
+		expect(error).toMatchObject({ kind: 'format' });
+		expect(error.message).toMatch(/didn’t take the request: it answered with a web page/);
+		// Not a question about the address: the address answered, as the API, to reads.
+		expect(error.message).not.toMatch(/address/);
 		expect(server.projects).toEqual([]);
 	});
 
-	// Known gap: the commit's identity has no "@type": "DataIdentity", and payloads carry every property; SysON keeps nothing.
-	it.fails('saves a changed element there', async () => {
+	it('saves a changed element there, sending only what changed', async () => {
 		const wheel = part('w1', 'Wheel');
 		const server = sysonLike([wheel]);
 		const api = new SysmlApi(BASE, null, server.fetch);
@@ -106,40 +118,53 @@ describe('Fairtide and a SysON server', () => {
 		expect(server.elements.get('w1')!.declaredName).toBe('Rim');
 	});
 
-	it('says that saving failed, and the server is unchanged', async () => {
+	it('changes a property of an element with many properties (the payload holds only the change)', async () => {
+		const many = {
+			isAbstract: false,
+			isVariation: false,
+			isIndividual: false,
+			isSufficient: false
+		};
+		const server = sysonLike([part('w1', 'Wheel', many)]);
+		const api = new SysmlApi(BASE, null, server.fetch);
+		const [branch] = await api.branches(PROJECT);
+		const plan = await planPush(api, PROJECT, branch!, [
+			part('w1', 'Wheel', { ...many, isAbstract: true })
+		]);
+		await push(api, PROJECT, branch!, plan, 'abstract');
+		expect(server.elements.get('w1')!.isAbstract).toBe(true);
+	});
+
+	it('says that saving failed when the server answers with nothing, and the server is unchanged', async () => {
 		const server = sysonLike([part('w1', 'Wheel')]);
 		const api = new SysmlApi(BASE, null, server.fetch);
 		const [branch] = await api.branches(PROJECT);
-		const plan = await planPush(api, PROJECT, branch!, [part('w1', 'Rim')]);
-		await expect(push(api, PROJECT, branch!, plan, 'rename')).rejects.toThrow(
-			/something other than JSON/
+		// A new element with all its properties: SysON answers 200 with an empty body and keeps nothing.
+		const rim = part('n1', 'Rim', {
+			isAbstract: false,
+			isVariation: false,
+			isIndividual: false,
+			isSufficient: false
+		});
+		const plan = await planPush(api, PROJECT, branch!, [part('w1', 'Tyre'), rim]);
+		expect(changeCount(plan.changes)).toBe(2);
+		await expect(push(api, PROJECT, branch!, plan, 'two changes')).rejects.toThrow(
+			'syson.test didn’t keep all of this save. Read back from the server, the new element is missing (Rim); the changed element is not as sent (Tyre). Your project here still has all of it.'
 		);
 		expect(server.elements.get('w1')!.declaredName).toBe('Wheel');
 	});
 
-	// Known gap: a save is reported done when the server answers 201; nothing reads the branch back. Today SysON never gets that far (above); once the identity is fixed, SysON's dropping of new elements would pass as saved.
-	it.fails('does not report a save as done when the server dropped new elements', async () => {
+	it('does not report a save as done when the server dropped new elements', async () => {
 		const server = sysonLike([part('w1', 'Wheel')]);
-		// The client as it would be with the identity fixed (minimal payloads, typed identity).
-		const typed = (async (input: string | URL | Request, init?: RequestInit) => {
-			if (init?.method === 'POST' && String(input).includes('/commits')) {
-				const body = JSON.parse(String(init.body)) as {
-					change: { identity: Record<string, unknown>; payload: ElementJson | null }[];
-				};
-				for (const c of body.change) c.identity['@type'] = 'DataIdentity';
-				init = { ...init, body: JSON.stringify(body) };
-			}
-			return server.fetch(input, init);
-		}) as typeof globalThis.fetch;
-		const api = new SysmlApi(BASE, null, typed);
+		const api = new SysmlApi(BASE, null, server.fetch);
 		const [branch] = await api.branches(PROJECT);
 		const plan = await planPush(api, PROJECT, branch!, [part('w1', 'Wheel'), part('n1', 'Rim')]);
 		expect(plan.changes.created.map((e) => e.declaredName)).toEqual(['Rim']);
 		const saved = await push(api, PROJECT, branch!, plan, 'add Rim').then(
 			() => 'reported as saved',
-			() => 'reported as failed'
+			(e: unknown) => `reported as failed: ${(e as Error).message}`
 		);
 		expect(server.elements.has('n1')).toBe(false); // the server dropped it
-		expect(saved).toBe('reported as failed');
+		expect(saved).toMatch(/^reported as failed: .*the new element is missing \(Rim\)/);
 	});
 });
