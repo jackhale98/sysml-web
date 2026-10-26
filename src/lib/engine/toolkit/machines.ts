@@ -275,10 +275,19 @@ class Builder {
 			const written = clean(this.cx.text(member));
 			const kind = /^(entry|do|exit)\b/.exec(written)?.[1] as 'entry' | 'do' | 'exit' | undefined;
 			if (!kind || out[kind]) continue;
-			const action = actionText(written.slice(kind.length).replace(/;$/, ''));
+			const source = written.slice(kind.length).replace(/;$/, '');
+			const action = actionText(source);
 			if (action) out[kind] = action;
+			this.notRun(`${kind} action of \`${state.written ?? state.name}\``, source);
 		}
 		return out;
+	}
+
+	/** Note the steps of an action the emulator does not run (it runs assignments only). */
+	private notRun(context: string, action: string) {
+		for (const step of skippedSteps(action)) {
+			this.warnings.push(`${context}: \`${step}\` is not run; only assignments are`);
+		}
 	}
 
 	private transition(record: ElementRecord, scope: string | undefined, previous?: string) {
@@ -335,6 +344,7 @@ class Builder {
 		else if (targetId && this.cx.isFinal(targetId)) to = { text: 'done' };
 		else to = { text: parts.target ?? '' };
 
+		if (hasEffect) this.notRun(`effect of ${context}`, parts.effect!);
 		this.pending.push({
 			...base,
 			from,
@@ -529,6 +539,26 @@ export function actionText(action: string): string | undefined {
 	const bare = text.replace(/^action\b\s*/, '');
 	if (/^[\w'.:]+$/.test(bare)) return bare;
 	return text.replace(/\s+/g, ' ');
+}
+
+/** A step the emulator runs, or that changes nothing it simulates: an assignment, a named action. */
+const RUN = /^(?:action\s+)?(?:assign\s[\s\S]*:=[\s\S]*|[\w'.:]*\s*(?::\s*[\w'.:]+)?)$/;
+/** Steps whose effect on the run is lost if they are not run. */
+const STEPS = /(^|[^\w$'])(send|accept|assign|if|while|loop|for|then|perform|terminate)\b/;
+
+/**
+ * The statements of an action the emulator does not run but that would
+ * change the run: a `send`, an `accept`, an `if`, a loop, a succession,
+ * an assignment inside one of them (`if x > 5 { assign y := 7; }`).
+ */
+export function skippedSteps(action: string): string[] {
+	const text = clean(action);
+	if (!text) return [];
+	const open = text.indexOf('{');
+	const body = open >= 0 ? text.slice(open + 1, text.lastIndexOf('}')) : text;
+	return splitTopLevel(body)
+		.map((statement) => statement.trim().replace(/\s+/g, ' '))
+		.filter((statement) => !RUN.test(statement) && STEPS.test(statement));
 }
 
 /** `in attribute x : Real = 1` → `Real`. */

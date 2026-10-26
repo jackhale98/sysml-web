@@ -13,7 +13,12 @@ Systems Library's `States`.
 The simulator runs one run-to-completion step at a time:
 
 - **An event** (a signal such as `ArmCommand`) fires the transitions that
-  accept it, at the current time. Signals match by their last name.
+  accept it, at the current time. A signal matches with or without its
+  package (`ArmCommand`, `DroneInterfaces::ArmCommand`); two signals whose
+  packages differ (`Commands::Stop`, `Faults::Stop`) are different. While
+  something is ready for a Step, events wait: the machine has already left a
+  state whose untriggered transition is ready, so the event buttons show
+  what fires first, and sending one says to Step first.
 - **Step** fires what is ready now: transitions without a trigger,
   guard-only ones, change triggers (`accept when …`) whose condition holds
   and time triggers (`accept after …`, `accept at …`) that are due. If
@@ -114,10 +119,21 @@ running `do` action, active while the charge goes down.
 
 ## Not supported
 
-- The steps inside a `do`, entry or exit action other than assignments
-  (`send`, `accept`, successions, loops).
+The simulator lists what it cannot run in a note above the diagram ("may
+not run as written") before the run starts.
+
+- The steps inside a `do`, entry or exit action or a transition effect other
+  than assignments (`send`, `accept`, `if`, successions, loops): each one is
+  named in the note.
 - Signals sent by `send` actions to the machine itself: send events with the
   buttons.
 - Change triggers that read the time, and clocks other than the default
   one.
-- History states, `terminate`, deferred signals.
+- `terminate` (the target shows as an unknown state, and the run stops
+  there), conditional initial transitions (`entry; if c then a;`: the first
+  state is entered; noted as a transition with no source state).
+- History states and deferred signals: SysML v2 has no notation for them.
+- A `when` trigger whose guard is false when its condition turns true is
+  taken later, once the guard holds (a time signal is lost in that case).
+- The payload of a signal (`accept r : Reading if r.v > 3`): a guard that
+  reads it stays blocked.
