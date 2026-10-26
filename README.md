@@ -84,7 +84,13 @@ Without them, people connect GitHub with a personal access token.
 | [Assessment: language coverage](docs/assessment/01-language.md) | The official corpus, the engine against the OMG pilot, a construct matrix. | Developers |
 | [Assessment: text, diagrams, round trips](docs/assessment/02-round-trip.md) | Every edit kind, save/reload, exports, edit latency. | Developers |
 | [Assessment: import, export, interoperability](docs/assessment/03-interchange.md) | JSON, `.kpar` and SysON, compared by meaning. | Developers |
+| [Assessment: MBSE coverage](docs/assessment/04-mbse.md) | Structure, behaviour, traceability, gaps, navigation, conventions. | Developers |
+| [Assessment: simulation](docs/assessment/05-simulation.md) | The state machine simulator against reference traces from the specification. | Developers |
+| [Assessment: calculations and trade studies](docs/assessment/06-calculations.md) | Known-answer tests for expressions, units, roll-ups, constraints and trade studies. | Developers |
+| [Assessment: requirements, risk, verification](docs/assessment/07-requirements-risk.md) | Requirement identity, coverage, FMEA arithmetic, change impact, revisions. | Developers |
 | [Assessment: data integrity, Git, recovery](docs/assessment/08-data-integrity.md) | Crashes, tabs, folders, GitHub, archives, credentials. | Developers |
+| [Assessment: software quality](docs/assessment/09-quality.md) | Tests, coverage, CI, supervision, security, contributor setup. | Developers |
+| [Assessment: performance, usability, deployment](docs/assessment/10-performance-usability.md) | Measured load and edit times by model size, phone emulation, accessibility, self-hosting. | Developers |
 | [Interop tools](docs/interop-tools.md) | Running the OMG pilot implementation and SysON as checkers. | Developers |
 | [Spike: WebAssembly engine](docs/spikes/wasm-engine.md) | A dated note (2026-10-21) from an engine the app no longer uses. | Developers (history) |
 

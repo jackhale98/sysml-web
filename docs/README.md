@@ -48,7 +48,13 @@ What each document is for, and who it is for. New to Fairtide? Start with the
   [language coverage](assessment/01-language.md),
   [text, diagrams and round trips](assessment/02-round-trip.md),
   [import, export and interoperability](assessment/03-interchange.md),
-  [data integrity, Git and recovery](assessment/08-data-integrity.md).
+  [MBSE coverage](assessment/04-mbse.md),
+  [simulation](assessment/05-simulation.md),
+  [calculations and trade studies](assessment/06-calculations.md),
+  [requirements, risk and verification](assessment/07-requirements-risk.md),
+  [data integrity, Git and recovery](assessment/08-data-integrity.md),
+  [software quality](assessment/09-quality.md),
+  [performance, usability and deployment](assessment/10-performance-usability.md).
 - [Interop tools](interop-tools.md): the OMG pilot implementation and SysON,
   run as checkers of Fairtide's output.
 
