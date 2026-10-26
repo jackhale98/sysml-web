@@ -370,6 +370,33 @@ ask and cached with it):
   comparison with a literal, `x <= 4 [kg]` — the limit and the margin in
   the limit's unit. `verify` reports 1-based lines and byte columns; they
   are mapped like findings (through the repair, then to UTF-16).
+- **What a check's values come from** (`CheckValue.from`): the expression
+  the model gives the feature (or the value it is given), the element that
+  writes it when that is not the one the value is for (a definition it
+  inherits from), whether it is a default, and the values the expression
+  reads, each with where it comes from in turn (three levels, twelve values
+  at most). The `checks` rows' `inputs` field says it in a sentence
+  (`inputsText` in `project/checks.ts`), and `ConstraintChecks` shows it.
+- **A definition's assertions, for each part.** `verify` decides an
+  `assert constraint` in a definition with the definition's own values only
+  (upstream, below). `Evaluation` decides it again, with the app's
+  evaluator over the values `appValue` works out (the toolkit's at the
+  part's path, an inherited expression with the part's own inputs), for
+  each specialization of the definition and each usage typed by it (or by
+  a specialization, or redefining or subsetting one) whose values for the
+  features the assertion reads differ from those of what it specializes,
+  redefines or is typed by; a part with the same values is covered by that
+  one's check. Each is a check of its own (`assertedIn`, `by` the part:
+  `HeavyArm`, `Craft::u`, `rig.h2`), placed at the redefinition that changes
+  the value (else the part's declaration), with `constraintAt` the
+  assertion. The definition's own check says which parts change its values.
+  A definition's assertion left undecided for want of values of its own
+  (values given only in its parts) is not a problem; its parts' checks are.
+- **Undecided checks** carry `undecided`: `fault` when the verdict or a
+  value it rests on is a division by zero or a cyclic value, else `open` (a
+  value not given yet, nothing claims the requirement, an expression the
+  app can't evaluate). Problems lists a `fault` as a warning and an `open`
+  one as a note, with the reason; a requirement in words only is neither.
 - **Values**: `evaluate` on each element, as `Evaluated` (a number with its
   unit, text, none, or undecided with the reason). An undecided value says
   why, followed through what its expression refers to: a collection of
@@ -412,7 +439,7 @@ ask and cached with it):
   analysis (once "Model ready" shows; on a model whose analysis takes more
   than 2 s, after a pause in typing — `docs/performance.md`); a violated check is a warning (`code: 'check'`) at its claim in
   Problems and the editor, which jumps to the claim's range
-  (`WorkbenchUi.revealText`); undecided ones are not problems. The
+  (`WorkbenchUi.revealText`); undecided ones are warnings or notes (above). The
   `checks` and `budget:<attribute>` row providers (`toolkit/views/budget.ts`)
   and the requirements' `check` field make the `ConstraintChecks`,
   `MassBudget` and `PowerBudget` tables and the requirements table's
@@ -758,6 +785,19 @@ Found while making the demo's trade study (sysml-toolkit 0.10.10):
 11. **`all X` extents are not evaluated** ("unsupported for evaluation: `all`
     extents"); the 10b example binds a study's subject to `all engineChoice`.
     The app asks for the alternatives to be listed.
+
+Found while checking definitions' assertions for their parts (sysml-toolkit
+0.10.10):
+
+- **`verify` decides a definition's `assert constraint` for the definition
+  only.** `part def Arm { attribute mass default 50 [g]; assert constraint
+  light { mass <= 60 [g] } }`, `part def HeavyArm :> Arm { :>> mass default
+  80 [g]; }` and `part u : Arm { :>> mass = 70 [g]; }`: one verdict,
+  satisfied, for `Arm`; nothing for `HeavyArm` or `u`, which break it. An
+  assertion holds for every instance of its definition, so a verdict per
+  specialization and per usage that redefines what it reads (or `verify`
+  with a receiver) would let the app drop its own evaluation
+  (`Evaluation.forEachPart`).
 
 Found while making the Sequence view (sysml-toolkit 0.10.10):
 

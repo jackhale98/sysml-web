@@ -468,10 +468,28 @@ export type CheckStatus = 'satisfied' | 'violated' | 'undecided';
 
 /** A value a check depends on, as the engine evaluated it. */
 export interface CheckValue {
-	/** The feature as written in the constraint (`drone.endurance`). */
+	/** The feature as written in the constraint (`drone.endurance`), or in the expression that reads it. */
 	feature: string;
 	/** Its value, when known. */
 	value: Evaluated;
+	/** Where the value comes from, when the model gives it one (`evaluation.ts`). */
+	from?: ValueSource;
+}
+
+/**
+ * What a value is worked out from: the expression the model gives it (or
+ * the value it is given), where that is written, and the values the
+ * expression reads, each with where it comes from in turn (a few levels).
+ */
+export interface ValueSource {
+	/** As written: `HoverEndurance(battery.usableEnergy, hoverPower)`, or `400 [W]`. */
+	expression: string;
+	/** The element that writes it, when it is not the one the value is for (a definition it inherits from). */
+	writtenIn: string | null;
+	/** Whether it is a default (`default 80 [g]`), which a part or a specialization may change. */
+	isDefault: boolean;
+	/** The values the expression reads (none for a value given as it is). */
+	inputs: CheckValue[];
 }
 
 /**
@@ -519,6 +537,17 @@ export interface Check {
 	byApp?: string;
 	/** How the problems list words it when violated, when the check says it best itself. */
 	problem?: string;
+	/**
+	 * For a definition's `assert constraint` decided for a part or a specialization
+	 * that changes the values it reads (`by`): the definition that asserts it.
+	 */
+	assertedIn?: string;
+	/**
+	 * Why an undecided check has no verdict, for the problems list: `fault` when the
+	 * model's values make it impossible (a division by zero, a value that depends on
+	 * itself), `open` when something is not given yet or can't be worked out.
+	 */
+	undecided?: 'fault' | 'open';
 }
 
 export interface CheckReport {

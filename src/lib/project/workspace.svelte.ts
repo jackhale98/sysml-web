@@ -173,7 +173,7 @@ export class Workspace {
 			...satisfyProblems(Object.values(this.analyses), (path) => this.files[path]),
 			// A stakeholder or actor declared before the requirement's subject.
 			...subjectFirstProblems(Object.values(this.analyses)),
-			// A requirement the design doesn't meet; undecided checks are not problems.
+			// A requirement the design doesn't meet, or can't be decided for a reason to act on.
 			...checkProblems(this.checks?.checks ?? [])
 		].sort((a, b) => severityRank(a.severity) - severityRank(b.severity))
 	);

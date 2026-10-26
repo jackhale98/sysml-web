@@ -2,8 +2,8 @@
  * Assessment §6: what a person sees when a calculation has no answer. The
  * drone's hover power set to 0 W makes its endurance a division by zero:
  * the inspector shows `?` and why, the requirement's check is undecided
- * (not met, not satisfied), and the mass budget is unaffected; undo puts
- * every value back.
+ * (not met, not satisfied) and a warning in Problems that says why, and
+ * the mass budget is unaffected; undo puts every value back.
  */
 import { expect, test, type Page } from '@playwright/test';
 
@@ -16,6 +16,7 @@ async function openDemo(page: Page) {
 
 const views = (page: Page) => page.locator('section[aria-labelledby="views-heading"]');
 const toasts = (page: Page) => page.getByRole('region', { name: 'Notifications' });
+const problems = (page: Page) => page.getByRole('button', { name: /^Problems:/ });
 
 async function openView(page: Page, title: string) {
 	await views(page).getByRole('button', { name: title }).click();
@@ -52,6 +53,13 @@ test('a division by zero shows as unknown, with the reason, never as a number', 
 		'Undecided',
 		{ timeout: 15_000 }
 	);
+	// Problems says so, and why: a warning beside the demo's two (its risk review item).
+	await expect(problems(page)).toHaveAccessibleName('Problems: 0 errors, 3 warnings');
+	await problems(page).click();
+	await expect(page.locator('section.problems-pane')).toContainText(
+		"SYS-001 Flight endurance can't be decided for drone: drone.endurance cannot be worked out: division by zero"
+	);
+	await problems(page).click();
 
 	// endurance = HoverEndurance(usable energy, 0 W): energy / power has no value.
 	const endurance = await select(page, 'endurance', 'attribute', 1, 'DroneArchitecture.sysml');
@@ -73,4 +81,5 @@ test('a division by zero shows as unknown, with the reason, never as a number', 
 		'Satisfied',
 		{ timeout: 15_000 }
 	);
+	await expect(problems(page)).toHaveAccessibleName('Problems: 0 errors, 2 warnings');
 });

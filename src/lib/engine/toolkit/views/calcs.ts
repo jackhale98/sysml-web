@@ -6,8 +6,8 @@
  * expression is evaluated with the expression language (`sim/expr.ts`),
  * which reads SysML's own expression syntax (`if c ? a else b`, enum
  * literals). A calc it invokes is evaluated the same way. An argument its
- * parameter's type rejects (a rating of 14 where 1 to 10 is asserted)
- * leaves the result undecided.
+ * parameter's type rejects (a rating of 14 where 1 to 10 is asserted, or
+ * 5.5 where the type is an `Integer`) leaves the result undecided.
  *
  * Calcs are found by name among the project's elements and the libraries
  * in its session (`Rpn`, or qualified: `RiskAnalysis::Rpn`); those of the
@@ -25,13 +25,15 @@ import type { Value } from '#lib/sim/expr.ts';
 import type { Levels } from '../../types';
 import type { ElementRecord } from '../model';
 import type { ViewContext } from './context';
-import { holds, typeDomain, typeInvariants, type Invariant } from './domains';
+import { holds, isWholeType, typeDomain, typeInvariants, type Invariant } from './domains';
 import { splitPath } from './text';
 
 interface Calc {
 	params: string[];
 	/** Per parameter, the asserted constraints of its type (an FmeaRating is 1 to 10). */
 	checks: Invariant[][];
+	/** Per parameter, whether its type takes whole numbers only (an FmeaRating is an Integer). */
+	whole: boolean[];
 	locals: Map<string, Expr>;
 	result: Expr;
 }
@@ -60,7 +62,10 @@ export class ModelCalcs {
 		if (args.length !== calc.params.length)
 			throw new EvalError(`${name} expects ${calc.params.length} argument(s), got ${args.length}`);
 		calc.params.forEach((p, i) => {
-			const broken = calc.checks[i]!.find((c) => holds(c.expr, args[i]!) === false);
+			const arg = args[i]!;
+			if (calc.whole[i] && typeof arg === 'number' && !Number.isInteger(arg))
+				throw new EvalError(`${p} is not a whole number`);
+			const broken = calc.checks[i]!.find((c) => holds(c.expr, arg) === false);
 			if (broken) throw new EvalError(`${p} is not a ${broken.owner}`);
 		});
 		const values = new Map<string, Value>(calc.params.map((p, i) => [p, args[i]!]));
@@ -130,6 +135,7 @@ export class ModelCalcs {
 	private read(record: ElementRecord): Calc | null {
 		const params: string[] = [];
 		const checks: Invariant[][] = [];
+		const whole: boolean[] = [];
 		const locals = new Map<string, Expr>();
 		let result: Expr | null = null;
 		for (const member of this.ctx.ownedBy(record.id)) {
@@ -141,12 +147,13 @@ export class ModelCalcs {
 			if (member.direction === 'in') {
 				params.push(member.name);
 				checks.push(member.typeIds[0] ? typeInvariants(this.ctx, member.typeIds[0]) : []);
+				whole.push(!!member.typeIds[0] && isWholeType(this.ctx, member.typeIds[0]));
 			} else if (member.value !== null) {
 				const expr = parse(member.value);
 				if (expr) locals.set(member.name, expr);
 			}
 		}
-		return result ? { params, checks, locals, result } : null;
+		return result ? { params, checks, whole, locals, result } : null;
 	}
 }
 

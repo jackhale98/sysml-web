@@ -73,11 +73,14 @@ Row providers (the `rows` value):
                           claim with its requirement's constraints
                           evaluated against what satisfies it, each
                           requirement constraint nothing satisfies
-                          yet, each `assert constraint` (status =
+                          yet, each `assert constraint` (a
+                          definition's also for each part and
+                          type that changes its values; status =
                           satisfied, violated or undecided; id,
                           requirement, by, constraint, values,
-                          limit, margin, detail; checkable = 0 for a
-                          requirement stated in words only). The
+                          limit, margin, detail, inputs (what each
+                          value is worked out from); checkable = 0
+                          for a requirement stated in words only). The
                           "requirements" rows have the worst verdict
                           of their claims as `check`.
   "trade"                 a trade study (an analysis typed by

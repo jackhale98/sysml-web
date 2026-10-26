@@ -5,12 +5,21 @@
  * every value an annotation gives the field must meet them. The toolkit
  * doesn't evaluate metadata values, so the constraints are evaluated here
  * with `that` bound to the value: `severity = 14` is flagged, from the
- * library's own constraint rather than a range the app knows.
+ * library's own constraint rather than a range the app knows. A type that
+ * is an `Integer` (or specializes it) takes whole numbers only: a rating of
+ * 5.5 is flagged too.
  */
 import { EvalError, ParseError, evaluate, mapScope, parseExpr, type Value } from '#lib/sim/expr.ts';
 import type { ElementRecord } from '../model';
 import type { Annotation, ViewContext } from './context';
-import { declaredFeature, holds, metadataDefinition, typeDomain, typeInvariants } from './domains';
+import {
+	declaredFeature,
+	holds,
+	isWholeType,
+	metadataDefinition,
+	typeDomain,
+	typeInvariants
+} from './domains';
 import { displayValue } from './text';
 
 /** What is wrong with one value of an annotation. */
@@ -39,24 +48,32 @@ export function valueProblems(ctx: ViewContext, a: Annotation): ValueProblem[] {
 		const type = declaredFeature(ctx, def, field)?.typeIds[0];
 		if (!type) continue;
 		const invariants = typeInvariants(ctx, type);
-		if (!invariants.length) continue;
+		// A rating of 5.5 where the type is an Integer: not a value of the type.
+		const whole = isWholeType(ctx, type);
+		if (!invariants.length && !whole) continue;
 		const value = valueOf(written);
 		if (value === null) continue;
-		const broken = invariants.find((i) => holds(i.expr, value) === false);
-		if (!broken) continue;
+		const fraction = whole && typeof value === 'number' && !Number.isInteger(value);
+		const broken = fraction ? null : invariants.find((i) => holds(i.expr, value) === false);
+		if (!fraction && !broken) continue;
 		const domain = typeDomain(ctx, type);
 		const shown = displayValue(written);
 		const words = fieldWords(field);
-		const range =
+		const scale =
 			domain?.numeric && isRun(domain.values)
-				? `outside the scale of ${domain.values[0]} to ${domain.values[domain.values.length - 1]}`
-				: `against the rule \`${broken.text}\` of ${broken.owner}`;
+				? `the scale of ${domain.values[0]} to ${domain.values[domain.values.length - 1]}`
+				: null;
+		const range = fraction
+			? `not a whole number${scale ? ` on ${scale}` : ''}`
+			: scale
+				? `outside ${scale}`
+				: `against the rule \`${broken!.text}\` of ${broken!.owner}`;
 		out.push({
 			field,
 			value: written,
 			message: `${sentence(words)} is ${shown}, ${range}.`,
-			rule: broken.text,
-			ruleName: broken.name,
+			rule: fraction ? 'a whole number' : broken!.text,
+			ruleName: fraction ? null : broken!.name,
 			at: a.record ? ctx.ownedBy(a.record.id).find((r) => r.name === field) : undefined,
 			number: typeof value === 'number' ? value : null
 		});

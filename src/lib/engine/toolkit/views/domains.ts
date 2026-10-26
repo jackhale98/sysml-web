@@ -150,6 +150,14 @@ export function holds(expr: Expr, value: Value): boolean | null {
 	}
 }
 
+/** Whether a type's values are whole numbers (`Integer`, or a type that specializes it). */
+export function isWholeType(ctx: ViewContext, typeId: string): boolean {
+	const record = ctx.byId.get(typeId);
+	if (record) return isWhole(ctx, record);
+	const name = ctx.nameOf(typeId);
+	return !!name && INTEGER.has(unquoteName(simpleName(name)));
+}
+
 /** Whether a definition's values are whole numbers (it specializes `Integer`). */
 function isWhole(ctx: ViewContext, record: ElementRecord): boolean {
 	const seen = new Set<string>();
