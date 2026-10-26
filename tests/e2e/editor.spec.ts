@@ -55,7 +55,9 @@ test('completion offers the project’s definitions, and rename changes every fi
 	await page.keyboard.press('Enter');
 	await page.keyboard.type('part spare : Batt');
 	const options = page.locator('.cm-tooltip-autocomplete');
-	await expect(options).toContainText('Battery');
+	// The engine answers after the analysis and checks each keystroke started: about 9 s
+	// with two tests sharing one slow core (a busy CI runner), well under 1 s otherwise.
+	await expect(options).toContainText('Battery', { timeout: 20_000 });
 	await page.keyboard.press('Escape');
 	await page.keyboard.type('ery;');
 	await expect(page.locator('.cm-content')).toContainText('part spare : Battery;');
@@ -77,4 +79,20 @@ test('completion offers the project’s definitions, and rename changes every fi
 		.first()
 		.click();
 	await expect(page.locator('.cm-content')).toContainText('part def PowerPack :> Component');
+});
+
+test('the editor runs without a part of it failing', async ({ page }) => {
+	// CodeMirror reports a part (plugin) that throws and carries on without it.
+	const crashed: string[] = [];
+	page.on('console', (m) => {
+		if (/plugin crashed/i.test(m.text())) crashed.push(m.text().slice(0, 200));
+	});
+	await openText(page, 'DroneArchitecture.sysml');
+	await find(page, 'part battery : Battery;');
+	await page.keyboard.press('End');
+	await page.keyboard.type(' // checked');
+	await expect(page.locator('.cm-content')).toContainText('// checked');
+	await page.getByRole('button', { name: 'StakeholderNeeds.sysml', exact: true }).click();
+	await expect(page.locator('.cm-content')).toContainText('StakeholderNeeds');
+	expect(crashed).toEqual([]);
 });

@@ -19,7 +19,8 @@ export function fileLineBreaks(lineBreak: LineBreak): Extension {
 	return [
 		EditorState.lineSeparator.of(lineBreak),
 		EditorView.clipboardInputFilter.of((text) => withLineBreak(text, lineBreak)),
-		highlightSpecialChars({ specialChars: /[\r\n]/ })
+		// The default set already marks a stray `\r` or `\n` (and other control characters).
+		highlightSpecialChars()
 	];
 }
 

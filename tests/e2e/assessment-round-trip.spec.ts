@@ -161,6 +161,22 @@ test('opening a file with Windows line endings in the editor leaves it as it was
 	expect(text.replace(/\s+part def (Washer|Pin|Clip);/g, '')).toBe(CRLF);
 });
 
+test('a line ending of another kind in a file is shown, and kept', async ({ page }) => {
+	await page.setViewportSize({ width: 1440, height: 900 });
+	// Windows line endings, but for one Unix one inside the second line.
+	const mixed = 'package Mixed {\r\n    part def A;\n    part def B;\r\n}\r\n';
+	await openFolderProject(page, { ...FILES, 'model/Mixed.sysml': mixed });
+	await page.getByRole('tab', { name: 'Files' }).click();
+	await explorer(page)
+		.getByRole('button', { name: /^Mixed\.sysml/ })
+		.click();
+	await page.getByRole('button', { name: 'Text', exact: true }).click();
+	await expect(page.locator('.cm-content')).toContainText('part def B;');
+	await expect(page.locator('.cm-content .cm-specialChar')).toHaveCount(1);
+	await page.waitForTimeout(2_000);
+	expect((await storedTexts(page))['model/Mixed.sysml']).toBe(mixed);
+});
+
 test('moving a box on a diagram writes only the layout file, never the model', async ({ page }) => {
 	await page.setViewportSize({ width: 1440, height: 900 });
 	await openFolderProject(page, FILES);
