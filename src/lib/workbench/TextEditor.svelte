@@ -27,6 +27,8 @@
 	import type { Engine } from '#lib/engine/client.ts';
 	import type { DefinitionTarget } from '#lib/engine/types.ts';
 	import { sysmlLanguage } from '#lib/editor/language.ts';
+	import { fileLineBreaks, fileText, toDoc, toFile } from '#lib/editor/lineBreaks.ts';
+	import { lineBreakOf } from '#lib/project/lineBreaks.ts';
 	import { editorTheme, highlightEffect, sysmlHighlighting } from '#lib/editor/sysml.ts';
 	import { editorFontSizeHere, settings } from '#lib/settings/settings.svelte.ts';
 	import { byteToUtf16, elementAt, utf16ToByte } from '#lib/project/elements.ts';
@@ -56,6 +58,8 @@
 	const editing = new Compartment();
 	const look = new Compartment();
 	const gutter = new Compartment();
+	/** The file's line endings, which the editor keeps. */
+	const lineBreaks = new Compartment();
 	/** The person's editor settings: font size, wrapping, line numbers. */
 	const prefs = new Compartment();
 	let canUndo = $state(false);
@@ -153,8 +157,8 @@
 	function selectAtCursor(state: EditorState) {
 		clearTimeout(selectTimer);
 		selectTimer = setTimeout(() => {
-			const text = state.doc.toString();
-			const byte = utf16ToByte(text, state.selection.main.head);
+			const text = fileText(state);
+			const byte = utf16ToByte(text, toFile(state, state.selection.main.head));
 			const element = elementAt(workspace.elements, path, byte);
 			if (element && element.key !== ui.selection?.key) ui.select(element.key, 'text');
 		}, 120);
@@ -167,6 +171,7 @@
 			state: EditorState.create({
 				doc: initial,
 				extensions: [
+					lineBreaks.of(fileLineBreaks(lineBreakOf(initial))),
 					editing.of(editingExtensions(editable)),
 					look.of(lookExtensions(phone)),
 					prefs.of(
@@ -211,7 +216,7 @@
 						canUndo = undoDepth(update.state) > 0;
 						canRedo = redoDepth(update.state) > 0;
 						if (update.docChanged) {
-							workspace.setText(path, update.state.doc.toString());
+							workspace.setText(path, fileText(update.state));
 							scheduleHighlights(150);
 						}
 						if (update.selectionSet && !revealing && update.view.hasFocus) {
@@ -227,8 +232,14 @@
 			// scroll to it, so every gesture teaches the text it produces.
 			apply: (changes) => {
 				if (!view || changes.length === 0) return;
-				const set = view.state.changes(changes);
-				const first = changes[0]!;
+				const state = view.state;
+				const at = changes.map((c) => ({
+					from: toDoc(state, c.from),
+					to: toDoc(state, c.to),
+					insert: c.insert
+				}));
+				const set = state.changes(at);
+				const first = at[0]!;
 				const from = set.mapPos(first.from, -1);
 				const to = set.mapPos(first.to, 1);
 				revealing = true;
@@ -273,7 +284,10 @@
 	// one applying them (e.g. a diagram edit applied before it was opened).
 	$effect(() => {
 		const text = workspace.files[path];
-		if (!view || text === undefined || text === view.state.doc.toString()) return;
+		if (!view || text === undefined || text === fileText(view.state)) return;
+		const lineBreak = lineBreakOf(text);
+		if (lineBreak !== view.state.lineBreak)
+			view.dispatch({ effects: lineBreaks.reconfigure(fileLineBreaks(lineBreak)) });
 		view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } });
 	});
 
@@ -281,14 +295,14 @@
 	$effect(() => {
 		const analysis = workspace.analyses[path];
 		if (!view || !analysis) return;
-		const text = view.state.doc.toString();
+		const state = view.state;
+		const text = fileText(state);
 		if (text !== workspace.files[path]) return;
-		const length = view.state.doc.length;
 		const diagnostics: CmDiagnostic[] = workspace.problems
 			.filter((p) => p.file === path)
 			.map((p) => ({
-				from: Math.min(p.span.from ?? byteToUtf16(text, p.span.start_byte), length),
-				to: Math.min(p.span.to ?? byteToUtf16(text, p.span.end_byte), length),
+				from: toDoc(state, p.span.from ?? byteToUtf16(text, p.span.start_byte)),
+				to: toDoc(state, p.span.to ?? byteToUtf16(text, p.span.end_byte)),
 				severity: p.severity === 'note' ? 'info' : p.severity,
 				message: p.suggestion ? `${p.message}. ${p.suggestion}` : p.message,
 				source: p.code
@@ -302,9 +316,8 @@
 		if (!view || !request || request.path !== path) return;
 		untrack(() => {
 			if (!view) return;
-			const length = view.state.doc.length;
-			const from = Math.min(request.from, length);
-			const to = Math.min(Math.max(request.to, from), length);
+			const from = toDoc(view.state, request.from);
+			const to = Math.max(toDoc(view.state, request.to), from);
 			revealing = true;
 			view.dispatch({
 				selection: { anchor: from, head: to },
@@ -320,10 +333,10 @@
 		if (!view || !selection || selection.source === 'text') return;
 		const element = workspace.elements.find((e) => e.key === selection.key);
 		if (!element || element.file !== path) return;
-		const text = view.state.doc.toString();
-		const anchor = Math.min(
-			element.span.from ?? byteToUtf16(text, element.span.start_byte),
-			view.state.doc.length
+		const text = fileText(view.state);
+		const anchor = toDoc(
+			view.state,
+			element.span.from ?? byteToUtf16(text, element.span.start_byte)
 		);
 		revealing = true;
 		view.dispatch({

@@ -108,7 +108,7 @@ const longestTaskSince = (page: Page, from: number) =>
 	);
 const now = (page: Page) => page.evaluate(() => performance.now());
 
-/** 5,000 unresolved types in ten files: 5,000 problems (the engine reports unresolved names as warnings). */
+/** 5,000 unresolved types in ten files: 5,000 problems (unresolved names are errors). */
 function brokenProject(files = 10, perFile = 500) {
 	return Array.from({ length: files }, (_, f) => ({
 		path: `broken/Broken${f}.sysml`,
@@ -135,7 +135,7 @@ test('a model with 5,000 problems stays usable: problems list, editor, status ba
 	await ready(page, 120_000);
 	measure('open → Model ready (ms)', Date.now() - from);
 	const chip = page.getByRole('button', { name: /^Problems: \d+ errors/ });
-	await expect(chip).toHaveAccessibleName(/^Problems: 0 errors, 5000 warnings/, {
+	await expect(chip).toHaveAccessibleName(/^Problems: 5000 errors, 0 warnings/, {
 		timeout: 60_000
 	});
 	measure('open → 5000 problems in the status bar (ms)', Date.now() - from);
@@ -199,7 +199,7 @@ test('a model with 5,000 problems stays usable: problems list, editor, status ba
 	await page.keyboard.press('Control+a');
 	await page.keyboard.press('Delete');
 	await page.keyboard.insertText('package Fixed { part def Holder; }\n');
-	await expect(chip).toHaveAccessibleName(/^Problems: 0 errors, 4500 warnings/, {
+	await expect(chip).toHaveAccessibleName(/^Problems: 4500 errors, 0 warnings/, {
 		timeout: 60_000
 	});
 

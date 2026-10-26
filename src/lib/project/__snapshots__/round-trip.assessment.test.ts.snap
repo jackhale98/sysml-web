@@ -109,7 +109,9 @@ exports[`every kind of edit changes only what it is about > add an element to a 
     ],
   },
   "problems": [],
-  "semantic": [],
+  "semantic": [
+    "changed view HostileViews::vehicleParts {exposes: Hostile::Vehicle::* -> Hostile::Vehicle::*; Hostile::car}",
+  ],
 }
 `;
 
@@ -228,7 +230,7 @@ exports[`every kind of edit changes only what it is about > change a transitionâ
   },
   "problems": [],
   "semantic": [
-    "changed transition Hostile::Power::off_on {multiplicity: - -> s}",
+    "changed transition Hostile::Power::off_on {trigger: Go -> after 5 s}",
   ],
 }
 `;
@@ -288,7 +290,9 @@ exports[`every kind of edit changes only what it is about > change a value to a 
     ],
   },
   "problems": [],
-  "semantic": [],
+  "semantic": [
+    "changed attribute Hostile::Engine::rpm {valueKind: - -> default}",
+  ],
 }
 `;
 
@@ -609,7 +613,7 @@ exports[`every kind of edit changes only what it is about > give a definition a 
   },
   "problems": [],
   "semantic": [
-    "changed part def Hostile::Engine {doc: KEEP-10 a named comment about Engine -> The engine. KEEP-10 a named comment about Engine}",
+    "changed part def Hostile::Engine {doc: - -> The engine.}",
   ],
 }
 `;
@@ -671,7 +675,9 @@ exports[`every kind of edit changes only what it is about > make a value derived
     ],
   },
   "problems": [],
-  "semantic": [],
+  "semantic": [
+    "changed attribute Hostile::Vehicle::totalMass {derived: - -> derived}",
+  ],
 }
 `;
 
@@ -1115,10 +1121,6 @@ exports[`the formatter > keeps every comment, is idempotent, and its changes are
       "-10 	}",
     ],
   },
-  "semantic": [
-    "added other dependency Tank to Engine (in Hostile)",
-    "changed attribute Hostile::Tank::mass {multiplicity: kg -> -}",
-    "removed other dependency from Tank to Engine (in Hostile)",
-  ],
+  "semantic": [],
 }
 `;

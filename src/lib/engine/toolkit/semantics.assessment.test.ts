@@ -31,7 +31,7 @@ describe('invalid models are diagnosed where the problem is', () => {
 		[
 			'an unresolved type',
 			'package P {\n  part p : Nope;\n}',
-			/^warning 2: unresolved reference `Nope`$/
+			/^error 2: unresolved reference `Nope`$/
 		],
 		[
 			'an action typed by a part definition',
@@ -46,7 +46,7 @@ describe('invalid models are diagnosed where the problem is', () => {
 		[
 			'a redefinition of a feature that is not inherited',
 			'package P {\n  part def A { attribute m; }\n  part def B :> A { attribute :>> q; }\n}',
-			/^warning 3: unresolved reference `q`$/
+			/^error 3: unresolved reference `q`$/
 		],
 		[
 			'overriding a bound (non-default) value',
@@ -79,20 +79,49 @@ describe('invalid models are diagnosed where the problem is', () => {
 		});
 });
 
+describe('messages name elements as people write them', () => {
+	// The toolkit names an element without a name of its own (here a redefinition of a name
+	// that doesn't resolve) by its id: `@871461b0-…` (OMG training lesson 29, checked alone).
+	it('an element the toolkit gives by its id', () => {
+		const text = [
+			'package Q {',
+			'\tpart car {',
+			'\t\tpart engine;',
+			'\t}',
+			'\tpart c :> car {',
+			'\t\tattribute :>> simpleMass = 1000;',
+			'\t\tpart :>> engine {',
+			'\t\t\tattribute :>> simpleMass = 100;',
+			'\t\t}',
+			'\t}',
+			'}'
+		].join('\n');
+		const found = problems(text);
+		expect(found.join('\n')).not.toMatch(/@[0-9a-f]{8}-/);
+		expect(
+			found.some((p) =>
+				/^error 8: Cannot override the non-default value of `Q::c::simpleMass`/.test(p)
+			),
+			found.join('\n')
+		).toBe(true);
+	});
+});
+
 describe('departures from the specification', () => {
-	// Known gap: an unresolved name is a warning; KerML 8.2.3.5.1 says the text "fails with a
-	// name resolution error" (the pilot reports an error), so a model with dangling names
-	// counts as having no errors.
-	it.fails('an unresolved name is an error', () => {
+	// KerML 8.2.3.5.1: the text "fails with a name resolution error" (the pilot reports an error).
+	// The toolkit says warning; the app shows it as an error (`diagnostics.ts`), so a model with
+	// dangling names doesn't read "0 errors".
+	it('an unresolved name is an error', () => {
 		expect(problems('package P {\n  part p : Nope;\n}')).toEqual([
 			'error 2: unresolved reference `Nope`'
 		]);
 	});
 
-	// Known gap: KerML 7.3.2.3 "Specialization relationships can form cycles" (and 8.2.3.5.1:
+	// KerML 7.3.2.3 "Specialization relationships can form cycles" (and 8.2.3.5.1:
 	// "Circularity is allowed for Imports and Specializations"); the pilot's own tests expect
-	// no errors (ShadowingTests_CircleInheritance.kerml.xt). The toolkit reports an error.
-	it.fails('circular specialization is not an error', () => {
+	// no errors (ShadowingTests_CircleInheritance.kerml.xt). The toolkit reports an error, which
+	// the app doesn't show (`diagnostics.ts`).
+	it('circular specialization is not an error', () => {
 		expect(
 			problems(
 				'package P {\n  classifier A specializes B;\n  classifier B specializes A;\n}',
@@ -109,7 +138,9 @@ describe('departures from the specification', () => {
 	// SysML 8.4.17.3 parses `by f` as `subject subj redefines R::subj = f`). So `drone` is the
 	// subject itself, `drone.fc` does not resolve, and the pilot says so. The toolkit resolves
 	// `drone` to the imported part and reports nothing: the claim means something else in
-	// Fairtide than in the reference implementation.
+	// Fairtide than in the reference implementation. This pins the engine's own findings (reported
+	// upstream, docs/engine.md); the app warns at such a satisfy (`project/requirementChecks.ts`,
+	// tested in requirementChecks.test.ts).
 	it.fails(
 		'`by` names the satisfy usage’s own subject before an imported part of the same name',
 		() => {
@@ -131,7 +162,9 @@ describe('departures from the specification', () => {
 
 	// Known gap: SysML 8.3.21 validateRequirementUsageSubjectParameterPosition, "The
 	// subjectParameter of a RequirementUsage must be its first input"; a stakeholder declared
-	// before the (inherited) subject breaks it. The pilot reports it; the toolkit does not.
+	// before the (inherited) subject breaks it. The pilot reports it; the toolkit does not. This
+	// pins the engine's own findings (reported upstream, docs/engine.md); the app warns
+	// (`project/requirementChecks.ts`, tested in requirementChecks.test.ts).
 	it.fails('a stakeholder before the subject is reported', () => {
 		const text = 'package C {\n  part def Op;\n  requirement r { stakeholder s : Op; }\n}';
 		expect(problems(text).some((p) => /^error 3: /.test(p))).toBe(true);

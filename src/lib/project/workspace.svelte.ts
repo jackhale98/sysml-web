@@ -19,6 +19,7 @@ import type {
 	ViewInfo
 } from '#lib/engine/types.ts';
 import { checkProblems } from './checks';
+import { inLineBreaksOf } from './lineBreaks';
 import { requirementIdProblems } from './requirementIds';
 import { satisfyProblems, subjectFirstProblems } from './requirementChecks';
 import { revertChanges } from './revert';
@@ -386,6 +387,7 @@ export class Workspace {
 
 	private applyTo(path: string, source: string, changes: Change[]) {
 		if (!changes.length) return;
+		changes = inLineBreaksOf(source, changes);
 		const editor = this.editors.get(path);
 		if (editor) editor.apply(changes);
 		else this.setText(path, applyChanges(source, changes));
@@ -570,7 +572,10 @@ export class Workspace {
 			});
 		}
 		if (!changes.length) return [];
-		const plain = changes.map((c) => ({ from: c.from, to: c.to, insert: c.insert }));
+		const plain = inLineBreaksOf(
+			after,
+			changes.map((c) => ({ from: c.from, to: c.to, insert: c.insert }))
+		);
 		const editor = this.editors.get(path);
 		if (editor) editor.apply(plain);
 		else this.setText(path, applyChanges(after, plain));
@@ -664,9 +669,10 @@ export class Workspace {
 		await this.transact(label, async () => {
 			const byFile: Record<string, Change[]> = {};
 			for (const { path, ...change } of changes) (byFile[path] ??= []).push(change);
-			for (const [path, fileChanges] of Object.entries(byFile)) {
+			for (const [path, changed] of Object.entries(byFile)) {
 				const before = this.files[path];
 				if (before === undefined) continue;
+				const fileChanges = inLineBreaksOf(before, changed);
 				const editor = this.editors.get(path);
 				if (editor) editor.apply(fileChanges);
 				else this.setText(path, applyChanges(before, fileChanges));

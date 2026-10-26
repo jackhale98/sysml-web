@@ -65,7 +65,7 @@ export interface SnapRelation extends Location {
 	ownerId: string | null;
 	/** Element ids it refers to (resolved by the engine), matched through renames. */
 	refs: string[];
-	/** What it says, as written (names), whitespace collapsed: matched with renames substituted. */
+	/** What it says, as written (names), however laid out (tokens one space apart, no comments): matched with renames substituted. */
 	key: string;
 	/** For people: `'Flight endurance' by drone`, `esc to motor`. */
 	text: string;

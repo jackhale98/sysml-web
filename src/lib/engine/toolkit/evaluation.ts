@@ -52,6 +52,7 @@ import type { Check, CheckReport, CheckStatus, CheckValue, Evaluated, Span } fro
 import type { TkElement, TkLibrary, TkSession, TkSite, Toolkit } from './api';
 import {
 	multiplicityOf,
+	toOriginalByte,
 	type ElementRecord,
 	type ExtractedModel,
 	type TraceRecord,
@@ -657,12 +658,8 @@ export class Evaluation {
 	private locate(p: TkPosition): Located | null {
 		const unit = this.source.units.get(p.unitName);
 		if (!unit || !p.line) return null;
-		let start = unit.repaired.byteOfLineCol(p.line, p.col);
-		let end = unit.repaired.byteOfLineCol(p.endLine, p.endCol);
-		if (unit.repair) {
-			start = unit.repair.toOriginal(start);
-			end = unit.repair.toOriginal(end);
-		}
+		const start = toOriginalByte(unit, unit.repaired.byteOfLineCol(p.line, p.col));
+		const end = toOriginalByte(unit, unit.repaired.byteOfLineCol(p.endLine, p.endCol));
 		const span = unit.original.spanOfBytes(start, Math.max(start, end));
 		const text = unit.original.text.slice(span.from, span.to).replace(/\s+/g, ' ').trim();
 		return { unit, start, span, text };

@@ -143,9 +143,9 @@ describe('requirement identity: rename, move, file rename, merge', { timeout: 12
 		);
 		const ws = await workspace(files);
 		expect(problems(ws)).toEqual([
-			`warning ${R}:${lineOf(files, R, "end #derive ::> 'Flight endurance'")} unresolved reference \`Flight endurance\``,
-			`warning ${S}:${lineOf(files, S, "satisfy 'Flight endurance'")} unresolved reference \`Flight endurance\``,
-			`warning ${V}:${lineOf(files, V, "verify 'Flight endurance'")} unresolved reference \`Flight endurance\``
+			`error ${R}:${lineOf(files, R, "end #derive ::> 'Flight endurance'")} unresolved reference \`Flight endurance\``,
+			`error ${S}:${lineOf(files, S, "satisfy 'Flight endurance'")} unresolved reference \`Flight endurance\``,
+			`error ${V}:${lineOf(files, V, "verify 'Flight endurance'")} unresolved reference \`Flight endurance\``
 		]);
 		// Coverage follows the model as it now resolves: SYS-001 has lost both links.
 		expect(row(ws, 'SYS-001')).toMatchObject({ satisfiedBy: [], verifiedBy: [] });
@@ -172,9 +172,9 @@ describe('requirement identity: rename, move, file rename, merge', { timeout: 12
 	it('the same move without updating references is reported at each reference', async () => {
 		const ws = await workspace(movedToNewFile(false));
 		expect(problems(ws).map((p) => p.replace(/:\d+ /, ' '))).toEqual([
-			`warning ${R} unresolved reference \`Payload capacity\``,
-			`warning ${S} unresolved reference \`Payload capacity\``,
-			`warning ${V} unresolved reference \`Payload capacity\``
+			`error ${R} unresolved reference \`Payload capacity\``,
+			`error ${S} unresolved reference \`Payload capacity\``,
+			`error ${V} unresolved reference \`Payload capacity\``
 		]);
 		expect(row(ws, 'SYS-002')).toMatchObject({ satisfiedBy: [], verifiedBy: [] });
 	});
@@ -212,7 +212,7 @@ describe('requirement identity: rename, move, file rename, merge', { timeout: 12
 		const files = asList({ ...renamed, [S]: merged! });
 		const ws = await workspace(files);
 		expect(problems(ws)).toEqual([
-			`warning ${S}:${lineOf(files, S, "satisfy 'Flight endurance' by drone.battery")} unresolved reference \`Flight endurance\``
+			`error ${S}:${lineOf(files, S, "satisfy 'Flight endurance' by drone.battery")} unresolved reference \`Flight endurance\``
 		]);
 	});
 
@@ -327,7 +327,7 @@ describe('traceability and gaps', { timeout: 120_000 }, () => {
 		const files = edit(demo, FM, "riskControls = 'RC-001';", "riskControls = 'RC-099';");
 		const ws = await workspace(files);
 		expect(problems(ws)).toEqual([
-			`warning ${FM}:${lineOf(files, FM, "riskControls = 'RC-099'")} unresolved reference \`RC-099\``
+			`error ${FM}:${lineOf(files, FM, "riskControls = 'RC-099'")} unresolved reference \`RC-099\``
 		]);
 	});
 
@@ -348,7 +348,7 @@ describe('traceability and gaps', { timeout: 120_000 }, () => {
 		const removed = edit(demo, A, '        part battery : Battery;\n', '');
 		const ws = await workspace(removed);
 		expect(problems(ws)).toContain(
-			`warning ${FM}:${lineOf(removed, FM, '@Fmea about drone::battery')} unresolved reference \`drone::battery\``
+			`error ${FM}:${lineOf(removed, FM, '@Fmea about drone::battery')} unresolved reference \`drone::battery\``
 		);
 	});
 

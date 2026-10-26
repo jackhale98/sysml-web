@@ -32,7 +32,8 @@
 		infoFromFiles,
 		isProjectFile,
 		pickFolder,
-		readUploadedFolder
+		readUploadedFolder,
+		refusedNote
 	} from '#lib/project/sources.ts';
 	import {
 		isTemplateId,
@@ -150,11 +151,21 @@
 	const modelFiles = (files: ProjectFile[]) =>
 		files.filter((f) => f.path !== '.project.json' && isProjectFile(f.path));
 
+	/** Why a folder didn't open: no model files, or none that are UTF-8. */
+	const noModelFiles = (folder: { name: string; refused: string[] }) =>
+		folder.refused.length
+			? refusedNote(folder.refused)
+			: `No .sysml or .kerml files in “${folder.name}”.`;
+	const refusedNoteOf = (folder: { refused: string[] }) =>
+		folder.refused.length
+			? { message: refusedNote(folder.refused), tone: 'error' as const }
+			: undefined;
+
 	async function openFolder() {
 		try {
 			const folder = await pickFolder();
 			if (!folder.files.some((f) => /\.(sysml|kerml)$/.test(f.path))) {
-				error = `No .sysml or .kerml files in “${folder.name}”.`;
+				error = noModelFiles(folder);
 				return;
 			}
 			await keep(
@@ -164,7 +175,8 @@
 					origin: 'folder',
 					folder: folder.handle
 				},
-				'Opening…'
+				'Opening…',
+				refusedNoteOf(folder)
 			);
 		} catch (e) {
 			if ((e as DOMException)?.name !== 'AbortError') error = String(e);
@@ -177,7 +189,7 @@
 		const folder = await readUploadedFolder(input.files);
 		input.value = '';
 		if (!folder.files.some((f) => /\.(sysml|kerml)$/.test(f.path))) {
-			error = `No .sysml or .kerml files in “${folder.name}”.`;
+			error = noModelFiles(folder);
 			return;
 		}
 		await keep(
@@ -186,7 +198,8 @@
 				files: modelFiles(folder.files),
 				origin: 'archive'
 			},
-			'Opening…'
+			'Opening…',
+			refusedNoteOf(folder)
 		);
 	}
 

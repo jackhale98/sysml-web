@@ -22,6 +22,12 @@ describe('declaration text', () => {
 		expect(multiplicityOf('part p[0..*] : P')).toBe('0..*');
 		expect(multiplicityOf('attribute :>> mass = 650 [g]')).toBeNull();
 		expect(multiplicityOf("part 'a[1]' : P")).toBeNull();
+		// However the value is spaced, and a unit after a number anywhere.
+		expect(multiplicityOf('attribute :>> mass=40[kg]')).toBeNull();
+		expect(multiplicityOf('attribute rpm : Real default 6000[1/min]')).toBeNull();
+		expect(multiplicityOf('attribute x[2] :=3[s]')).toBe('2');
+		expect(multiplicityOf('accept after 5 [s] then idle')).toBeNull();
+		expect(multiplicityOf('constraint { mass <= 4[kg] }')).toBeNull();
 	});
 
 	it('reads specializations as written', () => {

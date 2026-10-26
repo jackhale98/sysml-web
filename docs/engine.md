@@ -83,17 +83,38 @@ Fields filled from the declaration text rather than the model:
 ## Problems in the text
 
 A unit that doesn't parse can't be part of a session, so `ToolkitHost`
-repairs it first with `lenientSources()` (the broken member is cut out, open
-bodies are closed) and keeps a `RepairMap` (`toolkit/repair.ts`) to map
-positions in the repaired text back to the person's text. Then
-(`toolkit/diagnostics.ts`):
+repairs it first and keeps a `RepairMap` (`toolkit/repair.ts`) to map
+positions in the repaired text back to the person's text. While someone
+types, the file is repaired from its latest text that parsed
+(`fromLastParsed`): the changes since then are undone, the fewest that make
+it parse (one of them, else all), so an unclosed `{` leaves the file's
+model, its diagrams and its problems as they were, positions following
+the typing. A file never seen parsing (opened broken), or one that differs
+too much from its last parse (more than half rewritten, or more than 4,000
+characters to take back), is repaired by the toolkit's `lenientSources()`
+instead (the broken member is cut out, open bodies are closed), which can
+cut out the element the brace is in. Then (`toolkit/diagnostics.ts`):
 
 - parse errors become the file's syntax errors; a parse error within two
   lines after another in the same file is the parser's echo and is dropped;
 - while any file has a syntax error, an "unresolved reference" whose name, or
   a name before it in its chain, is written in a broken file is hidden (an
-  unclosed `{` otherwise gave 40 such warnings on the demo), and the first
-  syntax error says how many were hidden.
+  unclosed `{` otherwise gave 40 such problems on the demo), and so is a
+  finding in text the repair put in; the first syntax error says how many
+  were hidden;
+- a name that doesn't resolve is an error (KerML 8.2.3.5.1), though the
+  toolkit reports it as a warning: a model with dangling names doesn't read
+  "0 errors";
+- a circular specialization is not shown: KerML 7.3.2.3 allows cycles (and
+  the pilot's own tests expect none), though the toolkit reports an error;
+- an element a message names by its id (`@871461b0-…`, one without a name of
+  its own) is named by its qualified name, or as it is referred to.
+
+A file that starts with a UTF-8 byte-order mark keeps it (the folder reader
+reads it as U+FEFF, so it is written back). The toolkit reads the mark as an
+unexpected character, so it is given a space in its place (`toolkit/bom.ts`):
+one UTF-16 unit like the mark, so UTF-16 offsets agree, and two bytes fewer,
+which `toOriginalByte` adds back.
 
 ## Views and tables
 
@@ -551,16 +572,21 @@ words and shows it. The host takes a **snapshot** of each version
 
 - **Snapshots.** From the model adapter's records of the project's own
   files: every named element with what it says about itself as people
-  read it (`type`, `multiplicity`, `value`, `specializes`, `redefines`,
-  `direction`, `doc`, `shortName`, `abstract`, a requirement's `require
-  constraint`, and metadata values by `metadata:<Type>.<field>`: a status,
-  an FMEA rating), its label (`Motor.mass`, `SYS-003`), its group
+  read it (`type`, `multiplicity` (a unit in brackets after a value or a
+  number is not one), `value` and `valueKind` (`default`, `initial` for
+  `:=`; none for `=`), `specializes`, `redefines`, `direction`, `derived`,
+  `readonly`, `doc` (its own `doc` comments) and `comments` (comments about
+  it written elsewhere, `comment about X`), `shortName`, `abstract`, a
+  view's `exposes` and `filters`, a requirement's `require constraint`,
+  and metadata values by `metadata:<Type>.<field>`: a status, an FMEA
+  rating), its label (`Motor.mass`, `SYS-003`), its group
   (Requirements, Design, Behaviour, Verification, Risk, Other: from its
   kind or its owner's, and from the risk libraries' types) and its text
   without its name; the unnamed relationships (`satisfy`, `verify`,
   `allocate`, `connect`, interfaces, flows, bindings, derivations,
-  successions, transitions) with their text and the elements they
-  resolve to; the checks (`Evaluation.checks()`, with the value against
+  successions, transitions) with their text (tokens one space apart,
+  without comments, `dependency from A to B` as `dependency A to B`: a
+  reformatted model reads the same) and the elements they resolve to; the checks (`Evaluation.checks()`, with the value against
   its limit: `4.05 kg > 4 kg`); each budget table's total; and every
   attribute's evaluated value. An `about` that doesn't resolve is left
   out (the adapter would give the annotation to its package).
@@ -884,6 +910,16 @@ implementation as the reference (`docs/interop-tools.md`):
   its subject, or without one (SysML 8.3.21,
   `validate…SubjectParameterPosition`, which the pilot enforces). The app
   warns.
+- **Circular specialization is an error.** `classifier A specializes B;
+  classifier B specializes A;` gives "circular specialization: this
+  definition transitively specializes itself" (error); KerML 7.3.2.3 says
+  specializations can form cycles, and the pilot reports nothing
+  (`ShadowingTests_CircleInheritance.kerml.xt`). The app doesn't show it.
+- **Unresolved names are warnings.** KerML 8.2.3.5.1 makes a failed name
+  resolution an error, as the pilot does. The app shows them as errors.
+- **A byte-order mark is a syntax error.** `\uFEFFpackage P {}` gives
+  "unexpected character"; a UTF-8 BOM is common in files from Windows
+  editors. The app gives the toolkit a space in its place.
 - **A metadata body's values export as new features.** `@Safety { level =
   3; }` gives a `ReferenceUsage` named `level` with no Redefinition of
   `Safety::level` in `toCompactJson`; the pilot and SysON write the

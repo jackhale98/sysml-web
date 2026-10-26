@@ -5,7 +5,8 @@
  */
 import type { DeclarationSet } from '#lib/engine/types.ts';
 import type { ModelElement } from '#lib/project/elements.ts';
-import type { Workspace } from '#lib/project/workspace.svelte.ts';
+import { inLineBreaksOf } from '#lib/project/lineBreaks.ts';
+import { applyChanges, minimalChange, type Workspace } from '#lib/project/workspace.svelte.ts';
 import { toasts } from '#lib/ui/toasts.svelte.ts';
 import { planDuplicate } from '#lib/diagram/duplicate.ts';
 import { modelContext } from '#lib/diagram/modelContext.ts';
@@ -368,7 +369,12 @@ export async function applySteps(
 			if (workspace.text(step.path) !== step.before) {
 				return 'The file changed meanwhile; try again.';
 			}
-			workspace.setText(step.path, step.after);
+			// Lines it adds end as the file's other lines do.
+			const change = minimalChange(step.before, step.after);
+			workspace.setText(
+				step.path,
+				change ? applyChanges(step.before, inLineBreaksOf(step.before, [change])) : step.after
+			);
 		}
 		return null;
 	});

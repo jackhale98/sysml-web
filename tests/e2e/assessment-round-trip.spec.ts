@@ -128,11 +128,9 @@ test('an edit, a reload and a save to the folder change only the edited line', a
 	expect(folder['.project.json']).toEqual(bytesOf(FILES['.project.json']!));
 });
 
-// Known gap: the text editor normalises CRLF to LF on opening, and the workbench takes that as an edit: the whole file is rewritten with LF and counted as unsaved.
 test('opening a file with Windows line endings in the editor leaves it as it was', async ({
 	page
 }) => {
-	test.fail();
 	await page.setViewportSize({ width: 1440, height: 900 });
 	await openFolderProject(page, FILES);
 	await page.getByRole('tab', { name: 'Files' }).click();
@@ -144,6 +142,23 @@ test('opening a file with Windows line endings in the editor leaves it as it was
 	await page.waitForTimeout(2_000);
 	expect((await storedTexts(page))['model/Crlf.sysml']).toBe(CRLF);
 	await expect(unsaved(page)).toBeHidden();
+
+	// Typing a line, and pasting two, writes them with the file's line endings.
+	await page.locator('.cm-content').getByText('part def Bolt;', { exact: true }).click();
+	await page.keyboard.press('End');
+	await page.keyboard.press('Enter');
+	await page.keyboard.insertText('part def Washer;');
+	await page.locator('.cm-content').evaluate((el) => {
+		const data = new DataTransfer();
+		data.setData('text/plain', '\npart def Pin;\npart def Clip;');
+		el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true }));
+	});
+	await expect(unsaved(page)).toBeVisible({ timeout: 10_000 });
+	const stored = async () => (await storedTexts(page))['model/Crlf.sysml'] ?? '';
+	await expect.poll(stored).toContain('part def Washer;\r\npart def Pin;\r\npart def Clip;\r\n');
+	const text = await stored();
+	expect(text.replace(/\r\n/g, ''), 'no line ending in LF alone').not.toContain('\n');
+	expect(text.replace(/\s+part def (Washer|Pin|Clip);/g, '')).toBe(CRLF);
 });
 
 test('moving a box on a diagram writes only the layout file, never the model', async ({ page }) => {

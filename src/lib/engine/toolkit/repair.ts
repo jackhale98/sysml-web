@@ -39,6 +39,19 @@ export class RepairMap {
 		return last.original + Math.min(byte - last.repaired, last.length);
 	}
 
+	/**
+	 * Whether a byte of the repaired text is text the repair put in (closers, or
+	 * text taken back from the file as it last parsed), not the original's.
+	 */
+	isInserted(byte: number): boolean {
+		let last: Run | undefined;
+		for (const run of this.runs) {
+			if (byte < run.repaired) break;
+			last = run;
+		}
+		return !!last && byte >= last.repaired + last.length;
+	}
+
 	/** Whether an original byte offset is inside text the repair removed. */
 	isRemoved(byte: number): boolean {
 		return this.removed.some((r) => byte >= r.start && byte < r.end);
