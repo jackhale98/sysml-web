@@ -6,6 +6,7 @@
 	import PropertyForm from './PropertyForm.svelte';
 	import TradeSummary from './TradeSummary.svelte';
 	import TraceAdd from './TraceAdd.svelte';
+	import VerificationResult from './VerificationResult.svelte';
 	import RelatedElements from './RelatedElements.svelte';
 	import TransitionDetails from '#lib/diagram/TransitionDetails.svelte';
 	import {
@@ -25,6 +26,7 @@
 	import { familyColor } from '#lib/ui/kinds.ts';
 	import type { ModelElement, TreeNode } from '#lib/project/elements.ts';
 	import { displayReference } from '#lib/project/names.ts';
+	import { freshness, resultLabel, type RecordedResult } from '#lib/project/verification.ts';
 	import { humanize, statusLabel } from '#lib/project/status.ts';
 	import { isLibraryFile, type Workspace } from '#lib/project/workspace.svelte.ts';
 	import Pill from '#lib/ui/Pill.svelte';
@@ -202,6 +204,18 @@
 	{/if}
 {/snippet}
 
+<!-- How a verifying case's run went: its recorded result, and whether it still holds. -->
+{#snippet outcome(result: RecordedResult | null)}
+	{@const fresh = result ? freshness(result, workspace.revision) : null}
+	<span
+		class="outcome"
+		class:passed={result?.verdict === 'pass' && fresh?.state !== 'stale'}
+		class:failed={result?.verdict === 'fail' || result?.verdict === 'error'}
+		class:stale={fresh?.state === 'stale'}
+		title={fresh?.text ?? 'No result is recorded yet.'}>{resultLabel(result, fresh)}</span
+	>
+{/snippet}
+
 <aside class="inspector" class:phone={ui.phone} aria-label="Inspector">
 	{#if !element}
 		<div class="empty">
@@ -293,6 +307,10 @@
 			<TransitionDetails {element} {workspace} {engine} />
 		{/if}
 
+		{#if engine && element.kind === 'verification' && !element.isDefinition && !isLibraryFile(element.file)}
+			{#key element.key}<VerificationResult {element} {workspace} {ui} />{/key}
+		{/if}
+
 		{#if engine && !element.isDefinition}
 			<section aria-labelledby="values-heading" hidden={!valueCount}>
 				<h3 id="values-heading">Values</h3>
@@ -339,6 +357,8 @@
 								{@render traced(by, 'satisfy')}
 							</li>{/each}
 					</ul>
+				{:else if requirement.satisfied === 'derived'}
+					<p>Satisfied through the requirements derived from it.</p>
 				{:else}
 					<p class="gap">Nothing in the design satisfies this yet.</p>
 				{/if}
@@ -355,8 +375,13 @@
 				<h4>Verified by</h4>
 				{#if requirement.verifiedBy.length}
 					<ul class="links">
-						{#each requirement.verifiedBy as by (by)}<li>{@render traced(by, 'verify')}</li>{/each}
+						{#each requirement.verifiedBy as by, i (by)}<li>
+								{@render traced(by, 'verify')}
+								{@render outcome(requirement.results[i] ?? null)}
+							</li>{/each}
 					</ul>
+				{:else if requirement.verified === 'derived'}
+					<p>Verified through the requirements derived from it.</p>
 				{:else}
 					<p class="gap">No test verifies this yet.</p>
 				{/if}
@@ -671,6 +696,20 @@
 	}
 	.issue,
 	.gap {
+		color: var(--warn);
+	}
+	.outcome {
+		margin-left: var(--space-1);
+		color: var(--text-3);
+		font-size: var(--text-xs);
+	}
+	.outcome.passed {
+		color: var(--ok);
+	}
+	.outcome.failed {
+		color: var(--danger);
+	}
+	.outcome.stale {
 		color: var(--warn);
 	}
 	ul {

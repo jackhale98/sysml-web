@@ -230,7 +230,8 @@ test('a requirement links to what satisfies and verifies it', async ({ page }) =
 test('a requirement gets what satisfies it and a new test from the inspector', async ({ page }) => {
 	await openDemo(page);
 	const requirement = await select(page, 'Parcel delivery');
-	await expect(requirement).toContainText('Nothing in the design satisfies this yet.');
+	// A stakeholder need: satisfied through the requirements derived from it, not directly.
+	await expect(requirement).toContainText('Satisfied through the requirements derived from it.');
 	await requirement.getByRole('button', { name: 'Add what satisfies it' }).click();
 	const find = requirement.getByRole('searchbox', { name: 'Find what satisfies Parcel delivery' });
 	await find.fill('drone');

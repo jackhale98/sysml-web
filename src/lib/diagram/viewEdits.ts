@@ -186,6 +186,8 @@ export function neighbours(
 	const found: NeighbourElement[] = [];
 	const seen = new Set<string>();
 	for (const r of related) {
+		// An FMEA line's references are listed in the inspector, not drawn as lines.
+		if (r.kind === 'fmea') continue;
 		const element =
 			byId.get(r.element.id) ?? byKey.get(`${r.element.file}@${r.element.start_byte}`);
 		if (!element || !r.element.qualifiedName || element.file.startsWith('libraries/')) continue;

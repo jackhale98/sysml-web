@@ -145,7 +145,10 @@ steps; the matrix says how many of each.
 ## Review flags
 
 A connection or interface with no definition (a plain `connect`), and an
-element with no links among the counted kinds, are flagged.
+element with no links among the counted kinds, are flagged. Links to
+elements outside the matrix count: a step allocated to a part is not
+flagged in a functional DSM that counts allocations, though the matrix
+lists only steps.
 
 ## In the app
 

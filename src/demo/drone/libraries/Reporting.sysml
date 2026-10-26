@@ -17,6 +17,27 @@ package Reporting {
         attribute cellLevel : String[0..1];
     }
 
+    /*
+     * A modelling convention: on a table view, says that every row the
+     * view lists breaks a rule of the project. Fairtide lists each one
+     * under Problems, at the element it is about:
+     *
+     *   view requirementsWithoutOwner : RequirementsTable {
+     *       @TableRendering { where = "owner == \"\""; }
+     *       @Convention { rule = "Every requirement names its owner."; }
+     *   }
+     */
+    metadata def Convention {
+        attribute rule : String[0..1];
+        attribute severity : ConventionSeverity[0..1];
+    }
+
+    enum def ConventionSeverity {
+        enum error;
+        enum warning;
+        enum note;
+    }
+
     // --- Domain-neutral views usable in any model ---------------------
 
     view def PortTable {

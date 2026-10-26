@@ -25,6 +25,12 @@ beforeAll(async () => {
 
 type File = { path: string; text: string };
 const demo: File[] = demoFiles();
+/**
+ * The demo's coverage by the one rule (home, tables, report): 16 requirements satisfied and 13
+ * verified directly, and the stakeholder needs whose derived requirements all are (four
+ * satisfied, three verified); no test results recorded.
+ */
+const DEMO_COVERAGE = { total: 24, satisfied: 20, verified: 16, passed: 0 };
 const R = 'requirements/SystemRequirements.sysml';
 const S = 'system/Satisfaction.sysml';
 const V = 'verification/VerificationPlan.sysml';
@@ -121,14 +127,15 @@ describe('requirement identity: rename, move, file rename, merge', { timeout: 12
 			satisfiedBy: ['drone'],
 			verifiedBy: ['enduranceFlightTest']
 		});
-		expect(ws.coverage).toEqual({ total: 24, satisfied: 16, verified: 13 });
+		expect(ws.coverage).toEqual(DEMO_COVERAGE);
 		const said = lines(review(demo, files));
 		expect(said).toContain('Requirements: Renamed requirement `SYS-001` to `Hover endurance`');
 		expect(said.filter((l) => /Added requirement|Removed requirement/.test(l))).toEqual([]);
 	});
 
-	// Known gap: the review also lists an unnamed `objective` in another file (analysis enduranceBudget) as removed and added.
-	it.fails('the review of that rename lists nothing but the rename', () => {
+	// The review used to list an unnamed `objective` in another file (analysis enduranceBudget),
+	// whose doc names the requirement, as removed and added.
+	it('the review of that rename lists nothing but the rename', () => {
 		expect(lines(review(demo, renamedByEngine()))).toEqual([
 			'Requirements: Renamed requirement `SYS-001` to `Hover endurance`'
 		]);
@@ -147,9 +154,12 @@ describe('requirement identity: rename, move, file rename, merge', { timeout: 12
 			`warning ${S}:${lineOf(files, S, "satisfy 'Flight endurance'")} unresolved reference \`Flight endurance\``,
 			`warning ${V}:${lineOf(files, V, "verify 'Flight endurance'")} unresolved reference \`Flight endurance\``
 		]);
-		// Coverage follows the model as it now resolves: SYS-001 has lost both links.
+		// Coverage follows the model as it now resolves: SYS-001 has lost both links, and the need
+		// derived into it (STK-001) is no longer covered through it: its derivation names a
+		// requirement that isn't there.
 		expect(row(ws, 'SYS-001')).toMatchObject({ satisfiedBy: [], verifiedBy: [] });
-		expect(ws.coverage).toEqual({ total: 24, satisfied: 15, verified: 12 });
+		expect(row(ws, 'STK-001')).toMatchObject({ satisfied: null, verified: null });
+		expect(ws.coverage).toEqual({ total: 24, satisfied: 18, verified: 14, passed: 0 });
 	});
 
 	it('a move to another package and file, with references updated, keeps ID, links and coverage', async () => {
@@ -161,7 +171,7 @@ describe('requirement identity: rename, move, file rename, merge', { timeout: 12
 			satisfiedBy: ['drone'],
 			verifiedBy: ['massAndPayloadCheck']
 		});
-		expect(ws.coverage).toEqual({ total: 24, satisfied: 16, verified: 13 });
+		expect(ws.coverage).toEqual(DEMO_COVERAGE);
 		const said = lines(review(demo, files));
 		expect(said).toContain(
 			'Requirements: Moved requirement `SYS-002` ‘Payload capacity’ from `SystemRequirements` to `PayloadRequirements`'
@@ -194,7 +204,7 @@ describe('requirement identity: rename, move, file rename, merge', { timeout: 12
 			satisfiedBy: ['drone'],
 			verifiedBy: ['enduranceFlightTest']
 		});
-		expect(ws.coverage).toEqual({ total: 24, satisfied: 16, verified: 13 });
+		expect(ws.coverage).toEqual(DEMO_COVERAGE);
 		expect(lines(review(demo, files))).toEqual([
 			'Other: Moved package `SystemRequirements` to the file `reqs/System.sysml`'
 		]);
@@ -234,10 +244,7 @@ describe('requirement identity: rename, move, file rename, merge', { timeout: 12
 		]);
 	});
 
-	// The cross-package ID check (src/lib/project/requirementIds.ts) was landing on main during the
-	// assessment; this runs the real assertion once it is in the tree, and records the gap until then.
-	const hasIdCheck = Object.keys(import.meta.glob('./requirementIds.ts')).length > 0;
-	const twoFilesOneId = async () => {
+	it('two requirements in different packages sharing an ID are flagged at each', async () => {
 		const files = sorted([
 			...demo,
 			{
@@ -247,15 +254,7 @@ describe('requirement identity: rename, move, file rename, merge', { timeout: 12
 		]);
 		const ws = await workspace(files);
 		expect(problems(ws).filter((p) => p.includes('SYS-001')).length).toBeGreaterThanOrEqual(2);
-	};
-	if (hasIdCheck)
-		it('two requirements in different packages sharing an ID are flagged at each', twoFilesOneId);
-	// Known gap: no check for one ID used in two packages until requirementIds.ts lands.
-	else
-		it.fails(
-			'two requirements in different packages sharing an ID are flagged at each',
-			twoFilesOneId
-		);
+	});
 });
 
 describe('traceability and gaps', { timeout: 120_000 }, () => {
@@ -275,7 +274,11 @@ describe('traceability and gaps', { timeout: 120_000 }, () => {
 		);
 		expect(row(ws, 'SYS-005')!.satisfiedBy).toEqual(['drone']);
 		expect(row(ws, 'SYS-010')!.verifiedBy).toEqual([]);
-		expect(ws.coverage).toEqual({ total: 24, satisfied: 17, verified: 12 });
+		// By the rule: the need SYS-005 is derived from (STK-003) is satisfied now, and the one
+		// SYS-010 is derived from (STK-001) no longer verified.
+		expect(row(ws, 'STK-003')!.satisfied).toBe('derived');
+		expect(row(ws, 'STK-001')!.verified).toBeNull();
+		expect(ws.coverage).toEqual({ total: 24, satisfied: 22, verified: 14, passed: 0 });
 	});
 
 	it('the home view’s gaps and the Requirement gaps table name the same requirements', async () => {
@@ -286,8 +289,9 @@ describe('traceability and gaps', { timeout: 120_000 }, () => {
 			'    view gaps : RequirementGaps;\n    // Diagrams.'
 		);
 		const ws = await workspace(files);
+		// The home view's gaps, by the one coverage rule (`HomeView.svelte`).
 		const home = ws.requirements
-			.filter((r) => !r.satisfiedBy.length || !r.verifiedBy.length)
+			.filter((r) => !r.satisfied || !r.verified)
 			.map((r) => r.id)
 			.sort();
 		const table = host.renderView(files, 'gaps');
@@ -296,6 +300,8 @@ describe('traceability and gaps', { timeout: 120_000 }, () => {
 		expect(home).toEqual(
 			expect.arrayContaining(['SYS-005', 'SYS-006', 'SYS-011', 'RC-003', 'RC-007'])
 		);
+		// A need whose derived requirements are all satisfied and verified is not a gap.
+		expect(home).not.toContain('STK-001');
 	});
 
 	it('a satisfy whose target is not a requirement is an error', async () => {
@@ -309,18 +315,18 @@ describe('traceability and gaps', { timeout: 120_000 }, () => {
 		]);
 	});
 
-	// Known gap: nothing checks derivation for cycles (A derived from B derived from A).
-	it.fails('a circular derivation is reported', async () => {
-		const ws = await workspace(
-			edit(
-				demo,
-				R,
-				'    // ---- Derivation: which need each requirement comes from ----',
-				"    #derivation connection { end #original ::> 'Flight endurance'; end #derive ::> 'Payload capacity'; }\n" +
-					"    #derivation connection { end #original ::> 'Payload capacity'; end #derive ::> 'Flight endurance'; }\n"
-			)
+	it('a circular derivation is reported, naming the circle', async () => {
+		const files = edit(
+			demo,
+			R,
+			'    // ---- Derivation: which need each requirement comes from ----',
+			"    #derivation connection { end #original ::> 'Flight endurance'; end #derive ::> 'Payload capacity'; }\n" +
+				"    #derivation connection { end #original ::> 'Payload capacity'; end #derive ::> 'Flight endurance'; }\n"
 		);
-		expect(problems(ws).some((p) => /circular|cycle/i.test(p))).toBe(true);
+		const ws = await workspace(files);
+		expect(problems(ws).filter((p) => /circular|cycle/i.test(p))).toEqual([
+			`warning ${R}:${lineOf(files, R, "end #original ::> 'Flight endurance'; end #derive ::> 'Payload capacity'")} Circular derivation: SYS-001 Flight endurance → SYS-002 Payload capacity → SYS-001 Flight endurance. A requirement can’t be derived, through others, from itself.`
+		]);
 	});
 
 	it('an FMEA line naming a risk control that does not exist is reported at the line', async () => {
@@ -362,25 +368,22 @@ describe('traceability and gaps', { timeout: 120_000 }, () => {
 		expect(checks.filter((c) => /enduranceFlightTest|VC-0/.test(JSON.stringify(c)))).toEqual([]);
 	});
 
-	// Known gap: the DSM's "no links" flag ignores links to elements outside the matrix, so with
-	// allocations counted every step of the delivery flight is flagged, allocated or not.
-	it.fails(
-		'the functional DSM, counting allocations, flags only steps no part is allocated',
-		() => {
-			const files = edit(
-				demo,
-				'behaviour/Allocation.sysml',
-				'    allocate drone.deliveryFlight.land to drone.flightController;\n',
-				''
-			);
-			const m = host.dependencyMatrix(files, 'deliveryFlightDsm');
-			expect(m.available).toContain('allocation');
-			const flagged = reviewFlags(m, ['allocation']).unlinked.map((i) => m.items[i]!.name);
-			// `land` is the one step left without an allocation.
-			expect(flagged).toContain('land');
-			expect(flagged).not.toContain('takeOff');
-		}
-	);
+	// The DSM's "no links" flag used to ignore links to elements outside the matrix, so with
+	// allocations counted every step of the delivery flight was flagged, allocated or not.
+	it('the functional DSM, counting allocations, flags only steps no part is allocated', () => {
+		const files = edit(
+			demo,
+			'behaviour/Allocation.sysml',
+			'    allocate drone.deliveryFlight.land to drone.flightController;\n',
+			''
+		);
+		const m = host.dependencyMatrix(files, 'deliveryFlightDsm');
+		expect(m.available).toContain('allocation');
+		const flagged = reviewFlags(m, ['allocation']).unlinked.map((i) => m.items[i]!.name);
+		// `land` is the one step left without an allocation.
+		expect(flagged).toContain('land');
+		expect(flagged).not.toContain('takeOff');
+	});
 });
 
 describe('impact of a requirement change', { timeout: 120_000 }, () => {
@@ -416,8 +419,7 @@ describe('impact of a requirement change', { timeout: 120_000 }, () => {
 		expect(reached.sort()).toEqual(['SYS-001', 'SYS-002', 'SYS-010']);
 	});
 
-	// Known gap: the related panel does not list the FMEA lines whose riskControls name a control.
-	it.fails('the related panel of a risk control lists the FMEA lines that rely on it', () => {
+	it('the related panel of a risk control lists the FMEA lines that rely on it', () => {
 		const id = host
 			.analyzeProject(demo)
 			.flatMap((a) => a.model.usages)
@@ -427,30 +429,46 @@ describe('impact of a requirement change', { timeout: 120_000 }, () => {
 		expect(related.some((r) => r.endsWith(' DroneArchitecture::drone::battery'))).toBe(true);
 	});
 
-	// Known gap: the review reports the changed requirement, not what depends on it (its tests, implementers, FMEA lines).
-	it.fails(
-		'a reworded risk control names the verification, mitigation and FMEA line it affects',
-		() => {
-			const said = lines(
-				review(
+	it('a reworded risk control names the verification, mitigation and FMEA line it affects', () => {
+		const said = lines(
+			review(
+				demo,
+				edit(
 					demo,
-					edit(
-						demo,
-						FM,
-						'shall disconnect the pack and alert',
-						'shall disconnect the pack within 1 s and alert'
-					)
+					FM,
+					'shall disconnect the pack and alert',
+					'shall disconnect the pack within 1 s and alert'
 				)
-			).join('\n');
-			expect(said).toContain('RC-001');
-			expect(said).toContain('batteryAbuseTest');
-			expect(said).toContain('batteryManagementSystem');
-			expect(said).toMatch(/drone\.battery|Thermal runaway/);
-		}
-	);
+			)
+		).join('\n');
+		expect(said).toContain('RC-001');
+		expect(said).toContain('batteryAbuseTest');
+		expect(said).toContain('batteryManagementSystem');
+		expect(said).toMatch(/drone\.battery|Thermal runaway/);
+	});
 });
 
 describe('modelling conventions', { timeout: 120_000 }, () => {
+	it('a view marked as a convention lists what breaks it under Problems, at each element', async () => {
+		const files = edit(
+			demo,
+			'views/Views.sysml',
+			'    // Diagrams.',
+			'    view noOwner : RequirementsTable {\n' +
+				'        @TableRendering { where = "owner == \\"\\""; }\n' +
+				'        @Convention { rule = "Every requirement names its owner."; }\n' +
+				'    }\n    // Diagrams.'
+		);
+		const ws = await workspace(files);
+		const broken = problems(ws).filter((p) => p.includes('convention noOwner'));
+		expect(broken).toHaveLength(7);
+		expect(broken[0]).toBe(
+			`warning ${FM}:${lineOf(files, FM, "requirement <'RC-001'>")} Every requirement names its owner. (convention noOwner): RC-001`
+		);
+		// The rest of the model breaks nothing new.
+		expect(problems(ws).filter((p) => !p.includes('convention noOwner'))).toEqual([]);
+	});
+
 	it('a saved view with `where` lists the requirements that break a convention (no owner)', () => {
 		const files = edit(
 			demo,

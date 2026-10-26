@@ -15,9 +15,11 @@ function cssString(text: string): string {
 	return `"${escaped}"`;
 }
 
-/** `@page`: A4 margins, project and title at the top, page numbers at the bottom. */
+/** `@page`: A4 margins, project and title at the top, the revision and page numbers at the bottom. */
 export function pageCss(doc: ReportDocument): string {
-	const id = [doc.number, doc.version && `version ${doc.version}`].filter(Boolean).join(' · ');
+	const id = [doc.number, doc.version && `version ${doc.version}`, doc.revision]
+		.filter(Boolean)
+		.join(' · ');
 	return `@page {
 	size: A4;
 	margin: 20mm 18mm 22mm;

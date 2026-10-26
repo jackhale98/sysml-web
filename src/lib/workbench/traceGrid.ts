@@ -13,6 +13,7 @@ export const RELATION_WORDS = {
 		by: 'Satisfied by',
 		verb: 'is satisfied by',
 		gap: 'Not satisfied',
+		through: 'Through derived requirements',
 		done: 'satisfied',
 		what: 'design elements'
 	},
@@ -20,6 +21,7 @@ export const RELATION_WORDS = {
 		by: 'Verified by',
 		verb: 'is verified by',
 		gap: 'Not verified',
+		through: 'Through derived requirements',
 		done: 'verified',
 		what: 'verification cases'
 	}

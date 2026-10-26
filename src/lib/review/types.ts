@@ -103,6 +103,19 @@ export interface SnapBudget {
 	total: string;
 }
 
+/**
+ * Something that depends on a requirement (or risk control): what satisfies
+ * it (a part of the design, or a mitigation), a verification case that
+ * verifies it, a requirement derived from it, an FMEA line that names it.
+ */
+export interface Dependant {
+	kind: 'satisfier' | 'mitigation' | 'verification' | 'derived' | 'fmea';
+	/** Its element id (for an FMEA line, the element the line is about), when resolved. */
+	id: string | null;
+	/** As people read it: `drone.battery`, `batteryAbuseTest`, `drone.battery ‘Thermal runaway’`. */
+	label: string;
+}
+
 /** One version of the model. */
 export interface ModelSnapshot {
 	elements: SnapElement[];
@@ -113,6 +126,8 @@ export interface ModelSnapshot {
 	values: Record<string, string>;
 	/** Files with syntax errors (their broken parts are left out of the comparison). */
 	brokenFiles: string[];
+	/** What depends on each requirement, by its element id (`Dependant`). */
+	dependants?: Record<string, Dependant[]>;
 }
 
 // ---- What changed ------------------------------------------------------------
@@ -206,6 +221,12 @@ export interface ModelDiff {
 	budgets: BudgetChange[];
 	/** Files that didn't parse in either version (a note for the reader). */
 	brokenFiles: string[];
+	/**
+	 * What depends on the requirements, by element id, in either version
+	 * (the current one's where both have it): the review names them for a
+	 * requirement that changed.
+	 */
+	dependants?: Record<string, Dependant[]>;
 }
 
 /** The engine's answer to `compareModels`. */

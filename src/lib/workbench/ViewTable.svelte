@@ -30,6 +30,7 @@
 	import type { Engine } from '#lib/engine/client.ts';
 	import type { CheckStatus, RenderedTable, RowInfo, ViewInfo } from '#lib/engine/types.ts';
 	import { byteToUtf16, elementAt, type ModelElement } from '#lib/project/elements.ts';
+	import { OUTCOME_LABEL, outcomeOf } from '#lib/project/verification.ts';
 	import CheckChip from '#lib/ui/CheckChip.svelte';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
 	import { runGuideAction, type GuideAction } from './guide.ts';
@@ -606,7 +607,8 @@
 		| 'trace'
 		| 'level'
 		| 'elements'
-		| 'controls';
+		| 'controls'
+		| 'result';
 	function cellKind(column: string, value: string, index?: number): CellKind {
 		const c = column.toLowerCase();
 		if (isPivot) return 'mark';
@@ -629,6 +631,7 @@
 				return c === 'check' ? 'verdictIcon' : 'verdict';
 		}
 		if (c === 'id' || c === 'shortname') return 'id';
+		if (c === 'result' && value) return 'result';
 		if ((c === 'satisfied' || c === 'verified') && (value === '0' || value === '1')) return 'flag';
 		if (c === 'status' || c === 'state') return 'status';
 		if (c === 'satisfiedby' || c === 'verifiedby') return 'trace';
@@ -652,6 +655,29 @@
 
 	function heading(column: string): string {
 		return viewTitle(column);
+	}
+
+	/**
+	 * A requirement's verification as the table says it (`passed`), and as it
+	 * stands for the project's version: a pass the model has changed since is
+	 * out of date.
+	 */
+	function resultOf(index: number, value: string): { label: string; tone: string } {
+		const key = elementFor(index)?.key;
+		const requirement = key ? workspace.requirements.find((r) => r.key === key) : undefined;
+		const outcome = requirement
+			? outcomeOf(requirement.results, workspace.revision)
+			: (Object.keys(OUTCOME_LABEL) as (keyof typeof OUTCOME_LABEL)[]).find((o) => o === value);
+		if (!outcome) return { label: value, tone: 'plain' };
+		const tone =
+			outcome === 'passed'
+				? 'ok'
+				: outcome === 'failed'
+					? 'bad'
+					: outcome === 'not run'
+						? 'plain'
+						: 'warn';
+		return { label: OUTCOME_LABEL[outcome], tone };
 	}
 </script>
 
@@ -1325,6 +1351,9 @@
 										{@render controlGap(row.cells, table.columns[c] ?? '')}
 									{:else if kind === 'controls'}
 										{@render controlList(row.index)}{@render flag(problem)}
+									{:else if kind === 'result'}
+										{@const result = resultOf(row.index, value)}
+										<span class="chip {result.tone}">{result.label}</span>
 									{:else}
 										{@render cell(
 											kind,

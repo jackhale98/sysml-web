@@ -3,8 +3,18 @@
  * package (with their derivation tree when derivation links exist), the
  * traceability table, coverage figures and the gaps.
  */
+import { coverageRule, passedRule, type Covered } from '#lib/project/coverage.ts';
+import { derivationEnds, derivationLinks as linksBetween } from '#lib/project/derivations.ts';
 import type { RequirementRow } from '#lib/project/requirements.ts';
 import type { ModelElement } from '#lib/project/elements.ts';
+import {
+	freshness,
+	OUTCOME_LABEL,
+	outcomeOf,
+	resultLabel,
+	shortCommit,
+	type Outcome
+} from '#lib/project/verification.ts';
 import type { Chapter, ReportContext } from './context.ts';
 import {
 	cleanDoc,
@@ -20,7 +30,7 @@ import {
 	type Tone,
 	type TreeItem
 } from './document.ts';
-import { inScope, packageOf, resolveReference, splitName } from './model.ts';
+import { inScope, packageOf, resolveReference } from './model.ts';
 
 export interface RequirementTrace {
 	row: RequirementRow;
@@ -30,9 +40,13 @@ export interface RequirementTrace {
 	verifiedBy: Run[];
 	derivedFrom: RequirementRow[];
 	derives: RequirementRow[];
-	/** Satisfied directly, or through the requirements derived from it (all of them). */
-	satisfied: Coverage['how'];
-	verified: Coverage['how'];
+	/** Satisfied directly, or through the requirements derived from it (all of them): the coverage rule. */
+	satisfied: Covered;
+	verified: Covered;
+	/** Its verification cases all passed, and the results still hold (directly or through derived requirements). */
+	passed: Covered;
+	/** How its own verification went, from its cases' recorded results (null: nothing verifies it). */
+	outcome: Outcome | null;
 }
 
 const traced = new WeakMap<ReportContext, RequirementTrace[]>();
@@ -51,19 +65,19 @@ function trace(ctx: ReportContext): RequirementTrace[] {
 		return element ? inScope(index, element, ctx.scope) : !ctx.scope.length;
 	});
 	const links = derivationLinks(ctx);
-	const children = new Map<RequirementRow, RequirementRow[]>();
-	for (const l of links) children.set(l.original, [...(children.get(l.original) ?? []), l.derived]);
-	const through = (
-		row: RequirementRow,
-		field: 'satisfiedBy' | 'verifiedBy',
-		seen: Set<RequirementRow>
-	): boolean => {
-		if (row[field].length) return true;
-		const kids = (children.get(row) ?? []).filter((k) => !seen.has(k));
-		return kids.length > 0 && kids.every((k) => through(k, field, new Set([...seen, k])));
-	};
-	const how = (row: RequirementRow, field: 'satisfiedBy' | 'verifiedBy'): Coverage['how'] =>
-		row[field].length ? 'direct' : through(row, field, new Set([row])) ? 'derived' : null;
+	// The one coverage rule (#lib/project/coverage.ts), over every requirement of the model;
+	// a derived end that doesn't resolve (null) is never covered.
+	const children = new Map<RequirementRow, (RequirementRow | null)[]>();
+	for (const l of derivationEnds(ctx.requirements, ctx.derivations))
+		children.set(l.original, [...(children.get(l.original) ?? []), l.derived]);
+	const into = (row: RequirementRow) => children.get(row) ?? [];
+	const satisfied = coverageRule(ctx.requirements, (r) => r.satisfiedBy.length > 0, into);
+	const verified = coverageRule(ctx.requirements, (r) => r.verifiedBy.length > 0, into);
+	const passed = passedRule(
+		ctx.requirements.map((r) => ({ ...r, derivedInto: into(r).map((c) => c?.key ?? '?') })),
+		ctx.revisionInfo
+	);
+	const passedByKey = new Map([...passed].map(([r, how]) => [r.key, how]));
 	return rows.map((row) => {
 		const element = index.byKey.get(row.key);
 		// Trace names are written where the satisfy or verify is, not in the requirement.
@@ -77,8 +91,10 @@ function trace(ctx: ReportContext): RequirementTrace[] {
 			verifiedBy: refs(row.verifiedBy),
 			derivedFrom: links.filter((l) => l.derived === row).map((l) => l.original),
 			derives: links.filter((l) => l.original === row).map((l) => l.derived),
-			satisfied: how(row, 'satisfiedBy'),
-			verified: how(row, 'verifiedBy')
+			satisfied: satisfied.get(row) ?? null,
+			verified: verified.get(row) ?? null,
+			passed: passedByKey.get(row.key) ?? null,
+			outcome: outcomeOf(row.results ?? [], ctx.revisionInfo)
 		};
 	});
 }
@@ -87,20 +103,7 @@ function trace(ctx: ReportContext): RequirementTrace[] {
 export function derivationLinks(
 	ctx: ReportContext
 ): { original: RequirementRow; derived: RequirementRow }[] {
-	const find = (reference: string, file: string) => {
-		const segments = splitName(reference);
-		const name = segments.at(-1);
-		const matches = ctx.requirements.filter((r) => r.title === name || r.id === name);
-		return matches.find((r) => r.file === file) ?? matches[0];
-	};
-	return ctx.derivations.flatMap((d) => {
-		const original = find(d.original, d.file);
-		if (!original) return [];
-		return d.derived.flatMap((name) => {
-			const derived = find(name, d.file);
-			return derived && derived !== original ? [{ original, derived }] : [];
-		});
-	});
+	return linksBetween(ctx.requirements, ctx.derivations);
 }
 
 export function requirementRef(row: RequirementRow): Run {
@@ -142,7 +145,21 @@ function words(values: string[]): string {
 	return capitalize(values.join(', '));
 }
 
-function entry(trace: RequirementTrace): Section {
+/** Each verifying case's result: `enduranceFlightTest: Passed on 2026-10-20 at 3f2a9c1`. */
+function resultsText(ctx: ReportContext, row: RequirementRow): string {
+	return row.verifiedBy
+		.map((by, i) => {
+			const result = row.results?.[i] ?? null;
+			if (!result) return `${by}: not run`;
+			const fresh = freshness(result, ctx.revisionInfo);
+			const when = result.date ? ` on ${result.date}` : '';
+			const at = result.commit ? ` at ${shortCommit(result.commit)}` : ', commit unknown';
+			return `${by}: ${resultLabel(result, fresh)}${when}${at}`;
+		})
+		.join('; ');
+}
+
+function entry(ctx: ReportContext, trace: RequirementTrace): Section {
 	const { row } = trace;
 	const statement = cleanDoc(row.text);
 	const facts: { label: string; value: Text }[] = [];
@@ -169,6 +186,11 @@ function entry(trace: RequirementTrace): Section {
 			? joined(trace.verifiedBy)
 			: [t(trace.verified ? THROUGH_DERIVED : 'No verification yet')]
 	});
+	if (trace.outcome)
+		facts.push({
+			label: 'Result',
+			value: [t(`${OUTCOME_LABEL[trace.outcome]}. ${resultsText(ctx, row)}.`)]
+		});
 
 	const blocks: Block[] = [];
 	if (statement.length) {
@@ -242,7 +264,7 @@ export function requirementsChapter(ctx: ReportContext, chapter?: Chapter): Sect
 	} else if (groups.length === 1) {
 		const pkgDoc = cleanDoc(groups[0]!.pkg?.doc);
 		if (pkgDoc[0]) blocks.push({ type: 'paragraph', text: [t(pkgDoc[0])] });
-		sections = traces.map(entry);
+		sections = traces.map((tr) => entry(ctx, tr));
 	} else {
 		sections = groups.map(({ pkg, traces: list }) => ({
 			id: slug(pkg?.label ?? 'requirements'),
@@ -252,7 +274,7 @@ export function requirementsChapter(ctx: ReportContext, chapter?: Chapter): Sect
 			blocks: cleanDoc(pkg?.doc)
 				.slice(0, 1)
 				.map((p) => ({ type: 'paragraph' as const, text: [t(p)] })),
-			sections: list.map(entry)
+			sections: list.map((tr) => entry(ctx, tr))
 		}));
 	}
 	const tree = derivationTree(traces);
@@ -318,10 +340,12 @@ export function traceabilityChapter(ctx: ReportContext, chapter?: Chapter): Sect
 
 export interface Coverage {
 	/** How a requirement is covered: directly, through all it is derived into, or not. */
-	how: 'direct' | 'derived' | null;
+	how: Covered;
 	total: number;
 	satisfied: number;
 	verified: number;
+	/** Verified, and every result passed and still holds. */
+	passed: number;
 	both: number;
 	gaps: number;
 }
@@ -329,8 +353,9 @@ export interface Coverage {
 export function coverageOf(traces: RequirementTrace[]): Omit<Coverage, 'how'> {
 	const satisfied = traces.filter((tr) => tr.satisfied).length;
 	const verified = traces.filter((tr) => tr.verified).length;
+	const passed = traces.filter((tr) => tr.passed).length;
 	const both = traces.filter((tr) => tr.satisfied && tr.verified).length;
-	return { total: traces.length, satisfied, verified, both, gaps: traces.length - both };
+	return { total: traces.length, satisfied, verified, passed, both, gaps: traces.length - both };
 }
 
 function tone(part: number, whole: number): Tone {
@@ -348,7 +373,7 @@ export function coverageChapter(ctx: ReportContext, chapter?: Chapter): Section 
 						type: 'paragraph' as const,
 						text: [
 							t(
-								'A requirement that has been derived into others counts as satisfied (or verified) when all of those are.'
+								'A requirement that has been derived into others counts as satisfied (or verified, or passed) when all of those are.'
 							)
 						],
 						muted: true
@@ -376,6 +401,12 @@ export function coverageChapter(ctx: ReportContext, chapter?: Chapter): Section 
 					value: percent(c.both, c.total),
 					detail: `${c.both} of ${c.total}`,
 					tone: tone(c.both, c.total)
+				},
+				{
+					label: 'Tests passed',
+					value: percent(c.passed, c.total),
+					detail: `${c.passed} of ${c.total}`,
+					tone: tone(c.passed, c.total)
 				}
 			]
 		}
@@ -385,15 +416,16 @@ export function coverageChapter(ctx: ReportContext, chapter?: Chapter): Section 
 		blocks.push({
 			type: 'table',
 			caption: 'By package',
-			columns: ['Package', 'Requirements', 'Satisfied', 'Verified'],
-			numeric: [false, true, true, true],
+			columns: ['Package', 'Requirements', 'Satisfied', 'Verified', 'Passed'],
+			numeric: [false, true, true, true, true],
 			rows: groups.map(({ pkg, traces: list }) => {
 				const g = coverageOf(list);
 				return [
 					[t(pkg ? spaced(pkg.label) : '—', pkg?.key)],
 					[t(String(g.total))],
 					[t(`${g.satisfied} (${percent(g.satisfied, g.total)})`)],
-					[t(`${g.verified} (${percent(g.verified, g.total)})`)]
+					[t(`${g.verified} (${percent(g.verified, g.total)})`)],
+					[t(`${g.passed} (${percent(g.passed, g.total)})`)]
 				];
 			})
 		});

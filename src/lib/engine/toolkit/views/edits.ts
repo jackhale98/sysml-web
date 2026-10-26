@@ -147,6 +147,7 @@ export class ColumnEdits {
 				case 'satisfied':
 				case 'verified':
 				case 'check':
+				case 'result': // from the verification cases' recorded results, recorded on a case
 				case 'file':
 				case 'line':
 					return null;

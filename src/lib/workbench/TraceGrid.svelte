@@ -16,6 +16,7 @@
 	import type { TraceMatrix } from '#lib/engine/types.ts';
 	import { byteToUtf16, type ModelElement } from '#lib/project/elements.ts';
 	import type { Workspace } from '#lib/project/workspace.svelte.ts';
+	import { freshness, resultLabel } from '#lib/project/verification.ts';
 	import type { WorkbenchUi } from './ui.svelte.ts';
 	import {
 		RELATION_WORDS,
@@ -55,6 +56,28 @@
 	} = $props();
 
 	const words = $derived(RELATION_WORDS[matrix.relation]);
+
+	/** A verification case's recorded result, as its column says it (`Passed`, `Failed, out of date`). */
+	function resultOf(c: number): { label: string; tone: string; title: string } | null {
+		if (matrix.relation !== 'verify') return null;
+		const id = matrix.elements[c]?.elementId;
+		const result = id ? workspace.results.get(id) : undefined;
+		if (!result) return { label: 'Not run', tone: 'plain', title: 'No result is recorded yet.' };
+		const fresh = freshness(result, workspace.revision);
+		const tone =
+			fresh.state === 'stale'
+				? 'warn'
+				: result.verdict === 'pass'
+					? 'ok'
+					: result.verdict === 'inconclusive'
+						? 'warn'
+						: 'bad';
+		return {
+			label: resultLabel(result, fresh),
+			tone,
+			title: [result.date && `Run on ${result.date}`, fresh.text].filter(Boolean).join('. ')
+		};
+	}
 	const marks = $derived(marksByRow(matrix));
 	/** The link (or links) behind each mark, by `row:column`. */
 	const linksAt = $derived.by(() => {
@@ -67,7 +90,23 @@
 		return map;
 	});
 	const total = $derived(matrix.requirements.length);
-	const covered = $derived(marks.filter((m) => m.length).length);
+	/**
+	 * Covered through the requirements derived from it, by the one coverage
+	 * rule (#lib/project/coverage.ts): a need with no link of its own is not a
+	 * gap when every requirement derived from it is covered.
+	 */
+	const throughDerived = $derived.by(() => {
+		const byKey = new Map(workspace.requirements.map((r) => [r.key, r]));
+		const field = matrix.relation === 'verify' ? 'verified' : 'satisfied';
+		return matrix.requirements.map((r) => {
+			const element = r.elementId
+				? workspace.elements.find((e) => e.id === r.elementId)
+				: undefined;
+			return element ? byKey.get(element.key)?.[field] === 'derived' : false;
+		});
+	});
+	const isGap = (i: number) => !marks[i]?.length && !throughDerived[i];
+	const covered = $derived(matrix.requirements.filter((_, i) => !isGap(i)).length);
 
 	let gapsOnly = $state(false);
 	let hideEmpty = $state(false);
@@ -78,7 +117,7 @@
 
 	/** The rows shown: the search's, then only the gaps when asked, in the chosen order. */
 	const rows = $derived.by(() => {
-		let out = gapsOnly ? visible.filter((i) => !marks[i]?.length) : [...visible];
+		let out = gapsOnly ? visible.filter(isGap) : [...visible];
 		if (sort.by === 'total')
 			out = out.toSorted((a, b) => (marks[a]?.length ?? 0) - (marks[b]?.length ?? 0) || a - b);
 		return sort.descending ? out.toReversed() : out;
@@ -326,7 +365,7 @@
 					{@const element = requirementElement(i)}
 					<li
 						class="card"
-						class:gap={!marked.length}
+						class:gap={isGap(i)}
 						class:flash={flash === i}
 						class:selected={!!element && element.key === selectedKey}
 						data-row={i}
@@ -373,6 +412,8 @@
 									</li>
 								{/each}
 							</ul>
+						{:else if throughDerived[i]}
+							<p class="through">{words.through}</p>
 						{:else}
 							<p class="flag"><TriangleAlert size={13} aria-hidden="true" /> {words.gap}</p>
 						{/if}
@@ -415,6 +456,7 @@
 							{#each columns as c, k (c)}
 								{@const e = matrix.elements[c]!}
 								{@const target = columnElement(c)}
+								{@const result = resultOf(c)}
 								<th
 									scope="col"
 									class="col"
@@ -428,9 +470,17 @@
 									{#if target}
 										<button type="button" class="head" onclick={() => select(target)}>
 											<span class="label">{@render columnName(c)}</span>
+											{#if result}<span class="result {result.tone}" title={result.title}
+													>{result.label}</span
+												>{/if}
 										</button>
 									{:else}
-										<span class="head"><span class="label">{@render columnName(c)}</span></span>
+										<span class="head"
+											><span class="label">{@render columnName(c)}</span>{#if result}<span
+													class="result {result.tone}"
+													title={result.title}>{result.label}</span
+												>{/if}</span
+										>
 									{/if}
 								</th>
 							{/each}
@@ -453,7 +503,7 @@
 							{@const element = requirementElement(i)}
 							<tr
 								data-row={i}
-								class:gap={!marked.length}
+								class:gap={isGap(i)}
 								class:hot={hot.row === i}
 								class:flash={flash === i}
 								class:selected={!!element && element.key === selectedKey}
@@ -473,7 +523,9 @@
 												>
 											</span>
 										{/if}
-										{#if !marked.length}<span class="flag">{words.gap}</span>{/if}
+										{#if throughDerived[i] && !marked.length}<span class="through"
+												>{words.through}</span
+											>{:else if !marked.length}<span class="flag">{words.gap}</span>{/if}
 									</span>
 								</th>
 								{#each columns as c, k (c)}
@@ -827,6 +879,27 @@
 	.label {
 		display: block;
 	}
+	.result {
+		display: block;
+		margin-top: 2px;
+		color: var(--text-3);
+		font-size: 0.6875rem;
+		font-weight: 550;
+		white-space: nowrap;
+	}
+	.result.ok {
+		color: var(--ok);
+	}
+	.result.warn {
+		color: var(--warn);
+	}
+	.result.bad {
+		color: var(--danger);
+	}
+	.upright .result {
+		writing-mode: vertical-rl;
+		transform: rotate(180deg);
+	}
 	.owner {
 		display: block;
 		color: var(--text-3);
@@ -1176,5 +1249,14 @@
 		margin: 0;
 		font-size: var(--text-xs);
 		line-height: 1.8;
+	}
+	.through {
+		flex: none;
+		color: var(--text-3);
+		font-size: 0.6875rem;
+	}
+	.card > .through {
+		margin: 0;
+		font-size: var(--text-xs);
 	}
 </style>

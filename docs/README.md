@@ -19,6 +19,9 @@ What each document is for, and who it is for. New to Fairtide? Start with the
   and N² charts; links, suggested modules and change impact.
 - [Table rendering](table-rendering.md): the `@TableRendering` convention that
   turns any SysML view into a table.
+- [Requirements, verification results and conventions](verification.md): the
+  coverage rule, `@VerificationResult` and when a result is out of date,
+  reports that name their commit, change impact, and `@Convention` views.
 - [State machine simulator](simulator.md): what the simulator does with a state
   machine, its simulated clock and `do` actions, and where the specification
   leaves a choice open.

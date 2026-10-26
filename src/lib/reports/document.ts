@@ -71,6 +71,12 @@ export interface ReportDocument {
 	author: string | null;
 	/** The date it was generated, for people ("21 October 2026"). */
 	date: string;
+	/**
+	 * The version of the model it was made from: `Commit 3f2a9c1 of
+	 * owner/repo (main)`, with `, with changes not committed` when the model
+	 * had changed since, or `Not committed`.
+	 */
+	revision: string;
 	/** What the report covers: the view's `expose` targets; empty for the whole model. */
 	scope: string[];
 	/** Key figures for the title page. */

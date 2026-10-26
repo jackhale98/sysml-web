@@ -207,8 +207,9 @@ describe('general view', () => {
 			.filter((d) => d.kind !== 'package')
 			.map((d) => d.name)
 			.sort();
-		// With the dependency matrices' library: a metadata def and four view defs.
-		expect(definitions).toHaveLength(113);
+		// With the dependency matrices' library: a metadata def and four view defs; and the
+		// reporting library's convention marker (a metadata def and its severity enum def).
+		expect(definitions).toHaveLength(115);
 		expect(ids(tk)).toEqual(definitions);
 		expect(edges(tk, 'specialization')).toEqual([
 			'Airframe -specialization-> Component',

@@ -19,6 +19,9 @@ import type {
 	ViewInfo
 } from '#lib/engine/types.ts';
 import { checkProblems } from './checks';
+import { conventionProblems, conventionsOf } from './conventions';
+import { coverageFigures } from './coverage';
+import { derivationCycleProblems, derivationLinks, projectDerivations } from './derivations';
 import { requirementIdProblems } from './requirementIds';
 import { satisfyProblems, subjectFirstProblems } from './requirementChecks';
 import { revertChanges } from './revert';
@@ -30,6 +33,8 @@ import {
 	type TreeNode
 } from './elements';
 import { collectRequirements, type RequirementRow } from './requirements';
+import type { ProjectRevision } from './revision.svelte';
+import { collectResults, type RecordedResult } from './verification';
 
 export interface ProjectFile {
 	/** Path relative to the project root, forward slashes. */
@@ -56,10 +61,12 @@ export type LoadState =
 	| { phase: 'ready'; millis: number }
 	| { phase: 'error'; message: string };
 
+/** Coverage by the one rule (`coverage.ts`): satisfied, verified and passed, directly or through derived requirements. */
 export interface Coverage {
 	total: number;
 	satisfied: number;
 	verified: number;
+	passed: number;
 }
 
 export type Change = EditResult['changes'][number];
@@ -131,6 +138,8 @@ export class Workspace {
 	machines = $state.raw<StateMachine[]>([]);
 	/** Constraint checks of the latest analysis (after it: they take a moment longer). */
 	checks = $state.raw<CheckReport | null>(null);
+	/** What breaks the project's conventions (views marked `@Convention`), found with the checks. */
+	conventions = $state.raw<Diagnostic[]>([]);
 	/** Paths edited since the project was opened. */
 	readonly dirty = new SvelteSet<string>();
 	/** Model edits made through `transact`, newest last. */
@@ -142,13 +151,20 @@ export class Workspace {
 	elements: ModelElement[] = $derived(collectElements(Object.values(this.analyses)));
 	tree: TreeNode[] = $derived(buildTree(this.elements));
 
-	requirements: RequirementRow[] = $derived(collectRequirements(Object.values(this.analyses)));
+	requirements: RequirementRow[] = $derived(
+		collectRequirements(Object.values(this.analyses), this.analysedTexts)
+	);
 
-	coverage: Coverage = $derived({
-		total: this.requirements.length,
-		satisfied: this.requirements.filter((r) => r.satisfiedBy.length > 0).length,
-		verified: this.requirements.filter((r) => r.verifiedBy.length > 0).length
-	});
+	/** Each verification case's recorded result, by its element id (and name). */
+	results: Map<string, RecordedResult> = $derived(collectResults(Object.values(this.analyses)));
+
+	/**
+	 * The project's version, as recorded verification results are compared
+	 * with it (set by the project's session; null for a workspace without one).
+	 */
+	revision: ProjectRevision | null = null;
+
+	coverage: Coverage = $derived(coverageFigures(this.requirements, this.revision));
 
 	/** Why the latest analysis failed (the engine stopped, or refused the model). */
 	engineError = $state<string | null>(null);
@@ -173,8 +189,15 @@ export class Workspace {
 			...satisfyProblems(Object.values(this.analyses), (path) => this.files[path]),
 			// A stakeholder or actor declared before the requirement's subject.
 			...subjectFirstProblems(Object.values(this.analyses)),
+			// Requirements derived, through others, from themselves.
+			...derivationCycleProblems(
+				derivationLinks(this.requirements, projectDerivations(this.analysedTexts)),
+				(path) => this.analysedTexts[path]
+			),
 			// A requirement the design doesn't meet; undecided checks are not problems.
-			...checkProblems(this.checks?.checks ?? [])
+			...checkProblems(this.checks?.checks ?? []),
+			// Rows of the views marked as conventions.
+			...this.conventions
 		].sort((a, b) => severityRank(a.severity) - severityRank(b.severity))
 	);
 
@@ -305,7 +328,12 @@ export class Workspace {
 			if (!unchanged() || this.inFlight) return;
 		}
 		const checks = await engine.checks(files).catch(() => null);
+		const marked = conventionsOf(Object.values(this.analyses), this.views);
+		const conventions = marked.length
+			? await conventionProblems(engine, files, marked).catch(() => [])
+			: [];
 		if (files.every((f) => this.files[f.path] === f.text)) {
+			this.conventions = conventions;
 			this.checks = checks;
 			performance.mark('sysml:checked');
 		}

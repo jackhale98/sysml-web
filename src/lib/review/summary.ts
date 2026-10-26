@@ -8,6 +8,7 @@
 import { CATEGORY_ORDER } from './semantic';
 import type {
 	Category,
+	Dependant,
 	ElementChange,
 	Location,
 	ModelDiff,
@@ -112,14 +113,18 @@ export function summarize(diff: ModelDiff): ReviewSummary {
 					phrase: `${v.label} now ${v.after}`
 				}
 			)
-		)
+		),
+		...dependantItems(diff)
 	];
 
 	const byCategory = new Map<Category, ReviewItem[]>();
 	const add = (category: Category, it: ReviewItem) =>
 		byCategory.set(category, [...(byCategory.get(category) ?? []), it]);
 	diff.elements.forEach((c, i) => add(c.category, elementItem(c, i)));
-	diff.relations.forEach((r, i) => add(r.category, relationItem(r, i)));
+	const unchanged = unchangedRelations(diff.relations);
+	diff.relations.forEach((r, i) => {
+		if (!unchanged.has(r)) add(r.category, relationItem(r, i));
+	});
 	const groups = CATEGORY_ORDER.filter((c) => byCategory.has(c)).map((category) => ({
 		category,
 		title: CATEGORY_TITLES[category],
@@ -138,6 +143,89 @@ export function summarize(diff: ModelDiff): ReviewSummary {
 		},
 		empty: !all.length && !impact.length
 	};
+}
+
+/** Requirements (and risk controls) that changed or went, and what relies on them. */
+function dependantItems(diff: ModelDiff): ReviewItem[] {
+	const all = diff.dependants ?? {};
+	const out: ReviewItem[] = [];
+	diff.elements.forEach((c, i) => {
+		if (c.kind !== 'requirement' || c.isDefinition) return;
+		// A rename or a move made through the app takes every reference with it.
+		if ((c.change === 'renamed' || c.change === 'moved') && !c.properties.length) return;
+		if (c.change === 'added') return;
+		const id = c.after?.id ?? c.before?.id;
+		const dependants = id ? all[id] : undefined;
+		if (!dependants?.length) return;
+		const side = c.after ?? c.before!;
+		const name = named(side.label, side.title, c.shortName);
+		const what = dependantsText(dependants);
+		const text =
+			c.change === 'removed'
+				? `Removed ${name}, which ${what}`
+				: `${name} changed: check what relies on it. It ${what}`;
+		out.push(
+			item(`dependants:${i}`, 'impact', 'Affects', text, {
+				target: c.after?.id ?? null,
+				after: c.after ?? null,
+				before: c.before ?? null,
+				phrase: `Check what relies on ${side.label}`
+			})
+		);
+	});
+	return out;
+}
+
+/** `is satisfied by `drone`; is verified by `enduranceFlightTest`; …`. */
+function dependantsText(dependants: Dependant[]): string {
+	const of = (kind: Dependant['kind']) =>
+		dependants.filter((d) => d.kind === kind).map((d) => labelled(d.label));
+	const parts: string[] = [];
+	const add = (words: string, names: string[]) => {
+		if (names.length) parts.push(`${words} ${names.join(', ')}`);
+	};
+	add('is satisfied by', of('satisfier'));
+	add(
+		'is implemented by the mitigation' + (of('mitigation').length > 1 ? 's' : ''),
+		of('mitigation')
+	);
+	add('is verified by', of('verification'));
+	add('is derived into', of('derived'));
+	add(
+		of('fmea').length > 1 ? 'is named by the FMEA lines on' : 'is named by the FMEA line on',
+		of('fmea')
+	);
+	return parts.join('; ');
+}
+
+/** `drone.battery ‘Thermal runaway’` → `` `drone.battery` ‘Thermal runaway’ ``. */
+function labelled(label: string): string {
+	const quoted = /^(.*?)( ‘[^’]*’)$/.exec(label);
+	return quoted ? `${code(quoted[1]!)}${quoted[2]}` : code(label);
+}
+
+/**
+ * Relations listed as removed and added that read the same and are written
+ * in the same place in both versions: nothing a reader would see changed.
+ * After a rename, the comparison renames the old name everywhere in the old
+ * text, comments too, so an untouched `objective` whose doc mentions the
+ * old name no longer matches itself.
+ */
+function unchangedRelations(relations: readonly RelationChange[]): Set<RelationChange> {
+	const same = (a: RelationChange, b: RelationChange) =>
+		a.relation === b.relation &&
+		a.text === b.text &&
+		a.owner === b.owner &&
+		a.at.path === b.at.path &&
+		a.at.from === b.at.from &&
+		a.at.to === b.at.to;
+	const out = new Set<RelationChange>();
+	for (const added of relations) {
+		if (added.change !== 'added') continue;
+		const removed = relations.find((r) => r.change === 'removed' && !out.has(r) && same(r, added));
+		if (removed) out.add(added).add(removed);
+	}
+	return out;
 }
 
 function item(

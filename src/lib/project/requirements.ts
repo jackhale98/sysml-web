@@ -2,10 +2,16 @@
  * Requirements as rows: the plain-language view of `requirement` usages
  * (PLAN.md §7.3). Satisfy/verify links and metadata are matched to their
  * requirement by the toolkit's resolved element ids; by name for models
- * without ids.
+ * without ids. Given the files' texts, each row also says how it is covered
+ * by the one coverage rule (`coverage.ts`), through the derivations between
+ * requirements; and each verification case that verifies it brings its
+ * recorded result (`verification.ts`).
  */
 import type { Analysis, MetadataAnnotation, Span, TraceLink, Usage } from '#lib/engine/types.ts';
+import { coverageRule, type Covered } from './coverage';
+import { derivationEnds, projectDerivations } from './derivations';
 import { displayReference, lastSegment, stringValue, unescapeName } from './names';
+import { collectResults, type RecordedResult } from './verification';
 
 export interface RequirementRow {
 	/** Stable key within one analysis: file and source offset. */
@@ -25,15 +31,34 @@ export interface RequirementRow {
 	verifiedBy: string[];
 	/** The element ids of what satisfies or verifies it, by the name shown (when resolved). */
 	linkIds: Record<string, string>;
+	/** Each verifying case's recorded result (null: not run yet), parallel to `verifiedBy`. */
+	results: (RecordedResult | null)[];
+	/** Satisfied and verified by the coverage rule: directly, through what it is derived into, or not. */
+	satisfied: Covered;
+	verified: Covered;
+	/**
+	 * The requirements it is derived from, and those derived from it (by
+	 * `key`; a key no row has is a derived end that doesn't resolve).
+	 */
+	derivedFrom: string[];
+	derivedInto: string[];
 	file: string;
 	span: Span;
 }
 
-/** Collect every requirement usage across the analysed files. */
-export function collectRequirements(analyses: Iterable<Analysis>): RequirementRow[] {
+/**
+ * Collect every requirement usage across the analysed files. With the
+ * files' texts (`texts`, the model files to read derivations from), the
+ * coverage rule follows derivations; without, only direct links count.
+ */
+export function collectRequirements(
+	analyses: Iterable<Analysis>,
+	texts?: Record<string, string>
+): RequirementRow[] {
 	const all = [...analyses];
 	const satisfactions = new LinkIndex(all.flatMap((a) => a.model.satisfactions));
 	const verifications = new LinkIndex(all.flatMap((a) => a.model.verifications));
+	const results = collectResults(all);
 	const rows: RequirementRow[] = [];
 
 	for (const { model } of all) {
@@ -46,6 +71,9 @@ export function collectRequirements(analyses: Iterable<Analysis>): RequirementRo
 				a.target_id && usage.id ? a.target_id === usage.id : a.target === usage.name
 			);
 			const status = metadata(annotations, 'StatusInfo');
+			const verifying = verifications.of(usage);
+			const verifiedBy = linksTo(verifying);
+			const satisfiedBy = linksTo(satisfactions.of(usage));
 			rows.push({
 				key: `${model.file}@${usage.span.start_byte}`,
 				id: usage.short_name ? unescapeName(usage.short_name) : null,
@@ -62,15 +90,44 @@ export function collectRequirements(analyses: Iterable<Analysis>): RequirementRo
 				issues: annotations
 					.filter((a) => typeName(a) === 'Issue')
 					.map((a) => field(a, 'text', stringValue) ?? ''),
-				satisfiedBy: linksTo(satisfactions.of(usage)),
-				verifiedBy: linksTo(verifications.of(usage)),
-				linkIds: linkIds([...satisfactions.of(usage), ...verifications.of(usage)]),
+				satisfiedBy,
+				verifiedBy,
+				linkIds: linkIds([...satisfactions.of(usage), ...verifying]),
+				results: verifiedBy.map((by) => {
+					const link = verifying.find((l) => displayReference(l.by) === by);
+					if (link?.by_id) return results.get(link.by_id) ?? null;
+					return results.get(lastSegment(by.split('.').pop() ?? by)) ?? null;
+				}),
+				satisfied: satisfiedBy.length ? 'direct' : null,
+				verified: verifiedBy.length ? 'direct' : null,
+				derivedFrom: [],
+				derivedInto: [],
 				file: model.file,
 				span: usage.span
 			});
 		}
 	}
+	if (texts) applyCoverageRule(rows, texts);
 	return rows;
+}
+
+/** Fill each row's derivations and its coverage by the rule, from the derivations in `texts`. */
+function applyCoverageRule(rows: RequirementRow[], texts: Record<string, string>) {
+	const byKey = new Map(rows.map((r) => [r.key, r]));
+	for (const { original, derived, at } of derivationEnds(rows, projectDerivations(texts))) {
+		// An end that doesn't resolve stays, by where it is written: it covers nothing.
+		const key = derived?.key ?? `?${at.file}@${at.from ?? 0}`;
+		if (!original.derivedInto.includes(key)) original.derivedInto.push(key);
+		if (derived && !derived.derivedFrom.includes(original.key))
+			derived.derivedFrom.push(original.key);
+	}
+	const into = (r: RequirementRow) => r.derivedInto.map((k) => byKey.get(k) ?? null);
+	const satisfied = coverageRule(rows, (r) => r.satisfiedBy.length > 0, into);
+	const verified = coverageRule(rows, (r) => r.verifiedBy.length > 0, into);
+	for (const r of rows) {
+		r.satisfied = satisfied.get(r) ?? null;
+		r.verified = verified.get(r) ?? null;
+	}
 }
 
 function typeName(annotation: MetadataAnnotation): string {

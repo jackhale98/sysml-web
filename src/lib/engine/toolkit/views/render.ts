@@ -59,6 +59,7 @@ const REQUIREMENT_FIELDS = [
 	'check',
 	'satisfied',
 	'verified',
+	'result',
 	'file',
 	'line',
 	'kind',

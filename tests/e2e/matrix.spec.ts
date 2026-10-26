@@ -84,8 +84,13 @@ test.describe('on a desktop', () => {
 			})
 		).toBeVisible();
 		await expect(met.getByRole('rowheader')).not.toContainText('Not satisfied');
-		await expect(view.getByText('16 of 24')).toBeVisible();
-		await expect(view.getByText('8 not satisfied')).toBeVisible();
+		// By the coverage rule: the 16 linked, and the 4 needs satisfied through the requirements
+		// derived from them (flagged as such, not as gaps).
+		await expect(view.getByText('20 of 24')).toBeVisible();
+		await expect(view.getByText('4 not satisfied')).toBeVisible();
+		const need = grid.getByRole('row').filter({ hasText: 'STK-001' });
+		await expect(need.getByRole('rowheader')).toContainText('Through derived requirements');
+		await expect(need.getByRole('rowheader')).not.toContainText('Not satisfied');
 		// The column totals: the drone satisfies three.
 		const totals = grid
 			.getByRole('row')
@@ -144,7 +149,7 @@ test.describe('on a desktop', () => {
 		const grid = view.getByRole('table');
 		await view.getByRole('checkbox', { name: 'Show only gaps' }).check();
 		const body = grid.locator('tbody tr');
-		await expect(body).toHaveCount(8);
+		await expect(body).toHaveCount(4);
 		for (const row of await body.all()) await expect(row).toContainText('Not satisfied');
 		await view.getByRole('checkbox', { name: 'Hide empty columns' }).check();
 		await expect(grid.locator('thead th[data-c]')).toHaveCount(0);
@@ -159,7 +164,7 @@ test.describe('on a desktop', () => {
 			'descending'
 		);
 		await grid.getByRole('button', { name: 'Total' }).click();
-		await expect(body.first()).toContainText('Not satisfied');
+		await expect(body.first().getByRole('cell').last()).toHaveText('0');
 		await expect(grid.getByRole('columnheader', { name: 'Total' })).toHaveAttribute(
 			'aria-sort',
 			'ascending'
@@ -269,7 +274,7 @@ test.describe('on a phone', () => {
 		);
 		expect(wide).toBe(false);
 		await view.getByRole('checkbox', { name: 'Show only gaps' }).check();
-		await expect(cards.locator(':scope > li')).toHaveCount(8);
+		await expect(cards.locator(':scope > li')).toHaveCount(4);
 		await expectAccessible(page);
 	});
 });
