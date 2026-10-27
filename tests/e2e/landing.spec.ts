@@ -74,3 +74,25 @@ test('fits a phone without scrolling sideways', async ({ page }) => {
 	await page.emulateMedia({ colorScheme: 'dark' });
 	await expectAccessible(page);
 });
+
+test('the wordmark is drawn whole, its last letter not clipped', async ({ page }) => {
+	await page.goto('/');
+	// The outlined letters must sit inside the drawing's box, with room for the
+	// anti-aliased edge: an inline SVG clips at its box (seen on a phone's "a").
+	const room = await page.locator('header .brand svg[aria-label="Tessera"]').evaluate((svg) => {
+		const s = svg as SVGSVGElement;
+		const view = s.viewBox.baseVal;
+		const path = s.querySelector('path')!;
+		const box = path.getBBox();
+		const m = path.transform.baseVal.consolidate()?.matrix;
+		const x = (v: number) => (m ? m.a * v + m.e : v);
+		const y = (v: number) => (m ? m.d * v + m.f : v);
+		return {
+			left: x(box.x) - view.x,
+			right: view.x + view.width - x(box.x + box.width),
+			top: y(box.y) - view.y,
+			bottom: view.y + view.height - y(box.y + box.height)
+		};
+	});
+	for (const [side, gap] of Object.entries(room)) expect(gap, side).toBeGreaterThanOrEqual(0.5);
+});

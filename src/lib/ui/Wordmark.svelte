@@ -4,13 +4,21 @@
 	 * text colour. `height` is the drawing's height in px (the ink is a little less).
 	 */
 	let { height = 20 }: { height?: number } = $props();
+
+	/**
+	 * The letters reach the edges of their 154.16 × 30 box, and an inline SVG
+	 * clips at its box: drawn with a unit of room on every side (so the last
+	 * letter's anti-aliased edge isn't cut), laid out as the 154.16 × 30 box.
+	 */
+	const unit = $derived(height / 30);
 </script>
 
 <svg
 	class="tx-wordmark"
-	viewBox="0 0 154.16 30"
-	{height}
-	width={(height * 154.16) / 30}
+	viewBox="-1 -1 156.16 32"
+	height={height + 2 * unit}
+	width={(height * 154.16) / 30 + 2 * unit}
+	style:margin="{-unit}px"
 	role="img"
 	aria-label="Tessera"
 	fill="currentColor"
