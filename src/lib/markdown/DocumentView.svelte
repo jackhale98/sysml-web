@@ -11,12 +11,12 @@
 
 <script lang="ts">
 	import { ArrowUpRight, Pencil } from '@lucide/svelte';
-	import type { ModelElement } from '#lib/project/elements.ts';
 	import type { Workspace } from '#lib/project/workspace.svelte.ts';
 	import KindGlyph from '#lib/ui/KindGlyph.svelte';
 	import type { WorkbenchUi } from '#lib/workbench/ui.svelte.ts';
 	import { viewTitle } from '#lib/workbench/views.ts';
 	import { parseBlocks, type Inline } from './markdown.ts';
+	import { resolveReference, type Reference } from './references.ts';
 	import { isGuideAction, runGuideAction, type GuideAction } from '#lib/workbench/guide.ts';
 
 	/**
@@ -37,29 +37,8 @@
 		return () => page.removeEventListener('scroll', save);
 	}
 
-	type Reference =
-		| { kind: 'element'; element: ModelElement }
-		| { kind: 'view'; name: string }
-		| { kind: 'file'; path: string };
-
-	const unquote = (s: string) => s.replace(/^'|'$/g, '');
-
 	function resolve(code: string): Reference | null {
-		const text = code.trim();
-		if (/\.(sysml|kerml)$/.test(text)) {
-			const file = workspace.paths.find((p) => p === text || p.endsWith(`/${text}`));
-			return file ? { kind: 'file', path: file } : null;
-		}
-		if (!/^[\w']/.test(text) || /[\s;{}=]/.test(text.replace(/'[^']*'/g, ''))) return null;
-		const segments = text.split('::').map(unquote);
-		const name = segments.at(-1)!;
-		const view = workspace.views.find((v) => v.name === name && v.isUsage && !v.builtin);
-		if (view) return { kind: 'view', name: view.name };
-		const owner = segments.length > 1 ? segments.at(-2)! : null;
-		const candidates = workspace.elements.filter((e) => e.label === name);
-		const element =
-			candidates.find((e) => owner && unquote(e.parent ?? '') === owner) ?? candidates[0];
-		return element ? { kind: 'element', element } : null;
+		return resolveReference(code, workspace).reference;
 	}
 
 	function follow(reference: Reference) {
