@@ -240,6 +240,8 @@
 	}
 	.form {
 		display: grid;
+		/* The column may be narrower than a field's own minimum (Safari's date field). */
+		grid-template-columns: minmax(0, 1fr);
 		gap: var(--space-1);
 		margin-top: var(--space-1);
 		padding: var(--space-2);
@@ -282,6 +284,17 @@
 		color: var(--text);
 		font: inherit;
 		font-size: 16px; /* no zoom on iPhone */
+		min-width: 0;
+	}
+	/* Safari draws its own date field, wider than the form on a phone. */
+	input[type='date'] {
+		-webkit-appearance: none;
+		appearance: none;
+		display: block;
+	}
+	input[type='date']::-webkit-date-and-time-value {
+		min-width: 0;
+		text-align: left;
 	}
 	.mono {
 		font-family: var(--font-mono);
