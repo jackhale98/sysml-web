@@ -28,7 +28,7 @@ library package DependencyMatrices {
      *       @MatrixRendering { dependencies = "connection; flow; allocation"; order = "clustered"; }
      *   }
      *
-     * Documented in docs/dsm.md of Fairtide.
+     * Documented in docs/dsm.md of Tessera.
      */
 
     private import ScalarValues::*;

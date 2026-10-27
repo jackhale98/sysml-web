@@ -1,6 +1,6 @@
 # Risk analysis: the FMEA and hazard libraries
 
-Fairtide's FMEA worksheets, risk matrices and hazard logs are ordinary
+Tessera's FMEA worksheets, risk matrices and hazard logs are ordinary
 SysML v2. Two libraries say what the words mean, and the app's forms only
 write text that uses them:
 

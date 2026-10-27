@@ -1,10 +1,10 @@
-# Fairtide
+# Tessera
 
 A web workbench that makes **SysML v2** approachable. Build a model in text or
 in diagrams (both edit the same SysML, live) with a plain-language explanation
 of every element, so engineers new to MBSE can model productively. The model is
 standard SysML v2 text in your own git repository, readable by any conformant
-tool. Fairtide runs in the browser on a computer or a phone, keeps working
+tool. Tessera runs in the browser on a computer or a phone, keeps working
 offline, and has no server of its own: projects stay in your browser until you
 save them to GitHub, a folder or a file.
 
@@ -40,7 +40,7 @@ scripts/fetch-toolkit.sh  # the SysML engine and its standard library into stati
 npm run dev               # http://localhost:5173
 ```
 
-To change Fairtide, see [CONTRIBUTING.md](CONTRIBUTING.md): setup, tests and
+To change Tessera, see [CONTRIBUTING.md](CONTRIBUTING.md): setup, tests and
 their conventions, and releases.
 
 ## Testing
@@ -105,7 +105,7 @@ Without them, people connect GitHub with a personal access token.
 | [Performance](docs/performance.md) | How large models are measured, the results, and what still limits them. | Developers |
 | [Plan](docs/PLAN.md) | Product principles, architecture, what is built, what is next, and the decision log. | Developers |
 | [Sign in with GitHub](docs/setup-github-sign-in.md) | Setting up the GitHub App and the sign-in worker for your own deployment. | Self-hosters |
-| [Robustness and MBSE assessment](docs/assessment/README.md) | What Fairtide demonstrably supports, with evidence and scores, and every critical finding and its fix. | Everyone |
+| [Robustness and MBSE assessment](docs/assessment/README.md) | What Tessera demonstrably supports, with evidence and scores, and every critical finding and its fix. | Everyone |
 | [Assessment: language coverage](docs/assessment/01-language.md) | The official corpus, the engine against the OMG pilot, a construct matrix. | Developers |
 | [Assessment: text, diagrams, round trips](docs/assessment/02-round-trip.md) | Every edit kind, save/reload, exports, edit latency. | Developers |
 | [Assessment: import, export, interoperability](docs/assessment/03-interchange.md) | JSON, `.kpar` and SysON, compared by meaning. | Developers |
@@ -163,4 +163,4 @@ layout library (elkjs) is EPL-2.0.
 SysML is a registered trademark of the Object Management Group.
 
 The repository and site are still named `sysml-web`, the product's working name
-before it became Fairtide.
+before it became Tessera.

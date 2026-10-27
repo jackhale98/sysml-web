@@ -73,11 +73,11 @@ test('when the toolkit cannot start, it is retried once and then says so', async
 	});
 	expect(attempts).toBe(2);
 	await expect(
-		page.getByText('Fairtide stopped reading the model. Reload the page to try again.')
+		page.getByText('Tessera stopped reading the model. Reload the page to try again.')
 	).toBeVisible();
 	await expectAccessible(page);
 	await page.getByRole('button', { name: /^Problems:/ }).click();
 	await expect(page.locator('section.problems-pane')).toContainText(
-		/Fairtide stopped reading the model \(.+\)\. Reload the page to try again\./
+		/Tessera stopped reading the model \(.+\)\. Reload the page to try again\./
 	);
 });

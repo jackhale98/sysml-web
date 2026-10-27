@@ -1,7 +1,7 @@
 # §5 State-machine simulation and behavioural execution
 
 Assessed on `claude/assess-simulation` (based on 92cfbcf, merged with main at 68cb9db).
-Scores are Fairtide's: the simulator (`src/lib/sim/emulator.ts`) is Fairtide's own code.
+Scores are Tessera's: the simulator (`src/lib/sim/emulator.ts`) is Tessera's own code.
 The engine only parses and resolves the model (transition ends, `isParallel`, the final
 state), which `src/lib/engine/toolkit/machines.ts` turns into the simulator's input.
 Every test named here was run in this session unless it says otherwise. The OMG pilot
@@ -104,7 +104,7 @@ Each fix has a test that failed before it and passes with it: the seven tests of
   inside actions, no `terminate`, no conditional initial transitions, change triggers
   read only variables (not time); one clock.
 - **Status:** Partially verified
-- **Score:** 2 (Fairtide)
+- **Score:** 2 (Tessera)
 - **Next action:** planned capability (payloads; action steps beyond assignments).
 
 ### Are states, transitions, triggers, guards, effects, and event handling implemented correctly?
@@ -177,7 +177,7 @@ Each fix has a test that failed before it and passes with it: the seven tests of
 - **Score:** 3
 - **Next action:** None.
 
-### Can Fairtide identify unreachable states and dead transitions?
+### Can Tessera identify unreachable states and dead transitions?
 - **Answer:** No. There is no static reachability analysis. At run time a machine that can
   go nowhere shows "Stuck", unknown targets are noted, and auto-run favours the least
   visited targets, which helps exploration but proves nothing.

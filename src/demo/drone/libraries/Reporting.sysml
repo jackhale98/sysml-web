@@ -3,7 +3,7 @@ package Reporting {
     /*
      * The table-rendering convention for SysML v2 views: attach
      * @TableRendering to a view def to say which rows and columns its table
-     * has. Documented in docs/table-rendering.md of Fairtide.
+     * has. Documented in docs/table-rendering.md of Tessera.
      */
 
     private import ScalarValues::*;
@@ -19,7 +19,7 @@ package Reporting {
 
     /*
      * A modelling convention: on a table view, says that every row the
-     * view lists breaks a rule of the project. Fairtide lists each one
+     * view lists breaks a rule of the project. Tessera lists each one
      * under Problems, at the element it is about:
      *
      *   view requirementsWithoutOwner : RequirementsTable {

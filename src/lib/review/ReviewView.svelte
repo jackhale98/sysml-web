@@ -1,5 +1,5 @@
 <script lang="ts">
-	import FairtideLoader from '#lib/ui/FairtideLoader.svelte';
+	import TesseraLoader from '#lib/ui/TesseraLoader.svelte';
 	/**
 	 * Review changes: what changed in the model between two versions, in
 	 * plain language and grouped as an engineer reads a change — what it
@@ -350,7 +350,7 @@
 	<div class="body">
 		{#if review.status === 'loading' || review.status === 'idle'}
 			<div class="state" role="status">
-				<FairtideLoader size={40} label="" />
+				<TesseraLoader size={40} label="" />
 				<span>
 					{#if review.progress}Getting the other version from GitHub… {review.progress.done}/{review
 							.progress.total}

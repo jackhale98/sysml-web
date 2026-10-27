@@ -1,5 +1,5 @@
 /**
- * Keeping Fairtide on a phone's Home Screen, opening it where the work is,
+ * Keeping Tessera on a phone's Home Screen, opening it where the work is,
  * switching projects without losing track of changes, and several GitHub
  * accounts, each project using its own. Phone-sized throughout; GitHub is
  * answered by the test.
@@ -116,11 +116,11 @@ test.describe('on an iPhone, in Safari', () => {
 		page
 	}) => {
 		await page.goto('/projects');
-		const card = page.getByRole('complementary', { name: 'Keep Fairtide on your Home Screen' });
+		const card = page.getByRole('complementary', { name: 'Keep Tessera on your Home Screen' });
 		await expect(card).toBeVisible();
 		await card.getByRole('button', { name: 'Show me how' }).click();
 
-		const guide = page.getByRole('dialog', { name: 'Add Fairtide to your Home Screen' });
+		const guide = page.getByRole('dialog', { name: 'Add Tessera to your Home Screen' });
 		await expect(guide).toBeVisible();
 		await expect(guide).toContainText('Tap Share in the bar at the bottom.');
 		await expect(guide).toContainText('Scroll down and tap Add to Home Screen.');
@@ -150,7 +150,7 @@ test.describe('on an iPhone, in Safari', () => {
 		await projectMenu(page, 'Pump station');
 		await page.getByRole('menuitem', { name: /Install app/ }).click();
 		await expect(
-			page.getByRole('dialog', { name: 'Add Fairtide to your Home Screen' })
+			page.getByRole('dialog', { name: 'Add Tessera to your Home Screen' })
 		).toContainText('Add to Home Screen');
 	});
 });
@@ -212,7 +212,7 @@ test.describe('installed on an iPhone', () => {
 		await page.getByRole('button', { name: 'Settings' }).click();
 		const settings = page.getByRole('dialog', { name: 'Settings' });
 		await settings.getByRole('tab', { name: 'About' }).click();
-		await expect(settings).toContainText("You're using Fairtide as an installed app.");
+		await expect(settings).toContainText("You're using Tessera as an installed app.");
 	});
 });
 

@@ -94,7 +94,7 @@ describe('engine worker supervision', () => {
 		});
 		await expect(client.call('version')).resolves.toBeDefined();
 		await expect(client.call('analyzeProject', [])).rejects.toThrow(
-			/Fairtide stopped reading the model \(RuntimeError: unreachable\)\. Reload the page/
+			/Tessera stopped reading the model \(RuntimeError: unreachable\)\. Reload the page/
 		);
 		// Sent to the first worker and once more to its replacement.
 		expect(crashes).toBe(2);
@@ -148,7 +148,7 @@ describe('engine worker supervision', () => {
 		expect(workers).toHaveLength(1);
 		await vi.advanceTimersByTimeAsync(60_000);
 		expect(await failure).toBe(
-			'Reading the model took longer than 5 minutes, so Fairtide stopped it and started again. ' +
+			'Reading the model took longer than 5 minutes, so Tessera stopped it and started again. ' +
 				'If it keeps happening, the project may be too large for this device: try splitting it into smaller projects.'
 		);
 		expect(onTooLong).toHaveBeenCalledTimes(1);

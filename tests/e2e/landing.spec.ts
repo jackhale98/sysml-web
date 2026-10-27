@@ -1,5 +1,5 @@
 /**
- * The landing page: what it says Fairtide does, its links, accessibility in
+ * The landing page: what it says Tessera does, its links, accessibility in
  * both themes, and a phone without sideways scrolling.
  */
 import { expect, test, type Page } from '@playwright/test';

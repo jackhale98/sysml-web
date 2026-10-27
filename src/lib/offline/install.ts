@@ -1,5 +1,5 @@
 /**
- * How to put Fairtide on this device's Home Screen (or Dock, or app list),
+ * How to put Tessera on this device's Home Screen (or Dock, or app list),
  * worked out from the browser. Only Chromium offers an install prompt
  * (`beforeinstallprompt`); everywhere else the person does it from the
  * browser's own menus, so the guide shows those steps.

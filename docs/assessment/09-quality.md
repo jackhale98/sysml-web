@@ -89,7 +89,7 @@ npx vitest run --coverage.enabled --coverage.provider=v8 --coverage.reporter=jso
   is untested although phone use (iOS) is claimed. No long-session test.
   Svelte components are tested only end to end.
 - **Status:** Verified
-- **Score:** 3 (Fairtide)
+- **Score:** 3 (Tessera)
 - **Next action:** additional testing: a WebKit Playwright project and a
   long-session test.
 
@@ -101,7 +101,7 @@ npx vitest run --coverage.enabled --coverage.provider=v8 --coverage.reporter=jso
   external services: the GitHub REST API, the sign-in worker and Systems
   Modeling API servers. The one internal stand-in is the fake `Worker` used
   for restart logic. External tools (the OMG pilot, SysON) have checked
-  Fairtide's results through `tools/interop` (§1, §3), by hand.
+  Tessera's results through `tools/interop` (§1, §3), by hand.
 - **Evidence:** Inventory above. `src/lib/exchange/api-mock.ts:1-8`. The
   SysON stand-in is recorded from a live SysON
   (`exchange/syson.assessment.test.ts:1-13`).
@@ -110,7 +110,7 @@ npx vitest run --coverage.enabled --coverage.provider=v8 --coverage.reporter=jso
   specification and one recorded server. `toolkit.worker.ts` is covered only
   end to end.
 - **Status:** Verified
-- **Score:** 3 (Fairtide)
+- **Score:** 3 (Tessera)
 - **Next action:** additional testing: put `tools/interop/pilot-check.sh` on
   the demo and `npm run assess:conformance` in a scheduled CI job.
 
@@ -139,7 +139,7 @@ npx vitest run --coverage.enabled --coverage.provider=v8 --coverage.reporter=jso
   hides flakiness in the pass/fail signal. Lighthouse, conformance and the
   external checkers do not gate deploy either.
 - **Status:** Verified
-- **Score:** 2 (Fairtide)
+- **Score:** 2 (Tessera)
 - **Next action:** bug fix: make deploy depend on CI success (`workflow_run`,
   or one workflow with `needs`).
 
@@ -167,7 +167,7 @@ npx vitest run --coverage.enabled --coverage.provider=v8 --coverage.reporter=jso
   not vendored, so builds fail if the release disappears. Dependabot updates
   are only as safe as CI.
 - **Status:** Verified
-- **Score:** 3 (Fairtide)
+- **Score:** 3 (Tessera)
 - **Next action:** None required. Optional: pin Node to a minor version and
   actions to commit SHAs.
 
@@ -190,14 +190,14 @@ npx vitest run --coverage.enabled --coverage.provider=v8 --coverage.reporter=jso
   servers and sign-in need the network. Chromium only; iOS Safari's
   service-worker eviction is untested.
 - **Status:** Verified
-- **Score:** 3 (Fairtide)
+- **Score:** 3 (Tessera)
 - **Next action:** additional testing: the offline spec in WebKit.
 
 ### Are errors handled explicitly with actionable messages and useful diagnostics?
 - **Answer:** Largely.
   - The engine: start-up failure is retried once, then reported in the status
     bar ("Model can't be read"), a persistent notification and the problems
-    list, with the reason ("Fairtide stopped reading the model (…). Reload the
+    list, with the reason ("Tessera stopped reading the model (…). Reload the
     page to try again.").
   - Imports: they list what was skipped and why (`import.test.ts:209`,
     `interchange.test.ts:203`). Archive files left out are named (fixed in
@@ -223,7 +223,7 @@ npx vitest run --coverage.enabled --coverage.provider=v8 --coverage.reporter=jso
     "The engine cannot evaluate this yet: …" (`toolkit/evaluation.ts`) and
     "The engine has N notes" (`sim/StateEmulator.svelte`).
 - **Status:** Partially verified
-- **Score:** 2 (Fairtide)
+- **Score:** 2 (Tessera)
 - **Next action:** bug fix (docs and wording): update `docs/engine.md` and
   the two strings.
 
@@ -258,7 +258,7 @@ npx vitest run --coverage.enabled --coverage.provider=v8 --coverage.reporter=jso
   - Out-of-memory on the real worker has no test; `docs/performance.md`
     records it on 100k-line models.
 - **Status:** Verified (crash recovery); gap verified (no hang time limit)
-- **Score:** 2 (Fairtide)
+- **Score:** 2 (Tessera)
 - **Next action:** planned capability: a per-call watchdog that restarts a
   worker that hasn't answered within a bound scaled to model size, and a
   restart budget that refills after a healthy period.
@@ -277,7 +277,7 @@ npx vitest run --coverage.enabled --coverage.provider=v8 --coverage.reporter=jso
 - **Limitations:** Benchmarks are not in CI, only the 10k budgets. No
   low-memory device. No soak test.
 - **Status:** Partially verified
-- **Score:** 2 (Fairtide)
+- **Score:** 2 (Tessera)
 - **Next action:** additional testing: a 30-minute scripted editing session
   that records worker memory.
 
@@ -305,13 +305,13 @@ npx vitest run --coverage.enabled --coverage.provider=v8 --coverage.reporter=jso
 - **Limitations:** Nothing records which hand-typed signatures were checked
   against which toolkit release.
 - **Status:** Verified (by inspection)
-- **Score:** 2 (Fairtide)
+- **Score:** 2 (Tessera)
 - **Next action:** additional testing: check `api.ts` against the fetched
   `sysmlv2.d.ts` in `fetch-toolkit.sh` or `npm run check`.
 
 ### Are public interfaces and data formats documented, versioned, and tested for compatibility?
 - **Answer:** Documented and partly tested, but not versioned.
-  - The model is standard SysML v2 text, with no Fairtide format.
+  - The model is standard SysML v2 text, with no Tessera format.
   - The layout sidecar `layout/diagrams.json`
     (`{ "<view>:<scope>": { "<nodeId>": [x, y], "#hidden": [...], "#added": [...] } }`)
     is documented in `diagram/positions.ts:1-13` and the user guide. It has
@@ -332,7 +332,7 @@ npx vitest run --coverage.enabled --coverage.provider=v8 --coverage.reporter=jso
 - **Limitations:** With no version in the layout file or the stored record, a
   future incompatible change cannot be detected.
 - **Status:** Partially verified
-- **Score:** 1 (Fairtide)
+- **Score:** 1 (Tessera)
 - **Next action:** additional testing: a `version` in the layout file and the
   stored records, plus fixtures written by today's build that later builds
   must open.
@@ -372,7 +372,7 @@ npx vitest run --coverage.enabled --coverage.provider=v8 --coverage.reporter=jso
     disabled inline where used, so nothing automated checks new sites.
   - No CSP as a second line of defence.
 - **Status:** Verified
-- **Score:** 2 (Fairtide)
+- **Score:** 2 (Tessera)
 - **Next action:** additional testing: `npm audit --omit=dev
   --audit-level=high` or CodeQL in CI, and a CSP `<meta>` in `app.html`.
 
@@ -401,7 +401,7 @@ npx vitest run --coverage.enabled --coverage.provider=v8 --coverage.reporter=jso
 - **Limitations:** macOS and Windows not tried. The toolkit needs network
   access to GitHub Releases.
 - **Status:** Verified (Linux)
-- **Score:** 3 (Fairtide)
+- **Score:** 3 (Tessera)
 - **Next action:** add the Playwright step and a short CONTRIBUTING.md to the
   README.
 
@@ -422,7 +422,7 @@ npx vitest run --coverage.enabled --coverage.provider=v8 --coverage.reporter=jso
 - **Evidence:** The files cited; `grep -c "it.fails("`.
 - **Limitations:** The docs drift (the "Engine error" wording above).
 - **Status:** Verified
-- **Score:** 2 (Fairtide)
+- **Score:** 2 (Tessera)
 - **Next action:** file the upstream requests and the open findings as issues
   and link them from the docs.
 
@@ -440,7 +440,7 @@ npx vitest run --coverage.enabled --coverage.provider=v8 --coverage.reporter=jso
   `settings/Settings.svelte` (About), `.github/` contents.
 - **Limitations:** n/a
 - **Status:** Verified (absent)
-- **Score:** 1 (Fairtide)
+- **Score:** 1 (Tessera)
 - **Next action:** planned capability: tagged releases with a changelog, the
   commit id in About, SECURITY.md and issue templates.
 
@@ -465,7 +465,7 @@ npx vitest run --coverage.enabled --coverage.provider=v8 --coverage.reporter=jso
   no hang test on the worker (the gap shown by
   `supervision.assessment.test.ts`).
 - **Status:** Verified
-- **Score:** 3 (Fairtide). Reaching 4 needs the external checkers to run
+- **Score:** 3 (Tessera). Reaching 4 needs the external checkers to run
   automatically.
 - **Next action:** additional testing: a WebKit project, plus a scheduled job
   running the pilot and conformance checks.
@@ -481,7 +481,7 @@ npx vitest run --coverage.enabled --coverage.provider=v8 --coverage.reporter=jso
 - **Limitations:** macOS and Windows not tried; the fetch script assumes GNU
   `sha256sum`.
 - **Status:** Verified
-- **Score:** 3 (Fairtide)
+- **Score:** 3 (Tessera)
 - **Next action:** add the missing prerequisites to the README.
 
 ### 15. Are unsupported features, known bugs, and interchange limitations visible to users?
@@ -518,7 +518,7 @@ npx vitest run --coverage.enabled --coverage.provider=v8 --coverage.reporter=jso
 - **Limitations:** Visibility of individual unsupported SysML constructs in
   diagrams and the editor is assessed in §1/§2.
 - **Status:** Partially verified
-- **Score:** 2 (Fairtide)
+- **Score:** 2 (Tessera)
 - **Next action:** planned capability: a "Known limitations" page in Help,
   and simulator notices for history, `terminate` and `send`.
 

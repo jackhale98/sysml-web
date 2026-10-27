@@ -2,7 +2,7 @@
 
 > Written before the fixes that followed it: what became of each critical finding is in [the assessment summary](README.md#critical-findings-and-what-became-of-them).
 
-Assessed on `claude/assess-data-integrity` (based on 92cfbcf). Scores are Fairtide's unless
+Assessed on `claude/assess-data-integrity` (based on 92cfbcf). Scores are Tessera's unless
 marked "engine". Every test named here was run in this session unless it says otherwise.
 
 Commands (from the repository root):
@@ -101,7 +101,7 @@ The answers below describe the app as assessed; these gaps are now closed.
 - **Evidence:** `tests/e2e/assessment-data-integrity.spec.ts` ("an edit survives closing the tab straight after typing", "an edit shown as saved survives the browser being killed", "a save the browser refuses…"); `src/lib/project/session.assessment.test.ts` ("reports a save the browser refused…", "saves a change still waiting…when flushed", "reports a write that failed part-way…"); existing `tests/e2e/offline.spec.ts:146` (reload for a new version keeps the latest edit), `tests/e2e/smoke.spec.ts:171` (survives a reload). Run in this session: see the results table above (the tab-close test is timing-sensitive).
 - **Limitations:** An edit made less than 0.6 s before a hard crash (power loss, killed process) can be lost, and during that moment the status still says "Saved" from the save before (`session.assessment.test.ts`, `it.fails` "does not show a change waiting for its autosave as saved"). Undo history is in memory only (lost on reload). Storage eviction is possible unless the browser grants persistence (asked for when a project is first stored; shown in Settings).
 - **Status:** Verified
-- **Score:** 3 (Fairtide)
+- **Score:** 3 (Tessera)
 - **Next action:** additional testing (Safari/Firefox, iOS background kill); small fix for the stale "Saved" status.
 
 ### Does it distinguish saved changes from unsaved changes?
@@ -109,7 +109,7 @@ The answers below describe the app as assessed; these gaps are now closed.
 - **Evidence:** `src/lib/project/pending.test.ts` (existing, run), `session.assessment.test.ts` (leaveRisk after a refused save), `tests/e2e/install.spec.ts:219` (existing, not run here), `tests/e2e/files.spec.ts` folder test (existing, not run here).
 - **Limitations:** No per-file "modified" marker in the editor tabs for browser-only projects (everything is saved there). The `.project.json` (name/description) is not counted as a GitHub change.
 - **Status:** Verified
-- **Score:** 3 (Fairtide)
+- **Score:** 3 (Tessera)
 - **Next action:** bug fix (show "Saving…" from the first keystroke).
 
 ### Can multiple users collaborate without silently overwriting one another's work?
@@ -117,7 +117,7 @@ The answers below describe the app as assessed; these gaps are now closed.
 - **Evidence:** `src/lib/git/collab.assessment.test.ts` (two people on one branch: refused, nothing lost, merge, both saved; GitHub's 422 "not a fast forward" after the check is reported as "get the latest", base unchanged); existing `src/lib/git/github.test.ts:141`, `src/lib/git/sync.test.ts:112`, `src/lib/exchange/sync.test.ts:58`, `src/lib/exchange/merge.test.ts`; e2e "saving to GitHub after someone else saved is refused plainly…"; `session.assessment.test.ts` two-tab test and `it.fails` "does not overwrite a file changed on disk…".
 - **Limitations:** Folder projects: last writer wins against other editors/sync tools (known gap, test kept as `it.fails`). Two tabs: the losing tab is told and must reload; its unsaved edits are not merged. API server first save (no link to a base commit) is planned against the head and not re-checked before the commit.
 - **Status:** Partially verified
-- **Score:** 2 (Fairtide) — GitHub path 3, folder path 1.
+- **Score:** 2 (Tessera) — GitHub path 3, folder path 1.
 - **Next action:** bug fix (re-read folder files before writing; refuse or ask when they changed).
 
 ### Are merge conflicts involving the same model element detected and resolved safely?
@@ -125,7 +125,7 @@ The answers below describe the app as assessed; these gaps are now closed.
 - **Evidence:** `collab.assessment.test.ts` ("asks when both changed the same element (the same line)…", "flags a file renamed here and changed there"); existing `src/lib/git/diff.test.ts:81-100`, `src/lib/exchange/merge.test.ts:282-406`.
 - **Limitations:** Git merging is textual: two edits to one element on non-adjacent lines merge without a question. A rename is shown as delete + add, so a conflict on a renamed file reads as "deleted here".
 - **Status:** Verified
-- **Score:** 3 (Fairtide)
+- **Score:** 3 (Tessera)
 - **Next action:** planned capability (element-level merge for Git, reusing the server merge).
 
 ### Can Git merges produce syntactically valid but semantically inconsistent models, and how are these detected?
@@ -133,7 +133,7 @@ The answers below describe the app as assessed; these gaps are now closed.
 - **Evidence:** `src/lib/git/merge-semantics.assessment.test.ts` (real engine; merges as "Get latest" does; 4 tests, run, pass).
 - **Limitations:** The pull outcome says "Got the latest version" even when the merged model has new errors; there is no "problems introduced by this merge" list, so a break is noticed only if someone looks at the problem count. Breaks that are valid SysML (a value changed on one side that a constraint on the other side now fails) show only as a failed check. Found while testing: the engine rejects `first` and `frame` as names (they are keywords), which is correct SysML.
 - **Status:** Partially verified
-- **Score:** 2 (Fairtide; name resolution is the engine's)
+- **Score:** 2 (Tessera; name resolution is the engine's)
 - **Next action:** planned capability (after a pull, compare problems before/after and show new ones; flag duplicate names and identifiers).
 
 ### Are identifiers stable across renames, file moves, and refactoring?
@@ -141,7 +141,7 @@ The answers below describe the app as assessed; these gaps are now closed.
 - **Evidence:** existing `src/lib/project/workspace-undo.test.ts:49`, `src/lib/git/sync.test.ts:54`, `src/lib/project/session-folder.test.ts:115,159`, `src/lib/exchange/merge.test.ts:418` (all run here).
 - **Limitations:** Renaming an element changes its identity for Git history and for any external tool keyed on qualified names; there is no stable UUID in the text (SysML textual notation has none by default).
 - **Status:** Partially verified
-- **Score:** 2 (Fairtide)
+- **Score:** 2 (Tessera)
 - **Next action:** None for files; additional testing for API-server id stability across an element rename.
 
 ### Can users undo imports, bulk edits, and automated transformations?
@@ -149,7 +149,7 @@ The answers below describe the app as assessed; these gaps are now closed.
 - **Evidence:** existing `src/lib/project/workspace-undo.test.ts` (run), `src/lib/dataio/*` tests (not run here), `src/lib/exchange/ApiServer.svelte` `bringIn` (code).
 - **Limitations:** Undo is in memory, per page; lost on reload. 50 steps.
 - **Status:** Partially verified
-- **Score:** 2 (Fairtide)
+- **Score:** 2 (Tessera)
 - **Next action:** bug fix (make pull/discard one undoable transaction).
 
 ### Are failed saves and interrupted exports reported clearly?
@@ -157,7 +157,7 @@ The answers below describe the app as assessed; these gaps are now closed.
 - **Evidence:** `session.assessment.test.ts`, e2e storage-full test, existing `src/lib/git/github.test.ts:262,345` (run), `collab.assessment.test.ts` 422 case.
 - **Limitations:** The refused-save message is only in a tooltip (the visible text is "Not saved"). After a two-tab refusal, "Try again" fails again until reload (the dialog's advice is about storage).
 - **Status:** Verified
-- **Score:** 3 (Fairtide)
+- **Score:** 3 (Tessera)
 - **Next action:** additional testing (word the two-tab case in the leave dialog).
 
 ### Can a project be recovered from corrupt files or partial archives?
@@ -165,7 +165,7 @@ The answers below describe the app as assessed; these gaps are now closed.
 - **Evidence:** `src/lib/interchange/kpar.assessment.test.ts` (passing: truncated, invalid deflate, checksum mismatch, missing file, non-UTF-8 listed as skipped by the reader; `it.fails`: duplicate entries, CRC); e2e "importing an archive says which files were left out, and what did not check out"; existing `src/lib/interchange/kpar.test.ts:89,172`.
 - **Limitations:** No size limit on decompression (a ZIP bomb would exhaust memory; not tested). The import notice is a toast that stays until dismissed; it is not kept with the project.
 - **Status:** Partially verified
-- **Score:** 2 (Fairtide)
+- **Score:** 2 (Tessera)
 - **Next action:** bug fix (check CRC; warn on duplicates; cap entry size).
 
 ### Are multi-file operations atomic where necessary, or is there a safe recovery mechanism?
@@ -173,15 +173,15 @@ The answers below describe the app as assessed; these gaps are now closed.
 - **Evidence:** `session.assessment.test.ts` (write fails part-way; rename whose write fails), `collab.assessment.test.ts` (ref update refused), existing `src/lib/git/github.test.ts:91`.
 - **Limitations:** Folder writes are not transactional; a crash mid-save leaves the folder mixed (recoverable from the browser copy).
 - **Status:** Verified
-- **Score:** 3 (Fairtide)
+- **Score:** 3 (Tessera)
 - **Next action:** None (consider write-new-then-rename for folders).
 
-### Does Fairtide avoid modifying files outside the intended workspace?
+### Does Tessera avoid modifying files outside the intended workspace?
 - **Answer:** Yes on disk: it writes only through the folder handle the person picked (the browser scopes it), only `.sysml`, `.kerml`, `.md` and `.project.json`, and paths made in the app are checked (`src/lib/project/filenames.ts`: no `..`, no leading dot, no reserved names). Other files are not touched; empty folders left by a deleted file are removed. Archive entry paths, however, are not checked: `../x.sysml`, `/etc/x.sysml` and `C:\x.sysml` become project files and are written into any `.kpar` exported later. They cannot reach the disk (folder projects come only from a picked folder) and GitHub refuses them.
 - **Evidence:** `kpar.assessment.test.ts` (`it.fails` "refuses or reports paths that leave the project"; passing test documenting the re-export), existing `src/lib/project/filenames.test.ts`, `session-folder.test.ts`.
 - **Limitations:** `.project.json` is rewritten on every folder save (formatting normalised).
 - **Status:** Partially verified
-- **Score:** 2 (Fairtide)
+- **Score:** 2 (Tessera)
 - **Next action:** bug fix (normalise or refuse archive paths on import).
 
 ### Can users work offline and synchronize changes predictably?
@@ -189,15 +189,15 @@ The answers below describe the app as assessed; these gaps are now closed.
 - **Evidence:** existing `tests/e2e/offline.spec.ts` (not run here; the lead runs the full suite), `src/lib/offline/caching.test.ts` (run), `src/lib/git/errors.ts` `networkError`.
 - **Limitations:** One device per browser; no automatic retry.
 - **Status:** Partially verified (by existing tests)
-- **Score:** 3 (Fairtide)
+- **Score:** 3 (Tessera)
 - **Next action:** None
 
 ### Are repository permissions, credentials, and tokens handled securely?
 - **Answer:** GitHub tokens (a pasted fine-grained token, or "Sign in with GitHub" access + refresh tokens) and API-server tokens are kept in `localStorage` in plain text, sent only as `Authorization` headers. Sign-in uses PKCE and a state check; the one-time code is removed from the address bar; the client secret stays in a stateless worker that logs nothing and answers only allowed origins. In this session's tests the token was not in the stored project, the exported `.kpar`, any cache, any address or the console, and only `api.github.com` received it. One leak path: the SysML v2 API client sends its token to whatever host a "next page" `Link` header names.
 - **Evidence:** e2e "the GitHub token stays out of the project, its export, the offline cache, addresses and the console"; `src/lib/exchange/api.assessment.test.ts` (`it.fails` cross-host `Link`); existing `src/lib/git/oauth.test.ts`, `src/lib/git/account.test.ts`, `worker/src/index.test.ts`, `src/lib/offline/caching.test.ts` (run); grep: no `console.*` call outside the engine client prints request data.
-- **Limitations:** No Content-Security-Policy (`src/app.html`), so any script injection could read `localStorage` tokens. Permissions are GitHub's (fine-grained token scopes or the App's chosen repositories); Fairtide adds none.
+- **Limitations:** No Content-Security-Policy (`src/app.html`), so any script injection could read `localStorage` tokens. Permissions are GitHub's (fine-grained token scopes or the App's chosen repositories); Tessera adds none.
 - **Status:** Partially verified
-- **Score:** 2 (Fairtide)
+- **Score:** 2 (Tessera)
 - **Next action:** bug fix (keep the API token to the server's origin); planned capability (CSP).
 
 ### Can users migrate projects between machines and supported repository providers without losing work?
@@ -205,7 +205,7 @@ The answers below describe the app as assessed; these gaps are now closed.
 - **Evidence:** existing `tests/e2e/smoke.spec.ts:171` (round trip, not run here), `src/lib/interchange/kpar.test.ts:49,212` (run).
 - **Limitations:** As listed. Other providers: Not claimed.
 - **Status:** Verified (machines); Not claimed (other providers)
-- **Score:** 3 (Fairtide, machines)
+- **Score:** 3 (Tessera, machines)
 - **Next action:** planned capability (commit `.project.json`; GitLab).
 
 ## Prioritized question 8: Can a failed save, interrupted import, or browser crash cause data loss?
@@ -262,7 +262,7 @@ it reports success and leaves the person to notice the problem count.
    latest → Keep mine: the later edit is reverted. Tests: `collab.assessment.test.ts`.
 3. **Open — "Save to folder" overwrites changes made to the same file on disk.** Repro: open
    a folder; edit `model/A.sysml` in another editor and save there; edit `model/A.sysml` in
-   Fairtide; Save to folder: the other editor's change is gone, with no warning. Test:
+   Tessera; Save to folder: the other editor's change is gone, with no warning. Test:
    `session.assessment.test.ts` `it.fails` "does not overwrite a file changed on disk…".
 4. **Fixed — importing an archive dropped non-UTF-8 model files and checksum warnings
    silently.** Repro (before the fix): zip `Rig.sysml` (UTF-8) and `Weights.sysml` (Latin-1
@@ -277,7 +277,7 @@ it reports success and leaves the person to notice the problem count.
 | Check ZIP CRCs; warn on duplicate entries; cap entry size | Detects corrupt archives | Medium | S |
 | Normalise/refuse `..`, absolute and drive paths in archives | Stops hostile paths propagating to exports | Medium | S |
 | After "Get latest", list problems the merge introduced (before/after diff of diagnostics) | Detects semantic merge breaks at the point they happen | High | M |
-| Report duplicate member names and duplicate requirement identifiers | Detects the most common semantic merge clash | High | M (engine or Fairtide check) |
+| Report duplicate member names and duplicate requirement identifiers | Detects the most common semantic merge clash | High | M (engine or Tessera check) |
 | Element-level merge for Git (reuse the API-server merge) | Fewer false conflicts, real element conflicts | High | L |
 | Make "Get latest" and "Discard" one undoable step | Recovery after a wrong choice | Medium | S |
 | Show "Saving…" from the first change (not the stale "Saved") | Honest status | Medium | S |

@@ -111,7 +111,7 @@
 </script>
 
 <svelte:head>
-	<title>{workspace.info?.name ?? 'Project'} · Fairtide</title>
+	<title>{workspace.info?.name ?? 'Project'} · Tessera</title>
 </svelte:head>
 
 {#if missing}

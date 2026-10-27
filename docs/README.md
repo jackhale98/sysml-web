@@ -1,10 +1,10 @@
-# Fairtide documentation
+# Tessera documentation
 
-What each document is for, and who it is for. New to Fairtide? Start with the
+What each document is for, and who it is for. New to Tessera? Start with the
 [user guide](user-guide.md), or open the live app at
 <https://jackhale98.github.io/sysml-web/> and take the demo's tour.
 
-## For people using Fairtide
+## For people using Tessera
 
 - [User guide](user-guide.md): starting a project, the ideas of SysML in plain
   words, how to do the common jobs, keyboard shortcuts and where your data is
@@ -48,7 +48,7 @@ What each document is for, and who it is for. New to Fairtide? Start with the
 
 ## Assessment
 
-- [Robustness and MBSE assessment](assessment/README.md): what Fairtide
+- [Robustness and MBSE assessment](assessment/README.md): what Tessera
   demonstrably supports and how robustly, section by section, with the
   evidence, the scores and every critical finding and its fix:
   [language coverage](assessment/01-language.md),
@@ -62,7 +62,7 @@ What each document is for, and who it is for. New to Fairtide? Start with the
   [software quality](assessment/09-quality.md),
   [performance, usability and deployment](assessment/10-performance-usability.md).
 - [Interop tools](interop-tools.md): the OMG pilot implementation and SysON,
-  run as checkers of Fairtide's output.
+  run as checkers of Tessera's output.
 
 ## For self-hosters
 

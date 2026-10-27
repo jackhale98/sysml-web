@@ -86,12 +86,12 @@
 	<form class="connect" class:fallback onsubmit={connect}>
 		{#if fallback}
 			<p class="intro">
-				Rather not sign in? Give Fairtide an <strong>access token</strong> instead: a password just for
+				Rather not sign in? Give Tessera an <strong>access token</strong> instead: a password just for
 				this app, limited to the repositories you choose.
 			</p>
 		{:else}
 			<p class="intro">
-				Fairtide works with GitHub straight from your browser. To let it open and save your models,
+				Tessera works with GitHub straight from your browser. To let it open and save your models,
 				give it an <strong>access token</strong>: a password just for this app, limited to the
 				repositories you choose.
 			</p>
@@ -179,7 +179,7 @@
 		{:else}
 			<p class="intro">
 				Sign in with GitHub to open your models and save them back. You choose which repositories
-				Fairtide can use.
+				Tessera can use.
 			</p>
 		{/if}
 		<button

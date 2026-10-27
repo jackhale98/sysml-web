@@ -161,7 +161,7 @@ describe('startToolkit', () => {
 		expect(onMemoryHigh).toHaveBeenCalledWith(1780);
 		expect(MEMORY_WARNING_MIB).toBeLessThan(1780);
 		expect(memoryWarning(1780)).toBe(
-			'This project is close to the most Fairtide can hold in a browser tab (1.7 of 2 GB used). ' +
+			'This project is close to the most Tessera can hold in a browser tab (1.7 of 2 GB used). ' +
 				'If it grows much more, the model will stop updating. Move parts of it into separate projects; ' +
 				'reloading the page frees some memory for a while.'
 		);

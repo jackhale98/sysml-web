@@ -3,7 +3,7 @@ library package VerificationResults {
     /*
      * Recorded outcomes of verification cases: what a verification case
      * returned when it was run, when, by whom, against which commit of the
-     * model, and where the evidence is. Fairtide records one on a
+     * model, and where the evidence is. Tessera records one on a
      * verification case (Record a result, in its details); any tool can
      * read or write it, as it is plain SysML metadata:
      *
@@ -21,7 +21,7 @@ library package VerificationResults {
      * The verdict is SysML's own VerdictKind (VerificationCases): pass,
      * fail, inconclusive or error. A result names the commit of the model it
      * was run against: once the model changes, it may no longer hold, and
-     * Fairtide shows it as out of date. A case keeps its latest result; the
+     * Tessera shows it as out of date. A case keeps its latest result; the
      * earlier ones are in the history of the files.
      */
 

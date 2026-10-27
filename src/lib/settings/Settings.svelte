@@ -450,7 +450,7 @@
 						<h3>Where your projects are kept</h3>
 						<p>
 							In <strong>this browser, on this device</strong>. Every change is saved here as you
-							work; nothing is uploaded to a Fairtide server (there isn't one).
+							work; nothing is uploaded to a Tessera server (there isn't one).
 						</p>
 						<ul class="facts">
 							<li>
@@ -669,7 +669,7 @@
 							</ul>
 							<p class="muted small">
 								Sign-ins and tokens are kept only in this browser. Signing out forgets them here; to
-								remove Fairtide's access everywhere, revoke it on GitHub under
+								remove Tessera's access everywhere, revoke it on GitHub under
 								<!-- eslint-disable svelte/no-navigation-without-resolve -- external links -->
 								<a
 									href="https://github.com/settings/apps/authorizations"
@@ -738,7 +738,7 @@
 					<section class="block">
 						<h3><CircleQuestionMark size={18} aria-hidden="true" /> Help</h3>
 						<p class="muted">
-							How Fairtide works, in plain words: projects and their files, what SysML's ideas mean,
+							How Tessera works, in plain words: projects and their files, what SysML's ideas mean,
 							how to do the common jobs, keyboard shortcuts and where your data is kept. It works
 							offline. Press <kbd>?</kbd> in a project, or type <kbd>?</kbd> in search, to find a topic.
 						</p>
@@ -760,12 +760,12 @@
 						<h3><Smartphone size={18} aria-hidden="true" /> Install the app</h3>
 						{#if pwa.installed}
 							<p class="muted">
-								You're using Fairtide as an installed app. It opens straight into your projects and
+								You're using Tessera as an installed app. It opens straight into your projects and
 								works offline.
 							</p>
 						{:else}
 							<p class="muted">
-								Keep Fairtide on your Home Screen, Dock or app list: it opens straight into your
+								Keep Tessera on your Home Screen, Dock or app list: it opens straight into your
 								projects, like any app, and works offline.
 							</p>
 							<button type="button" class="button" onclick={() => pwa.offerInstall()}>
@@ -777,7 +777,7 @@
 						<div class="brand">
 							<Logo size={48} variant="tile" />
 							<div>
-								<strong>Fairtide</strong>
+								<strong>Tessera</strong>
 								<span class="muted">Version {version}</span>
 							</div>
 						</div>
@@ -806,7 +806,7 @@
 					<section class="block">
 						<h3>Licences</h3>
 						<p>
-							Fairtide is free software, available under either the
+							Tessera is free software, available under either the
 							<a
 								href="https://spdx.org/licenses/Apache-2.0.html"
 								target="_blank"
@@ -870,7 +870,7 @@
 					<section class="block">
 						<h3>Trademarks</h3>
 						<p class="muted">
-							SysML is a registered trademark of the Object Management Group (OMG). Fairtide is an
+							SysML is a registered trademark of the Object Management Group (OMG). Tessera is an
 							independent project, not affiliated with or endorsed by OMG.
 						</p>
 					</section>

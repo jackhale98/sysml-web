@@ -1,7 +1,7 @@
 <script lang="ts">
 	/**
 	 * A small card on the projects page for phone and tablet visitors who
-	 * haven't added Fairtide to their Home Screen yet. Dismissed once, it
+	 * haven't added Tessera to their Home Screen yet. Dismissed once, it
 	 * stays away on this device.
 	 */
 	import { onMount } from 'svelte';
@@ -45,7 +45,7 @@
 	<aside class="install-card" aria-labelledby="install-card-title">
 		<Logo size={44} variant="tile" />
 		<div class="text">
-			<h2 id="install-card-title">Keep Fairtide on your Home Screen</h2>
+			<h2 id="install-card-title">Keep Tessera on your Home Screen</h2>
 			<p>Open your projects in one tap, like any app. It works offline too.</p>
 			<button type="button" class="show" onclick={() => pwa.offerInstall()}>
 				{pwa.canInstall ? 'Install app' : 'Show me how'}
@@ -68,7 +68,7 @@
 		border-radius: var(--radius-lg);
 		background: linear-gradient(150deg, var(--accent-weak), var(--surface) 70%);
 	}
-	.install-card :global(.ft-logo) {
+	.install-card :global(.tx-logo) {
 		flex: none;
 		border-radius: 10px;
 	}

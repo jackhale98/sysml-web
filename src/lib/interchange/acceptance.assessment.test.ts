@@ -4,7 +4,7 @@
  * cross-file references, units, multiplicities, specialization, redefinition,
  * requirements with satisfy/verify, constraints, ports and an interface,
  * states, actions, metadata, an alias, a variation) exchanged through every
- * route Fairtide offers, compared by NORMALIZED SEMANTICS
+ * route Tessera offers, compared by NORMALIZED SEMANTICS
  * (`semantics-testing.ts`: qualified name → kind, typing, specialization,
  * multiplicity, values, relationships), not by text or ids.
  *
@@ -47,12 +47,12 @@ let outside: (id: string) => string | null;
 const model = filesIn(join(FIXTURES, 'acceptance'));
 let reference: Digest;
 
-/** The meaning of a set of files, as Fairtide's engine reads it. */
+/** The meaning of a set of files, as Tessera's engine reads it. */
 function digestOf(files: SourceFile[]): Digest {
 	return semanticDigest(readElements(host.exportInterchange(files, {}).json), outside);
 }
 
-/** Errors (syntax and semantic) Fairtide reports for a set of files. */
+/** Errors (syntax and semantic) Tessera reports for a set of files. */
 function errorsOf(files: SourceFile[]): string[] {
 	return host
 		.analyzeProject(files)
@@ -83,7 +83,7 @@ beforeAll(async () => {
 }, 60_000);
 
 describe('the acceptance model', () => {
-	it('is clean in Fairtide (and the OMG pilot: see the assessment doc)', () => {
+	it('is clean in Tessera (and the OMG pilot: see the assessment doc)', () => {
 		const findings = host
 			.analyzeProject(model)
 			.flatMap((a) => [
@@ -132,7 +132,7 @@ describe('the acceptance model', () => {
 	});
 });
 
-describe('Fairtide → SysML v2 JSON → Fairtide', () => {
+describe('Tessera → SysML v2 JSON → Tessera', () => {
 	for (const [label, options] of [
 		['only the model (the default)', {}],
 		['with derived properties', { derived: true }],
@@ -204,7 +204,7 @@ describe('.kpar round trip', () => {
 	});
 });
 
-describe('SysON → Fairtide (what SysON v2026.9.3 made of the acceptance model)', () => {
+describe('SysON → Tessera (what SysON v2026.9.3 made of the acceptance model)', () => {
 	const syson = () => gz('syson/acceptance.elements.json.gz');
 
 	it('opens SysON’s element JSON, leaving out only the expression SysON could not resolve, and says so', () => {
@@ -248,7 +248,7 @@ describe('SysON → Fairtide (what SysON v2026.9.3 made of the acceptance model)
 		const text = filesIn(join(FIXTURES, 'syson/acceptance-text'));
 		const errors = errorsOf(text);
 		// SysON prints `totalMass :> mass = ;` for a calculation call, a bare `import`, and
-		// `variant` usages as plain parts: each is an error Fairtide shows.
+		// `variant` usages as plain parts: each is an error Tessera shows.
 		expect(errors.length).toBeGreaterThanOrEqual(3);
 		expect(errors.join('\n')).toMatch(/expected an expression/);
 	});
@@ -338,7 +338,7 @@ describe('what an exported project needs elsewhere', () => {
 		expect(standaloneErrors(model)).toEqual([]);
 	});
 
-	it('a project that checks clean exports a .kpar that is complete without Fairtide', async () => {
+	it('a project that checks clean exports a .kpar that is complete without Tessera', async () => {
 		const files: SourceFile[] = [
 			{
 				path: 'Model.sysml',

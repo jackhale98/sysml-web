@@ -85,7 +85,7 @@ export function errorFor(
 		return new GitError(
 			'permission',
 			access === 'app'
-				? `${host} didn't allow ${what}. Check that Fairtide can use this repository (choose repositories on ${host}), and that your account can make changes to it.`
+				? `${host} didn't allow ${what}. Check that Tessera can use this repository (choose repositories on ${host}), and that your account can make changes to it.`
 				: `Your token isn't allowed to do ${what}. Check that it covers this repository with “Contents: Read and write” (and “Pull requests: Read and write” to propose changes).`,
 			status,
 			detail
@@ -94,7 +94,7 @@ export function errorFor(
 		return new GitError(
 			'not-found',
 			access === 'app'
-				? `${host} couldn't find ${what}. Check the name, or that Fairtide can use this repository (choose repositories on ${host}).`
+				? `${host} couldn't find ${what}. Check the name, or that Tessera can use this repository (choose repositories on ${host}).`
 				: `${host} couldn't find ${what}. Check the name, or that your token includes this repository.`,
 			status,
 			detail

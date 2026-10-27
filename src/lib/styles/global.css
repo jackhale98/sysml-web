@@ -1,8 +1,8 @@
 /*
- * Fairtide design tokens and base styles.
+ * Tessera design tokens and base styles.
  *
  * Calm and typographic: a warm neutral canvas, white surfaces, one ink-blue
- * accent (Fairtide's sea glass). Colour encodes status and kind, always alongside a label or shape.
+ * accent (Tessera's sea glass). Colour encodes status and kind, always alongside a label or shape.
  * Themes: light (default), dark, and "system" via prefers-color-scheme;
  * an explicit choice is set as data-theme on <html>.
  */

@@ -38,7 +38,7 @@ the home view by one.
 - **Evidence:** `src/lib/project/traceability.assessment.test.ts:115` (rename via app), `:137` (typed rename), `:155`/`:172` (move), `:182` (file rename, ids change), `:203` (merge, dangling link), `:219` (merge, duplicate ID error), `:252` (cross-package duplicate ID; the test falls back to `it.fails` only on a tree without the check); existing `src/lib/project/requirementIds.test.ts:18`, `:65`. Existing: `src/lib/engine/toolkit/compare.test.ts:166` (ids by qualified name; unnamed elements by position), `src/lib/review/semantic.test.ts:142`, `:215`. All ran in this session.
 - **Limitations:** No "move to package" operation in the app: a move is cut/paste plus fixing imports by hand. Unresolved references are **warnings**, not errors, so a merged model with a dangling trace link still "works" and its coverage silently loses that link apart from the warning. The review of an app rename also lists an unrelated unnamed `objective` (in `analysis/Performance.sysml`) as removed and added (`traceability.assessment.test.ts:131`, `it.fails`). Unnamed relationships (`satisfy`, `verify`) have positional engine ids (`compare.test.ts:211`): fine for the review (it matches them by content) but not an identity for an external tool. A requirement without a short name has no identity that survives a rename.
 - **Status:** Verified (for the scenarios listed)
-- **Score:** 2 (Fairtide; identity is a modelling convention plus the engine's name resolution)
+- **Score:** 2 (Tessera; identity is a modelling convention plus the engine's name resolution)
 - **Next action:** bug fix (spurious `objective` change in the review); consider raising unresolved trace references to errors in the gap views.
 
 ### Can requirements be traced through design, implementation, and verification?
@@ -46,7 +46,7 @@ the home view by one.
 - **Evidence:** `traceability.assessment.test.ts:262` (links follow edits), `:397` (related panel: `in satisfies drone`, `in verifies enduranceFlightTest`, `out derives Parcel delivery`); existing `src/lib/project/requirements.test.ts:102`, `src/lib/project/requirementChecks.test.ts:33`, `:40`, `src/lib/engine/toolkit/diagrams/related.test.ts:70`, `src/lib/reports/reports.test.ts:131`, `src/lib/engine/toolkit/views/dsm.test.ts`. Ran in this session.
 - **Limitations:** No link to external artefacts. Trace across the derivation chain to verification is computed only in the report. The engine's subject-name reading is still the engine's (warned, not changed).
 - **Status:** Partially verified
-- **Score:** 2 (Fairtide)
+- **Score:** 2 (Tessera)
 - **Next action:** additional testing (compare trace links with the pilot implementation automatically).
 
 ### Are coverage metrics derived from actual model relationships?
@@ -54,15 +54,15 @@ the home view by one.
 - **Evidence:** `traceability.assessment.test.ts:262`, `:281`, `:137` (unresolved link not counted); `src/lib/reports/revision.assessment.test.ts:51` (76 % → 88 %); `src/lib/reports/reports.test.ts:180`. Before `68cb9db` six of the demo's links were read differently by the pilot (interop note above); now warned and removed from the demo. Ran in this session.
 - **Limitations:** Inconsistent definitions across home/tables/report; "verified" is planned verification, not executed; a `satisfy` whose root names the requirement's subject still counts as the engine reads it (with a warning).
 - **Status:** Verified (derivation from relationships); Partially verified (consistency)
-- **Score:** 2 (Fairtide)
+- **Score:** 2 (Tessera)
 - **Next action:** planned capability (one coverage definition shared by home, tables and report, with "through derived requirements" shown as such everywhere).
 
-### Can Fairtide identify missing, circular, contradictory, or orphaned relationships where meaningful?
+### Can Tessera identify missing, circular, contradictory, or orphaned relationships where meaningful?
 - **Answer:** *Missing*: unsatisfied and unverified requirements (home gap list, `RequirementGaps`, report Gaps chapter); FMEA lines of high priority or unacceptable risk without a verified control; DSM "unlinked" flags (a step with no allocation, a part with no connection) and untyped connections. *Dangling/orphaned*: any reference that no longer resolves (a `satisfy`/`verify`/derivation to a renamed requirement, an `@Fmea about` a removed part, a `riskControls` naming a control that does not exist) is an `unresolved reference` warning at its line. *Wrong kind*: `satisfy` of a non-requirement is an error from the engine. *Circular*: not detected (a derivation cycle A→B→A raises nothing). *Contradictory*: not detected between requirements; a requirement's own constraint can be reported violated by the design.
 - **Evidence:** `traceability.assessment.test.ts:281`, `:301`, `:313` (`it.fails`, circular), `:326`, `:334`, `:367` (`it.fails`, DSM flag); existing `src/lib/create/riskReview.test.ts:277`, `src/lib/workbench/dsm.test.ts`. Ran in this session.
 - **Limitations:** Circular derivation and contradictory requirements are not checked. Dangling references are warnings, not errors. A need without derived requirements and without links is listed as a gap but not called "orphaned".
 - **Status:** Partially verified
-- **Score:** 2 (Fairtide; resolution diagnostics are the engine's)
+- **Score:** 2 (Tessera; resolution diagnostics are the engine's)
 - **Next action:** planned capability (derivation-cycle check; an "orphan" filter in the gap views).
 
 ### Can verification cases specify methods, expected results, and pass/fail outcomes?
@@ -70,7 +70,7 @@ the home view by one.
 - **Evidence:** `traceability.assessment.test.ts:355` (no verification case appears among the checks; SYS-001's "satisfied" comes from the design); `src/lib/engine/toolkit/views/rows.ts:492` (the requirement's verdict is the worst check of its constraint); `docs/table-rendering.md`. Ran in this session.
 - **Limitations:** No test-result model, no import of test results, no link from a result to a requirement.
 - **Status:** Partially verified (methods, expected results); outcomes not offered
-- **Score:** 1 (Fairtide)
+- **Score:** 1 (Tessera)
 - **Next action:** planned capability (record outcomes as model content, e.g. an `@VerificationResult { verdict; date; revision; evidence }` metadata on the case, shown in the verification matrix).
 
 ### Are test results associated with the exact model revision they verify?
@@ -78,7 +78,7 @@ the home view by one.
 - **Evidence:** none in code (`src/lib/review/remote.ts:24`, `src/lib/git/github.ts:451` for revisions only).
 - **Limitations:** —
 - **Status:** Not claimed
-- **Score:** — (not claimed). Gap note for regulated use: verification evidence must live outside Fairtide (test management system) and reference the commit SHA by hand.
+- **Score:** — (not claimed). Gap note for regulated use: verification evidence must live outside Tessera (test management system) and reference the commit SHA by hand.
 - **Next action:** planned capability (result metadata carrying the commit it was run against).
 
 ### Can requirement changes identify affected designs, tests, and risks?
@@ -86,7 +86,7 @@ the home view by one.
 - **Evidence:** `traceability.assessment.test.ts:387`, `:397`, `:412`, `:420` (`it.fails`: related panel without FMEA lines), `:431` (`it.fails`: review without dependants); existing `src/lib/engine/toolkit/compare.test.ts:93`. Ran in this session.
 - **Limitations:** No transitive impact across kinds (requirement → design → other requirements' verdicts → tests → risks) in one place.
 - **Status:** Partially verified
-- **Score:** 1 (Fairtide)
+- **Score:** 1 (Tessera)
 - **Next action:** planned capability (an impact list for a changed requirement: its satisfiers, verification cases, derived requirements and FMEA lines/hazards, in the review and the related panel).
 
 ### Can risk analyses reference model elements and remain consistent when the architecture changes?
@@ -94,7 +94,7 @@ the home view by one.
 - **Evidence:** `traceability.assessment.test.ts:326`, `:334`; existing `src/lib/engine/toolkit/views/risk.test.ts:180`, `src/lib/create/riskReview.test.ts:98`, `src/lib/engine/toolkit/compare.test.ts:108` (FMEA follows a part rename in the review). Ran in this session.
 - **Limitations:** Warnings, not errors; the review of a part removal does not say an FMEA line was orphaned. FMEA lines on a definition apply to every usage, which the worksheet shows once.
 - **Status:** Verified
-- **Score:** 2 (Fairtide)
+- **Score:** 2 (Tessera)
 - **Next action:** additional testing (an FMEA line about a usage inherited through a definition).
 
 ### Are FMEA calculations and risk-priority metrics configurable and correct?
@@ -102,7 +102,7 @@ the home view by one.
 - **Evidence:** `src/lib/engine/toolkit/views/fmea.assessment.test.ts:99` (oracle sanity), `:117` (1000 cells), `:155`, `:170`, `:192`, `:229`, `:248` (`it.fails`, fractional rating); existing `src/lib/engine/toolkit/views/risk.test.ts:103` (app = toolkit, every cell), `src/lib/create/riskPolicy.test.ts:73`, `:103`. Ran in this session.
 - **Limitations:** A non-integer rating is accepted and computed (above). Only the DFMEA/PFMEA action-priority table (not FMEA-MSR). The RPN has no "S≥9 always reviewed" rule unless the project's policy adds it (the default `Acceptability` and the AP table cover it). Not cross-checked by another FMEA tool.
 - **Status:** Verified
-- **Score:** 3 for the calculations (Fairtide; calcs evaluated by the toolkit from the project's library); input validation has the fractional-rating gap
+- **Score:** 3 for the calculations (Tessera; calcs evaluated by the toolkit from the project's library); input validation has the fractional-rating gap
 - **Next action:** bug fix (check a value against its type's base type — `Integer` — as well as its asserted constraints).
 
 ### Can users distinguish identified risks, mitigations, verification activities, and evidence of mitigation effectiveness?
@@ -110,7 +110,7 @@ the home view by one.
 - **Evidence:** `src/lib/create/riskReview.test.ts:98`, `:277`; `src/lib/engine/toolkit/views/risk.test.ts:239` (hazard log); demo `src/demo/drone/risk/DesignFmea.sysml`. Ran in this session.
 - **Limitations:** "Verified control" means "a verification case names it"; a `Mitigation` status of `verified` is self-declared.
 - **Status:** Partially verified
-- **Score:** 2 (Fairtide)
+- **Score:** 2 (Tessera)
 - **Next action:** planned capability (tie "verified" to a recorded passing result).
 
 ### Can reports be regenerated from a specific revision for review or audit?
@@ -118,11 +118,11 @@ the home view by one.
 - **Evidence:** `src/lib/reports/revision.assessment.test.ts:45`, `:51`, `:66`; existing `src/lib/reports/reports.test.ts`. Ran in this session.
 - **Limitations:** No "open at commit/tag"; no revision stamp on the report; the date is the generation date.
 - **Status:** Partially verified
-- **Score:** 2 (Fairtide)
+- **Score:** 2 (Tessera)
 - **Next action:** planned capability (open a project read-only at a commit or tag; stamp reports with repository, branch and commit SHA).
 
 ### Are approval identity, timestamps, and change records available where required by the intended workflow?
-- **Answer:** Fairtide has no approvals, sign-off states or user accounts of its own. Change records come from Git: commits made through the app carry the GitHub user's identity and time, the review suggests a commit message and pull-request description from the semantic diff, and approvals can be GitHub pull-request reviews. Requirement `@StatusInfo { status; owner }` is free model content, not an access-controlled approval.
+- **Answer:** Tessera has no approvals, sign-off states or user accounts of its own. Change records come from Git: commits made through the app carry the GitHub user's identity and time, the review suggests a commit message and pull-request description from the semantic diff, and approvals can be GitHub pull-request reviews. Requirement `@StatusInfo { status; owner }` is free model content, not an access-controlled approval.
 - **Evidence:** `src/lib/git/github.ts:332` (commit), `:383` (pull request); `src/lib/review/semantic.test.ts:414` (commit message). Not run beyond those unit tests.
 - **Limitations:** Approval identity and e-signature are whatever GitHub provides; nothing in the model records who approved which revision.
 - **Status:** Not claimed
@@ -134,7 +134,7 @@ the home view by one.
 - **Audit trail:** Git history of the text (who, when, what, line by line) plus the semantic review for a readable model-level change record. Browser-local edits before a commit have no audit trail.
 - **Electronic signatures:** none (no 21 CFR Part 11 / EU Annex 11 signature manifestation, meaning, or binding to a record). GitHub PR approvals are not e-signatures in that sense. **Not claimed.**
 - **Validation for a quality system:** no validation package (requirements spec, risk assessment of the tool, IQ/OQ/PQ, traceable test report). The automated tests (including this assessment's) are a starting point for an organisation's own tool validation; the FMEA calcs have known-answer tests.
-- **Gap note:** for ISO 13485 / ISO 14971 / IEC 62304 work, use Fairtide as an authoring and analysis tool inside a controlled Git workflow (protected branches, required reviews, signed commits), keep approvals and verification results in a validated system, and record the commit SHA of each reviewed report by hand.
+- **Gap note:** for ISO 13485 / ISO 14971 / IEC 62304 work, use Tessera as an authoring and analysis tool inside a controlled Git workflow (protected branches, required reviews, signed commits), keep approvals and verification results in a validated system, and record the commit SHA of each reviewed report by hand.
 
 ---
 

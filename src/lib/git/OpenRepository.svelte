@@ -1,5 +1,5 @@
 <script lang="ts">
-	import FairtideLoader from '#lib/ui/FairtideLoader.svelte';
+	import TesseraLoader from '#lib/ui/TesseraLoader.svelte';
 	/**
 	 * Choose a GitHub repository and branch: from the account's repositories
 	 * (searchable) or a pasted URL. Connects the account first if needed.
@@ -280,12 +280,12 @@
 						<legend class="visually-hidden">Repository</legend>
 						{#if repos === null}
 							<p class="muted pad loading" role="status">
-								<FairtideLoader size={28} label="" /> Loading your repositories…
+								<TesseraLoader size={28} label="" /> Loading your repositories…
 							</p>
 						{:else if !results.length && !repos.length && installLink}
 							<div class="none">
 								<p>
-									<strong>Choose the repositories Fairtide can use.</strong>
+									<strong>Choose the repositories Tessera can use.</strong>
 									GitHub asks you once which of your repositories (or your organisation’s) to open here.
 									You’ll come straight back.
 								</p>

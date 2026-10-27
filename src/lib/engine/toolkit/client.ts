@@ -71,7 +71,7 @@ export function tooLongMessage(method: Method): string {
 				? 'Checking the model'
 				: 'A step';
 	return (
-		`${what} took longer than ${minutes} minute${minutes === 1 ? '' : 's'}, so Fairtide stopped it and started again. ` +
+		`${what} took longer than ${minutes} minute${minutes === 1 ? '' : 's'}, so Tessera stopped it and started again. ` +
 		'If it keeps happening, the project may be too large for this device: try splitting it into smaller projects.'
 	);
 }
@@ -87,7 +87,7 @@ export const MEMORY_WARNING_MIB = 1600;
 export function memoryWarning(mib: number): string {
 	const gb = (mib / 1024).toFixed(1);
 	return (
-		`This project is close to the most Fairtide can hold in a browser tab (${gb} of 2 GB used). ` +
+		`This project is close to the most Tessera can hold in a browser tab (${gb} of 2 GB used). ` +
 		'If it grows much more, the model will stop updating. Move parts of it into separate projects; ' +
 		'reloading the page frees some memory for a while.'
 	);
@@ -230,7 +230,7 @@ export function startToolkit(
 			for (const call of pending.values()) worker.postMessage(call.message);
 			return;
 		}
-		failed = `Fairtide stopped reading the model (${reason}). Reload the page to try again.`;
+		failed = `Tessera stopped reading the model (${reason}). Reload the page to try again.`;
 		for (const call of pending.values()) call.reject(new Error(failed));
 		pending.clear();
 		watch();

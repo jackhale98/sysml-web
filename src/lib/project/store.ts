@@ -53,9 +53,9 @@ export type ProjectSummary = Omit<StoredProject, 'files'> & {
  */
 export const PROJECT_FORMAT = 1;
 
-/** Why a stored project can't be opened: a newer version of Fairtide saved it. */
+/** Why a stored project can't be opened: a newer version of Tessera saved it. */
 export const NEWER_FORMAT =
-	'This project was saved by a newer version of Fairtide. Reload the page to get the newer version.';
+	'This project was saved by a newer version of Tessera. Reload the page to get the newer version.';
 
 /** A record as this version reads it: one without a version is version 1; a newer one is refused. */
 export function readStored(record: StoredProject | undefined): StoredProject | undefined {
@@ -227,7 +227,7 @@ export async function deleteAllData(): Promise<void> {
 		request.onsuccess = () => resolve();
 		request.onerror = () => reject(request.error ?? new Error('Browser storage failed.'));
 		request.onblocked = () =>
-			reject(new Error('Fairtide is open in another tab. Close it, then try again.'));
+			reject(new Error('Tessera is open in another tab. Close it, then try again.'));
 	});
 	try {
 		for (const key of Object.keys(localStorage))

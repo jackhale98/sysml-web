@@ -1,6 +1,6 @@
 # Dependency matrices (DSM and N² charts)
 
-How Fairtide shows a SysML v2 view as a dependency matrix: a design
+How Tessera shows a SysML v2 view as a dependency matrix: a design
 structure matrix (DSM) or an N² chart. The convention is defined in the
 `DependencyMatrices` library (`libraries/DependencyMatrices.sysml` in the
 demo, copied into a project by its first **New DSM**); this page documents

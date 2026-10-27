@@ -1,4 +1,4 @@
-// The Fairtide sign-in worker. JSONC (not TOML) on purpose: it's the format
+// The Tessera sign-in worker. JSONC (not TOML) on purpose: it's the format
 // Wrangler prefers, and the Cloudflare dashboard edits it in place.
 {
 	"name": "sysml-web-sync",

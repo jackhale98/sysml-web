@@ -1,6 +1,6 @@
-# Contributing to Fairtide
+# Contributing to Tessera
 
-Thank you for helping. This page is how to set up, test and change Fairtide,
+Thank you for helping. This page is how to set up, test and change Tessera,
 and how a change becomes a release. The README has the code map and the
 documentation index; [docs/engine.md](docs/engine.md) explains how the app
 talks to the SysML engine. Security problems go to [SECURITY.md](SECURITY.md),
@@ -79,7 +79,7 @@ scripts/fetch-conformance.sh            # first: the OMG corpora into .cache/con
 npm run assess:conformance              # then the conformance runner (docs/assessment/01-language.md)
 ```
 
-The OMG pilot implementation and SysON can check Fairtide's output; they need
+The OMG pilot implementation and SysON can check Tessera's output; they need
 Java and Docker ([docs/interop-tools.md](docs/interop-tools.md)).
 
 ## Making a change

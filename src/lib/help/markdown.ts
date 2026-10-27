@@ -28,12 +28,12 @@ function topic(t: HelpTopic): string {
 
 export function userGuideMarkdown(): string {
 	const out = [
-		'# Fairtide user guide',
+		'# Tessera user guide',
 		'',
 		'<!-- Made from src/lib/help/content.ts, the help in the app: change it there, then run',
 		'     UPDATE_USER_GUIDE=1 npx vitest run src/lib/help -->',
 		'',
-		'Fairtide is a workbench for SysML v2 models, in the browser, on a phone or a computer. This is',
+		'Tessera is a workbench for SysML v2 models, in the browser, on a phone or a computer. This is',
 		'the help that comes with it: open it in the app with **Help** in the project menu, by pressing',
 		'<kbd>?</kbd>, or by typing `?` in search.',
 		'',

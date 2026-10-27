@@ -316,7 +316,7 @@
 </script>
 
 <svelte:head>
-	<title>Your projects · Fairtide</title>
+	<title>Your projects · Tessera</title>
 	<meta name="description" content="Create, open and import SysML v2 projects." />
 </svelte:head>
 

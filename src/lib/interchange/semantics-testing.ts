@@ -4,7 +4,7 @@
  * ("normalized semantics", not text).
  *
  * Works on SysML v2 element JSON (KerML 10.4), compact or full, from any tool:
- * Fairtide's export, the toolkit's session JSON, or a Systems Modeling API
+ * Tessera's export, the toolkit's session JSON, or a Systems Modeling API
  * server's elements (SysON). Every element gets a key that does not depend on
  * ids: its qualified name when it has a declared name; `(:>>name)` for an
  * unnamed feature that redefines `name`; otherwise its kind and position among

@@ -1,5 +1,5 @@
 /**
- * Assessment (docs/assessment/01-language.md, checklist 1.2): what Fairtide
+ * Assessment (docs/assessment/01-language.md, checklist 1.2): what Tessera
  * reports for semantically invalid models — the toolkit's findings as the
  * problems list shows them — and where the toolkit departs from the
  * specification (KerML 1.1 / SysML 2.1 Beta 1, Release 2026-05, the
@@ -138,7 +138,7 @@ describe('departures from the specification', () => {
 	// SysML 8.4.17.3 parses `by f` as `subject subj redefines R::subj = f`). So `drone` is the
 	// subject itself, `drone.fc` does not resolve, and the pilot says so. The toolkit resolves
 	// `drone` to the imported part and reports nothing: the claim means something else in
-	// Fairtide than in the reference implementation. This pins the engine's own findings (reported
+	// Tessera than in the reference implementation. This pins the engine's own findings (reported
 	// upstream, docs/engine.md); the app warns at such a satisfy (`project/requirementChecks.ts`,
 	// tested in requirementChecks.test.ts).
 	it.fails(

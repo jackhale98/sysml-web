@@ -21,10 +21,10 @@
 </script>
 
 <svelte:head>
-	<title>Help · Fairtide</title>
+	<title>Help · Tessera</title>
 	<meta
 		name="description"
-		content="How to use Fairtide: projects, SysML ideas in plain words, how-tos, shortcuts and where your data is kept."
+		content="How to use Tessera: projects, SysML ideas in plain words, how-tos, shortcuts and where your data is kept."
 	/>
 </svelte:head>
 
@@ -41,7 +41,7 @@
 	<main>
 		<h1>Help</h1>
 		<p class="lede">
-			Fairtide is a workbench for SysML v2 models. Here is how it works, in plain words.
+			Tessera is a workbench for SysML v2 models. Here is how it works, in plain words.
 		</p>
 		<HelpGuide {topic} onaction={run} canRun={(a) => HERE.includes(a)} />
 	</main>

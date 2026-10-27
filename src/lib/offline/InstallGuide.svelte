@@ -36,10 +36,10 @@
 
 	const title = $derived(
 		platform === 'mac-safari' || platform === 'mac-safari-old'
-			? 'Add Fairtide to your Dock'
+			? 'Add Tessera to your Dock'
 			: platform === 'chromium' || platform === 'unsupported'
-				? 'Install Fairtide'
-				: 'Add Fairtide to your Home Screen'
+				? 'Install Tessera'
+				: 'Add Tessera to your Home Screen'
 	);
 
 	/** The address to open in Safari: the projects page, where the installed app starts. */
@@ -126,7 +126,7 @@
 		<p class="note">Or open this page in Safari, which works the same way.</p>
 	{:else if kind === 'ios-open-in-safari'}
 		<p class="note">
-			This browser can't add apps to the Home Screen. Open Fairtide in <strong>Safari</strong> and add
+			This browser can't add apps to the Home Screen. Open Tessera in <strong>Safari</strong> and add
 			it from there.
 		</p>
 		<ol class="steps">
@@ -189,19 +189,19 @@
 			</li>
 			<li>
 				<span class="glyph text" aria-hidden="true">Add</span>
-				<span>Click {@render key('Add')}. Fairtide opens in its own window from the Dock.</span>
+				<span>Click {@render key('Add')}. Tessera opens in its own window from the Dock.</span>
 			</li>
 		</ol>
 	{:else if kind === 'mac-safari-old'}
 		<p class="note">
-			Safari can add web apps to the Dock from macOS Sonoma on. Update macOS, or install Fairtide
+			Safari can add web apps to the Dock from macOS Sonoma on. Update macOS, or install Tessera
 			from Chrome or Edge.
 		</p>
 	{:else if kind === 'chromium'}
 		{#if pwa.canInstall && kind === platform}
-			<p class="note">Your browser can install Fairtide as an app, with its own window and icon.</p>
+			<p class="note">Your browser can install Tessera as an app, with its own window and icon.</p>
 			<button type="button" class="primary" onclick={install}>
-				<MonitorDown size={17} aria-hidden="true" /> Install Fairtide
+				<MonitorDown size={17} aria-hidden="true" /> Install Tessera
 			</button>
 		{:else}
 			<ol class="steps">
@@ -210,7 +210,7 @@
 					<span
 						>Click the install icon at the right of the address bar.
 						<small
-							>Or open the browser menu <strong>⋮</strong> and choose Install Fairtide (in Chrome: Cast,
+							>Or open the browser menu <strong>⋮</strong> and choose Install Tessera (in Chrome: Cast,
 							save and share → Install page as app).</small
 						></span
 					>
@@ -224,7 +224,7 @@
 	{:else}
 		<p class="note">
 			This browser can't install web apps. Chrome and Edge (on computers and Android) and Safari (on
-			iPhone, iPad and Mac) can. Fairtide works just as well here in the browser: keep a bookmark.
+			iPhone, iPad and Mac) can. Tessera works just as well here in the browser: keep a bookmark.
 		</p>
 	{/if}
 {/snippet}
@@ -233,10 +233,10 @@
 	{#snippet icon()}<Logo size={40} variant="tile" />{/snippet}
 	<div class="guide">
 		{#if platform === 'installed'}
-			<p class="note">You're using Fairtide as an installed app already.</p>
+			<p class="note">You're using Tessera as an installed app already.</p>
 		{:else}
 			<p class="lede">
-				Open Fairtide like any app, straight into your projects. It works offline too, and your
+				Open Tessera like any app, straight into your projects. It works offline too, and your
 				projects stay on this device.
 			</p>
 			{@render steps(platform, appleDevice)}

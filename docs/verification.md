@@ -1,6 +1,6 @@
 # Requirements, verification results and conventions
 
-How Fairtide reads coverage, recorded verification results, change impact
+How Tessera reads coverage, recorded verification results, change impact
 and a project's own modelling conventions from the SysML text, for
 modellers writing it by hand and for other tools reading it. Everything
 here is ordinary SysML v2, checked with the OMG pilot implementation
@@ -74,7 +74,7 @@ result never makes another out of date.
 
 - Connected to GitHub, at the result's commit: it holds unless the model
   has changed since (changes not saved yet count).
-- At a later commit: Fairtide reads the result's commit from GitHub once,
+- At a later commit: Tessera reads the result's commit from GitHub once,
   compares its model files with the project's base, and the result holds
   if only results differ.
 - Not connected, or the result names no commit: **commit unknown**: it is
@@ -117,7 +117,7 @@ view requirementsWithoutOwner : RequirementsTable {
 `rule` is the message (`message` is a SysML keyword); `severity =
 ConventionSeverity::error` (or `note`) sets how much it matters, a warning
 otherwise. The view's `rows`, `expose` and `where` say what to look at, so
-any table Fairtide can show can be a convention. A view that can't be shown
+any table Tessera can show can be a convention. A view that can't be shown
 is a problem of its own; one convention lists at most 100 problems.
 
 Conventions are checked in the app, with the other checks. Nothing blocks a

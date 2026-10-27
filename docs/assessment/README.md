@@ -1,6 +1,6 @@
 # Robustness and MBSE assessment
 
-An assessment of Fairtide as software and as an MBSE tool, question by
+An assessment of Tessera as software and as an MBSE tool, question by
 question, against the owner's checklist (correctness, edge cases,
 interoperability, failure handling, reproducibility), completed in October
 2026. Each section's report gives, per question, the answer, the evidence
@@ -27,7 +27,7 @@ and [the roadmap](#roadmap-and-what-was-done).
 | --- | --- | --- |
 | 1. Language coverage | [01-language](01-language.md) | 309/309 official example files parse; 99.4–99.8 % of references resolve; the engine and the pilot agree on 249 of 251 SysML files (`npm run assess:conformance`). |
 | 2. Text, diagrams, round trips | [02-round-trip](02-round-trip.md) | 55 kinds of edit change only their target; comments and other files stay byte-identical; no drift over repeated round trips. |
-| 3. Import, export, interoperability | [03-interchange](03-interchange.md) | Fairtide ↔ Fairtide keeps the meaning exactly; with SysON, text works one way and its API neither way. |
+| 3. Import, export, interoperability | [03-interchange](03-interchange.md) | Tessera ↔ Tessera keeps the meaning exactly; with SysON, text works one way and its API neither way. |
 | 4. MBSE coverage | [04-mbse](04-mbse.md) | Structure, behaviour, requirements and their links in one model; gaps found from relationships; no conventions mechanism. |
 | 5. Simulation | [05-simulation](05-simulation.md) | Semantics written down clause by clause and checked by 13 reference traces; three silent misbehaviours fixed. |
 | 6. Calculations and trade studies | [06-calculations](06-calculations.md) | Known answers by hand; five silent wrong results fixed; one open. |
@@ -38,7 +38,7 @@ and [the roadmap](#roadmap-and-what-was-done).
 
 ## Scores
 
-Fairtide's own scores; each report also gives the engine's where they differ.
+Tessera's own scores; each report also gives the engine's where they differ.
 **Assessed** is the score the section reports give. **After the fixes** is the
 lead's estimate once every finding below was dealt with; it was not
 re-assessed independently, and stays under 4 wherever no other tool checks
@@ -103,7 +103,7 @@ ones.
 | 3. Engine calls that never answer | **Done.** Calls time out and say so; a memory warning before the tab gives out. |
 | 4. Checks at 50k lines | **Done.** The metadata checks are cached per view. Re-measured with every fix merged (50k lines, 3 runs): checks on opening 4.6 s → 3.4 s median, of which the metadata checks 1.4 s → 6 ms. |
 | 5. Verification results | **Done (core).** Results are recorded on verification cases as SysML metadata (verdict, date, who, commit, evidence), shown in tables, matrices, the home view and the report, and marked out of date once the model changes after their commit ([verification](../verification.md)). Simulator runs export with their commit but aren't results. |
-| 6. Save to server | **Done.** The server is read back after saving and anything it didn't keep is named. Requests now fit SysON's API, checked live: creating and opening projects and changing names and values work; SysON ignores changed references and new elements, and Fairtide says so. |
+| 6. Save to server | **Done.** The server is read back after saving and anything it didn't keep is named. Requests now fit SysON's API, checked live: creating and opening projects and changing names and values work; SysON ignores changed references and new elements, and Tessera says so. |
 | 7. Change impact | **Done.** A review names what relies on a changed requirement or risk control (designs, tests, mitigations, derived requirements, FMEA lines); circular derivations are problems. |
 | 8. Security | **Done.** Token origin, archive paths, duplicates, checksums and sizes; a Content-Security-Policy; a dependency audit in CI. GitHub Enterprise Server works with access tokens. |
 | 9. Keyboard | **Done.** Focus ring, menu arrow keys, focus return, skip links; the accessibility checks wait for animations and hold notifications. |
@@ -115,7 +115,7 @@ ones.
 - **Identity through JSON:** element ids don't survive export, import and
   export again; designed in [interchange](../interchange.md#identity), not built.
 - **SysON:** its text export and its loss of `total <= limit` in its own
-  element JSON are reported to SysON; Fairtide opens the rest.
+  element JSON are reported to SysON; Tessera opens the rest.
 - **Libraries across projects:** a design note in [verification](../verification.md);
   replacing a library from the template would overwrite a project's own policy.
 - **Conventions in CI:** conventions show in Problems but don't fail a build.
@@ -125,7 +125,7 @@ ones.
 
 ## The final question
 
-*What evidence shows that Fairtide can be trusted to represent, modify,
+*What evidence shows that Tessera can be trusted to represent, modify,
 analyse and exchange real engineering models without silently losing
 information or producing misleading results?*
 
@@ -142,9 +142,9 @@ information or producing misleading results?*
   known-answer tests, including inherited constraints and temperatures.
   Analysis outside budgets, checks, trade studies, FMEA and the simulator
   is not claimed.
-- **Exchange:** Fairtide's own formats round-trip by meaning, and its text
+- **Exchange:** Tessera's own formats round-trip by meaning, and its text
   passes the reference implementation. With SysON, text works one way and
-  its API keeps only some kinds of change; Fairtide reads the server back
+  its API keeps only some kinds of change; Tessera reads the server back
   and names what was not kept rather than reporting success.
 
 So: trustworthy for representing, modifying and analysing models within

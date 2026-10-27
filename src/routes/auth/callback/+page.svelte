@@ -1,9 +1,9 @@
 <script lang="ts">
-	import FairtideLoader from '#lib/ui/FairtideLoader.svelte';
+	import TesseraLoader from '#lib/ui/TesseraLoader.svelte';
 	/**
 	 * Back from GitHub: finish signing in, then return to the page the person
 	 * started from. Also where GitHub lands after someone chooses which
-	 * repositories Fairtide may use.
+	 * repositories Tessera may use.
 	 */
 	import { onMount } from 'svelte';
 	import { goto, replaceState } from '$app/navigation';
@@ -88,7 +88,7 @@
 </script>
 
 <svelte:head>
-	<title>Signing in · Fairtide</title>
+	<title>Signing in · Tessera</title>
 	<meta name="robots" content="noindex" />
 </svelte:head>
 
@@ -116,12 +116,12 @@
 					</button>
 				{/if}
 				<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- a page on this site, checked by safeReturn -->
-				<a class="button" href={back}>Back to Fairtide</a>
+				<a class="button" href={back}>Back to Tessera</a>
 			</div>
 		{:else}
 			<h1 class="visually-hidden">Signing in</h1>
 			<p class="status" role="status">
-				<FairtideLoader size={32} label="" />
+				<TesseraLoader size={32} label="" />
 				{status}
 			</p>
 		{/if}

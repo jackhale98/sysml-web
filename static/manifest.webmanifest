@@ -1,7 +1,7 @@
 {
 	"id": "./",
-	"name": "Fairtide",
-	"short_name": "Fairtide",
+	"name": "Tessera",
+	"short_name": "Tessera",
 	"description": "SysML v2 in text and diagrams: requirements, architecture, behaviour, verification and risk in one model, stored as standard SysML in your own git repository. Works offline.",
 	"lang": "en",
 	"dir": "ltr",

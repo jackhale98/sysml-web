@@ -119,7 +119,7 @@ test('a project saved by a newer version is not opened, and not overwritten', as
 		timeout: 30_000
 	});
 	await expect(
-		page.getByText('This project was saved by a newer version of Fairtide.')
+		page.getByText('This project was saved by a newer version of Tessera.')
 	).toBeVisible();
 	expect(await stored(page, newer.id)).toEqual(newer);
 });

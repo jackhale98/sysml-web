@@ -32,7 +32,7 @@ Toolkit 0.10.10; library OMG SysML v2 Release 2026-05 (de1070ae), as bundled by 
 | kerml/src/examples | 58 | 58 | 1998 | 237 | 88.14 % | 13 |
 | all | 309 | 309 | 12206 | 978 | 91.99 % | 20 |
 
-## Release corpus, Fairtide layer
+## Release corpus, Tessera layer
 
 - Diagnostics: 355 of 355 engine findings shown on their line (0 missing, 0 extra); 355 over exactly the engine's range.
 - Model adapter: 10792 located elements of 13941 walked; 0 lost; 209 named elements have no place in the text; 0 named records missing from the app's model.
@@ -139,7 +139,7 @@ Toolkit 0.10.10; library OMG SysML v2 Release 2026-05 (de1070ae), as bundled by 
 | Invariant | 1 | 0 | 0.00 % |
 | Specialization | 1 | 0 | 0.00 % |
 
-## Pilot Xpect suites (as Fairtide shows them)
+## Pilot Xpect suites (as Tessera shows them)
 
 | Suite | Files | `errors` items | Error there | Any problem there | `noErrors` files | Held | `linkedName` | Agreed |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |

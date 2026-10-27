@@ -1,7 +1,7 @@
 # §6 Calculations, roll-ups, constraints and trade studies
 
 Assessed on `claude/assess-calculations` (merged with `main` at 68cb9db). Scores are
-Fairtide's unless marked "engine". Every test named here was run in this session unless it
+Tessera's unless marked "engine". Every test named here was run in this session unless it
 says otherwise.
 
 Commands (from the repository root):
@@ -111,7 +111,7 @@ passes with the fix (both runs above).
   expression syntax (no `collect`, `select`, sequences); what it can't read is "not an
   expression the app reads", never a guess.
 - **Status:** Verified
-- **Score:** 3 (engine and Fairtide)
+- **Score:** 3 (engine and Tessera)
 - **Next action:** None
 
 ### Are units checked for dimensional consistency, including conversions and incompatible-unit errors?
@@ -132,7 +132,7 @@ passes with the fix (both runs above).
   So is a plain number, with a share computed as if it were grams. Comparisons in the
   app's evaluator still compare unknown units by magnitude.
 - **Status:** Verified
-- **Score:** 2 (Fairtide; units outside the two lists are a gap); engine 3
+- **Score:** 2 (Tessera; units outside the two lists are a gap); engine 3
 - **Next action:** planned capability: take conversion factors from the library's own unit definitions, one list for tables, inspector and evaluator.
 
 ### Are missing values, undefined expressions, circular dependencies, and divide-by-zero conditions handled explicitly?
@@ -152,7 +152,7 @@ passes with the fix (both runs above).
   self-reference (`selfRef = selfRef + 1`) gives an "unresolved reference" warning instead
   of a cycle.
 - **Status:** Verified
-- **Score:** 3 (engine and Fairtide)
+- **Score:** 3 (engine and Tessera)
 - **Next action:** additional testing; consider listing undecided checkable claims in Problems as information.
 
 ### Are numerical results reproducible across sessions and supported environments?

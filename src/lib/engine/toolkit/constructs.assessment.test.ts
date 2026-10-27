@@ -1,7 +1,7 @@
 /**
  * Assessment (docs/assessment/01-language.md): the supported-construct
  * matrix, from evidence. One model with each construct the checklist names
- * (1.1), run through what Fairtide does with it: parse and resolve (the
+ * (1.1), run through what Tessera does with it: parse and resolve (the
  * toolkit), the model adapter (what the explorer, inspector and tables
  * see), the standard diagrams, an inspector edit, evaluation and the state
  * machine simulator.

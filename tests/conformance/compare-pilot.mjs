@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Compare the conformance runner's results (`results.json`, the toolkit
- * engine as Fairtide runs it) with the OMG pilot implementation's verdicts
+ * engine as Tessera runs it) with the OMG pilot implementation's verdicts
  * on the same files (`tools/interop/pilot-check.sh --json`, branch
  * claude/interop-tools), file by file: errors or not, and on which lines.
  *

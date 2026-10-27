@@ -237,7 +237,7 @@
 		merge = null;
 		choices = {};
 		woven = null;
-		description = `Saved from Fairtide: ${projectName}`;
+		description = `Saved from Tessera: ${projectName}`;
 		await attempt('Comparing with the server…', async () => {
 			// Others saved since this project was opened from (or saved to) this branch: merge.
 			const link = localId ? apiServers.linkOf(localId) : null;

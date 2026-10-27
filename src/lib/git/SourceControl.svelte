@@ -1,5 +1,5 @@
 <script lang="ts">
-	import FairtideLoader from '#lib/ui/FairtideLoader.svelte';
+	import TesseraLoader from '#lib/ui/TesseraLoader.svelte';
 	/**
 	 * The project's GitHub side sheet: what changed (with diffs and Discard),
 	 * Save to GitHub (commit & push), Get latest (pull, with a per-file choice
@@ -76,7 +76,7 @@
 	const missingLogin = $derived(record?.account && !git.account ? record.account : null);
 	/** Signed in with GitHub (rather than with an access token). */
 	const signedIn = $derived((record ? git.account : accounts.github)?.via === 'app');
-	/** Signed in: where to choose the repositories Fairtide can use. */
+	/** Signed in: where to choose the repositories Tessera can use. */
 	const installLink = $derived(signedIn ? chooseRepositoriesUrl() : null);
 
 	function chooseOnGitHub(event: MouseEvent) {
@@ -364,7 +364,7 @@
 				</span>
 				{#if busy === 'checking'}
 					<span class="sync muted" role="status">
-						<FairtideLoader size={24} label="" /> Checking GitHub…
+						<TesseraLoader size={24} label="" /> Checking GitHub…
 					</span>
 				{:else if git.behind > 0}
 					<span class="sync warn" role="status">

@@ -63,7 +63,7 @@ ASSESS_SHOW_GAPS=1 npx vitest run src/lib/project/round-trip.assessment.test.ts 
   space); an entry action in a tab-indented file is indented with tabs plus four spaces. The
   diagram-move (layout) and "remove from diagram" never touch SysML (below).
 - **Status:** Verified
-- **Score:** 3 (Fairtide)
+- **Score:** 3 (Tessera)
 - **Next action:** None (cosmetic indentation: roadmap)
 
 ### Does editing text update all affected diagrams, tables, and inspector views correctly?
@@ -77,10 +77,10 @@ ASSESS_SHOW_GAPS=1 npx vitest run src/lib/project/round-trip.assessment.test.ts 
 - **Limitations:** Views update after the analysis delay (debounced); on large models that is
   seconds (see responsiveness). Not checked in the browser by me.
 - **Status:** Verified (Node, real engine)
-- **Score:** 2 (Fairtide)
+- **Score:** 2 (Tessera)
 - **Next action:** additional testing (browser e2e of a typed change reaching an open diagram and table)
 
-### Does Fairtide preserve comments, formatting, annotations, and unsupported constructs during edits?
+### Does Tessera preserve comments, formatting, annotations, and unsupported constructs during edits?
 - **Answer:** Yes for model edits: across 55 edit kinds on the hostile fixture, every marked
   comment (line, block, trailing, inside bodies, before/after the package, in `rep`, `doc`)
   is kept as written unless it sits on the statement being removed or is the doc being
@@ -99,7 +99,7 @@ ASSESS_SHOW_GAPS=1 npx vitest run src/lib/project/round-trip.assessment.test.ts 
   `layout/diagrams.json` is re-serialized by the app, dropping unknown keys (by design,
   `positions.ts:49`).
 - **Status:** Verified (with the two line-ending gaps)
-- **Score:** 3 (Fairtide)
+- **Score:** 3 (Tessera)
 - **Next action:** bug fix (line endings)
 
 ### Can users repeatedly move between text and diagrams without semantic drift?
@@ -111,7 +111,7 @@ ASSESS_SHOW_GAPS=1 npx vitest run src/lib/project/round-trip.assessment.test.ts 
 - **Limitations:** Byte identity holds because deletes take their whole line; a part added
   and deleted inside a one-line body was not cycled.
 - **Status:** Verified
-- **Score:** 3 (Fairtide)
+- **Score:** 3 (Tessera)
 - **Next action:** None
 
 ### Do diagram edits preserve model elements and relationships that were not intentionally changed?
@@ -132,7 +132,7 @@ ASSESS_SHOW_GAPS=1 npx vitest run src/lib/project/round-trip.assessment.test.ts 
   Camera → Component line in the component catalogue (`:>> powerDraw` is reported, `:>> mass`
   is not). See critical findings.
 - **Status:** Partially verified (one unreported rebinding)
-- **Score:** 2 (Fairtide); the missing diagnostic is the engine's
+- **Score:** 2 (Tessera); the missing diagnostic is the engine's
 - **Next action:** bug fix (refuse or warn when a header edit changes what a member's redefinition resolves to; report a redefinition of a non-inherited feature)
 
 ### Are unsupported diagram constructs preserved rather than deleted or silently rewritten?
@@ -144,7 +144,7 @@ ASSESS_SHOW_GAPS=1 npx vitest run src/lib/project/round-trip.assessment.test.ts 
   `round-trip.assessment.test.ts:293-657` asserts those lines' markers. Run by me.
 - **Limitations:** The formatter rewrites some of them into equivalent forms (above).
 - **Status:** Verified
-- **Score:** 3 (Fairtide)
+- **Score:** 3 (Tessera)
 - **Next action:** None
 
 ### Can users create, modify, and delete elements through both text and graphical workflows?
@@ -159,7 +159,7 @@ ASSESS_SHOW_GAPS=1 npx vitest run src/lib/project/round-trip.assessment.test.ts 
   fixture; `setTableColumns` and `setViewMetadata` were not (the demo covers them in
   `edits.test.ts`).
 - **Status:** Verified
-- **Score:** 3 (Fairtide)
+- **Score:** 3 (Tessera)
 - **Next action:** additional testing (remaining forms on the hostile fixture)
 
 ### Are undo and redo reliable across edits involving multiple model elements?
@@ -177,7 +177,7 @@ ASSESS_SHOW_GAPS=1 npx vitest run src/lib/project/round-trip.assessment.test.ts 
   (`undo`). Existing `workspace-undo.test.ts`. Run by me.
 - **Limitations:** Workspace undo is reachable only from the toast (6 s, 12 s with a warning).
 - **Status:** Partially verified
-- **Score:** 2 (Fairtide)
+- **Score:** 2 (Tessera)
 - **Next action:** bug fix (undo by inverse change rather than whole-file restore; toast undoes its own entry)
 
 ### Are diagram layouts stored independently from semantic model content where appropriate?
@@ -189,7 +189,7 @@ ASSESS_SHOW_GAPS=1 npx vitest run src/lib/project/round-trip.assessment.test.ts 
 - **Limitations:** Moving a box is not a model undo step; the layout file's unknown content
   is dropped when it is rewritten.
 - **Status:** Verified
-- **Score:** 3 (Fairtide)
+- **Score:** 3 (Tessera)
 - **Next action:** None
 
 ### Can diagrams be exported without missing labels, relationships, or visual elements?
@@ -203,7 +203,7 @@ ASSESS_SHOW_GAPS=1 npx vitest run src/lib/project/round-trip.assessment.test.ts 
   "…", compartments show 6 rows then "+n more", decisions/forks/joins carry no name (a
   tooltip on the canvas), and edges ELK cannot route between drawn nodes are absent.
 - **Status:** Verified (SVG); PNG/clipboard rely on the existing e2e
-- **Score:** 2 (Fairtide)
+- **Score:** 2 (Tessera)
 - **Next action:** None
 
 ### Are SVG, PNG, clipboard, and other supported exports correct at different diagram sizes?
@@ -214,7 +214,7 @@ ASSESS_SHOW_GAPS=1 npx vitest run src/lib/project/round-trip.assessment.test.ts 
 - **Evidence:** `export.assessment.test.ts:112` (one node, scale 2), `:122` (large). Run by me.
 - **Limitations:** PNG pixels and clipboard were not checked at large sizes in a browser.
 - **Status:** Partially verified
-- **Score:** 2 (Fairtide)
+- **Score:** 2 (Tessera)
 - **Next action:** additional testing (browser PNG at large size)
 
 ### Does the application remain responsive when editing large models?
@@ -225,12 +225,12 @@ ASSESS_SHOW_GAPS=1 npx vitest run src/lib/project/round-trip.assessment.test.ts 
 - **Limitations:** Node, not a browser; one worker; re-analysis cost grows with the whole
   project, not the edit (docs/engine.md item 12), so larger models wait longer.
 - **Status:** Verified (10k lines)
-- **Score:** 2 (Fairtide)
+- **Score:** 2 (Tessera)
 - **Next action:** additional testing (browser, 30k+ lines — owned by the performance section)
 
 ## Prioritized questions
 
-### 1. Can Fairtide preserve the semantics of a complex model through text edits, diagram edits, save/reload, and export/import?
+### 1. Can Tessera preserve the semantics of a complex model through text edits, diagram edits, save/reload, and export/import?
 - **Answer:** Text edits, diagram/inspector/form edits, undo and save/reload: yes, with
   text outside the intended change byte-identical in every case tried and unedited files
   byte-identical through save and reload — with one exception in meaning: removing a
@@ -240,7 +240,7 @@ ASSESS_SHOW_GAPS=1 npx vitest run src/lib/project/round-trip.assessment.test.ts 
 - **Evidence:** all of the above; `save-fidelity.assessment.test.ts`; `assessment-round-trip.spec.ts:99`.
 - **Limitations:** CRLF files, BOM, non-UTF-8 files (below).
 - **Status:** Partially verified (edit and save/reload legs)
-- **Score:** 2 (Fairtide) — 3 for text fidelity, held at 2 by the unreported rebinding
+- **Score:** 2 (Tessera) — 3 for text fidelity, held at 2 by the unreported rebinding
 - **Next action:** bug fix (rebinding check; line endings, encoding checks)
 
 ### 4. Does the application preserve constructs that its graphical editors cannot represent?
@@ -248,7 +248,7 @@ ASSESS_SHOW_GAPS=1 npx vitest run src/lib/project/round-trip.assessment.test.ts 
 - **Evidence:** fixture and the 55-case table. Run by me.
 - **Limitations:** The formatter normalises some of them to equivalent forms.
 - **Status:** Verified
-- **Score:** 3 (Fairtide)
+- **Score:** 3 (Tessera)
 - **Next action:** None
 
 ## Save/reload fidelity details

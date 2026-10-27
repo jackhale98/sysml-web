@@ -1,6 +1,6 @@
 /**
  * Leaving for GitHub from a page: to sign in, or to choose which
- * repositories Fairtide may use. Both come back to the page they left
+ * repositories Tessera may use. Both come back to the page they left
  * (through /auth/callback/), which then reopens what the person was doing.
  * The same tab is used throughout, so this also works on phones and in the
  * installed app.
@@ -33,7 +33,7 @@ export async function signInWithGitHub(
 	return true;
 }
 
-/** GitHub's page for choosing which repositories Fairtide may use. */
+/** GitHub's page for choosing which repositories Tessera may use. */
 export function chooseRepositoriesUrl(): string | null {
 	return SIGN_IN ? installUrl(SIGN_IN) : null;
 }

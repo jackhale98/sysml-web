@@ -1,5 +1,5 @@
 <!--
-	"Analysis on top": what Fairtide works out from the model, each with a small picture of what
+	"Analysis on top": what Tessera works out from the model, each with a small picture of what
 	the workbench shows. The figures are the delivery-drone demo's own (the risk matrix's zones are
 	only a pattern). Static content; no behaviour.
 -->

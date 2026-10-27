@@ -150,7 +150,7 @@
 </script>
 
 <svelte:head>
-	<title>Fairtide — SysML v2 in text and diagrams</title>
+	<title>Tessera for SysML v2 — text and diagrams of one model</title>
 	<meta
 		name="description"
 		content="A SysML v2 workbench: text and diagrams edit the same model, live, with every element explained in plain language. Standard SysML in your own git repository, offline and on your phone, with checks, budgets, trade studies, simulation, risk analysis and dependency matrices."

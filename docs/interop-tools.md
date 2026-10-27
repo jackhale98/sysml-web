@@ -1,14 +1,14 @@
 # Interop reference tools
 
-Tools other than Fairtide that check what Fairtide reads and writes, so an
-assessment does not rely on Fairtide grading itself. Everything they download
+Tools other than Tessera that check what Tessera reads and writes, so an
+assessment does not rely on Tessera grading itself. Everything they download
 goes to `.cache/interop/` (gitignored). Results below are from 2026-10-23.
 
 | Tool | Runs here | Entry point |
 | --- | --- | --- |
 | OMG SysML v2 pilot implementation (reference implementation, Xtext) | yes, plain Java 21 | `tools/interop/pilot-check.sh` |
 | Eclipse SysON (Spring Boot + PostgreSQL) | yes, with Docker | `tools/interop/syson-roundtrip.sh` |
-| Fairtide's own exchange code, headless | yes, Node 22 + the app's `node_modules` | `node tools/interop/fairtide/run.mjs` |
+| Tessera's own exchange code, headless | yes, Node 22 + the app's `node_modules` | `node tools/interop/fairtide/run.mjs` |
 
 ## OMG pilot implementation: `pilot-check.sh`
 
@@ -80,7 +80,7 @@ node tools/interop/fairtide/run.mjs check <out>/text
 node tools/interop/fairtide/run.mjs import <out>/api-elements.json <out>/fairtide-import
 ```
 
-## Fairtide headless: `fairtide/run.mjs`
+## Tessera headless: `fairtide/run.mjs`
 
 Calls the app's own code (the engine host the unit tests use, `src/lib/exchange/`)
 through Vite's SSR loader, so the result is what the app does minus its
@@ -89,7 +89,7 @@ dialogs. Needs the app's `node_modules` and `static/toolkit/`
 (a few seconds).
 
 ```sh
-node tools/interop/fairtide/run.mjs check  <model dir> [--json out.json]   # Fairtide's diagnostics, with syntax errors
+node tools/interop/fairtide/run.mjs check  <model dir> [--json out.json]   # Tessera's diagnostics, with syntax errors
 node tools/interop/fairtide/run.mjs export <model dir> <out.json> [--library] [--derived]
 node tools/interop/fairtide/run.mjs import <in.json> <out dir>
 node tools/interop/fairtide/run.mjs projects <server>                      # connectTo, as "Open from server"
@@ -104,7 +104,7 @@ node tools/interop/fairtide/run.mjs compare <a> <b> [--json out.json]           
 
 `semantics`/`compare` use `src/lib/interchange/semantics-testing.ts`: a model's meaning as
 facts keyed by qualified name (kind, typing, specialization, multiplicity, values,
-relationships), from Fairtide's reading of a folder or from any tool's element JSON.
+relationships), from Tessera's reading of a folder or from any tool's element JSON.
 
 ## The interchange acceptance test: `acceptance.sh`
 
@@ -113,7 +113,7 @@ tools/interop/acceptance.sh [model dir] [out dir]   # default: src/lib/interchan
 ```
 
 Sends one model through every route (JSON in three forms, `.kpar`, SysON text upload, SysON's
-element JSON and text export, Fairtide's API client against SysON), runs the pilot on every
+element JSON and text export, Tessera's API client against SysON), runs the pilot on every
 text artifact, adds the pilot's own abstract syntax (`pilot/PilotExport.java`, its kernel's
 `%export`), and compares each result's semantics with the original. Results and the
 classification: `docs/assessment/03-interchange.md`.
@@ -122,7 +122,7 @@ classification: `docs/assessment/03-interchange.md`.
 
 ### Demo model (`src/demo/drone`, 22 files) and the custom libraries
 
-Fairtide (`run.mjs check`): 0 errors, 0 warnings. Pilot 0.57.0 and 0.62.0
+Tessera (`run.mjs check`): 0 errors, 0 warnings. Pilot 0.57.0 and 0.62.0
 (same result): 12 errors in 2 files, 20 files clean.
 
 - `requirements/StakeholderNeeds.sysml` lines 14, 24, 35, 46, 57, 67:
@@ -157,7 +157,7 @@ the reference implementation checks, but `RiskAnalysis` and
 (`TableRendering`). The app's engine adds `Reporting`/`ModelViews` to a
 project's analysis when they are missing (`missingViewLibraries`), while
 `missingRiskLibraries` adds only the two risk files. A project that gets the
-risk libraries but not `Reporting.sysml` would check clean in Fairtide and
+risk libraries but not `Reporting.sysml` would check clean in Tessera and
 show these errors in other tools. Worth checking on an exported project.
 
 SysON's importer accepts all three, except that it cannot resolve `that` in
@@ -166,19 +166,19 @@ accepts it).
 
 ### SysON exchange
 
-Fairtide → SysON:
+Tessera → SysON:
 
-- API, project creation: fails. Fairtide sends `POST /projects` with a JSON
+- API, project creation: fails. Tessera sends `POST /projects` with a JSON
   body; SysON wants `?name=` (it logs `MissingServletRequestParameterException:
-  'name'`) and answers 200 with its web page, so Fairtide says "The server
+  'name'`) and answers 200 with its web page, so Tessera says "The server
   answered with something other than JSON."
-- API, commit ("Save to server"): fails. Fairtide's `DataVersion.identity`
+- API, commit ("Save to server"): fails. Tessera's `DataVersion.identity`
   has no `"@type": "DataIdentity"`; SysON cannot read it (`RestDataIdentityRequest
   … NullPointerException`) and again answers with its web page. With the
   `@type` added by hand, SysON answers 201 but applies only changes to
   attributes of elements it already has: new elements (a new
   `OwningMembership` + `PartDefinition`) are silently dropped, and a full
-  element payload as Fairtide sends it makes the commit fail
+  element payload as Tessera sends it makes the commit fail
   (`ClassCastException: String cannot be cast to Collection`). So a model
   cannot be pushed to SysON through the API at all, whatever the client.
 - Text: works, with gaps. Uploading the `.sysml` files gives 8,787 elements in
@@ -188,9 +188,9 @@ Fairtide → SysON:
   chains above, `that` (4), and the parameter `r` in
   `rotors->collect { in r : Rotor; r.mass }` (2).
 
-SysON → Fairtide:
+SysON → Tessera:
 
-- API reading works with Fairtide's client (`connectTo` finds `/api/rest`
+- API reading works with Tessera's client (`connectTo` finds `/api/rest`
   from the site address; projects, branches, commits and paged elements read
   fine; SysON calls the parent list `previousCommits`).
 - Import of SysON's element JSON ("Open from server"): fails for the drone
@@ -204,7 +204,7 @@ SysON → Fairtide:
   A small model (one library file) imports; the text matches the original
   apart from formatting, though the import report lists 6 "not carried over"
   notes for typings and multiplicities that the text does have.
-- SysON's text export (per-file upload), read by the pilot and by Fairtide:
+- SysON's text export (per-file upload), read by the pilot and by Tessera:
   21 of 22 documents export, and both tools find syntax errors in the same 9
   of them. Names SysON did not resolve on import are printed
   empty (`private import ;`, `by drone.null`, `>= 0.0 and <= 1.0`), plus
@@ -221,7 +221,7 @@ docker compose -f tools/interop/syson/docker-compose.yml up -d
 tools/interop/syson-roundtrip.sh src/demo/drone
 ```
 
-In Fairtide, use `http://localhost:8080` as the server address (it finds
-`/api/rest` itself). The compose file allows any CORS origin, so a Fairtide
+In Tessera, use `http://localhost:8080` as the server address (it finds
+`/api/rest` itself). The compose file allows any CORS origin, so a Tessera
 dev server on another port can reach it (checked: a preflight from
 `http://localhost:5173` is allowed).

@@ -1,6 +1,6 @@
 # Model interchange
 
-How Fairtide exchanges models with other SysML v2 tools, what comes across
+How Tessera exchanges models with other SysML v2 tools, what comes across
 and what doesn't, and why. The SysML text stays the source of truth: what
 comes in is written as text, and what goes out is made from the text.
 Background on the standards (KerML clause 10, `.kpar`, element identity, the
@@ -149,7 +149,7 @@ whose tool writes them out without marking them, whatever the lifted
 model's full form has, implied, in the same place. "Reads differently"
 compares only properties that carry meaning: references by place, unset,
 `false` and empty as one value, and not derived properties (those the
-toolkit's compact form leaves empty and its full form fills in). Fairtide's
+toolkit's compact form leaves empty and its full form fills in). Tessera's
 own export in every form, opened again, has no notes; SysON's JSON of the
 acceptance model has 3 (the expression SysON couldn't resolve, and two
 transition parameters the toolkit doesn't model) plus "reads differently"

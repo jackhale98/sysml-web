@@ -15,8 +15,8 @@ Reproduce the existing evidence cited here:
 Last run (with the existing tests cited, 18 files): 199 passed, 6 expected failures (the `it.fails` gaps), on `68cb9db` plus these tests.
 
 One model, one source: everything below is read from the SysML text on each analysis. The
-toolkit parses and resolves; Fairtide's adapter, tables, DSM, related panel, checks and
-reports are TypeScript over the toolkit's model. Scores are Fairtide's unless stated.
+toolkit parses and resolves; Tessera's adapter, tables, DSM, related panel, checks and
+reports are TypeScript over the toolkit's model. Scores are Tessera's unless stated.
 
 ---
 
@@ -31,12 +31,12 @@ reports are TypeScript over the toolkit's model. Scores are Fairtide's unless st
 ### Can requirements be traced to design elements, behavior, and verification cases?
 - **Answer:** Yes. `satisfy R by X` (X a part, a part's feature, or an action such as a `Mitigation`), `verify R` in a verification case's objective, `#derivation` (need → requirement), `allocate` (action → part). The requirements table, Requirement coverage, Trace matrix (requirement × satisfier), Verification matrix (requirement × case), Requirement DSM (derivation/refinement, optionally satisfy), the related panel and the specification report all read these; links follow edits. A `satisfy` whose target is not a requirement is an error. Since `68cb9db`, Problems warns at a `satisfy … by x.y` whose root `x` is the requirement's own subject name, which other SysML tools read as the subject rather than the imported part (the engine reads the part; the demo's subject is now `system`, so the demo means the same in every tool).
 - **Evidence:** `traceability.assessment.test.ts` (coverage follows `satisfy`/`verify` edits; satisfy of a non-requirement is an error; related panel of SYS-001); `src/lib/project/requirements.test.ts:102`; `src/lib/engine/toolkit/diagrams/related.test.ts:70`; `src/lib/project/requirementChecks.test.ts:33`, `:40`; `src/lib/engine/toolkit/views/views.test.ts:516`. Ran in this session.
-- **Limitations:** Behaviour reaches a requirement only through `satisfy … by <action>` or through allocation to a part that satisfies it; there is no view that joins requirement → part → allocated action. The engine's reading of a subject-named `satisfy` root differs from the spec (reported upstream; Fairtide warns).
+- **Limitations:** Behaviour reaches a requirement only through `satisfy … by <action>` or through allocation to a part that satisfies it; there is no view that joins requirement → part → allocated action. The engine's reading of a subject-named `satisfy` root differs from the spec (reported upstream; Tessera warns).
 - **Status:** Verified
 - **Score:** 2
 - **Next action:** None (cross-check trace links with the pilot implementation is §1/§3's).
 
-### Can Fairtide identify orphaned requirements, unallocated functions, missing interfaces, and unverified requirements?
+### Can Tessera identify orphaned requirements, unallocated functions, missing interfaces, and unverified requirements?
 - **Answer:** *Unverified / unsatisfied requirements*: yes — the home view's gap list ("Not allocated", "No test"), the `RequirementGaps` table and the report's Gaps chapter; on the demo, 11 of 24 (six stakeholder needs, SYS-005, SYS-006, SYS-011, RC-003, RC-007); the home list and the table agree. *Orphaned*: a link or annotation whose target no longer exists is an `unresolved reference` warning at the line; a requirement with no links at all shows as a gap; a requirement not derived from any need is shown by the Requirement DSM's "no links" flag. *Missing interfaces*: the part DSM flags connections with no interface/connection definition and parts with no connection. *Unallocated functions*: **not reliably** — in the functional DSM with allocations counted, the "no links" flag ignores links to elements outside the matrix (the parts), so every step of the delivery flight is flagged, allocated or not; the allocation does show as "Also, outside this matrix".
 - **Evidence:** `traceability.assessment.test.ts` (home gaps = `RequirementGaps`; unresolved references; functional DSM flag is `it.fails` with the gap); `src/lib/workbench/dsm.test.ts:167` (untyped connection, unlinked element); `src/lib/engine/toolkit/views/views.test.ts:501`. Ran in this session.
 - **Limitations:** No check for unallocated actions; no cycle check on derivation; dangling links are warnings, not errors.

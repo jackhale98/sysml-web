@@ -5,7 +5,7 @@
  * review's semantic diff, the related-elements panel and the DSM).
  *
  * Each test asserts the behaviour a requirements engineer needs; where
- * Fairtide falls short the test is `it.fails` with the gap named, so it
+ * Tessera falls short the test is `it.fails` with the gap named, so it
  * flips when the gap is closed.
  */
 import { beforeAll, describe, expect, it } from 'vitest';

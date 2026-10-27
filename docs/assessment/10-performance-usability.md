@@ -3,7 +3,7 @@
 Section §10 of the checklist, and prioritized question 11 (how performance scales with
 model size, diagnostic count and lower-memory devices).
 
-Assessed on `claude/assess-perf-ux` (main at 68cb9db merged in). Scores are Fairtide's
+Assessed on `claude/assess-perf-ux` (main at 68cb9db merged in). Scores are Tessera's
 unless marked "engine". Every figure here was measured in this session unless it says
 otherwise; nothing is quoted from `docs/performance.md` without a re-run beside it.
 
@@ -188,12 +188,12 @@ to show and the analysis half a minute; at 100k nearly a second and over a minut
 
 ## §10 questions
 
-### Does Fairtide remain responsive with representative small, medium, and large projects?
+### Does Tessera remain responsive with representative small, medium, and large projects?
 - **Answer:** Small (demo, 2.6k lines) and medium (10.5k lines): yes. The page never blocks for long (longest main-thread task 53–178 ms on open, ≤113 ms on an edit), a keystroke reaches the next frame in 19–41 ms, and the model is re-analysed 0.26–0.41 s (demo) and 1.1–1.6 s (10k) after a keystroke. Large (50k): typing stays fluid (64–99 ms to the next frame) but feedback is slow: the analysis lands 6–8 s after a pause and the checks 12–15 s, and completion and hover wait behind them (one worker). 100k: a keystroke takes ~200 ms to show (190–215 ms, the main thread's work on a 100k-line model), the analysis 16–19 s and the checks 33–35 s after a pause, and the engine ends within 17–92 MiB of its 2 GiB ceiling. The page itself is not the bottleneck at any size (JS heap ≤ 79 MiB, explorer and tables paged); the engine's whole-project re-analysis is, plus the app's metadata checks, which are quadratic (below).
 - **Evidence:** tables above (`assessment-engine.bench.ts`, `assessment-perf-ux.bench.ts`, run here); guardrails `tests/unit/large-model.test.ts` and `tests/e2e/large-model.spec.ts` (10k only; not run here — the lead runs the suites).
 - **Limitations:** headless Chromium on a shared Linux container; one character typed at a time (a run of typing is not measured); the guardrails stop at 10k lines, so the 2× checks regression at 50k–100k went unnoticed for days.
 - **Status:** Verified
-- **Score:** 2 (Fairtide) — measured and reproducible, but no guardrail above 10k and a regression undetected.
+- **Score:** 2 (Tessera) — measured and reproducible, but no guardrail above 10k and a regression undetected.
 - **Next action:** bug fix (cache `metadataDefinition`); additional testing (a 50k budget in the large-model test).
 
 ### What are cold-start, repeat-load, and first-edit latency distributions?
@@ -201,7 +201,7 @@ to show and the analysis half a minute; at 100k nearly a second and over a minut
 - **Evidence:** `tests/perf/assessment-perf-ux.bench.ts`, `tests/perf/assessment-engine.bench.ts` (commands at the top; run here, raw runs summarised with `assessment-stats.ts`).
 - **Limitations:** first visit measured with the app's files served from localhost (no network transfer time; the engine is 3.3 MB to download, the snapshot 10 MB); no real device.
 - **Status:** Verified
-- **Score:** 3 (Fairtide) — reproducible distributions at four sizes, desktop and slowed phone.
+- **Score:** 3 (Tessera) — reproducible distributions at four sizes, desktop and slowed phone.
 - **Next action:** None (keep the bench; add its 10k figures to CI as a budget).
 
 ### What are peak memory and CPU usage on desktop and lower-memory mobile devices?
@@ -209,7 +209,7 @@ to show and the analysis half a minute; at 100k nearly a second and over a minut
 - **Evidence:** desktop and phone tables above (`assessment-perf-ux.bench.ts`, run here); `VmHWM` of the renderer via CDP `SystemInfo.getProcessInfo`; CDP `Performance.getMetrics` for the JS heap; the worker's `sysmlStats()`.
 - **Limitations:** no real phone; Chrome's DevTools CPU throttling cannot slow a worker ("Operation is only supported for pages, not workers", seen in this session), so the phone runs slow the whole renderer process by pausing it (`assessment-duty-cycle.mjs`), calibrated at 4.0× on both the main thread and a worker; `performance.measureUserAgentSpecificMemory` needs cross-origin isolation, which the app does not have.
 - **Status:** Partially verified (desktop measured; phone emulated, memory limits inferred)
-- **Score:** 2 (Fairtide)
+- **Score:** 2 (Tessera)
 - **Next action:** additional testing on a real mid-range phone; planned capability: warn before opening a project whose size will not fit (the engine's memory is known after the first analysis).
 
 ### Does the UI remain usable when semantic analysis reports thousands of diagnostics?
@@ -217,7 +217,7 @@ to show and the analysis half a minute; at 100k nearly a second and over a minut
 - **Evidence:** `tests/e2e/assessment-perf-ux.spec.ts` "a model with 5,000 problems stays usable…" (run here); the cap `PROBLEMS_LISTED = 500` (`src/lib/workbench/Workbench.svelte`).
 - **Limitations:** problems of one kind (unresolved names); the 501st and later problems are reachable only by fixing earlier ones or through the editor's underlines (the list has no paging or filter by file); 50k-line projects with thousands of problems not tried.
 - **Status:** Verified
-- **Score:** 2 (Fairtide)
+- **Score:** 2 (Tessera)
 - **Next action:** additional testing (why re-analysis of the problem-heavy project is slow); planned capability (filter or page the problems list).
 
 ### Can engineers navigate large models without excessive waiting?
@@ -225,7 +225,7 @@ to show and the analysis half a minute; at 100k nearly a second and over a minut
 - **Evidence:** `tests/e2e/assessment-perf-ux.spec.ts` "a 10k-line model: explorer, search and views…" (run here); worker-side times in the engine table; `docs/performance.md`'s browser table for 50k/100k explorer and tables (2026-10-22; not re-run here).
 - **Limitations:** navigation steps timed once per run at 10k only; not measured while an analysis is running at 50k/100k.
 - **Status:** Partially verified
-- **Score:** 2 (Fairtide)
+- **Score:** 2 (Tessera)
 - **Next action:** additional testing (navigation timings at 50k in the bench); bug fix (the metadata checks) shortens every wait above 10k.
 
 ### Are common tasks discoverable without extensive documentation?
@@ -233,7 +233,7 @@ to show and the analysis half a minute; at 100k nearly a second and over a minut
 - **Evidence:** `tests/e2e/onboarding.spec.ts` (existing, not re-run here); the walk-through test below (run here); help content `src/lib/help/content.ts`; next steps `src/lib/workbench/home/NextSteps.svelte`.
 - **Limitations:** judged by scripted walk-throughs and reading the screens, not by sessions with real first-time users.
 - **Status:** Partially verified
-- **Score:** 2 (Fairtide)
+- **Score:** 2 (Tessera)
 - **Next action:** additional testing (a moderated session with two or three new users).
 
 ### Can a first-time user complete a meaningful modeling task using the guided workflow alone?
@@ -241,7 +241,7 @@ to show and the analysis half a minute; at 100k nearly a second and over a minut
 - **Evidence:** `tests/e2e/assessment-perf-ux.spec.ts` "a first-time user completes a modelling task with the guided workflow alone" (run here: passed in two of three runs; the failed one was point 3); screenshots of each screen and the written text checked by hand (`perfux/dbg/walk*.mjs` in the session scratchpad, not committed).
 - **Limitations:** a script knows where to click; real first-time users were not observed; Blank template only (the other two starting points are covered by `onboarding.spec.ts`).
 - **Status:** Verified (the path works); Partially verified (that a newcomer would find it)
-- **Score:** 2 (Fairtide)
+- **Score:** 2 (Tessera)
 - **Next action:** planned capability: the limit step should target the requirement just written and offer to set the value it checks; additional testing with real users.
 
 ### Does the application work on supported browsers and mobile screen sizes?
@@ -249,7 +249,7 @@ to show and the analysis half a minute; at 100k nearly a second and over a minut
 - **Evidence:** `tests/e2e/assessment-perf-ux.spec.ts` "on a phone/tablet/desktop/wide desktop…" (4 passed here); `tests/e2e/phone-layout.spec.ts` (existing, not re-run).
 - **Limitations:** emulated viewports in Chromium, not real devices; no WebKit or Gecko run at all.
 - **Status:** Partially verified (screen sizes); Unverified (other browsers)
-- **Score:** 2 (screen sizes), 1 (browsers) — Fairtide
+- **Score:** 2 (screen sizes), 1 (browsers) — Tessera
 - **Next action:** additional testing: add Playwright `webkit` and `firefox` projects to CI for a smoke subset; state the supported browsers in the README.
 
 ### Are keyboard navigation, screen-reader labels, focus management, and contrast adequate?
@@ -257,39 +257,39 @@ to show and the analysis half a minute; at 100k nearly a second and over a minut
 - **Evidence:** `tests/e2e/assessment-perf-ux.spec.ts`: "axe finds nothing on any screen of the demo, in the light / dark theme", "the exchange dialog contrast failure is axe catching the dialog mid-fade", "keyboard only…", and three `test.fail` known gaps (focus ring, arrow keys, focus back on the menu button) — run here; existing axe checks in 31 specs (not re-run).
 - **Limitations:** automated rules catch a part of WCAG; no NVDA/VoiceOver session; zoom/reflow at 200 % and forced-colours mode not tried; the sweep waits for finished CSS animations before each check (`settled()`), which is what removes the flake.
 - **Status:** Verified (axe, keyboard paths tried); Unverified (real screen readers)
-- **Score:** 2 (Fairtide)
+- **Score:** 2 (Tessera)
 - **Next action:** bug fix (the three keyboard gaps; wait for animations in `tests/e2e/axe.ts`); additional testing with a screen reader.
 
 ### Can users recover from failed imports, invalid edits, and failed simulations without restarting?
-- **Answer:** Yes for the three cases tried, all in one page without a reload. Failed imports: a damaged `.kpar` says "damaged.kpar could not be read: This is not a ZIP file (a .kpar file is one)." and a truncated JSON file "broken.json could not be imported: This isn't a JSON file (Expected ',' or '}' after property value … line 1 column 33)."; the projects page then creates a project as usual. Invalid edit: typing `part def }}} ;; : : missing` shows "Problems: 1 errors", the model stays "Model ready" (the rest still read), and Ctrl Z returns to 0 problems. Failed simulation: a machine whose two states hand over to each other with no trigger, asked to wait 10 s, stops itself at 200 transitions within 0.2 s and says "stopped after 200 steps at 0 s: the machine keeps moving without time passing"; the rest of the app answers meanwhile (the command palette opens). But the emulator first plays all 200 transitions as an animation, so the reason appears only after 89 s and the emulator takes no other step until then. Engine failures (the worker crashing or running out of memory) restart the worker and say "Fairtide stopped reading the model. Reload the page to try again." (`src/lib/engine/instance.ts`), which does ask for a reload; not triggered here.
+- **Answer:** Yes for the three cases tried, all in one page without a reload. Failed imports: a damaged `.kpar` says "damaged.kpar could not be read: This is not a ZIP file (a .kpar file is one)." and a truncated JSON file "broken.json could not be imported: This isn't a JSON file (Expected ',' or '}' after property value … line 1 column 33)."; the projects page then creates a project as usual. Invalid edit: typing `part def }}} ;; : : missing` shows "Problems: 1 errors", the model stays "Model ready" (the rest still read), and Ctrl Z returns to 0 problems. Failed simulation: a machine whose two states hand over to each other with no trigger, asked to wait 10 s, stops itself at 200 transitions within 0.2 s and says "stopped after 200 steps at 0 s: the machine keeps moving without time passing"; the rest of the app answers meanwhile (the command palette opens). But the emulator first plays all 200 transitions as an animation, so the reason appears only after 89 s and the emulator takes no other step until then. Engine failures (the worker crashing or running out of memory) restart the worker and say "Tessera stopped reading the model. Reload the page to try again." (`src/lib/engine/instance.ts`), which does ask for a reload; not triggered here.
 - **Evidence:** `tests/e2e/assessment-perf-ux.spec.ts` "recovery without a reload…" (run here, passed); existing `exchange.spec.ts` "a file that is not SysML v2 JSON says so" (not re-run).
 - **Limitations:** one example of each; a corrupt but valid ZIP, a JSON with valid syntax but wrong shapes, and a worker crash were not tried here (§3 and §8 cover archives and storage).
 - **Status:** Verified
-- **Score:** 2 (Fairtide)
+- **Score:** 2 (Tessera)
 - **Next action:** bug fix (show a runaway wait's reason at once; don't animate hundreds of steps).
 
-### Can organizations deploy Fairtide locally or in controlled environments?
+### Can organizations deploy Tessera locally or in controlled environments?
 - **Answer:** Yes for the app itself: it is static files. A build with `BASE_PATH=/tools/fairtide` and the sign-in variables empty, served by a 60-line static server under that path with a strict Content-Security-Policy (`default-src 'self'`, `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'`, `connect-src 'self'`, …) and every request to another host refused, opened from its landing page and from a deep link (`/tools/fairtide/p/demo`, served by the `404.html` fallback), read the demo with no problems, opened a table and Settings → About, with no refused request, no CSP violation and no console error. Without the GitHub sign-in worker, GitHub is connected with a personal access token (`docs/setup-github-sign-in.md`). Limits for a controlled environment: the GitHub API host is fixed (`src/lib/git/github.ts:28`, `https://api.github.com`), so GitHub Enterprise Server is not supported, and GitHub is the only Git host (GitLab is "planned" in Settings); the site ships no CSP of its own (`src/app.html`), so the policy above is the deployer's to set, and it needs `'unsafe-inline'` for SvelteKit's inline start script and `'wasm-unsafe-eval'` for the engine; the service worker (offline use) needs HTTPS or localhost.
 - **Evidence:** `tests/e2e/assessment-perf-ux-deploy.spec.ts` with `tests/perf/assessment-static-server.mjs` (commands at the top; run here: 1 passed, "refused: none; problems: none"); `README.md` "Deploying".
 - **Limitations:** one static server and Chromium; not tried behind a real proxy or on an intranet host; Git integration in a closed network not possible (GitHub.com only).
 - **Status:** Verified (static hosting); Not claimed (GitHub Enterprise, other Git hosts)
-- **Score:** 3 (Fairtide) for self-hosting the app; 1 for Git in a closed network.
+- **Score:** 3 (Tessera) for self-hosting the app; 1 for Git in a closed network.
 - **Next action:** planned capability (a configurable GitHub API base URL for Enterprise Server); document a recommended CSP.
 
 ### Is telemetry documented and controllable?
-- **Answer:** There is no telemetry. Walking through the landing page, the projects page, a new project from a template, the demo, two views and Settings → About, then idling 20 s (the engine snapshot download and the service worker's caching), every one of 610–612 requests (three runs) went to the app's own host, from the page, its workers and the service worker; no analytics, error-reporting or font CDN. The source has no analytics or beacon code; the only other hosts it can contact are the ones a person connects to (`api.github.com` with their token, the sign-in worker when configured, a Systems Modeling API server they enter). The user guide says projects stay in the browser and "Nothing is sent to a Fairtide server: there isn't one" (`docs/user-guide.md:498`), but no document says in so many words that there is no telemetry.
+- **Answer:** There is no telemetry. Walking through the landing page, the projects page, a new project from a template, the demo, two views and Settings → About, then idling 20 s (the engine snapshot download and the service worker's caching), every one of 610–612 requests (three runs) went to the app's own host, from the page, its workers and the service worker; no analytics, error-reporting or font CDN. The source has no analytics or beacon code; the only other hosts it can contact are the ones a person connects to (`api.github.com` with their token, the sign-in worker when configured, a Systems Modeling API server they enter). The user guide says projects stay in the browser and "Nothing is sent to a Tessera server: there isn't one" (`docs/user-guide.md:498`), but no document says in so many words that there is no telemetry.
 - **Evidence:** `tests/e2e/assessment-perf-ux.spec.ts` "every request goes to the site itself" (run here three times: `localhost:4328 (610)` to `(612)`); `grep` for `fetch(`, `sendBeacon`, `WebSocket`, analytics names over `src/` (run here: only engine, library, export, Git, sign-in and API-server calls).
 - **Limitations:** the e2e build has sign-in configured but no one signed in, so the worker was correctly not contacted; GitHub flows were not exercised here (§8 covers tokens).
 - **Status:** Verified
-- **Score:** 3 (Fairtide)
-- **Next action:** add one sentence to the user guide ("Fairtide collects no telemetry or usage data").
+- **Score:** 3 (Tessera)
+- **Next action:** add one sentence to the user guide ("Tessera collects no telemetry or usage data").
 
 ### Are releases reproducible, and can users verify which version and engine they are running?
 - **Answer:** Partly. Settings → About shows "App 0.0.1" and "Engine: sysml-toolkit 0.10.10" (a link to that release) with the running engine's own report beside it ("(toolkit 0.10.10)"). But the app version is `package.json`'s 0.0.1, never changed, and there is no commit, build date or tag on the page or in the repository (no git tags, no releases, no changelog), so two different deployments both say 0.0.1. Inputs are pinned: `package-lock.json` with `npm ci` in CI and deploy, and the engine by version and SHA-256 (`toolkit.json`, checked by `scripts/fetch-toolkit.sh`). Two builds of the same commit differ in 8 of 230 files (the HTML pages, `_app/version.json` and `service-worker.js`), only by SvelteKit's version string, which defaults to the build time (`1792937107005` vs `…123967`); every JS chunk and the engine files were byte-identical.
 - **Evidence:** `tests/e2e/assessment-perf-ux.spec.ts` "Settings → About…" (run here); two builds of 68cb9db with `sha256sum` over `build/` (run here, through the gate); `src/lib/version.ts`, `src/lib/settings/Settings.svelte` About section, `.github/workflows/deploy.yml`.
 - **Limitations:** builds compared on one machine with the same Node; no check against the published GitHub Pages build.
 - **Status:** Verified
-- **Score:** 1 (Fairtide)
+- **Score:** 1 (Tessera)
 - **Next action:** planned capability: set SvelteKit's `version.name` to the commit SHA (reproducible builds, and a version people can quote), show it in About, tag releases with a changelog.
 
 ## Prioritized question 11
@@ -299,12 +299,12 @@ to show and the analysis half a minute; at 100k nearly a second and over a minut
 - **Evidence:** every table above; commands at the top (all run here).
 - **Limitations:** generated models of one style (no problems, many metadata annotations — 4,229 at 100k — which is what makes the metadata checks dominate); no real phone; one character per edit.
 - **Status:** Verified (size, diagnostics, CPU); Partially verified (memory on phones)
-- **Score:** 2 (Fairtide)
+- **Score:** 2 (Tessera)
 - **Next action:** bug fix (cache `metadataDefinition`); additional testing (real phone; a 50k budget in CI); planned capability (upstream incremental analysis, `docs/engine.md` request 12).
 
 ## Section scores
 
-Fairtide's scores (the engine's own speed is upstream; where it decides the answer it is
+Tessera's scores (the engine's own speed is upstream; where it decides the answer it is
 noted).
 
 | Sub-area | Score | Notes |

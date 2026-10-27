@@ -1,13 +1,13 @@
 /**
  * The conformance runner (`npm run assess:conformance`; corpora from
- * `scripts/fetch-conformance.sh`). It runs the toolkit engine and Fairtide's
+ * `scripts/fetch-conformance.sh`). It runs the toolkit engine and Tessera's
  * layer over it on:
  *
  * 1. the OMG SysML v2 Release corpus (every file is meant to be valid: the
  *    corpus has no files marked invalid; its "this should fail" lines are
  *    commented out), each file alone and each folder as one project —
  *    parse, reference resolution and validation findings, measured
- *    separately; then, per project, what Fairtide makes of it: diagnostics
+ *    separately; then, per project, what Tessera makes of it: diagnostics
  *    shown (and where), the model adapter's elements and kinds, and the
  *    standard diagrams;
  * 2. the OMG pilot implementation's Xpect suites: the errors, `noErrors`
@@ -146,7 +146,7 @@ function byteOffset(bytes: Buffer, line: number, col: number): number {
 	return at + col - 1;
 }
 
-interface FairtideResult {
+interface TesseraResult {
 	diagnostics: {
 		/** Engine findings (files that parse) shown with the same message on the same line. */
 		matched: number;
@@ -179,11 +179,11 @@ interface FairtideResult {
 	ms: number;
 }
 
-/** What Fairtide makes of a project: diagnostics, the adapter's model, diagrams. */
-function fairtide(host: ToolkitHost, files: SourceFile[], engineRun: EngineResult): FairtideResult {
+/** What Tessera makes of a project: diagnostics, the adapter's model, diagrams. */
+function fairtide(host: ToolkitHost, files: SourceFile[], engineRun: EngineResult): TesseraResult {
 	const started = performance.now();
 	const analyses = host.analyzeProject(files);
-	const out: FairtideResult = {
+	const out: TesseraResult = {
 		diagnostics: { matched: 0, exactRange: 0, missing: [], extra: [], wrongRange: [] },
 		adapter: { walked: 0, located: 0, lost: [], unlocated: {}, notInModel: [], kinds: {} },
 		diagrams: { shown: {}, errors: [], built: 0 },
@@ -487,7 +487,7 @@ function sameElement(host: ToolkitHost, files: SourceFile[], a: string, b: strin
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 const pct = (a: number, b: number) => (b ? `${((100 * a) / b).toFixed(2)} %` : 'n/a');
 
-it('measures the toolkit and Fairtide over the conformance corpora', async () => {
+it('measures the toolkit and Tessera over the conformance corpora', async () => {
 	const host = await loadHost();
 	const projects = releaseProjects();
 	expect(
@@ -703,7 +703,7 @@ function summarize(
 			fs.filter((f) => f.errors.length).length
 		);
 	}
-	lines.push('', '## Release corpus, Fairtide layer', '');
+	lines.push('', '## Release corpus, Tessera layer', '');
 	const ft = perProject.map((p) => p.fairtide);
 	const engineFindings = sum(ft.map((f) => f.diagnostics.matched + f.diagnostics.missing.length));
 	lines.push(
@@ -730,7 +730,7 @@ function summarize(
 	for (const [m, t] of Object.entries(shown).sort((a, b) => b[1].total - a[1].total))
 		row(m, t.total, t.shown, pct(t.shown, t.total));
 
-	lines.push('', '## Pilot Xpect suites (as Fairtide shows them)', '');
+	lines.push('', '## Pilot Xpect suites (as Tessera shows them)', '');
 	row(
 		'Suite',
 		'Files',

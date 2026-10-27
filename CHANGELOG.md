@@ -1,6 +1,6 @@
 # Changelog
 
-What changed in each release of Fairtide. Versions are `MAJOR.MINOR.PATCH`
+What changed in each release of Tessera. Versions are `MAJOR.MINOR.PATCH`
 (`package.json`); while the major version is 0, a minor version adds or
 changes features and a patch only fixes. Each release is a git tag `vX.Y.Z`
 made by the Release workflow ([CONTRIBUTING.md](CONTRIBUTING.md#releases)).
@@ -9,7 +9,8 @@ copy you are running.
 
 ## Unreleased
 
-Nothing yet.
+- Fairtide is now **Tessera**: a new name, logo, loader and app icons.
+  Projects, settings and accounts saved under the old name open as before.
 
 ## 0.1.0
 

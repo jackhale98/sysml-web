@@ -2,7 +2,7 @@
 	"name": "sysml-web-sync",
 	"private": true,
 	"license": "Apache-2.0 OR MIT",
-	"description": "Completes “Sign in with GitHub” for Fairtide: trades the one-time code for tokens, adding the client secret.",
+	"description": "Completes “Sign in with GitHub” for Tessera: trades the one-time code for tokens, adding the client secret.",
 	"type": "module",
 	"scripts": {
 		"build": "wrangler deploy --dry-run",

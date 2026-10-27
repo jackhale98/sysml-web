@@ -1,5 +1,5 @@
 /**
- * Assessment (§3, question 3): Fairtide's Systems Modeling API client against
+ * Assessment (§3, question 3): Tessera's Systems Modeling API client against
  * a server that answers as Eclipse SysON v2026.9.3 did when checked live on
  * 2026-10-23 (tools/interop; docs/assessment/03-interchange.md):
  *
@@ -7,12 +7,12 @@
  *   with its web page (HTML) and creates nothing.
  * - A commit whose `identity` lacks `"@type": "DataIdentity"` answers 200
  *   with its web page and changes nothing.
- * - With the `@type`: a full element payload (as Fairtide sends it) answers
+ * - With the `@type`: a full element payload (as Tessera sends it) answers
  *   200 with an empty body and changes nothing; a minimal payload changing a
  *   property of an element it has answers 201 and applies it; new elements
  *   answer 201 and are dropped.
  *
- * Correct behaviour: Fairtide creates and saves where the server allows it,
+ * Correct behaviour: Tessera creates and saves where the server allows it,
  * and never reports a save as done when the server did not keep it. (The
  * same answers were checked live against SysON v2026.9.3 again on
  * 2026-10-26: docs/interchange.md.)
@@ -59,7 +59,7 @@ function sysonLike(initial: ElementJson[]) {
 			};
 			if (body.change.some((c) => c.identity['@type'] !== 'DataIdentity'))
 				return answer(200, PAGE, 'text/html');
-			// A payload with every property (as Fairtide sends) fails inside the server.
+			// A payload with every property (as Tessera sends) fails inside the server.
 			if (body.change.some((c) => c.payload && Object.keys(c.payload).length > 6))
 				return answer(200, '');
 			for (const c of body.change) {
@@ -80,12 +80,12 @@ const part = (id: string, name: string, extra: Record<string, unknown> = {}): El
 	...extra
 });
 
-describe('Fairtide and a SysON server', () => {
+describe('Tessera and a SysON server', () => {
 	it('creates a project there', async () => {
 		const server = sysonLike([]);
 		const api = new SysmlApi(BASE, null, server.fetch);
-		await api.createProject('From Fairtide');
-		expect(server.projects.map((p) => p.name)).toEqual(['From Fairtide']);
+		await api.createProject('From Tessera');
+		expect(server.projects.map((p) => p.name)).toEqual(['From Tessera']);
 	});
 
 	it('says that creating failed when the server answers with its web page, and why', async () => {
@@ -96,7 +96,7 @@ describe('Fairtide and a SysON server', () => {
 				? new Response(PAGE, { headers: { 'content-type': 'text/html' } })
 				: server.fetch(input, init)) as typeof globalThis.fetch;
 		const api = new SysmlApi(BASE, null, page);
-		const error = await api.createProject('From Fairtide').then(
+		const error = await api.createProject('From Tessera').then(
 			() => new Error('created'),
 			(e: unknown) => e as Error
 		);

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import FairtideLoader from '#lib/ui/FairtideLoader.svelte';
+	import TesseraLoader from '#lib/ui/TesseraLoader.svelte';
 	import Logo from '#lib/ui/Logo.svelte';
 
 	/**
@@ -29,7 +29,7 @@
 			<p class="lead">{lead}</p>
 			{#if rest}<p class="rest">{rest}</p>{/if}
 			<div class="loading">
-				<FairtideLoader size={72} label="" />
+				<TesseraLoader size={72} label="" />
 				<p class="status" role="status">Opening the workbench…</p>
 			</div>
 		</section>

@@ -78,8 +78,8 @@ export interface TokenSource {
  */
 export function tokenUrl(api: string = GITHUB_API): string {
 	const params = new URLSearchParams({
-		name: 'Fairtide',
-		description: 'Open and save SysML models from Fairtide.',
+		name: 'Tessera',
+		description: 'Open and save SysML models from Tessera.',
 		expires_in: '90',
 		contents: 'write',
 		pull_requests: 'write',

@@ -1,9 +1,9 @@
-# Fairtide user guide
+# Tessera user guide
 
 <!-- Made from src/lib/help/content.ts, the help in the app: change it there, then run
      UPDATE_USER_GUIDE=1 npx vitest run src/lib/help -->
 
-Fairtide is a workbench for SysML v2 models, in the browser, on a phone or a computer. This is
+Tessera is a workbench for SysML v2 models, in the browser, on a phone or a computer. This is
 the help that comes with it: open it in the app with **Help** in the project menu, by pressing
 <kbd>?</kbd>, or by typing `?` in search.
 
@@ -437,28 +437,28 @@ In the app: **Save to GitHub**.
 
 ### Exchange models with other tools
 
-Other SysML v2 tools read and write models in three ways, and Fairtide does all three. Your SysML text stays the source of truth: what comes in is written as text, and what goes out is made from it.
+Other SysML v2 tools read and write models in three ways, and Tessera does all three. Your SysML text stays the source of truth: what comes in is written as text, and what goes out is made from it.
 
 - **A .kpar file**: the project’s SysML text in one archive. **Download as .kpar** in the project menu writes one; **Import** on **Your projects** opens one. Everything comes across exactly as written. If your project uses the built-in `ModelViews` or `Reporting` library without holding it, the archive includes it, so other tools can read the archive too. On import, a file whose path leads outside the project, a file the archive holds twice or one that fails the archive’s own check is named; an archive that would unpack to more than 256 MB isn’t opened.
 - **SysML v2 JSON**: the standard file of model elements, each with an id and a type, that API servers and many tools exchange. **Download as SysML v2 JSON…** in the project menu writes it: only your model (it refers to the standard library by its standard ids, which every tool knows), or with the standard library too, so the file stands on its own. **Import** on **Your projects** reads one and writes it as SysML text.
 - **A SysML v2 API server**, such as the OMG pilot server or SysON (its address ends in `/api/rest`): **Connect to a SysML v2 API server…** in the project menu.
 
-An import says what came across and what didn’t, in a few lines; **Download the full list** gives all of it as a text file. JSON holds no comments, blank lines or layout, so a model that went through JSON reads the way Fairtide writes SysML, and element ids are not kept in the text (they come from file names here). What a file from another tool writes out that the text implies anyway (a calculation’s `result`, derived values) doesn’t count as lost; a file in which two elements share an id isn’t opened.
+An import says what came across and what didn’t, in a few lines; **Download the full list** gives all of it as a text file. JSON holds no comments, blank lines or layout, so a model that went through JSON reads the way Tessera writes SysML, and element ids are not kept in the text (they come from file names here). What a file from another tool writes out that the text implies anyway (a calculation’s `result`, derived values) doesn’t count as lost; a file in which two elements share an id isn’t opened.
 
 1. **Open from server**: choose the project, its branch and a version (the latest, or an earlier commit). It opens as a new project on this device.
-2. **Save to server**: Fairtide reads the branch’s latest version, matches your elements to the server’s and saves only what differs, as one commit. What the server has and your project doesn’t is removed in that commit; earlier commits keep it. Then it reads the branch back: if the server didn’t keep something, it says what, instead of “Saved”. SysON keeps changes to elements it has but not new elements: with SysON, removals go only once the new elements are seen kept, so nothing is lost there.
+2. **Save to server**: Tessera reads the branch’s latest version, matches your elements to the server’s and saves only what differs, as one commit. What the server has and your project doesn’t is removed in that commit; earlier commits keep it. Then it reads the branch back: if the server didn’t keep something, it says what, instead of “Saved”. SysON keeps changes to elements it has but not new elements: with SysON, removals go only once the new elements are seen kept, so nothing is lost there.
 
 If someone else saved to the branch since you opened the project from the server (or last saved it there), saving merges first. Their changes come into your project, as one step you can undo, and yours go to the server on top of theirs. Where you both changed the same element differently, or one of you removed something the other changed, both versions are shown in plain words: choose **Keep mine** or **Keep theirs** for each (or **Keep all mine**, **Keep all theirs**). Nothing is written until you save, and the result says what came in and what was sent.
 
 The merge works on the model, not on your text: your files keep their notes and layout, and a new element of theirs is added where it belongs. An element they changed is written again the way the formatter writes it, so `//` notes and layout inside it don’t come through; the review names those elements first.
 
-The browser talks to the server directly (there is no Fairtide server in between), so the server must allow this page. It answers `OPTIONS` requests and sends `Access-Control-Allow-Origin` with this page’s address (or `*`), `Access-Control-Allow-Headers: Authorization, Content-Type`, `Access-Control-Allow-Methods: GET, POST` and `Access-Control-Expose-Headers: Link` (for long lists). If it doesn’t, Fairtide says so: ask whoever runs it. A token stays on this device and goes only to its server.
+The browser talks to the server directly (there is no Tessera server in between), so the server must allow this page. It answers `OPTIONS` requests and sends `Access-Control-Allow-Origin` with this page’s address (or `*`), `Access-Control-Allow-Headers: Authorization, Content-Type`, `Access-Control-Allow-Methods: GET, POST` and `Access-Control-Expose-Headers: Link` (for long lists). If it doesn’t, Tessera says so: ask whoever runs it. A token stays on this device and goes only to its server.
 
 In the app: **Download as SysML v2 JSON**.
 
 ### Install it on my phone
 
-Fairtide can live on your Home Screen, Dock or app list and works offline. Choose **Install app** in the project menu or in **Settings** › **About**. On an iPhone or iPad, use **Share** › **Add to Home Screen** in Safari.
+Tessera can live on your Home Screen, Dock or app list and works offline. Choose **Install app** in the project menu or in **Settings** › **About**. On an iPhone or iPad, use **Share** › **Add to Home Screen** in Safari.
 
 In the app: **Install app**.
 
@@ -535,7 +535,7 @@ Plainly: on your device, unless you choose to put it somewhere else.
 
 ### In this browser
 
-Your projects are kept in this browser, on this device, as you work. Nothing is sent to a Fairtide server: there isn’t one. They are there next time you open Fairtide here, even offline.
+Your projects are kept in this browser, on this device, as you work. Nothing is sent to a Tessera server: there isn’t one. They are there next time you open Tessera here, even offline.
 
 They are not on your other devices, and clearing this browser’s site data deletes them. So keep a copy of anything that matters:
 

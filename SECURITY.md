@@ -5,7 +5,7 @@
 Please report security problems privately, not in a public issue: use
 **Report a vulnerability** on the repository's Security tab (GitHub's private
 vulnerability reporting). Say what you found, how to reproduce it, and which
-copy of Fairtide you used: the version, commit and build date are in Settings →
+copy of Tessera you used: the version, commit and build date are in Settings →
 About.
 
 You can expect an acknowledgement within a week, and a fix or a plan in the
@@ -18,7 +18,7 @@ Fixes go into the latest release and the site built from `main`. Older
 releases are not patched; self-hosted copies should update to the latest
 release.
 
-## What Fairtide does to keep you safe
+## What Tessera does to keep you safe
 
 - **No server of its own.** Projects stay in your browser until you save them
   to GitHub, a folder or a file; nothing is sent anywhere else, and there is

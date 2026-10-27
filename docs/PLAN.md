@@ -1,4 +1,4 @@
-# Fairtide — Plan
+# Tessera — Plan
 
 A beautiful, fast, standards-conformant **web workbench for SysML v2** that
 makes the language approachable. Build models in **text or diagrams** (both
@@ -8,7 +8,7 @@ SysML text in a git repository is the single source of truth; every change is a
 minimal, reviewable diff that any other conformant tool can read. It runs well
 on desktop and mobile.
 
-(The product was called "SysML Web" until it was named Fairtide; the
+(The product was called "SysML Web" until it was named Tessera; the
 repository and the site's path keep the old name.)
 
 ## Status (2026-10-23)
@@ -524,7 +524,7 @@ Each phase ended in something usable and demoable.
 | 14 | A document-centric reading of the model is offered as a *perspective* over SysML views, not as a separate data model | 2026-10-21 |
 | 15 | Spreadsheets in and out without a spreadsheet library: hand-written OOXML and a small ZIP over the browser's `CompressionStream`; imported requirements become SysML written the way the engine's own edits write it, in one undoable change | 2026-10-21 |
 | 16 | Move the app onto the Open-MBEE sysml-toolkit engine (one core, maintained by an organisation) in place of our own `sysml-cli` engine; features the toolkit lacks are written in TypeScript over its model; the app switches to it directly (no users yet), porting piece by piece behind one engine interface | 2026-10-21 |
-| 17 | The product is named **Fairtide**; the repository and site path stay `sysml-web` | 2026-10-22 |
+| 17 | The product is named **Tessera**; the repository and site path stay `sysml-web` | 2026-10-22 |
 
 ## Open questions
 

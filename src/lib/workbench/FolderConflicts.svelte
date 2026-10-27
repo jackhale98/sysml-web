@@ -53,7 +53,7 @@
 	{#if pending}
 		<div class="message">
 			<p class="muted">
-				{count === 1 ? 'It was' : 'They were'} changed outside Fairtide since you opened or last saved
+				{count === 1 ? 'It was' : 'They were'} changed outside Tessera since you opened or last saved
 				{count === 1 ? 'it' : 'them'}. Choose which version to keep for each. Nothing is saved until
 				you finish.
 				{#if broughtIn}{files(broughtIn)} changed only in the folder will simply be brought in.{/if}
