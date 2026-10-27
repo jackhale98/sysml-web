@@ -65,9 +65,24 @@
 	// The editor and diagram bring CodeMirror, Svelte Flow and ELK; load them
 	// only when a file or diagram is first opened.
 	const loadTextEditor = () => import('./TextEditor.svelte').then((m) => m.default);
-	const loadCanvas = () => import('#lib/diagram/DiagramCanvas.svelte').then((m) => m.default);
+	// Loaded once and the same promise handed back: an {#await} given a new one
+	// after an edit would show its loading state and draw the diagram afresh,
+	// losing where the person had panned and zoomed.
+	let canvas: ReturnType<typeof importCanvas> | undefined;
+	let sequence: ReturnType<typeof importSequence> | undefined;
+	const importCanvas = () => import('#lib/diagram/DiagramCanvas.svelte').then((m) => m.default);
 	// A sequence diagram is drawn by its own canvas, without Svelte Flow and ELK.
-	const loadSequence = () => import('#lib/diagram/SequenceCanvas.svelte').then((m) => m.default);
+	const importSequence = () => import('#lib/diagram/SequenceCanvas.svelte').then((m) => m.default);
+	const loadCanvas = () =>
+		(canvas ??= importCanvas().catch((error) => {
+			canvas = undefined;
+			throw error;
+		}));
+	const loadSequence = () =>
+		(sequence ??= importSequence().catch((error) => {
+			sequence = undefined;
+			throw error;
+		}));
 	const loadDiagram = (view?: DiagramView) => (view === 'sequence' ? loadSequence() : loadCanvas());
 	// Dialogs mount on first use and then stay, so they keep their state.
 	let palettePrimed = $state(false);

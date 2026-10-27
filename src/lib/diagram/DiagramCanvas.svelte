@@ -172,6 +172,14 @@
 	const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
 	const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 	const FIT = { padding: 0.15, maxZoom: 1.1 };
+	/**
+	 * On a narrow screen, the least zoom a whole diagram is fitted at: below it
+	 * the labels are too small to read, so the diagram opens at this zoom from
+	 * its top (and its left, when wider than the screen) and is panned instead.
+	 * After an edit it opens on what the edit drew.
+	 */
+	const READABLE_ZOOM = 0.65;
+	const NARROW = 640;
 
 	let nodes = $state.raw<Node<SysmlNodeData>[]>([]);
 	let edges = $state.raw<Edge<SysmlEdgeData>[]>([]);
@@ -458,17 +466,27 @@
 		savePositions(Object.fromEntries(nodes.map((n) => [n.id, n.position])));
 	}
 
-	/** What the drawing covers: its nodes, and the routes and labels ELK placed beside them. */
-	function drawingBounds() {
+	/** What a part of the drawing changed by an edit: new boxes, and new lines (`source>target`). */
+	interface Focus {
+		nodes: Set<string>;
+		lines: Set<string>;
+	}
+
+	/**
+	 * What the drawing covers: its nodes, and the routes and labels ELK placed
+	 * beside them (or only those of `focus`).
+	 */
+	function drawingBounds(focus?: Focus) {
 		const xs: number[] = [];
 		const ys: number[] = [];
 		for (const n of nodes) {
+			if (focus && !focus.nodes.has(n.id)) continue;
 			xs.push(n.position.x, n.position.x + (n.width ?? 0));
 			ys.push(n.position.y, n.position.y + (n.height ?? 0));
 		}
 		for (const e of edges) {
 			const route = e.data?.route;
-			if (!route) continue;
+			if (!route || (focus && !focus.lines.has(`${e.source}>${e.target}`))) continue;
 			for (const p of route.points) {
 				xs.push(p.x);
 				ys.push(p.y);
@@ -485,21 +503,38 @@
 		return { x, y, width: Math.max(...xs) - x, height: Math.max(...ys) - y };
 	}
 
-	function fit() {
+	function fit(focus?: Focus) {
 		requestAnimationFrame(() =>
 			requestAnimationFrame(() => {
 				const bounds = drawingBounds();
+				const changed = focus && drawingBounds(focus);
 				const duration = reducedMotion ? 0 : 280;
 				if (!flow || !bounds || !host) return void flow?.fitView({ ...FIT, duration });
 				const { clientWidth: width, clientHeight: height } = host;
-				const viewport = getViewportForBounds(
+				// On a narrow screen the toolbar (and the frame's title below it) cover the
+				// diagram's top: fit it into the room beneath them.
+				const narrow = width < NARROW;
+				const top = narrow ? toolbarHeight + (frameTitle && frameBelow ? 44 : 12) : 0;
+				let viewport = getViewportForBounds(
 					bounds,
 					width,
-					height,
+					height - top,
 					0.15,
 					FIT.maxZoom,
 					FIT.padding
 				);
+				viewport = { ...viewport, y: viewport.y + top };
+				if (narrow && viewport.zoom < READABLE_ZOOM) {
+					const zoom = READABLE_ZOOM;
+					const at = changed ?? bounds;
+					const spareX = width - at.width * zoom;
+					const spareY = height - top - at.height * zoom;
+					viewport = {
+						zoom,
+						x: (spareX > 0 ? spareX / 2 : 12) - at.x * zoom,
+						y: top + (changed && spareY > 0 ? spareY / 2 : 8) - at.y * zoom
+					};
+				}
 				void flow.setViewport(viewport, { duration });
 			})
 		);
@@ -543,11 +578,21 @@
 			// A state machine or flow nobody has arranged by hand is laid out afresh as it
 			// grows, so each new state or line lands where the layout reads best.
 			// Only when what is drawn changed: a new label alone moves nothing.
-			const shape = JSON.stringify([
-				graph.nodes.map((n) => n.id),
-				graph.edges.map((e) => [e.source, e.target])
-			]);
+			const drawn = {
+				nodes: graph.nodes.map((n) => n.id),
+				lines: graph.edges.map((e) => `${e.source}>${e.target}`)
+			};
+			const shape = JSON.stringify(drawn);
 			const settle = behavior && !Object.keys(stored).length && shape !== lastShape;
+			// What this drawing adds to the last one: where to look after an edit.
+			const before = lastShape ? (JSON.parse(lastShape) as typeof drawn) : null;
+			const newOf = (now: string[], then: string[]) => {
+				const had = new Set(then);
+				return new Set(now.filter((id) => !had.has(id)));
+			};
+			const focus: Focus | undefined = before
+				? { nodes: newOf(drawn.nodes, before.nodes), lines: newOf(drawn.lines, before.lines) }
+				: undefined;
 			lastShape = shape;
 			const sizes = new Map(graph.nodes.map((n) => [n.id, nodeSize(n, view)]));
 
@@ -689,7 +734,8 @@
 				if (Object.keys(stored).length) savePositions({ [dropped]: p });
 				else pinAll();
 			}
-			if (!hadNodes || relayout || settle) fit();
+			if (!hadNodes || relayout) fit();
+			else if (settle) fit(focus);
 			if (addedCheck && current > addedCheck.after) {
 				const drawnKeys = new Set(
 					graph.nodes.flatMap((n) =>

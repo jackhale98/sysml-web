@@ -188,3 +188,33 @@ test('on a phone, recording a test result fits the width', async ({ page }) => {
 	});
 	expect(past, 'form fields wider than the form').toEqual([]);
 });
+
+test('on a phone, a large diagram opens readable from its start, clear of the toolbar', async ({
+	page
+}) => {
+	await openDemo(page);
+	await nav(page, 'Views');
+	const open = page.getByRole('button', { name: /^Flight mode states/ }).first();
+	await open.scrollIntoViewIfNeeded();
+	await open.click();
+	const diagram = page.getByRole('region', { name: /Flight mode states diagram/ });
+	const idle = diagram.getByRole('group', { name: 'state idle', exact: true });
+	await expect(idle).toBeVisible({ timeout: 15_000 });
+	// Not shrunk to fit the whole machine on the screen: drawn at a readable zoom…
+	await expect
+		.poll(() =>
+			diagram
+				.locator('.svelte-flow__viewport')
+				.evaluate((el) => new DOMMatrix(getComputedStyle(el).transform).a)
+		)
+		.toBeGreaterThanOrEqual(0.65);
+	// …from its first state, inside the canvas and below the diagram tools.
+	await expect
+		.poll(async () => {
+			const tools = (await diagram.getByRole('toolbar', { name: 'Diagram tools' }).boundingBox())!;
+			const box = (await idle.boundingBox())!;
+			return box.y >= tools.y + tools.height && box.x >= 0 && box.x + box.width <= 390;
+		})
+		.toBe(true);
+	await expectFitsWidth(page, 'the state diagram');
+});

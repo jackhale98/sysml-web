@@ -258,6 +258,27 @@ test('duplicate copies an element beside it, selects the copy, and undoes in one
 	await expectAccessible(page);
 });
 
+test('an edit redraws a view in place, keeping its zoom', async ({ page }) => {
+	await openDemo(page);
+	const catalogue = await openView(page, 'Component catalogue');
+	const flow = catalogue.locator('.svelte-flow');
+	const transform = () =>
+		catalogue.locator('.svelte-flow__viewport').evaluate((el) => getComputedStyle(el).transform);
+	await catalogue.getByRole('button', { name: 'Zoom In' }).click();
+	await catalogue.getByRole('button', { name: 'Zoom In' }).click();
+	await expect.poll(transform).not.toBe('none');
+	await page.waitForTimeout(400);
+	const zoomed = await transform();
+	await flow.evaluate((el) => el.setAttribute('data-first-drawn', ''));
+	await node(catalogue, 'Camera').click({ button: 'right' });
+	await page.getByRole('menuitem', { name: /^Duplicate/ }).click();
+	await expect(toasts(page)).toContainText('Duplicated Camera as Camera2');
+	await page.waitForTimeout(1000);
+	// The same canvas, not one drawn afresh (and fitted again) after a reload.
+	await expect(catalogue.locator('.svelte-flow[data-first-drawn]')).toHaveCount(1);
+	expect(await transform()).toBe(zoomed);
+});
+
 test('the inspector lists related elements both ways, each one a link to it', async ({ page }) => {
 	await openDemo(page);
 	await page.keyboard.press('Control+k');
