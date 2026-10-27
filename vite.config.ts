@@ -67,7 +67,7 @@ export default defineConfig({
 			// handles updates (a "new version" notice instead of a surprise reload).
 			serviceWorker: { register: false },
 			paths: {
-				// The deploy takes it from the Pages settings: /sysml-web at jackhale98.github.io, empty at tessera-engineering.org.
+				// The deploy takes it from the Pages settings: /sysml-web at jackhale98.github.io, empty at tessera-engineering.com.
 				base: (process.env.BASE_PATH ?? '') as '' | `/${string}`
 			}
 		}),

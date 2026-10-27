@@ -62,7 +62,7 @@ jobs:
 
       # The site's base path as Pages serves it: /sysml-web at
       # jackhale98.github.io, nothing once the custom domain
-      # (tessera-engineering.org) is set in Settings → Pages.
+      # (tessera-engineering.com) is set in Settings → Pages.
       - id: pages
         uses: actions/configure-pages@v6
 

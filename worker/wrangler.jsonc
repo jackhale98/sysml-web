@@ -12,7 +12,7 @@
 	"vars": {
 		// Origins (no path) that may use this worker: the site on GitHub Pages, and
 		// localhost for development (vite dev on 5173, vite preview and the e2e tests on 4173).
-		"ALLOWED_ORIGINS": "https://tessera-engineering.org,https://jackhale98.github.io,http://localhost:5173,http://localhost:4173"
+		"ALLOWED_ORIGINS": "https://tessera-engineering.com,https://jackhale98.github.io,http://localhost:5173,http://localhost:4173"
 	}
 	// The GitHub App's client credentials are secrets, never vars:
 	//   npx wrangler secret put GITHUB_CLIENT_ID

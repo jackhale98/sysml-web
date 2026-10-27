@@ -35,7 +35,7 @@ sequenceDiagram
     B->>G: 7. GitHub API calls with the token, straight from the browser
 ```
 
-The callback URL is `https://tessera-engineering.org/auth/callback/` (with the
+The callback URL is `https://tessera-engineering.com/auth/callback/` (with the
 trailing slash). While the site moves from
 `https://jackhale98.github.io/sysml-web/`, the GitHub App lists both callback
 URLs and the worker's `ALLOWED_ORIGINS` both origins. If the site moves again,
@@ -83,7 +83,7 @@ repository and redeploys it whenever that folder changes on `main`.
 **Allowed origins live in the repository, not the dashboard.**
 `ALLOWED_ORIGINS` is set in `worker/wrangler.jsonc`, and every build applies the
 file's value, so a variable edited in the dashboard would be overwritten on the
-next deploy. It lists `https://tessera-engineering.org` and
+next deploy. It lists `https://tessera-engineering.com` and
 `https://jackhale98.github.io` (origins, no path) and
 `http://localhost:5173` and `http://localhost:4173` for local development
 (`npm run dev` and `npm run preview`). To change it, edit the file on GitHub
@@ -127,8 +127,8 @@ refresh automatically (for about 6 months, after which people sign in again).
    | Field                                                  | Value                                                   |
    | ------------------------------------------------------ | ------------------------------------------------------- |
    | GitHub App name                                        | `Tessera` (must be unique on GitHub; any name works)  |
-   | Homepage URL                                           | `https://tessera-engineering.org/`                       |
-   | Callback URL                                           | `https://tessera-engineering.org/auth/callback/`         |
+   | Homepage URL                                           | `https://tessera-engineering.com/`                       |
+   | Callback URL                                           | `https://tessera-engineering.com/auth/callback/`         |
    | Expire user authorization tokens                       | Checked                                                 |
    | Request user authorization (OAuth) during installation | Checked                                                 |
    | Enable Device Flow                                     | Unchecked                                               |
@@ -204,7 +204,7 @@ worker URL are set.
 
 ## Step 4 — Check it
 
-Open https://tessera-engineering.org/projects and select **Connect
+Open https://tessera-engineering.com/projects and select **Connect
 GitHub…**. You should see **Sign in with GitHub**, with "Use an access token
 instead" below it.
 
@@ -223,7 +223,7 @@ instead" below it.
 | Symptom                                               | Likely cause                                                 | Fix                                                                                                                 |
 | ----------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
 | No "Sign in with GitHub" button                       | Build variables missing, or the site wasn't redeployed       | Check the variable names in Step 3 and re-run the Pages deploy                                                      |
-| GitHub says the redirect URI is invalid               | Callback URL differs by a character (trailing slash, `http`) | Use exactly `https://tessera-engineering.org/auth/callback/`                                                 |
+| GitHub says the redirect URI is invalid               | Callback URL differs by a character (trailing slash, `http`) | Use exactly `https://tessera-engineering.com/auth/callback/`                                                 |
 | "GitHub sign-in isn't available at this address"      | `ALLOWED_ORIGINS` doesn't list the site's origin             | Add it in `worker/wrangler.jsonc` on `main` (Option A rebuilds by itself; with Option B run `npx wrangler deploy`)  |
 | "GitHub sign-in isn't set up on this site yet"        | A worker secret is missing (the worker answers 501)          | Add it under the worker's **Settings → Variables and Secrets**, or `npx wrangler secret put …`                      |
 | "isn't set up correctly for this site yet"            | Wrong client secret, or the callback URL doesn't match       | Generate a new client secret and set it again; check the callback URL                                               |
