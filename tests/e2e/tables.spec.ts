@@ -81,3 +81,26 @@ test('a trace matrix made with New view renders from the view library', async ({
 	await expect(table.getByRole('columnheader', { name: 'Payload release (drone)' })).toBeVisible();
 	await expectAccessible(page);
 });
+
+test('Show SysML opens a table or report at its own view, not the top of the file', async ({
+	page
+}) => {
+	await page.setViewportSize({ width: 1440, height: 900 });
+	await openDemo(page);
+	const cases: [RegExp, string][] = [
+		[/mass budget/i, 'view droneMassBudget : MassBudget'],
+		[/requirement coverage/i, 'view requirementCoverage : RequirementsTraceMatrix'],
+		[/fmea worksheet/i, 'view fmeaWorksheet : DesignFmeaWorksheet'],
+		[/drone specification/i, 'view droneSpecification : SpecificationDocument']
+	];
+	for (const [title, declaration] of cases) {
+		await views(page).getByRole('button', { name: title }).first().click();
+		await page
+			.getByRole('button', { name: /^(Show SysML|SysML)$/ })
+			.first()
+			.click();
+		await expect(page.locator('.cm-activeLine').first()).toContainText(declaration, {
+			timeout: 10_000
+		});
+	}
+});

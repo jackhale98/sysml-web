@@ -5,6 +5,7 @@
  * itself, so its filters apply; the others from the element it exposes).
  */
 import type { DiagramView, ViewInfo } from '#lib/engine/types.ts';
+import type { ModelElement } from '#lib/project/elements.ts';
 
 export type Presentation =
 	| { kind: 'table' }
@@ -166,4 +167,15 @@ export function groupViews<T>(
 		...f,
 		views: views.filter((v) => viewFamily(info(v)) === f.id)
 	})).filter((g) => g.views.length);
+}
+
+/**
+ * A view's own element in the model (its `view` usage), found by its name
+ * in its file: what "Show SysML" selects, and what its settings are saved on.
+ */
+export function viewElementOf(
+	elements: readonly ModelElement[],
+	view: Pick<ViewInfo, 'file' | 'name'>
+): ModelElement | undefined {
+	return elements.find((e) => e.file === view.file && e.kind === 'view' && e.name === view.name);
 }

@@ -57,7 +57,7 @@
 		levelTone,
 		matrixOf
 	} from './risk.ts';
-	import { breakable, viewTitle } from './views.ts';
+	import { breakable, viewElementOf, viewTitle } from './views.ts';
 	import TableFilters from './TableFilters.svelte';
 	import {
 		describeFilter,
@@ -473,9 +473,9 @@
 
 	function showSource() {
 		if (!info || info.builtin) return;
-		ui.open({ kind: 'file', path: info.file });
-		const element = workspace.elements.find((e) => e.file === info.file && e.label === info.name);
-		if (element) ui.select(element.key, 'table');
+		const element = viewElementOf(workspace.elements, info);
+		if (element) ui.showInText(element, 'table');
+		else ui.open({ kind: 'file', path: info.file });
 	}
 
 	let columnsOpen = $state(false);

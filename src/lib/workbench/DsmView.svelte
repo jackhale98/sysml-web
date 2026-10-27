@@ -46,7 +46,7 @@
 		reviewFlags
 	} from './dsm.ts';
 	import type { WorkbenchUi } from './ui.svelte.ts';
-	import { viewTitle } from './views.ts';
+	import { viewElementOf, viewTitle } from './views.ts';
 
 	/**
 	 * A view as a dependency matrix (DSM or N² chart, `@MatrixRendering`):
@@ -75,13 +75,7 @@
 	);
 	const title = $derived(viewTitle(info?.name ?? name));
 	/** The view's own element, which its settings are saved on. */
-	const viewElement = $derived(
-		info
-			? workspace.elements.find(
-					(e) => e.file === info.file && e.kind === 'view' && e.name === info.name
-				)
-			: undefined
-	);
+	const viewElement = $derived(info ? viewElementOf(workspace.elements, info) : undefined);
 	/** A view of the project (not a library's definition): its settings can be saved. */
 	const editable = $derived(
 		!!info && info.isUsage && !info.builtin && !isLibraryFile(info.file) && !!viewElement

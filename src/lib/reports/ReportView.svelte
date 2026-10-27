@@ -9,7 +9,7 @@
 	import { toasts } from '#lib/ui/toasts.svelte.ts';
 	import { undoAction } from '#lib/workbench/actions.ts';
 	import type { WorkbenchUi } from '#lib/workbench/ui.svelte.ts';
-	import { viewTitle } from '#lib/workbench/views.ts';
+	import { viewElementOf, viewTitle } from '#lib/workbench/views.ts';
 	import { buildReport } from './build.ts';
 	import type { ReportContext } from './context.ts';
 	import type { Block, ReportDocument, Section, Text, TreeItem } from './document.ts';
@@ -161,10 +161,10 @@
 	}
 
 	function showSource() {
-		if (!info) return;
-		ui.open({ kind: 'file', path: info.file });
-		const element = workspace.elements.find((e) => e.file === info.file && e.label === info.name);
-		if (element) ui.select(element.key, 'table');
+		if (!info || info.builtin) return;
+		const element = viewElementOf(workspace.elements, info);
+		if (element) ui.showInText(element, 'table');
+		else ui.open({ kind: 'file', path: info.file });
 	}
 
 	let saving = $state(false);
