@@ -6,7 +6,8 @@ name: Browsers
 
 on:
   push:
-    branches: [main]
+    # The working branches too, so a fix is seen on Safari's engine before main.
+    branches: [main, 'claude/**']
   pull_request:
   workflow_dispatch:
 
