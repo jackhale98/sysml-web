@@ -60,17 +60,21 @@ jobs:
       - name: Fetch toolkit
         run: scripts/fetch-toolkit.sh
 
+      # The site's base path as Pages serves it: /sysml-web at
+      # jackhale98.github.io, nothing once the custom domain
+      # (tessera-engineering.org) is set in Settings → Pages.
+      - id: pages
+        uses: actions/configure-pages@v6
+
       - name: Build
         run: npm run build
         env:
-          BASE_PATH: /sysml-web
+          BASE_PATH: ${{ steps.pages.outputs.base_path }}
           # "Sign in with GitHub" (docs/setup-github-sign-in.md). Repository Actions
           # variables; while they are unset, people connect with an access token.
           PUBLIC_GITHUB_CLIENT_ID: ${{ vars.PUBLIC_GITHUB_CLIENT_ID }}
           PUBLIC_GITHUB_APP_SLUG: ${{ vars.PUBLIC_GITHUB_APP_SLUG }}
           PUBLIC_SYNC_WORKER: ${{ vars.PUBLIC_SYNC_WORKER }}
-
-      - uses: actions/configure-pages@v6
 
       - uses: actions/upload-pages-artifact@v5
         with:

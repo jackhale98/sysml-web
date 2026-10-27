@@ -8,7 +8,7 @@ tool. Tessera runs in the browser on a computer or a phone, keeps working
 offline, and has no server of its own: projects stay in your browser until you
 save them to GitHub, a folder or a file.
 
-**Try it:** <https://jackhale98.github.io/sysml-web/> (open the delivery-drone
+**Try it:** <https://tessera-engineering.org/> (open the delivery-drone
 demo, no sign-up).
 
 What it does today:
@@ -70,7 +70,8 @@ folder works only in Chrome and Edge, as the app says.
 ## Deploying
 
 Each push to `main` whose CI passes is built and published to GitHub Pages
-(`.github/workflows/deploy.yml`, with `BASE_PATH=/sysml-web`); a commit whose CI
+(`.github/workflows/deploy.yml`) at tessera-engineering.org, its base path
+taken from the Pages settings; a commit whose CI
 failed is never published. Releases are tagged by hand
 ([CONTRIBUTING.md](CONTRIBUTING.md#releases), [CHANGELOG.md](CHANGELOG.md)).
 The site is plain files, so any static host works:

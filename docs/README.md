@@ -2,7 +2,7 @@
 
 What each document is for, and who it is for. New to Tessera? Start with the
 [user guide](user-guide.md), or open the live app at
-<https://jackhale98.github.io/sysml-web/> and take the demo's tour.
+<https://tessera-engineering.org/> and take the demo's tour.
 
 ## For people using Tessera
 
