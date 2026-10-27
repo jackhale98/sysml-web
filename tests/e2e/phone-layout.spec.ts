@@ -162,3 +162,29 @@ test('on a phone, the guided forms fit the width', async ({ page }) => {
 	await expect(page.getByRole('dialog', { name: 'Set a limit' }).getByLabel('Limit')).toBeVisible();
 	await expectFitsWidth(page, 'the limit form');
 });
+
+test('on a phone, recording a test result fits the width', async ({ page }) => {
+	await openDemo(page);
+	await page.keyboard.press('Control+k');
+	const palette = page.getByRole('dialog', { name: 'Command palette' });
+	await palette.getByRole('combobox').fill('enduranceFlightTest');
+	await palette
+		.getByRole('option')
+		.filter({ hasText: /^\s*enduranceFlightTest\b/ })
+		.first()
+		.click();
+	await nav(page, 'Details');
+	const inspector = page.getByRole('complementary', { name: 'Inspector' });
+	await inspector.getByRole('button', { name: 'Record a result' }).click();
+	const form = inspector.getByRole('form', { name: 'Record a result for enduranceFlightTest' });
+	await expect(form.getByLabel('Date')).toBeVisible();
+	await expectFitsWidth(page, 'the result form');
+	// Nothing in the form reaches past the inspector's edge either.
+	const past = await form.evaluate((f) => {
+		const edge = f.getBoundingClientRect().right;
+		return [...f.querySelectorAll('*')]
+			.filter((el) => el.getBoundingClientRect().right > edge + 1)
+			.map((el) => `${el.tagName.toLowerCase()}${el.id ? '#' + el.id : ''}`);
+	});
+	expect(past, 'form fields wider than the form').toEqual([]);
+});
