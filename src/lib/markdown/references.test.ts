@@ -29,7 +29,7 @@ async function problemsOfTour(files: ProjectFile[], tour: string): Promise<strin
 	for (const span of spans) {
 		if (EXAMPLES.has(span)) continue;
 		const { reference, candidates, byOwner } = resolveReference(span, ws);
-		const qualified = /::|\./.test(span) && /^[A-Za-z_']/.test(span) && !/[\s;{}=*~\[]/.test(span);
+		const qualified = /::|\./.test(span) && /^[A-Za-z_']/.test(span) && !/[\s;{}=*~[]/.test(span);
 		if (!reference) {
 			if (qualified && segmentsOf(span).length > 1 && !/^\d/.test(span))
 				problems.push(`\`${span}\` names nothing in the model`);
