@@ -44,9 +44,9 @@ PW_PORT=4328 npx playwright test tests/e2e/assessment-perf-ux.spec.ts --workers=
 # baseline for the checks: in a worktree at b49281c
 BENCH_LINES=50000 BENCH_RUNS=3 npx vitest run --config tests/perf/vitest.config.ts
 # self-hosting
-BASE_PATH=/tools/fairtide PUBLIC_GITHUB_CLIENT_ID= PUBLIC_GITHUB_APP_SLUG= PUBLIC_SYNC_WORKER= npm run build
-node tests/perf/assessment-static-server.mjs build /tools/fairtide 4329 --csp &
-ASSESS_DEPLOY_URL=http://localhost:4329/tools/fairtide/ PW_PORT=4328 npx playwright test tests/e2e/assessment-perf-ux-deploy.spec.ts
+BASE_PATH=/tools/tessera PUBLIC_GITHUB_CLIENT_ID= PUBLIC_GITHUB_APP_SLUG= PUBLIC_SYNC_WORKER= npm run build
+node tests/perf/assessment-static-server.mjs build /tools/tessera 4329 --csp &
+ASSESS_DEPLOY_URL=http://localhost:4329/tools/tessera/ PW_PORT=4328 npx playwright test tests/e2e/assessment-perf-ux-deploy.spec.ts
 ```
 
 ## Runs in this session
@@ -269,7 +269,7 @@ to show and the analysis half a minute; at 100k nearly a second and over a minut
 - **Next action:** bug fix (show a runaway wait's reason at once; don't animate hundreds of steps).
 
 ### Can organizations deploy Tessera locally or in controlled environments?
-- **Answer:** Yes for the app itself: it is static files. A build with `BASE_PATH=/tools/fairtide` and the sign-in variables empty, served by a 60-line static server under that path with a strict Content-Security-Policy (`default-src 'self'`, `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'`, `connect-src 'self'`, …) and every request to another host refused, opened from its landing page and from a deep link (`/tools/fairtide/p/demo`, served by the `404.html` fallback), read the demo with no problems, opened a table and Settings → About, with no refused request, no CSP violation and no console error. Without the GitHub sign-in worker, GitHub is connected with a personal access token (`docs/setup-github-sign-in.md`). Limits for a controlled environment: the GitHub API host is fixed (`src/lib/git/github.ts:28`, `https://api.github.com`), so GitHub Enterprise Server is not supported, and GitHub is the only Git host (GitLab is "planned" in Settings); the site ships no CSP of its own (`src/app.html`), so the policy above is the deployer's to set, and it needs `'unsafe-inline'` for SvelteKit's inline start script and `'wasm-unsafe-eval'` for the engine; the service worker (offline use) needs HTTPS or localhost.
+- **Answer:** Yes for the app itself: it is static files. A build with `BASE_PATH=/tools/tessera` and the sign-in variables empty, served by a 60-line static server under that path with a strict Content-Security-Policy (`default-src 'self'`, `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'`, `connect-src 'self'`, …) and every request to another host refused, opened from its landing page and from a deep link (`/tools/tessera/p/demo`, served by the `404.html` fallback), read the demo with no problems, opened a table and Settings → About, with no refused request, no CSP violation and no console error. Without the GitHub sign-in worker, GitHub is connected with a personal access token (`docs/setup-github-sign-in.md`). Limits for a controlled environment: the GitHub API host is fixed (`src/lib/git/github.ts:28`, `https://api.github.com`), so GitHub Enterprise Server is not supported, and GitHub is the only Git host (GitLab is "planned" in Settings); the site ships no CSP of its own (`src/app.html`), so the policy above is the deployer's to set, and it needs `'unsafe-inline'` for SvelteKit's inline start script and `'wasm-unsafe-eval'` for the engine; the service worker (offline use) needs HTTPS or localhost.
 - **Evidence:** `tests/e2e/assessment-perf-ux-deploy.spec.ts` with `tests/perf/assessment-static-server.mjs` (commands at the top; run here: 1 passed, "refused: none; problems: none"); `README.md` "Deploying".
 - **Limitations:** one static server and Chromium; not tried behind a real proxy or on an intranet host; Git integration in a closed network not possible (GitHub.com only).
 - **Status:** Verified (static hosting); Not claimed (GitHub Enterprise, other Git hosts)

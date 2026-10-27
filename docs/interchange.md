@@ -334,7 +334,7 @@ plainly: unreachable, or not allowing this origin.
 ### With SysON (checked live, SysON v2026.9.3, 2026-10-26)
 
 Run with `tools/interop/syson-roundtrip.sh` (SysON in Docker) and
-`node tools/interop/fairtide/run.mjs create|push|pull`:
+`node tools/interop/tessera/run.mjs create|push|pull`:
 
 | Step | Before (2026-10-23) | Now |
 | --- | --- | --- |

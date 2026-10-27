@@ -132,7 +132,7 @@ export interface NextStepsState {
 	downloaded?: boolean;
 }
 
-const key = (project: string) => `fairtide.next-steps.${project}`;
+const key = (project: string) => `tessera.next-steps.${project}`;
 
 export function readNextSteps(project: string): NextStepsState {
 	try {
@@ -156,5 +156,5 @@ export function writeNextSteps(project: string, change: Partial<NextStepsState>)
 /** Remember that a copy of the project was downloaded (ticks "Keep a copy"). */
 export function noteDownloaded(project: string): void {
 	writeNextSteps(project, { downloaded: true });
-	if (typeof window !== 'undefined') window.dispatchEvent(new Event('fairtide:next-steps'));
+	if (typeof window !== 'undefined') window.dispatchEvent(new Event('tessera:next-steps'));
 }

@@ -5,9 +5,9 @@
  * (optionally with a strict Content-Security-Policy), with every request to
  * another host refused, as behind a firewall.
  *
- *   BASE_PATH=/tools/fairtide PUBLIC_GITHUB_CLIENT_ID= PUBLIC_SYNC_WORKER= npm run build
- *   node tests/perf/assessment-static-server.mjs build /tools/fairtide 4329 --csp &
- *   ASSESS_DEPLOY_URL=http://localhost:4329/tools/fairtide/ npx playwright test assessment-perf-ux-deploy
+ *   BASE_PATH=/tools/tessera PUBLIC_GITHUB_CLIENT_ID= PUBLIC_SYNC_WORKER= npm run build
+ *   node tests/perf/assessment-static-server.mjs build /tools/tessera 4329 --csp &
+ *   ASSESS_DEPLOY_URL=http://localhost:4329/tools/tessera/ npx playwright test assessment-perf-ux-deploy
  */
 import { expect, test } from '@playwright/test';
 

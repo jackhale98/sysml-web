@@ -43,7 +43,7 @@ import visibility, alias) so a digest that captures nothing cannot pass.
 ```sh
 npx vitest run src/lib/interchange/acceptance.assessment.test.ts src/lib/exchange/syson.assessment.test.ts
 tools/interop/acceptance.sh                       # everything below, with SysON + the pilot
-node tools/interop/fairtide/run.mjs compare <model dir|elements.json[.gz]> <same>   # one comparison
+node tools/interop/tessera/run.mjs compare <model dir|elements.json[.gz]> <same>   # one comparison
 ```
 
 `tools/interop/acceptance.sh` sends the model through every route (JSON ×3 forms, `.kpar`,
@@ -280,7 +280,7 @@ the pilot.
    `MetadataBodyUsage = 'ref'? (':>>' | 'redefines')? OwnedRedefinition …`). Tessera's
    own JSON round trip is symmetric, so nothing shows inside Tessera, but a tool reading
    Tessera's JSON gets metadata whose attribute is unset plus a stray feature. Repro:
-   `node tools/interop/fairtide/run.mjs export src/lib/interchange/fixtures/acceptance
+   `node tools/interop/tessera/run.mjs export src/lib/interchange/fixtures/acceptance
    out.json` → find `"declaredName": "level"` under a `MetadataUsage`: its
    `ownedRelationship` holds only a `FeatureValue`. Not fixed here (not a minimal app
    change; belongs in the toolkit, or a post-processing step in `exportModel` that turns
@@ -311,7 +311,7 @@ the pilot.
 - `src/lib/interchange/acceptance.assessment.test.ts`: the acceptance test, SysON compatibility, malformed JSON, export completeness.
 - `src/lib/interchange/fixtures/syson/`: SysON v2026.9.3's element JSON (gzipped) and text export of the acceptance model; its element JSON of `EngineeringBasics`.
 - `src/lib/exchange/syson.assessment.test.ts`: the API client against SysON's observed behaviour.
-- `tools/interop/acceptance.sh`, `tools/interop/pilot/PilotExport.java`; `tools/interop/fairtide/exchange.ts` gains `kpar`, `unkpar`, `semantics`, `compare`.
+- `tools/interop/acceptance.sh`, `tools/interop/pilot/PilotExport.java`; `tools/interop/tessera/exchange.ts` gains `kpar`, `unkpar`, `semantics`, `compare`.
 
 ## Overlap with other sections
 

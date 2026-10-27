@@ -177,7 +177,7 @@ for (const [how, trigger] of [
 
 // eslint-disable-next-line no-empty-pattern -- only the project settings are needed
 test('an edit shown as saved survives the browser being killed', async ({}, testInfo) => {
-	const dir = mkdtempSync(join(tmpdir(), 'fairtide-crash-'));
+	const dir = mkdtempSync(join(tmpdir(), 'tessera-crash-'));
 	const use = testInfo.project.use;
 	const launch = () =>
 		chromium.launchPersistentContext(dir, {

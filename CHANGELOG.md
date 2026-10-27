@@ -10,7 +10,6 @@ copy you are running.
 ## Unreleased
 
 - Fairtide is now **Tessera**: a new name, logo, loader and app icons.
-  Projects, settings and accounts saved under the old name open as before.
 
 ## 0.1.0
 

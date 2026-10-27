@@ -180,7 +180,7 @@ interface TesseraResult {
 }
 
 /** What Tessera makes of a project: diagnostics, the adapter's model, diagrams. */
-function fairtide(host: ToolkitHost, files: SourceFile[], engineRun: EngineResult): TesseraResult {
+function tessera(host: ToolkitHost, files: SourceFile[], engineRun: EngineResult): TesseraResult {
 	const started = performance.now();
 	const analyses = host.analyzeProject(files);
 	const out: TesseraResult = {
@@ -520,7 +520,7 @@ it('measures the toolkit and Tessera over the conformance corpora', async () => 
 			});
 		}
 		const r = engine(host, project.files);
-		const f = fairtide(host, project.files, r);
+		const f = tessera(host, project.files, r);
 		perProject.push({
 			project: project.name,
 			suite: project.suite,
@@ -535,7 +535,7 @@ it('measures the toolkit and Tessera over the conformance corpora', async () => 
 			references: r.references,
 			unresolvedCount: r.unresolvedCount,
 			engineMs: r.ms,
-			fairtide: f
+			tessera: f
 		});
 	}
 
@@ -704,7 +704,7 @@ function summarize(
 		);
 	}
 	lines.push('', '## Release corpus, Tessera layer', '');
-	const ft = perProject.map((p) => p.fairtide);
+	const ft = perProject.map((p) => p.tessera);
 	const engineFindings = sum(ft.map((f) => f.diagnostics.matched + f.diagnostics.missing.length));
 	lines.push(
 		`- Diagnostics: ${sum(ft.map((f) => f.diagnostics.matched))} of ${engineFindings} engine findings shown on their line ` +

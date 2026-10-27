@@ -39,8 +39,8 @@
 		remembered = readNextSteps(id);
 		// A copy downloaded from the project menu ticks "Keep a copy".
 		const reread = () => (remembered = readNextSteps(id));
-		window.addEventListener('fairtide:next-steps', reread);
-		return () => window.removeEventListener('fairtide:next-steps', reread);
+		window.addEventListener('tessera:next-steps', reread);
+		return () => window.removeEventListener('tessera:next-steps', reread);
 	});
 
 	/** What the model has now, once it is read and checked. */

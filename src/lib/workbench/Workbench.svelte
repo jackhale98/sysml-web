@@ -186,7 +186,7 @@
 	const showDiagram = $derived(layout !== 'text' && !!filePackage);
 
 	// ── The text and diagram side by side: a divider sets how much each gets ──
-	const SPLIT_KEY = 'fairtide:split';
+	const SPLIT_KEY = 'tessera:split';
 	/** The text's share of the split, in percent (the diagram has the rest). */
 	let splitShare = $state(readSplit());
 	/** Side by side on wide screens; text above the diagram below 1100 px. */

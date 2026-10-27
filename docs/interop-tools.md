@@ -8,7 +8,7 @@ goes to `.cache/interop/` (gitignored). Results below are from 2026-10-23.
 | --- | --- | --- |
 | OMG SysML v2 pilot implementation (reference implementation, Xtext) | yes, plain Java 21 | `tools/interop/pilot-check.sh` |
 | Eclipse SysON (Spring Boot + PostgreSQL) | yes, with Docker | `tools/interop/syson-roundtrip.sh` |
-| Tessera's own exchange code, headless | yes, Node 22 + the app's `node_modules` | `node tools/interop/fairtide/run.mjs` |
+| Tessera's own exchange code, headless | yes, Node 22 + the app's `node_modules` | `node tools/interop/tessera/run.mjs` |
 
 ## OMG pilot implementation: `pilot-check.sh`
 
@@ -76,11 +76,11 @@ docker compose -f tools/interop/syson/docker-compose.yml down -v   # stop SysON 
 
 ```sh
 tools/interop/pilot-check.sh --quiet <out>/text
-node tools/interop/fairtide/run.mjs check <out>/text
-node tools/interop/fairtide/run.mjs import <out>/api-elements.json <out>/fairtide-import
+node tools/interop/tessera/run.mjs check <out>/text
+node tools/interop/tessera/run.mjs import <out>/api-elements.json <out>/tessera-import
 ```
 
-## Tessera headless: `fairtide/run.mjs`
+## Tessera headless: `tessera/run.mjs`
 
 Calls the app's own code (the engine host the unit tests use, `src/lib/exchange/`)
 through Vite's SSR loader, so the result is what the app does minus its
@@ -89,17 +89,17 @@ dialogs. Needs the app's `node_modules` and `static/toolkit/`
 (a few seconds).
 
 ```sh
-node tools/interop/fairtide/run.mjs check  <model dir> [--json out.json]   # Tessera's diagnostics, with syntax errors
-node tools/interop/fairtide/run.mjs export <model dir> <out.json> [--library] [--derived]
-node tools/interop/fairtide/run.mjs import <in.json> <out dir>
-node tools/interop/fairtide/run.mjs projects <server>                      # connectTo, as "Open from server"
-node tools/interop/fairtide/run.mjs create <api base> <name>               # SysmlApi.createProject
-node tools/interop/fairtide/run.mjs push <api base> <project id> <model dir>   # "Save to server"
-node tools/interop/fairtide/run.mjs pull <api base> <project id> <out dir>     # "Open from server"
-node tools/interop/fairtide/run.mjs kpar <model dir> <out.kpar> [name]          # "Download as .kpar"
-node tools/interop/fairtide/run.mjs unkpar <in.kpar> <out dir>                  # "Import" of an archive
-node tools/interop/fairtide/run.mjs semantics <model dir | elements.json[.gz]> [out.txt]
-node tools/interop/fairtide/run.mjs compare <a> <b> [--json out.json]           # normalized semantics
+node tools/interop/tessera/run.mjs check  <model dir> [--json out.json]   # Tessera's diagnostics, with syntax errors
+node tools/interop/tessera/run.mjs export <model dir> <out.json> [--library] [--derived]
+node tools/interop/tessera/run.mjs import <in.json> <out dir>
+node tools/interop/tessera/run.mjs projects <server>                      # connectTo, as "Open from server"
+node tools/interop/tessera/run.mjs create <api base> <name>               # SysmlApi.createProject
+node tools/interop/tessera/run.mjs push <api base> <project id> <model dir>   # "Save to server"
+node tools/interop/tessera/run.mjs pull <api base> <project id> <out dir>     # "Open from server"
+node tools/interop/tessera/run.mjs kpar <model dir> <out.kpar> [name]          # "Download as .kpar"
+node tools/interop/tessera/run.mjs unkpar <in.kpar> <out dir>                  # "Import" of an archive
+node tools/interop/tessera/run.mjs semantics <model dir | elements.json[.gz]> [out.txt]
+node tools/interop/tessera/run.mjs compare <a> <b> [--json out.json]           # normalized semantics
 ```
 
 `semantics`/`compare` use `src/lib/interchange/semantics-testing.ts`: a model's meaning as
