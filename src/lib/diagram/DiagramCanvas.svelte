@@ -503,12 +503,20 @@
 		return { x, y, width: Math.max(...xs) - x, height: Math.max(...ys) - y };
 	}
 
+	/**
+	 * Whether the drawing has been placed once. Until then it is hidden: the
+	 * first place is set at once, rather than sliding there from where Svelte
+	 * Flow's own fit put it.
+	 */
+	let placed = $state(false);
+
 	function fit(focus?: Focus) {
 		requestAnimationFrame(() =>
 			requestAnimationFrame(() => {
 				const bounds = drawingBounds();
 				const changed = focus && drawingBounds(focus);
-				const duration = reducedMotion ? 0 : 280;
+				const duration = reducedMotion || !placed ? 0 : 280;
+				placed = true;
 				if (!flow || !bounds || !host) return void flow?.fitView({ ...FIT, duration });
 				const { clientWidth: width, clientHeight: height } = host;
 				// On a narrow screen the toolbar (and the frame's title below it) cover the
@@ -2017,6 +2025,7 @@
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div
 	class="canvas"
+	class:unplaced={!placed}
 	aria-label={label}
 	role="region"
 	tabindex="-1"
@@ -2762,6 +2771,9 @@
 		--xy-controls-button-color: var(--text-2);
 		--xy-controls-button-border-color: var(--border);
 		--xy-node-border-radius: 0;
+	}
+	.unplaced :global(.svelte-flow__viewport) {
+		visibility: hidden;
 	}
 	.canvas :global(.svelte-flow__attribution) {
 		background: transparent;
