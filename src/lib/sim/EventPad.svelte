@@ -37,6 +37,8 @@
 		onauto: () => void;
 		onspeed: () => void;
 		onvariable: (name: string) => void;
+		/** On a phone: events in one row that scrolls sideways, without key hints, to leave the machine room. */
+		compact?: boolean;
 	}
 
 	let {
@@ -58,7 +60,8 @@
 		onrestart,
 		onauto,
 		onspeed,
-		onvariable
+		onvariable,
+		compact = false
 	}: Props = $props();
 
 	const uid = $props.id();
@@ -99,15 +102,15 @@
 	}
 </script>
 
-<section class="pad" aria-labelledby="{uid}-title">
-	<div class="pad-head">
+<section class="pad" class:compact aria-labelledby="{uid}-title">
+	<div class="pad-head" class:visually-hidden={compact && !pendingCount}>
 		<h3 id="{uid}-title"><Zap size={14} aria-hidden="true" /> Events</h3>
 		{#if pendingCount}
 			<span class="pending"
 				>{pendingCount} variable{pendingCount > 1 ? 's' : ''} change{pendingCount > 1 ? '' : 's'} on the
 				next step</span
 			>
-		{:else if events.length}
+		{:else if events.length && !compact}
 			<span class="hint"
 				>Press <kbd>1</kbd>{events.length > 1 ? '–' : ''}{#if events.length > 1}<kbd
 						>{Math.min(9, events.length)}</kbd
@@ -117,7 +120,7 @@
 	</div>
 
 	{#if events.length}
-		<ul class="events">
+		<ul class="events" class:strip={compact} data-scroll-x={compact ? '' : undefined}>
 			{#each events as o, i (o.trigger)}
 				<li>
 					<button
@@ -130,7 +133,7 @@
 						aria-keyshortcuts={i < 9 ? String(i + 1) : undefined}
 						onclick={() => press(o)}
 					>
-						{#if i < 9}<kbd aria-hidden="true">{i + 1}</kbd>{/if}
+						{#if i < 9 && !compact}<kbd aria-hidden="true">{i + 1}</kbd>{/if}
 						<span class="trigger">{o.trigger}</span>
 						<span class="target">
 							<ArrowRight size={13} aria-hidden="true" />
@@ -601,6 +604,40 @@
 		font-size: var(--text-xs);
 		font-variant-numeric: tabular-nums;
 		font-weight: 650;
+	}
+
+	.pad.compact {
+		gap: var(--space-2);
+		padding: var(--space-3) var(--space-4);
+	}
+	.events.strip {
+		display: flex;
+		margin: 0 calc(-1 * var(--space-4));
+		padding: 2px var(--space-4) 4px;
+		overflow-x: auto;
+		overscroll-behavior-x: contain;
+		scroll-snap-type: x mandatory;
+		scroll-padding-inline: var(--space-4);
+		scrollbar-width: none;
+	}
+	.events.strip::-webkit-scrollbar {
+		display: none;
+	}
+	.strip li {
+		flex: 0 0 auto;
+		width: max-content;
+		max-width: 82%;
+		scroll-snap-align: start;
+	}
+	.strip li:only-child {
+		flex: 1;
+		max-width: none;
+	}
+	.strip .target {
+		max-width: none;
+	}
+	.strip .event {
+		min-height: 44px;
 	}
 
 	@container emulator (max-width: 430px) {

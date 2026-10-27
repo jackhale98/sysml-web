@@ -594,7 +594,7 @@
 	const stageHeight = $derived(
 		wide || !rootHeight
 			? undefined
-			: `${Math.max(260, rootHeight - headerHeight - (hasNotices ? noticesHeight : 0) - dockHeight)}px`
+			: `${Math.max(180, rootHeight - headerHeight - (hasNotices ? noticesHeight : 0) - dockHeight)}px`
 	);
 </script>
 
@@ -646,7 +646,8 @@
 		</div>
 	{:else}
 		<header class="header" bind:clientHeight={headerHeight}>
-			<div class="ident">
+			<!-- On a phone the view switcher above already names the machine. -->
+			<div class="ident" class:visually-hidden={!wide}>
 				<span class="glyph" aria-hidden="true"><Activity size={18} /></span>
 				<div class="titles">
 					<h2>{def.name}</h2>
@@ -819,6 +820,7 @@
 		<div class="dock" bind:clientHeight={dockHeight}>
 			<EventPad
 				bind:this={pad}
+				compact={!wide}
 				{events}
 				{step}
 				{labelOf}
@@ -922,6 +924,15 @@
 		display: flex;
 		align-items: center;
 		gap: var(--space-3);
+	}
+	.emulator:not(.wide) .header {
+		padding: var(--space-2) var(--space-4);
+	}
+	.emulator:not(.wide) .meta {
+		flex: 1;
+	}
+	.emulator:not(.wide) .meta .ghost {
+		margin-left: auto;
 	}
 	.count {
 		color: var(--text-2);

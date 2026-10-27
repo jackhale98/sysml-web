@@ -137,3 +137,47 @@ test.describe('on a phone', () => {
 		await expectAccessible(page);
 	});
 });
+
+test.describe('on a short phone', () => {
+	// An iPhone 13 in Safari, between its address bar and toolbar.
+	test.use({ viewport: { width: 390, height: 664 }, isMobile: true, hasTouch: true });
+
+	test('the machine keeps most of the screen while it runs, the current state in sight', async ({
+		page
+	}) => {
+		await openFlightModes(page);
+		const emulator = page.locator('section.emulator');
+		await emulator.getByRole('button', { name: 'preflightChecksPassed', exact: true }).click();
+		await emulator.getByRole('switch', { name: /preflightChecksPassed/ }).click();
+		await emulator.getByRole('button', { name: 'ArmCommand to armed' }).click();
+		await emulator.getByRole('button', { name: 'TakeOffCommand to flying' }).click();
+		await expect(emulator.getByText(/Now in flying/)).toBeVisible();
+		await emulator.evaluate((el) => el.scrollTo({ top: 0 }));
+
+		const box = async (selector: string) => (await emulator.locator(selector).boundingBox())!;
+		await expect
+			.poll(async () => {
+				const [area, stage, dock] = [
+					await emulator.boundingBox(),
+					await box('.stage'),
+					await box('.dock')
+				];
+				const seen = Math.min(stage.y + stage.height, dock.y) - Math.max(stage.y, area!.y);
+				return seen / area!.height;
+			})
+			.toBeGreaterThanOrEqual(0.45);
+		// The diagram follows the run: the state it is in is drawn above the events.
+		await expect
+			.poll(async () => {
+				const now = await box('.state.active.leaf');
+				const [stage, dock] = [await box('.stage'), await box('.dock')];
+				return now.y >= stage.y && now.y + now.height <= dock.y;
+			})
+			.toBe(true);
+		// The variables (opened by the link to preflightChecksPassed) are in reach, above the events.
+		const card = emulator.getByRole('switch', { name: /preflightChecksPassed/ });
+		await card.scrollIntoViewIfNeeded();
+		const [onBox, dock] = [(await card.boundingBox())!, await box('.dock')];
+		expect(onBox.y + onBox.height).toBeLessThanOrEqual(dock.y);
+	});
+});
