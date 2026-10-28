@@ -74,6 +74,30 @@
 		if (!route) return null;
 		if (!data?.sourcePort && !data?.targetPort) return route.points;
 		let p = route.points.map((q) => ({ ...q }));
+		// A straight line to a port square keeps straight when its other end, a box
+		// without a port there, still meets that box at the new height (or width).
+		if (p.length === 2 && data.sourcePort !== data.targetPort) {
+			const [a, b] = p as [XY, XY];
+			const flat = Math.abs(a.y - b.y) < 0.5;
+			const [at, other] = data.sourcePort
+				? [{ x: sourceX, y: sourceY }, to.current]
+				: [{ x: targetX, y: targetY }, from.current];
+			const box = other && {
+				...other.internals.positionAbsolute,
+				width: other.measured.width ?? 0,
+				height: other.measured.height ?? 0
+			};
+			const meets =
+				box &&
+				(flat
+					? at.y > box.y + 2 && at.y < box.y + box.height - 2
+					: at.x > box.x + 2 && at.x < box.x + box.width - 2);
+			if (meets) {
+				const line = p.map((q) => (flat ? { x: q.x, y: at.y } : { x: at.x, y: q.y }));
+				line[data.sourcePort ? 0 : 1] = at;
+				return line;
+			}
+		}
 		// A straight line gets a jog in its middle, so each end can move on its own.
 		if (p.length === 2) {
 			const [a, b] = p as [XY, XY];
