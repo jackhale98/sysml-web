@@ -104,3 +104,36 @@ test('Show SysML opens a table or report at its own view, not the top of the fil
 		});
 	}
 });
+
+test('a report shows where its chapters come from: the view def and each chapter view', async ({
+	page
+}) => {
+	await page.setViewportSize({ width: 1440, height: 900 });
+	await openDemo(page);
+	await views(page)
+		.getByRole('button', { name: /drone specification/i })
+		.first()
+		.click();
+	const report = page.getByRole('article', { name: 'Delivery drone requirements specification' });
+	// Each chapter names the view it is drawn from, and opens it.
+	const source = report.getByRole('button', { name: 'view traceabilityChapter : TraceMatrix' });
+	await expect(source).toBeVisible({ timeout: 15_000 });
+	await expect(
+		report.getByRole('button', { name: 'view requirementsChapter : RequirementsTable' })
+	).toBeVisible();
+	await source.click();
+	await expect(page.locator('.cm-activeLine').first()).toContainText(
+		'view traceabilityChapter : TraceMatrix',
+		{ timeout: 10_000 }
+	);
+	// The definition in the header opens the view def that lists the chapters.
+	await views(page)
+		.getByRole('button', { name: /drone specification/i })
+		.first()
+		.click();
+	await page.getByRole('button', { name: 'SpecificationDocument', exact: true }).click();
+	await expect(page.locator('.cm-activeLine').first()).toContainText(
+		'view def SpecificationDocument',
+		{ timeout: 10_000 }
+	);
+});

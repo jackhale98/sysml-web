@@ -289,7 +289,13 @@ function introduction(ctx: ReportContext): Section {
 const lowerFirst = (text: string) => text.charAt(0).toLowerCase() + text.slice(1);
 
 export function buildReport(ctx: ReportContext): ReportDocument {
-	const sections = [introduction(ctx), ...ctx.chapters.map((c) => chapterSection(ctx, c))];
+	const sections = [
+		introduction(ctx),
+		...ctx.chapters.map((c) => ({
+			...chapterSection(ctx, c),
+			source: { name: c.name, definition: c.definition, ...(c.file ? { file: c.file } : {}) }
+		}))
+	];
 	const summary =
 		ctx.kind === 'specification'
 			? specificationSummary(ctx)

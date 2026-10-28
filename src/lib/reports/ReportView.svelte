@@ -123,6 +123,7 @@
 		if (!article) return '';
 		const clone = article.cloneNode(true) as HTMLElement;
 		clone.classList.remove('rd-printable');
+		for (const source of clone.querySelectorAll('.rd-source')) source.remove();
 		for (const button of clone.querySelectorAll('button.rd-ref')) {
 			const span = document.createElement('span');
 			span.className = 'rd-ref';
@@ -162,10 +163,22 @@
 
 	function showSource() {
 		if (!info || info.builtin) return;
-		const element = viewElementOf(workspace.elements, info);
-		if (element) ui.showInText(element, 'table');
-		else ui.open({ kind: 'file', path: info.file });
+		showView(info);
 	}
+
+	/** A view or view def of the report in its SysML file, at its declaration. */
+	function showView(view: { file: string; name: string }) {
+		const element = viewElementOf(workspace.elements, view);
+		if (element) ui.showInText(element, 'table');
+		else ui.open({ kind: 'file', path: view.file });
+	}
+
+	/** The view def the report is typed by, where the project declares it (its chapters are its views). */
+	const definitionInfo = $derived(
+		info?.isUsage
+			? workspace.views.find((v) => !v.isUsage && !v.builtin && v.name === info.definition)
+			: undefined
+	);
 
 	let saving = $state(false);
 	async function save() {
@@ -330,6 +343,24 @@
 					>{s.badge.text}</span
 				>{/if}
 		</svelte:element>
+		{#if depth === 1 && s.source}
+			{@const src = s.source}
+			<!-- Where the chapter comes from in the model: on screen only. -->
+			<p class="rd-source">
+				<span>From</span>
+				{#if src.file}
+					<button
+						type="button"
+						onclick={() => showView({ file: src.file!, name: src.name })}
+						title="Show this chapter's view in its SysML file"
+						><Code size={13} aria-hidden="true" /><code>view {src.name} : {src.definition}</code
+						></button
+					>
+				{:else}
+					<code>view {src.name} : {src.definition}</code>
+				{/if}
+			</p>
+		{/if}
 		{#each s.blocks as b, i (i)}{@render block(b)}{/each}
 		{#each s.sections as child (child.id)}{@render section(child, depth + 1)}{/each}
 	</section>
@@ -340,9 +371,15 @@
 		<div class="what">
 			<span class="eyebrow">{doc?.kindLabel ?? standard?.title ?? 'Report'}</span>
 			<code class="keyword"
-				>{info?.isUsage
-					? `view ${info.name} : ${info.definition ?? ''}`
-					: `view def ${standard?.definition ?? name}`}</code
+				>{#if info?.isUsage}view {info.name} :
+					{#if definitionInfo}<button
+							type="button"
+							class="definition"
+							onclick={() => showView(definitionInfo)}
+							title="Show {info.definition}, which gives the report its chapters, in its SysML file"
+							>{info.definition}</button
+						>{:else}{info.definition ?? ''}{/if}{:else}view def {standard?.definition ??
+						name}{/if}</code
 			>
 		</div>
 		<div class="actions">
@@ -522,6 +559,46 @@
 		font-size: var(--text-xs);
 		white-space: nowrap;
 		text-overflow: ellipsis;
+	}
+	.keyword .definition {
+		padding: 0;
+		color: var(--accent);
+		background: none;
+		border: 0;
+		font: inherit;
+		text-decoration: underline dotted;
+		text-underline-offset: 2px;
+		cursor: pointer;
+	}
+	.rd :global(.rd-source) {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		margin: -4px 0 12px;
+		color: var(--text-3);
+		font-size: var(--text-xs);
+	}
+	.rd :global(.rd-source button) {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		padding: 2px 6px;
+		color: var(--accent);
+		background: none;
+		border: 1px solid var(--border);
+		border-radius: var(--radius-sm);
+		cursor: pointer;
+	}
+	.rd :global(.rd-source button:hover) {
+		background: var(--surface-hover);
+	}
+	.rd :global(.rd-source code) {
+		font-size: 11.5px;
+	}
+	@media print {
+		.rd :global(.rd-source) {
+			display: none;
+		}
 	}
 	.actions {
 		display: flex;

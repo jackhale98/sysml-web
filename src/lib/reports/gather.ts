@@ -68,7 +68,8 @@ function toChapter(analyses: Analysis[], view: ViewInfo): Chapter {
 		definition: view.definition ?? '',
 		doc: view.doc,
 		filters: filtersOf(analyses, view),
-		hasTable: view.hasTable
+		hasTable: view.hasTable,
+		file: view.file
 	};
 }
 

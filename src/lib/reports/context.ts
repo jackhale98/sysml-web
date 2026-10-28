@@ -19,6 +19,8 @@ export interface Chapter {
 	/** `filter` conditions as written, e.g. `@SysML::PortDefinition`. */
 	filters: string[];
 	hasTable: boolean;
+	/** The file the chapter's view is declared in (absent for a built-in report's chapters). */
+	file?: string;
 }
 
 export interface DocumentMeta {

@@ -52,6 +52,8 @@ export interface Section {
 	ref?: string;
 	/** A word shown with the title, e.g. a requirement's status. */
 	badge?: { text: string; tone: Tone };
+	/** A chapter: the view in the model it is drawn from (on screen only, not in exports). */
+	source?: { name: string; definition: string; file?: string };
 	blocks: Block[];
 	sections: Section[];
 }
