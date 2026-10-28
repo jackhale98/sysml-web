@@ -131,7 +131,7 @@ test('a report shows where its chapters come from: the view def and each chapter
 		.getByRole('button', { name: /drone specification/i })
 		.first()
 		.click();
-	await page.getByRole('button', { name: 'SpecificationDocument', exact: true }).click();
+	await report.getByRole('button', { name: 'view def SpecificationDocument' }).click();
 	await expect(page.locator('.cm-activeLine').first()).toContainText(
 		'view def SpecificationDocument',
 		{ timeout: 10_000 }

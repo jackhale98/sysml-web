@@ -429,6 +429,19 @@
 					<h2 class="rd-title">{doc.title}</h2>
 					<p class="rd-project">{doc.project}</p>
 					{#if doc.description}<p class="rd-description">{doc.description}</p>{/if}
+					{#if info?.isUsage && definitionInfo}
+						{@const def = definitionInfo}
+						<!-- Where the chapters are defined: on screen only. -->
+						<p class="rd-source">
+							<span>Chapters from</span>
+							<button
+								type="button"
+								onclick={() => showView(def)}
+								title="Show the view def that lists this report's chapters, in its SysML file"
+								><Code size={13} aria-hidden="true" /><code>view def {def.name}</code></button
+							>
+						</p>
+					{/if}
 					<dl class="rd-meta">
 						{#each metaRows as [label, value] (label)}
 							<div>
