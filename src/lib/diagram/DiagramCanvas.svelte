@@ -65,6 +65,7 @@
 		layout,
 		MAX_NODES,
 		nodeSize,
+		portAnchors,
 		UPWARD,
 		type Direction,
 		type Layout
@@ -707,6 +708,10 @@
 			});
 			const ids = new Set(graph.nodes.map((n) => n.id));
 			const labelOf = (id: string) => graph.nodes.find((n) => n.id === id)?.label ?? id;
+			// Border ports a line can end on (interconnection views), by node.
+			const portsOf = new Map(graph.nodes.map((n) => [n.id, portAnchors(n, view)]));
+			const handleOf = (node: string, key: string | undefined) =>
+				key && portsOf.get(node)?.has(key) ? `port:${key}` : undefined;
 			edges = graph.edges
 				.map((e, index) => ({ e, index }))
 				.filter(({ e }) => ids.has(e.source) && ids.has(e.target))
@@ -716,10 +721,14 @@
 					const route = auto.routes.get(index);
 					const from = autoAt.get(reversed ? e.target : e.source);
 					const to = autoAt.get(reversed ? e.source : e.target);
+					const ends = [handleOf(e.source, e.source_port), handleOf(e.target, e.target_port)];
+					const [sourceHandle, targetHandle] = reversed ? ends.reverse() : ends;
 					return {
 						id: `${e.kind}:${e.source}:${e.target}:${i}`,
 						source: reversed ? e.target : e.source,
 						target: reversed ? e.source : e.target,
+						...(sourceHandle ? { sourceHandle } : {}),
+						...(targetHandle ? { targetHandle } : {}),
 						type: 'sysml',
 						ariaLabel: `${e.kind.replace(/_/g, ' ')} from ${labelOf(e.source)} to ${labelOf(e.target)}`,
 						data: {
@@ -728,6 +737,8 @@
 							reversed,
 							...(e.element ? { element: e.element } : {}),
 							editable: canEditEdge(e, graph),
+							sourcePort: !!sourceHandle,
+							targetPort: !!targetHandle,
 							route: route && from && to ? { ...route, from, to } : undefined
 						}
 					};

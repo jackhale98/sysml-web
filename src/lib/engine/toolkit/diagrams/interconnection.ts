@@ -35,6 +35,11 @@ export function interconnectionView(ctx: DiagramContext, scope: string): Diagram
 
 	// Toolkit node id → where it lands.
 	const ends = new Map<string, End>();
+	// A border port's row text, by node and port path: what an edge's end attaches to.
+	const portRows = new Map<string, string>();
+	const rowOf = (end: End) =>
+		end.port ? (portRows.get(`${end.node}\u0000${end.port}`) ?? null) : null;
+	const portsOf = (a: End, b: End) => ({ source: rowOf(a), target: rowOf(b) });
 	// Per node: its undirected ports' rows by port path, and how often each starts or ends a connection.
 	const undirected = new Map<string, Map<string, string>>();
 	const uses = new Map<string, { from: number; to: number }>();
@@ -84,6 +89,7 @@ export function interconnectionView(ctx: DiagramContext, scope: string): Diagram
 				const text = [...path, labelOf(c)].join('.');
 				rows.push([`${c.direction ? `${c.direction} ` : ''}port`, text]);
 				ends.set(c.id, { node: id, port: portPath });
+				portRows.set(`${id}\u0000${portPath}`, text);
 				if (!c.direction) {
 					const rowsByPort = undirected.get(id) ?? new Map<string, string>();
 					rowsByPort.set(portPath, text);
@@ -109,7 +115,14 @@ export function interconnectionView(ctx: DiagramContext, scope: string): Diagram
 		const source = ends.get(e.source);
 		const target = ends.get(e.target);
 		if (!source || !target || source.node === target.node) continue;
-		g.edge(source.node, target.node, kind, edgeLabel(e.kind, e.label, source, target));
+		g.edge(
+			source.node,
+			target.node,
+			kind,
+			edgeLabel(e.kind, e.label, source, target),
+			undefined,
+			portsOf(source, target)
+		);
 		if (kind === 'binding') continue;
 		for (const [end, key] of [
 			[source, 'from'],
@@ -152,7 +165,7 @@ export function interconnectionView(ctx: DiagramContext, scope: string): Diagram
 		if (!kind || !written) continue;
 		const [a, b] = written.map((path) => endByPath(g, path));
 		if (!a || !b || a.node === b.node) continue;
-		g.edge(a.node, b.node, kind, edgeLabel(kind, c.written, a, b));
+		g.edge(a.node, b.node, kind, edgeLabel(kind, c.written, a, b), undefined, portsOf(a, b));
 	}
 	return g.graph();
 }

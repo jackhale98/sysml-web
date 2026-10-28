@@ -162,10 +162,13 @@ export class GraphBuilder {
 		target: string,
 		kind: EdgeKind,
 		label: string | null = null,
-		record?: ElementRecord
+		record?: ElementRecord,
+		ports: { source?: string | null; target?: string | null } = {}
 	): void {
 		if (!this.taken.has(source) || !this.taken.has(target)) return;
-		const key = `${kind}\u0000${source}\u0000${target}\u0000${label ?? ''}`;
+		const key = [kind, source, target, label ?? '', ports.source ?? '', ports.target ?? ''].join(
+			'\u0000'
+		);
 		if (this.edgeKeys.has(key)) return;
 		this.edgeKeys.add(key);
 		this.edges.push({
@@ -173,6 +176,8 @@ export class GraphBuilder {
 			target,
 			label,
 			kind,
+			...(ports.source ? { source_port: ports.source } : {}),
+			...(ports.target ? { target_port: ports.target } : {}),
 			...(record
 				? {
 						element: {

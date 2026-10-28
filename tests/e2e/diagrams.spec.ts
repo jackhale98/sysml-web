@@ -40,6 +40,84 @@ test('an interconnection view shows inherited ports, flows and bindings', async 
 	await expectAccessible(page);
 });
 
+test('on an interconnection view, each line runs to the ports it connects', async ({ page }) => {
+	await openDemo(page);
+	const diagram = await openView(page, 'Drone interconnection');
+	/** Where a line ends on screen, and where the port squares at its ends are. */
+	const check = async (label: string, from: [string, string], to: [string, string]) => {
+		const line = diagram.getByRole('group', { name: label });
+		const ends = await line
+			.locator('path.svelte-flow__edge-path')
+			.evaluate((path: SVGPathElement) => {
+				const m = path.getScreenCTM()!;
+				const at = (l: number) => {
+					const p = path.getPointAtLength(l).matrixTransform(m);
+					return { x: p.x, y: p.y };
+				};
+				return [at(0), at(path.getTotalLength())];
+			});
+		const zoom = await diagram
+			.locator('.svelte-flow__viewport')
+			.evaluate((el) => new DOMMatrix(getComputedStyle(el).transform).a);
+		for (const [[name, port], end] of [
+			[from, ends[0]!],
+			[to, ends[1]!]
+		] as const) {
+			const node = diagram.locator(`.svelte-flow__node[data-id="${name}"]`);
+			const row = (await node.locator('.side li').filter({ hasText: port }).boundingBox())!;
+			const box = (await node.boundingBox())!;
+			// The port's square sits on the border, 9 px below the top of its row.
+			expect(Math.abs(end.y - (row.y + 9 * zoom)), `${label}: ${name}.${port} (y)`).toBeLessThan(
+				2 * zoom + 1
+			);
+			const border = Math.min(Math.abs(end.x - box.x), Math.abs(end.x - (box.x + box.width)));
+			expect(border, `${label}: ${name}.${port} (x)`).toBeLessThan(9 * zoom);
+		}
+	};
+	await check(
+		'connection from battery : Battery to powerDistribution : PowerDistributionBoard',
+		['battery', 'powerOut'],
+		['powerDistribution', 'powerIn']
+	);
+	await check(
+		'flow from gnss : GnssReceiver to flightController : FlightController',
+		['gnss', 'navigation'],
+		['flightController', 'navigation']
+	);
+	await check(
+		'connection from radio : TelemetryRadio to flightController : FlightController',
+		['radio', 'controllerLink'],
+		['flightController', 'commandLink']
+	);
+	await check(
+		'flow from camera : Camera to flightController : FlightController',
+		['camera', 'imageOut'],
+		['flightController', 'imageIn']
+	);
+	await check(
+		'connection from powerDistribution : PowerDistributionBoard to frontLeft : Rotor',
+		['powerDistribution', 'rotorPower'],
+		['frontLeft', 'powerIn']
+	);
+	// A box moved by hand keeps its lines on its ports.
+	const battery = (await diagram
+		.locator('.svelte-flow__node[data-id="battery"] .head')
+		.boundingBox())!;
+	await page.mouse.move(battery.x + battery.width / 2, battery.y + battery.height / 2);
+	await page.mouse.down();
+	await page.mouse.move(battery.x + battery.width / 2, battery.y + 90, { steps: 8 });
+	await page.mouse.up();
+	const moved = (await diagram
+		.locator('.svelte-flow__node[data-id="battery"] .head')
+		.boundingBox())!;
+	expect(moved.y - battery.y).toBeGreaterThan(30);
+	await check(
+		'connection from battery : Battery to powerDistribution : PowerDistributionBoard',
+		['battery', 'powerOut'],
+		['powerDistribution', 'powerIn']
+	);
+});
+
 test('selecting a node highlights its connections and what they reach', async ({ page }) => {
 	await openDemo(page);
 	const diagram = await openView(page, 'Drone interconnection');

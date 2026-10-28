@@ -27,6 +27,9 @@ export interface SysmlEdgeData extends Record<string, unknown> {
 	element?: { file: string; start_byte: number; end_byte?: number };
 	/** Its label opens a form to change it (a transition, a decision branch). */
 	editable?: boolean;
+	/** The line runs from a port's square, or to one (interconnection views): its ends sit on the squares. */
+	sourcePort?: boolean;
+	targetPort?: boolean;
 	/** ELK's route, valid while the two nodes stay at `from` and `to` (their positions when it was made). */
 	route?: Route & { from: XY; to: XY };
 }

@@ -1079,6 +1079,12 @@ export interface DiagramEdge {
 	element?: { file: string; start_byte: number; end_byte?: number };
 	/** Sequence views: the message an edge draws (edges come in time order). */
 	message?: SequenceMessage;
+	/**
+	 * Interconnection views: the port the edge leaves from and the one it
+	 * reaches, by the port's row text on its node (`powerOut : PowerPort`).
+	 */
+	source_port?: string;
+	target_port?: string;
 }
 
 /** A message of a sequence view: `message name of Payload from a.sent to b.received`. */

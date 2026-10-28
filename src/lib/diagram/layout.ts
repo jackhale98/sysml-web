@@ -4,7 +4,7 @@
  */
 import type { DiagramGraph, DiagramNode } from '#lib/engine/types.ts';
 import { LABEL_HEIGHT, labelWidth } from './labels.svelte.ts';
-import { edgeLabelText, MAX_ROWS, notationOf } from './notation.ts';
+import { edgeLabelText, MAX_ROWS, notationOf, type BorderPort } from './notation.ts';
 
 export interface Placed {
 	node: DiagramNode;
@@ -77,17 +77,7 @@ export function nodeSize(node: DiagramNode, view = 'general'): { width: number; 
 	}
 	const m = METRICS;
 	const rows = n.compartments.flatMap((c) => c.rows);
-	// Ports on both borders sit side by side on a row, when that fits; else the right ones go below.
-	const sideWidth = (side: 'left' | 'right') =>
-		Math.max(
-			0,
-			...n.ports.filter((p) => p.side === side).map((p) => p.label.length * MONO_CHAR + 14)
-		);
-	const [leftPorts, rightPorts] = [sideWidth('left'), sideWidth('right')];
-	const sideBySide = leftPorts + rightPorts + 36 <= m.maxPortsWidth;
-	const portsWidth = sideBySide
-		? leftPorts + rightPorts + 36
-		: Math.max(leftPorts, rightPorts) + 28;
+	const { sideBySide, width: portsWidth } = portColumns(n.ports);
 	const longest = Math.max(
 		node.label.length * NAME_CHAR + 52,
 		n.keyword.length * 6.4 + 52,
@@ -116,6 +106,42 @@ export function nodeSize(node: DiagramNode, view = 'general'): { width: number; 
 		height += m.compartmentPad + (sideBySide ? Math.max(left, right) : left + right) * m.row;
 	}
 	return { width, height: Math.round(height) };
+}
+
+/** Ports on both borders sit side by side on a row, when that fits; else the right ones go below. */
+function portColumns(ports: BorderPort[]): { sideBySide: boolean; width: number } {
+	const sideWidth = (side: 'left' | 'right') =>
+		Math.max(
+			0,
+			...ports.filter((p) => p.side === side).map((p) => p.label.length * MONO_CHAR + 14)
+		);
+	const [left, right] = [sideWidth('left'), sideWidth('right')];
+	const sideBySide = left + right + 36 <= METRICS.maxPortsWidth;
+	return { sideBySide, width: sideBySide ? left + right + 36 : Math.max(left, right) + 28 };
+}
+
+/** Where a box's border ports are: by port key, the middle of its square, from the box's top left. */
+export function portAnchors(
+	node: DiagramNode,
+	view = 'general'
+): Map<string, XY & { side: 'left' | 'right' }> {
+	const anchors = new Map<string, XY & { side: 'left' | 'right' }>();
+	const { ports } = notationOf(node, view);
+	if (!ports.length) return anchors;
+	const { width, height } = nodeSize(node, view);
+	const { sideBySide } = portColumns(ports);
+	const left = ports.filter((p) => p.side === 'left');
+	const right = ports.filter((p) => p.side === 'right');
+	const m = METRICS;
+	const shown = sideBySide ? Math.max(left.length, right.length) : left.length + right.length;
+	// The ports compartment closes the box: half its padding, then a row per port.
+	const top = height - m.compartmentPad - shown * m.row + m.compartmentPad / 2;
+	left.forEach((p, i) => anchors.set(p.key, { side: 'left', x: 0, y: top + (i + 0.5) * m.row }));
+	const below = sideBySide ? 0 : left.length;
+	right.forEach((p, i) =>
+		anchors.set(p.key, { side: 'right', x: width, y: top + (below + i + 0.5) * m.row })
+	);
+	return anchors;
 }
 
 /**
@@ -163,9 +189,15 @@ export async function layout(
 ): Promise<Layout> {
 	const ids = new Set(graph.nodes.map((n) => n.id));
 	const engine = await getElk();
+	// Border ports, fixed where the box draws them, so lines run to them.
+	const anchors = new Map(graph.nodes.map((n) => [n.id, portAnchors(n, view)]));
+	const portId = (node: string, key: string | undefined) =>
+		key && anchors.get(node)?.has(key) ? `${node}\u0000${key}` : node;
 	const edges = graph.edges.flatMap((e, i) => {
 		if (!ids.has(e.source) || !ids.has(e.target) || e.source === e.target) return [];
-		const [from, to] = UPWARD.has(e.kind) ? [e.target, e.source] : [e.source, e.target];
+		const source = portId(e.source, e.source_port);
+		const target = portId(e.target, e.target_port);
+		const [from, to] = UPWARD.has(e.kind) ? [target, source] : [source, target];
 		const text = edgeText(e.kind, e.label);
 		// Labels take part in the layout, so ELK keeps them clear of nodes and of each other.
 		const labels = text ? [{ text, width: labelWidth(text), height: LABEL_HEIGHT }] : [];
@@ -193,7 +225,21 @@ export async function layout(
 			// up are the ones to states declared earlier.
 			...(view === 'states' ? { 'elk.layered.cycleBreaking.strategy': 'MODEL_ORDER' } : {})
 		},
-		children: graph.nodes.map((node) => ({ id: node.id, ...nodeSize(node, view) })),
+		children: graph.nodes.map((node) => {
+			const ports = [...(anchors.get(node.id) ?? [])].map(([key, at]) => ({
+				id: `${node.id}\u0000${key}`,
+				x: at.x,
+				y: at.y,
+				width: 0,
+				height: 0,
+				layoutOptions: { 'elk.port.side': at.side === 'left' ? 'WEST' : 'EAST' }
+			}));
+			return {
+				id: node.id,
+				...nodeSize(node, view),
+				...(ports.length ? { ports, layoutOptions: { 'elk.portConstraints': 'FIXED_POS' } } : {})
+			};
+		}),
 		edges
 	});
 	const byId = new Map(graph.nodes.map((n) => [n.id, n]));

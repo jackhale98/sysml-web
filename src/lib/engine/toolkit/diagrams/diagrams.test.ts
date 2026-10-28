@@ -317,6 +317,30 @@ describe('interconnection view', () => {
 		]);
 	});
 
+	it('names the port at each end of a line, so it is drawn to that port', () => {
+		const tk = toolkit('interconnection', 'drone');
+		const ends = tk.edges
+			.map((e) => `${e.source}.${e.source_port ?? '-'} -> ${e.target}.${e.target_port ?? '-'}`)
+			.sort();
+		expect(ends).toEqual([
+			'battery.powerOut : PowerPort -> powerDistribution.powerIn : ~PowerPort',
+			'camera.imageOut : ImagePort -> flightController.imageIn : ~ImagePort',
+			'commandLink.- -> radio.airLink : ~CommandLinkPort',
+			'flightController.motorControl : MotorControlPort -> frontLeft.control : ~MotorControlPort',
+			'flightController.motorControl : MotorControlPort -> frontRight.control : ~MotorControlPort',
+			'flightController.motorControl : MotorControlPort -> rearLeft.control : ~MotorControlPort',
+			'flightController.motorControl : MotorControlPort -> rearRight.control : ~MotorControlPort',
+			'flightController.releaseControl : ReleaseControlPort -> payloadRelease.releaseControl : ~ReleaseControlPort',
+			'gnss.navigation : NavigationPort -> flightController.navigation : ~NavigationPort',
+			'powerDistribution.avionicsPower : PowerPort -> flightController.powerIn : ~PowerPort',
+			'powerDistribution.rotorPower : PowerPort -> frontLeft.powerIn : ~PowerPort',
+			'powerDistribution.rotorPower : PowerPort -> frontRight.powerIn : ~PowerPort',
+			'powerDistribution.rotorPower : PowerPort -> rearLeft.powerIn : ~PowerPort',
+			'powerDistribution.rotorPower : PowerPort -> rearRight.powerIn : ~PowerPort',
+			'radio.controllerLink : CommandLinkPort -> flightController.commandLink : ~CommandLinkPort'
+		]);
+	});
+
 	it('shows ports a part inherits through what it subsets', () => {
 		const tk = toolkit('interconnection', 'deliveryService');
 		expect(ids(tk)).toEqual(['drone', 'groundStation', 'operator', 'recipient']);

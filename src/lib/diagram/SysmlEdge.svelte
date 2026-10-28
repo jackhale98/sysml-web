@@ -11,6 +11,7 @@
 	import { useEditing } from './editing.svelte.ts';
 	import { useLabels } from './labels.svelte.ts';
 	import { edgeText } from './layout.ts';
+	import type { XY } from './layout.ts';
 	import type { SysmlEdgeData } from './types.ts';
 
 	interface EdgeStyle {
@@ -64,7 +65,44 @@
 			borderRadius: 6
 		})
 	);
-	const path = $derived(route ? roundedPath(route.points, 6) : smooth[0]);
+	/**
+	 * ELK's route, its ends moved onto the port squares they run to: the box
+	 * draws a square a few pixels off where the layout reckoned it. The next
+	 * point moves with an end, so the segment stays straight.
+	 */
+	const points = $derived.by(() => {
+		if (!route) return null;
+		if (!data?.sourcePort && !data?.targetPort) return route.points;
+		let p = route.points.map((q) => ({ ...q }));
+		// A straight line gets a jog in its middle, so each end can move on its own.
+		if (p.length === 2) {
+			const [a, b] = p as [XY, XY];
+			const flat = Math.abs(a.y - b.y) < 0.5;
+			const mid = flat ? (a.x + b.x) / 2 : (a.y + b.y) / 2;
+			p = flat
+				? [a, { x: mid, y: a.y }, { x: mid, y: b.y }, b]
+				: [a, { x: a.x, y: mid }, { x: b.x, y: mid }, b];
+		}
+		const snap = (end: number, next: number, x: number, y: number) => {
+			const [a, b] = [p[end]!, p[next]!];
+			if (Math.abs(b.y - a.y) < 0.5) b.y = y;
+			else if (Math.abs(b.x - a.x) < 0.5) b.x = x;
+			p[end] = { x, y };
+		};
+		if (data.sourcePort) snap(0, 1, sourceX, sourceY);
+		if (data.targetPort) snap(p.length - 1, p.length - 2, targetX, targetY);
+		// Without points that repeat or lie on a straight run (a jog that came out straight).
+		const same = (a: number, b: number) => Math.abs(a - b) < 0.5;
+		return p.filter((q, i) => {
+			const [before, after] = [p[i - 1], p[i + 1]];
+			if (!before || !after) return true;
+			if (same(q.x, before.x) && same(q.y, before.y)) return false;
+			return (
+				!(same(before.x, q.x) && same(q.x, after.x)) && !(same(before.y, q.y) && same(q.y, after.y))
+			);
+		});
+	});
+	const path = $derived(points ? roundedPath(points, 6) : smooth[0]);
 	const kind = $derived(data?.kind ?? 'dependency');
 	/**
 	 * SysML v2 notation per relationship kind: specialization ends in a hollow

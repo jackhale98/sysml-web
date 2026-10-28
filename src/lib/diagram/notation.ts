@@ -18,6 +18,8 @@ export interface Compartment {
 export interface BorderPort {
 	label: string;
 	side: 'left' | 'right';
+	/** The port's row text, which an edge's `source_port` or `target_port` names. */
+	key: string;
 }
 
 export interface Notation {
@@ -147,7 +149,7 @@ export function notationOf(node: DiagramNode, view: 'general' | 'interconnection
 					: direction
 						? 'left'
 						: (node.port_sides?.[text] ?? (text.includes(': ~') ? 'left' : 'right'));
-			ports.push({ label: row, side });
+			ports.push({ label: row, side, key: text });
 			continue;
 		}
 		const title = PLURAL[rowBase] ?? (rowBase.endsWith('s') ? rowBase : `${rowBase}s`);

@@ -151,11 +151,40 @@
 			{/each}
 			{#if n.ports.length}
 				<div class="ports">
+					<!-- Each port's square anchors the lines that connect it. -->
 					<ul class="side left">
-						{#each left as p, i (i)}<li>{p.label}</li>{/each}
+						{#each left as p, i (i)}<li>
+								{p.label}<Handle
+									type="target"
+									id="port:{p.key}"
+									position={Position.Left}
+									class="port-handle"
+									isConnectable={false}
+								/><Handle
+									type="source"
+									id="port:{p.key}"
+									position={Position.Left}
+									class="port-handle"
+									isConnectable={false}
+								/>
+							</li>{/each}
 					</ul>
 					<ul class="side right">
-						{#each right as p, i (i)}<li>{p.label}</li>{/each}
+						{#each right as p, i (i)}<li>
+								{p.label}<Handle
+									type="target"
+									id="port:{p.key}"
+									position={Position.Right}
+									class="port-handle"
+									isConnectable={false}
+								/><Handle
+									type="source"
+									id="port:{p.key}"
+									position={Position.Right}
+									class="port-handle"
+									isConnectable={false}
+								/>
+							</li>{/each}
 					</ul>
 				</div>
 			{/if}
@@ -382,6 +411,27 @@
 	}
 	.side.right li::before {
 		right: -6.5px;
+	}
+	/* A line ends on the outer side of the port's square, at its middle. */
+	.side li :global(.port-handle) {
+		position: absolute;
+		top: 9px;
+		width: 0;
+		min-width: 0;
+		height: 0;
+		min-height: 0;
+		background: none;
+		border: 0;
+		transform: none;
+		pointer-events: none;
+	}
+	.side.left li :global(.port-handle) {
+		right: auto;
+		left: -6.5px;
+	}
+	.side.right li :global(.port-handle) {
+		right: -6.5px;
+		left: auto;
 	}
 
 	/* Package: a folder with a tab. */

@@ -93,11 +93,11 @@ describe('notationOf', () => {
 		expect(n.compartments).toEqual([]);
 		// Without a direction: where its connections run, else conjugated (receiving) on the left.
 		expect(n.ports).toEqual([
-			{ label: 'out thrust : Thrust', side: 'right' },
-			{ label: 'in fuel : Fuel', side: 'left' },
-			{ label: 'data : Bus', side: 'right' },
-			{ label: 'power : ~Power', side: 'left' },
-			{ label: 'link : Link', side: 'left' }
+			{ label: 'out thrust : Thrust', side: 'right', key: 'thrust : Thrust' },
+			{ label: 'in fuel : Fuel', side: 'left', key: 'fuel : Fuel' },
+			{ label: 'data : Bus', side: 'right', key: 'data : Bus' },
+			{ label: 'power : ~Power', side: 'left', key: 'power : ~Power' },
+			{ label: 'link : Link', side: 'left', key: 'link : Link' }
 		]);
 	});
 
