@@ -892,7 +892,11 @@
 		{/if}
 		<div class="tools">
 			{#if configurable}
-				<ConfigurationPicker variability={workspace.variability} bind:value={ui.configuration} />
+				<ConfigurationPicker
+					variability={workspace.variability}
+					bind:value={ui.configuration}
+					compact={ui.phone}
+				/>
 			{/if}
 			{#if !table?.trade && !table?.counts}
 				<label class="search">

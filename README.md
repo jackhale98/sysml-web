@@ -98,6 +98,7 @@ Without them, people connect GitHub with a personal access token.
 | [Risk analysis](docs/risk-analysis.md) | The FMEA and hazard libraries: each definition, the risk policy, reviews saved as views, how another tool reads them. | Modellers |
 | [Dependency matrices](docs/dsm.md) | The DSM and N² chart views: rows, links, suggested modules, change impact. | Modellers |
 | [Table rendering](docs/table-rendering.md) | How any SysML view becomes a table (`@TableRendering`), for views written by hand. | Modellers |
+| [Variants and configurations](docs/variants.md) | Product lines, variation points and configurations in standard SysML; showing one configuration, the variability matrix. | Modellers |
 | [Requirements, verification results and conventions](docs/verification.md) | The coverage rule, recorded test results (`@VerificationResult`) and when they are out of date, reports that name their commit, change impact, `@Convention` views. | Modellers |
 | [State machine simulator](docs/simulator.md) | What the simulator does with a state machine: steps, the simulated clock, `do` actions, what is not supported. | Modellers |
 | [Model interchange](docs/interchange.md) | `.kpar`, SysML v2 JSON and Systems Modeling API servers: what round-trips, merging on Save to server, what a server must allow. | Modellers, developers |

@@ -15,7 +15,7 @@
 	}: {
 		variability: Variability;
 		value: string | null;
-		/** In a diagram's toolbar: the label is only read out. */
+		/** In a diagram's toolbar, or on a phone: the label is only read out. */
 		compact?: boolean;
 	} = $props();
 
@@ -48,6 +48,8 @@
 <style>
 	.configuration {
 		display: inline-flex;
+		flex: 0 1 auto;
+		min-width: 0;
 		align-items: center;
 		gap: 6px;
 		height: 2rem;
@@ -61,11 +63,15 @@
 	.configuration.compact {
 		border-color: transparent;
 	}
+	.compact select {
+		max-width: 8rem;
+	}
 	.configuration.on {
 		border-color: var(--accent);
 	}
 	select {
 		height: 100%;
+		min-width: 0;
 		max-width: 12rem;
 		border: 0;
 		border-radius: var(--radius-sm);

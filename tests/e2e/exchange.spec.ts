@@ -168,7 +168,7 @@ test('the demo downloads as SysML v2 JSON, and that file opens as a project with
 	});
 	const report = page.getByRole('dialog', { name: /Import/ });
 	await expect(report.getByTestId('import-summary')).toContainText(
-		`Everything came across: ${elements.length.toLocaleString('en')} elements in 22 files, with no problems.`,
+		`Everything came across: ${elements.length.toLocaleString('en')} elements in 23 files, with no problems.`,
 		{ timeout: 30_000 }
 	);
 	await expectAccessible(page);
