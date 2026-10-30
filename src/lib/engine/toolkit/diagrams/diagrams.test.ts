@@ -188,7 +188,7 @@ describe('general view', () => {
 
 	it('draws the view usages of a package with what they expose', () => {
 		const tk = toolkit('general', 'DroneViews');
-		expect(tk.nodes).toHaveLength(30);
+		expect(tk.nodes).toHaveLength(31);
 		expect(node(tk, 'componentCatalogue')).toMatchObject({
 			label: 'componentCatalogue : GeneralView',
 			stereotype: '<<view>>',

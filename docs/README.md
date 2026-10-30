@@ -25,6 +25,9 @@ What each document is for, and who it is for. New to Tessera? Start with the
 - [Requirements, verification results and conventions](verification.md): the
   coverage rule, `@VerificationResult` and when a result is out of date,
   reports that name their commit, change impact, and `@Convention` views.
+- [ReqIF import and export](reqif.md): exchanging requirements with DOORS,
+  Polarion, Jama and other requirements tools; what maps to what, and what is
+  left out.
 - [Baselines](baselines.md): named versions frozen at design reviews (PDR,
   CDR…); git tags on GitHub or copies in this browser, comparing with one, and
   how reports name them.
