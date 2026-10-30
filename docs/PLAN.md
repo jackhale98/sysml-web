@@ -28,8 +28,9 @@ is under **Next** and **Not doing, or later** below.
   their import, related elements both ways, satisfy and verify pickers);
   problems; search and commands (Ctrl K); one undo for every kind of edit;
   settings; the help, which is also `docs/user-guide.md`.
-- **Diagrams.** General, interconnection, state, action flow and sequence
-  views drawn from the model in SysML v2 notation, laid out by ELK. On the
+- **Diagrams.** General, interconnection, state, action flow, sequence and use
+  case views drawn from the model in SysML v2 notation, laid out by ELK (use
+  case diagrams in a column of their own). On the
   canvas: add elements, connect ports, draw states, transitions, steps and
   successions, rename, remove from the diagram (hidden elements are listed)
   or delete from the model, add connected elements, duplicate, show a saved
@@ -272,6 +273,7 @@ Missing entries fall back to automatic layout, so a diagram always renders.
 | Action Flow View | Built, read and edit: start/done, decide/merge, fork/join, successions |
 | State Transition View | Built, read and edit: states, transitions with trigger, guard and effect; run in the simulator |
 | Sequence View | Built, read: lifelines and messages in time order |
+| Use case view (`ModelViews::UseCaseView`, a General View kept to use cases) | Built, read and edit: use cases as ellipses in their subject's boundary, actors as stick figures outside, «include», specialization; add a use case or an actor, connect an actor or an include |
 | Geometry View | Not planned |
 
 Export: every diagram's toolbar has **Export**: SVG for documents, PNG at 2×

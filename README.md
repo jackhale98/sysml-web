@@ -15,8 +15,8 @@ What it does today:
 
 - **Text and diagrams, one model.** A SysML editor with completion, hover
   explanations, go to definition, rename and formatting; general,
-  interconnection, state, action flow and sequence diagrams drawn from the text
-  and editable on the canvas; guided forms that write the SysML for you.
+  interconnection, state, action flow, sequence and use case diagrams drawn
+  from the text and editable on the canvas; guided forms that write the SysML for you.
 - **Requirements and traceability.** Requirements tables, trace and
   verification matrices, gaps, a specification and an interface control
   document, import from Excel or CSV and export to Excel, CSV, SVG and PNG.

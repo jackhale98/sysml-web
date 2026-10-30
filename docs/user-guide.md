@@ -200,7 +200,7 @@ In the app: **Link a part to a requirement**.
 
 A view is a saved table, diagram or report. It is part of the model, so it is shared and reviewed like the rest. `expose` says which part of the model it shows; the view’s kind says how.
 
-- **Diagrams**: general, interconnection, state, action flow and sequence diagrams.
+- **Diagrams**: general, interconnection, state, action flow, sequence and use case diagrams.
 - **Tables**: requirements, requirement gaps, bill of materials, interfaces, trace and verification matrices, budgets and design checks, and the tables of trade studies and risk.
 - **Documents**: a specification of the requirements, and an interface control document.
 - **Matrices**: dependency matrices and N² charts (see **See what depends on what**).
@@ -256,6 +256,22 @@ An action flow is a process, step by step: `then` for the next step, `fork` and 
 > **Succession**: A succession says one step must finish before the next one starts.
 
 In the app: **Draw an action flow**.
+
+### Use case
+
+A use case is something the system does for the people or other systems around it, such as delivering a parcel. Its **subject** is the system (`subject drone : DeliveryDrone`), its **actors** are who take part (`actor operator : Operator`, each typed by a part def), and its **objective** says what success means. `include use case` makes one use case part of another, every time it happens.
+
+> **Use case definition**: A use case definition describes a goal-driven interaction between the system and its users, like 'deliver a parcel'.
+
+> **Actor**: An actor is someone or something outside the system that interacts with it, like an operator or a ground station.
+
+A **use case diagram** draws them: each use case an ellipse with its objective, inside a box named after its subject; the actors as stick figures outside the box, one per part def, with a line to each use case they take part in. An actor who starts most of its use cases stands on the left, the others on the right. A dashed «include» arrow runs to an included use case, and a hollow triangle means one use case (or actor) specializes another.
+
+On the diagram, **Add** writes a new use case beside the others, with the same subject, or an actor of one of the use cases (with a part def for it, if there is none of that name). **Connect** from an actor to a use case adds the actor to it; from one use case to another, it includes the other. Deleting a line takes that actor or include out of the text.
+
+SysML v2 has no use case view of its own: a use case diagram is a general view that keeps the use cases, written `view myUseCases : UseCaseView { expose MyUseCases::*; }` with `UseCaseView` from the project’s `ModelViews` library. Other SysML v2 tools read it as the general view it specializes. `extend` is not part of SysML v2, so there is no «extend».
+
+In the app: **New view**.
 
 ### Package
 
