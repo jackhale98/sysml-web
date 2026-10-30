@@ -15,6 +15,7 @@ import type {
 	Diagnostic,
 	EditRequest,
 	EditResult,
+	MachineSystem,
 	StateMachine,
 	Variability,
 	ActionFlow,
@@ -143,6 +144,8 @@ export class Workspace {
 	variability = $state.raw<Variability>({ points: [], configurations: [] });
 	/** The project's actions, for the action flow runner (`runnable` ones are offered to run). */
 	flows = $state.raw<ActionFlow[]>([]);
+	/** Parts whose parts' state machines run together, for the emulator. */
+	systems = $state.raw<MachineSystem[]>([]);
 	/** Constraint checks of the latest analysis (after it: they take a moment longer). */
 	checks = $state.raw<CheckReport | null>(null);
 	/** What breaks the project's conventions (views marked `@Convention`), found with the checks. */
@@ -311,11 +314,13 @@ export class Workspace {
 			const machines = await engine.stateMachines(files);
 			const variability = await engine.variability(files);
 			const flows = await engine.actionFlows(files);
+			const systems = await engine.machineSystems(files);
 			if (files.every((f) => this.files[f.path] === f.text)) {
 				this.views = views;
 				this.machines = machines;
 				this.variability = variability;
 				this.flows = flows;
+				this.systems = systems;
 			}
 			void this.check(files, performance.now() - started);
 		} catch (error) {

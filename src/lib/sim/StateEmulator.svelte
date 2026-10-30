@@ -30,6 +30,7 @@
 		findMachine,
 		record,
 		sessionAt,
+		signalFields,
 		statusText,
 		stepOption,
 		stepsSince,
@@ -374,11 +375,14 @@
 		void start();
 	}
 
-	const fire = (event: string | null) => run({ event });
+	const fire = (event: string | null, payload?: Record<string, unknown>) =>
+		run(payload ? { event, payload } : { event });
 	const wait = (amount: number | 'next') => run({ wait: amount });
 
 	/** Send an event, Step (`event: null`) or let time pass. */
-	async function run(choice: { event: string | null } | { wait: number | 'next' }) {
+	async function run(
+		choice: { event: string | null; payload?: Record<string, unknown> } | { wait: number | 'next' }
+	) {
 		const before = session;
 		if (!before || busy || !def) return;
 		if (before.status !== 'running') {
@@ -832,7 +836,8 @@
 				{speed}
 				pendingCount={changedCount}
 				time={view?.time ?? 0}
-				onfire={(event) => void fire(event)}
+				onfire={(event, payload) => void fire(event, payload)}
+				fields={(trigger) => (def ? signalFields(def, trigger) : [])}
 				onwait={(amount) => void wait(amount)}
 				onback={() => goTo(history.cursor - 1)}
 				onforward={() => goTo(history.cursor + 1)}

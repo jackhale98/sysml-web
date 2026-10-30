@@ -68,6 +68,7 @@
 			),
 			...machineItems(workspace.machines),
 			...flowItems(workspace.flows),
+			...machineItems(workspace.systems),
 			...commandItems(theme.choice),
 			...openFileItems(ui.activeTab?.kind === 'file' ? ui.activeTab.path : null),
 			...newViewItems(VIEW_KINDS)

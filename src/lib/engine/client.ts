@@ -39,6 +39,7 @@ export function toolkitEngine(toolkit: ToolkitClient): Engine {
 		related: (...params) => toolkit.call('related', ...params),
 		stateMachines: (...params) => toolkit.call('stateMachines', ...params),
 		actionFlows: (...params) => toolkit.call('actionFlows', ...params),
+		machineSystems: (...params) => toolkit.call('machineSystems', ...params),
 		edit: (...params) => toolkit.call('edit', ...params),
 		checks: (...params) => toolkit.call('checks', ...params),
 		evaluate: (...params) => toolkit.call('evaluate', ...params),

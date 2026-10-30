@@ -7,11 +7,28 @@
 		Play,
 		Redo2,
 		RotateCcw,
+		Send,
+		SlidersHorizontal,
 		StepForward,
 		Undo2,
 		Zap
 	} from '@lucide/svelte';
-	import { WAITS, explain, timeText, type EventOption, type StepOption } from './model.ts';
+	import {
+		WAITS,
+		explain,
+		inputKind,
+		parseLiteral,
+		timeText,
+		type EventOption,
+		type StepOption
+	} from './model.ts';
+
+	/** An attribute of a signal, which the person may give a value when sending it. */
+	export interface SignalField {
+		name: string;
+		type?: string;
+		value?: unknown;
+	}
 
 	interface Props {
 		events: EventOption[];
@@ -28,7 +45,12 @@
 		pendingCount: number;
 		/** Simulated time, in seconds since the start. */
 		time: number;
-		onfire: (event: string | null) => void;
+		/** Send an event (with the values given for its signal's attributes), or Step (`null`). */
+		onfire: (event: string | null, payload?: Record<string, unknown>) => void;
+		/** The attributes of the signal an event sends, when the machine reads them. */
+		fields?: (trigger: string) => SignalField[];
+		/** What the Step button says it will do, instead of the machine's own (several parts run together). */
+		stepHint?: string;
 		/** Let time pass: so many seconds, or to the next timer. */
 		onwait: (amount: number | 'next') => void;
 		onback: () => void;
@@ -61,6 +83,8 @@
 		onauto,
 		onspeed,
 		onvariable,
+		fields = () => [],
+		stepHint,
 		compact = false
 	}: Props = $props();
 
@@ -75,6 +99,53 @@
 		setTimeout(() => {
 			if (nudged === trigger) nudged = null;
 		}, 500);
+	}
+
+	/** The event whose signal values are being given, and the values as typed. */
+	let editing = $state<string | null>(null);
+	let draft = $state<Record<string, string | boolean>>({});
+	const editFields = $derived(editing ? fields(editing) : []);
+
+	function edit(trigger: string) {
+		if (editing === trigger) {
+			editing = null;
+			return;
+		}
+		editing = trigger;
+		draft = Object.fromEntries(
+			fields(trigger).map((f) => {
+				const kind = inputKind(f);
+				const value = parseLiteral(f.value);
+				if (kind === 'boolean') return [f.name, value === true];
+				if (kind === 'integer' || kind === 'real')
+					return [
+						f.name,
+						typeof value === 'number'
+							? String(value)
+							: String(parseFloat(String(value ?? '')) || '')
+					];
+				return [f.name, value === null || value === undefined ? '' : String(value)];
+			})
+		);
+	}
+
+	/** Send the event being edited with the values given; an empty number keeps the signal's default. */
+	function sendValues(e: SubmitEvent) {
+		e.preventDefault();
+		const trigger = editing;
+		if (!trigger) return;
+		const payload: Record<string, unknown> = {};
+		for (const f of fields(trigger)) {
+			const raw = draft[f.name];
+			const kind = inputKind(f);
+			if (kind === 'boolean') payload[f.name] = raw === true;
+			else if (kind === 'integer' || kind === 'real') {
+				const n = Number(raw);
+				if (String(raw).trim() !== '' && Number.isFinite(n)) payload[f.name] = n;
+			} else if (typeof raw === 'string') payload[f.name] = raw;
+		}
+		editing = null;
+		onfire(trigger, payload);
 	}
 
 	function press(o: EventOption) {
@@ -141,6 +212,18 @@
 							{targets(o).join(', ')}
 						</span>
 					</button>
+					{#if fields(o.trigger).length}
+						<button
+							type="button"
+							class="values-toggle"
+							aria-expanded={editing === o.trigger}
+							aria-label="Values for {o.trigger}"
+							title="Send {o.trigger} with values you choose"
+							onclick={() => edit(o.trigger)}
+						>
+							<SlidersHorizontal size={14} aria-hidden="true" />
+						</button>
+					{/if}
 					{#if !o.ready}
 						<p class="why" id="{uid}-why-{i}">
 							{#each o.reasons.slice(0, 2) as reason, r (r)}
@@ -164,7 +247,36 @@
 				</li>
 			{/each}
 		</ul>
-	{:else}
+	{/if}
+	{#if editing && editFields.length}
+		<form class="values" onsubmit={sendValues} aria-label="Values of {editing}">
+			<p class="values-title">Values of <code>{editing}</code></p>
+			{#each editFields as f (f.name)}
+				{@const kind = inputKind(f)}
+				<label class="field">
+					<span
+						>{f.name}{#if f.type}<small> : {f.type.split('::').pop()}</small>{/if}</span
+					>
+					{#if kind === 'boolean'}
+						<input type="checkbox" bind:checked={draft[f.name] as boolean} />
+					{:else}
+						<input
+							type={kind === 'text' ? 'text' : 'number'}
+							step={kind === 'integer' ? '1' : 'any'}
+							bind:value={draft[f.name] as string}
+						/>
+					{/if}
+				</label>
+			{/each}
+			<div class="values-actions">
+				<button type="submit" class="send" aria-disabled={busy || !running}>
+					<Send size={14} aria-hidden="true" /> Send {editing}
+				</button>
+				<button type="button" class="cancel" onclick={() => (editing = null)}>Cancel</button>
+			</div>
+		</form>
+	{/if}
+	{#if !events.length}
 		<p class="none">
 			{#if !running}
 				The machine has stopped. Restart to run it again.
@@ -245,7 +357,9 @@
 			<span class="step-text">
 				<span>Step</span>
 				<small>
-					{#if stepTargets.length}
+					{#if stepHint}
+						{stepHint}
+					{:else if stepTargets.length}
 						{moves(stepTargets)}
 					{:else if step.queued}
 						take {step.queued}, sent by the machine
@@ -348,10 +462,90 @@
 		list-style: none;
 	}
 	.events li {
+		position: relative;
 		display: flex;
 		flex-direction: column;
 		gap: 4px;
 		min-width: 0;
+	}
+	.events li:has(.values-toggle) .event {
+		padding-right: 44px;
+	}
+	.values-toggle {
+		position: absolute;
+		top: 6px;
+		right: 6px;
+		display: grid;
+		place-items: center;
+		width: 32px;
+		height: 32px;
+		color: var(--text-2);
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-sm);
+		cursor: pointer;
+	}
+	.values-toggle:hover,
+	.values-toggle[aria-expanded='true'] {
+		color: var(--kind-behavior);
+		border-color: var(--kind-behavior);
+	}
+	.values {
+		display: grid;
+		gap: var(--space-2);
+		margin: var(--space-2) 0 0;
+		padding: var(--space-3);
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-md);
+		font-size: var(--text-sm);
+	}
+	.values-title {
+		color: var(--text-2);
+	}
+	.field {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+		align-items: center;
+		gap: var(--space-2);
+	}
+	.field small {
+		color: var(--text-2);
+	}
+	.field input:not([type='checkbox']) {
+		min-width: 0;
+		min-height: 36px;
+		padding: 0 8px;
+		color: var(--text);
+		background: var(--bg);
+		border: 1px solid var(--border-strong);
+		border-radius: var(--radius-sm);
+		font: inherit;
+	}
+	.values-actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--space-2);
+	}
+	.values-actions button {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		min-height: 36px;
+		padding: 0 12px;
+		border-radius: var(--radius-sm);
+		font-weight: 600;
+		cursor: pointer;
+	}
+	.values-actions .send {
+		color: var(--accent-text);
+		background: var(--accent);
+		border: 0;
+	}
+	.values-actions .cancel {
+		color: var(--text);
+		background: transparent;
+		border: 1px solid var(--border-strong);
 	}
 	.event {
 		--fam: var(--kind-behavior);

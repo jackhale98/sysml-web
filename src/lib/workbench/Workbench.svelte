@@ -112,6 +112,7 @@
 	});
 	const loadEmulator = () => import('#lib/sim/StateEmulator.svelte').then((m) => m.default);
 	const loadFlowRunner = () => import('#lib/sim/FlowRunner.svelte').then((m) => m.default);
+	const loadSystemEmulator = () => import('#lib/sim/SystemEmulator.svelte').then((m) => m.default);
 	const loadLibraryFile = () => import('./LibraryFile.svelte').then((m) => m.default);
 	const loadReport = () => import('#lib/reports/ReportView.svelte').then((m) => m.default);
 	const loadMatrix = () => import('./DsmView.svelte').then((m) => m.default);
@@ -720,6 +721,15 @@
 								{ui}
 								{engine}
 							/>
+						{/await}
+					{/key}
+				{:else if tab.kind === 'emulator' && workspace.systems.some((s) => s.qualifiedName === tab.machine)}
+					<!-- Parts whose machines run together: one tab, every machine on one clock. -->
+					{#key tab.machine}
+						{#await loadSystemEmulator()}
+							<p class="empty">Loading the emulator…</p>
+						{:then SystemEmulator}
+							<SystemEmulator system={tab.machine} {workspace} {ui} {engine} />
 						{/await}
 					{/key}
 				{:else if tab.kind === 'emulator'}

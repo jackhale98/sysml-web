@@ -505,6 +505,7 @@ describe('in the workspace', () => {
 			listViews: async () => [],
 			stateMachines: async () => [],
 			variability: async () => ({ points: [], configurations: [] }),
+			machineSystems: async () => [],
 			checks: async (f: { path: string; text: string }[]) => host.checks(f),
 			edit: async (request: EditRequest) => host.edit(request)
 		} as unknown as Engine;

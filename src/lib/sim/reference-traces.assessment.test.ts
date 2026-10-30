@@ -1135,3 +1135,57 @@ describe('auto-run', () => {
 		expect(moves).toEqual(['X', 'Back', 'Y', 'Back']);
 	});
 });
+
+describe('change triggers that read the clock', () => {
+	// SysML 7.17.8: `accept when c` is `TriggerWhen`: a change signal when `c`
+	// becomes true (Observation::ObserveChange). The default clock is the
+	// occurrence's `localClock`, which defaults to `Clocks::universalClock`
+	// (`Occurrences`); its `currentTime` advances with time (`Clock`). So a
+	// condition on `currentTime` turns true when the clock reaches its time,
+	// with no step to make it so.
+	const CLOCKED = `package K1 {
+        private import Time::*;
+        state def K1 {
+            attribute deadline :> ISQ::time = 20 [SI::s];
+            attribute ok : Boolean = true;
+            entry; then a;
+            state a; state b; state c; state d;
+            transition first a accept when localClock.currentTime >= 30 [SI::s] then b;
+            transition first b accept when universalClock.currentTime > deadline + 30 [SI::s] then c;
+            transition first c accept when Time::universalClock.currentTime >= 90 [SI::s] if ok then d;
+        }
+    }`;
+
+	it('a condition on the clock turns true when the clock reaches its time: a Step lets time pass to it', () => {
+		const run = new Run(CLOCKED, 'K1');
+		const due = run.session.enabled.find((e) => e.from === 'a')!;
+		expect(due).toMatchObject({ ready: false, due: 30 });
+		expect(due.reason).toBe('`when localClock.currentTime >= 30 [SI::s]` turns true at 30 s');
+		expect(run.session.nextDue).toBe(30);
+		run.fire(null);
+		expect(run.trace).toEqual(['0: entry -> a', '30: a -> b']);
+	});
+
+	it('a strict comparison first holds just after its time; the time it reads can be a variable', () => {
+		const run = new Run(CLOCKED, 'K1').play([STEP, STEP]);
+		// deadline + 30 s = 50 s: `>` holds from just after 50 s.
+		expect(run.session.time).toBeCloseTo(50.001, 6);
+		expect(run.session.current).toEqual(['c']);
+	});
+
+	it('a Wait takes each condition on the clock at its time', () => {
+		const run = new Run(CLOCKED, 'K1').play([{ wait: 120 }]);
+		expect(run.trace.map((t) => t.split(':')[0]!.slice(0, 4))).toEqual(['0', '30', '50.0', '90']);
+		expect(run.session.current).toEqual(['d']);
+		expect(run.session.time).toBe(120);
+	});
+
+	it('the change signal that comes while the guard is false is lost, as for any change trigger', () => {
+		// ObserveChange sends it once, when the condition becomes true.
+		const run = new Run(CLOCKED, 'K1', { ok: false }).play([STEP, STEP, STEP]);
+		expect(run.session.current).toEqual(['c']);
+		expect(run.session.time).toBe(90);
+		run.fire(null, { ok: true });
+		expect(run.session.current).toEqual(['c']);
+	});
+});

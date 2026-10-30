@@ -22,6 +22,7 @@ import type {
 	RenderedTable,
 	RiskPolicy,
 	FmeaLineInfo,
+	MachineSystem,
 	StateMachine,
 	ActionFlow,
 	TradeStudy,
@@ -95,6 +96,8 @@ export interface EngineApi {
 	stateMachines(files: SourceFile[]): StateMachine[];
 	/** The project's actions, to run as flows (`toolkit/flows.ts`). */
 	actionFlows(files: SourceFile[]): ActionFlow[];
+	/** Parts whose parts' state machines run together, with the connections between their ports. */
+	machineSystems(files: SourceFile[]): MachineSystem[];
 	/** Every constraint and `satisfy` claim of the project, decided (cached per analysis). */
 	checks(files: SourceFile[]): CheckReport;
 	/** Elements' bound values, evaluated, by element id (cached per analysis). */

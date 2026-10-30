@@ -385,3 +385,29 @@ export function statusText(status: string): string {
 			return status.charAt(0).toUpperCase() + status.slice(1);
 	}
 }
+
+/**
+ * The attributes of the signal an event sends, when a transition that
+ * accepts it reads its values (`accept r : Reading`): the person may give
+ * them when sending it. None when no transition reads them.
+ */
+export function signalFields(
+	machine: StateMachine,
+	trigger: string
+): NonNullable<StateMachine['signals']>[string] {
+	const reads = machine.transitions.some(
+		(t) =>
+			t.payload &&
+			t.trigger &&
+			(t.trigger === trigger ||
+				t.trigger.endsWith(`::${trigger}`) ||
+				trigger.endsWith(`::${t.trigger}`))
+	);
+	if (!reads) return [];
+	const all = machine.signals ?? {};
+	const key =
+		trigger in all
+			? trigger
+			: Object.keys(all).find((k) => k.endsWith(`::${trigger}`) || trigger.endsWith(`::${k}`));
+	return key ? all[key]! : [];
+}

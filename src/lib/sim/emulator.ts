@@ -26,6 +26,9 @@
  * written (`actions.ts`): assignments, `if`, successions and signals sent
  * to the machine itself, which wait in a queue and are taken one per Step,
  * in the order sent. A transition to a `terminate` action ends the machine.
+ * With `outward`, signals sent elsewhere (`via` a port, `to` another part)
+ * come out in `session.sent` for `system.ts` to deliver, and signals other
+ * parts sent wait in the same queue, with the port they came in at.
  *
  * Time is simulated: the session keeps the time and when each active state
  * was entered. A time trigger is the library's `TriggerAfter` / `TriggerAt`
@@ -40,6 +43,8 @@
  * change signal once, when the condition turns true): a timer until its
  * state is entered again, a change trigger until its condition turns false
  * and true again.
+ * A condition may read the clock (`localClock.currentTime`, the simulated
+ * time): it is due, like a timer, at the first time it holds.
  * Durations are numbers with time units (`5 [s]`, `2 [SI::min]`); a bare
  * number counts seconds. One that cannot be evaluated is noted in the trace
  * and does not fire; values given to variables later (in the Variables
@@ -59,7 +64,14 @@
  * `at …`; an action is its statements as written.
  */
 import type { SimStep, StateMachine, StateSession } from '#lib/engine/types.ts';
-import { needsFlow, parseAction, runsSomething, sendsToSelf, type ActionStep } from './actions.ts';
+import {
+	allSteps,
+	needsFlow,
+	parseAction,
+	runsSomething,
+	sendsToSelf,
+	type ActionStep
+} from './actions.ts';
 import {
 	EnumLiteral,
 	EvalError,
@@ -79,6 +91,7 @@ export type Enabled = StateSession['enabled'][number];
 type MachineState = StateMachine['states'][number];
 type MachineTransition = StateMachine['transitions'][number];
 type Queued = NonNullable<StateSession['queue']>[number];
+type Sent = NonNullable<StateSession['sent']>[number];
 
 /** A value as sessions hold it (JSON). `null` unsets a variable. */
 export type Variables = Record<string, unknown>;
@@ -100,6 +113,12 @@ export type Choice =
 export interface Options {
 	/** Stop with status `max steps reached` once this many transitions have fired. */
 	maxSteps?: number;
+	/**
+	 * Signals sent to anything but the machine itself (`send … via p`, `send
+	 * … to other`) go out in `session.sent`, for the parts around the
+	 * machine to deliver (`system.ts`); without it they are not sent.
+	 */
+	outward?: boolean;
 }
 
 /** A wait stops after this many steps, in case the machine never lets time pass. */
@@ -249,13 +268,26 @@ const depth = (chart: Chart, name: string) => ancestry(chart, name).length - 1;
 
 // ---------------------------------------------------------------- variables
 
+/**
+ * The clock a condition may read (`localClock.currentTime`,
+ * `universalClock.currentTime`, `Time::universalClock.currentTime`): the
+ * simulated time, the default clock's (`Occurrence::localClock` defaults to
+ * the `universalClock`).
+ */
+const CLOCK = /^(?:self\.)?(?:localClock|(?:(?:Time|Clocks)::)?universalClock)\.currentTime$/;
+
 /** The emulator's variables: values may carry units and enum literals while a step runs. */
 class Env implements Scope {
 	readonly values = new Map<string, Value>();
+	/** The simulated time conditions read through the clock. */
+	clock: { time: number } | null = null;
 	constructor(private readonly chart: Chart) {}
 
 	get(name: string): Value | undefined {
-		return this.values.get(name);
+		const value = this.values.get(name);
+		if (value === undefined && this.clock && CLOCK.test(name))
+			return new Quantity(this.clock.time, 's');
+		return value;
 	}
 	isVariable(name: string): boolean {
 		return this.chart.variables.has(name) || this.values.has(name);
@@ -284,6 +316,7 @@ class Env implements Scope {
 	clone(): Env {
 		const copy = new Env(this.chart);
 		for (const [k, v] of this.values) copy.values.set(k, v);
+		copy.clock = this.clock;
 		return copy;
 	}
 }
@@ -464,7 +497,7 @@ function runSteps(run: Run, steps: ActionStep[], scope: Scope, where: string, do
 				}
 			}
 			if (branch) runSteps(run, branch, scope, where, doing);
-		} else if (step.kind === 'send' && sendsToSelf(step, chart.own)) {
+		} else if (step.kind === 'send' && (run.outward || sendsToSelf(step, chart.own))) {
 			const args: { name?: string; value: Value }[] = [];
 			try {
 				for (const text of step.args) {
@@ -478,13 +511,19 @@ function runSteps(run: Run, steps: ActionStep[], scope: Scope, where: string, do
 				continue;
 			}
 			const payload = payloadOf(chart, step.signal, scope, args);
-			const queued: Queued = { signal: step.signal, from: where };
-			if (payload.values.size) {
-				queued.values = Object.fromEntries(
-					[...payload.values].map(([k, v]) => [k, toJson(v)] as const)
-				);
+			const values = payload.values.size
+				? Object.fromEntries([...payload.values].map(([k, v]) => [k, toJson(v)] as const))
+				: null;
+			if (sendsToSelf(step, chart.own)) {
+				run.queue.push({ signal: step.signal, from: where, ...(values ? { values } : {}) });
+			} else {
+				// Out of the machine: its part's connections take it on (`system.ts`).
+				const sent: Sent = { signal: step.signal, from: where };
+				if (values) sent.values = values;
+				if (step.via) sent.via = step.via.replace(/^self\./, '');
+				if (step.to) sent.to = step.to.replace(/^self\./, '');
+				run.sent.push(sent);
 			}
-			run.queue.push(queued);
 		}
 		// Named actions change nothing the simulator keeps; other steps are noted on the machine.
 	}
@@ -636,6 +675,89 @@ function nextDue(clock: Clock): number | undefined {
 	return next;
 }
 
+/** Whether an expression reads the clock. */
+const readsClock = (expr: Expr | null) => !!expr && [...namesIn(expr)].some((n) => CLOCK.test(n));
+
+/**
+ * The times at which a condition on the clock may change: the other side of
+ * each comparison with the clock (`localClock.currentTime >= start + 30 [s]`
+ * changes at `start + 30 [s]`), in seconds.
+ */
+function clockEdges(expr: Expr, env: Env, out: number[] = []): number[] {
+	if (expr.kind === 'binary') {
+		if (['<', '>', '<=', '>=', '==', '!='].includes(expr.op)) {
+			const left = readsClock(expr.left);
+			const right = readsClock(expr.right);
+			const other = left && !right ? expr.right : right && !left ? expr.left : null;
+			const clock = left && !right ? expr.left : right && !left ? expr.right : null;
+			if (other && clock?.kind === 'name') {
+				try {
+					out.push(seconds(evaluate(other, env)));
+				} catch {
+					// Not a time: the condition is read at each step only.
+				}
+			}
+		}
+		clockEdges(expr.left, env, out);
+		clockEdges(expr.right, env, out);
+	} else if (expr.kind === 'unary') clockEdges(expr.operand, env, out);
+	else if (expr.kind === 'if') {
+		clockEdges(expr.condition, env, out);
+		clockEdges(expr.then, env, out);
+		clockEdges(expr.else, env, out);
+	}
+	return out;
+}
+
+/** A strict comparison with the clock (`> 30 [s]`) first holds just after its time: this much after. */
+const JUST_AFTER = 0.001;
+
+/**
+ * When a change trigger whose condition reads the clock turns true as time
+ * passes, with the variables as they are now: the first time after now at
+ * which it holds (just after, for a strict comparison). Undefined when it
+ * holds now, never will, or does not read the clock.
+ */
+function clockDue(run: Run, t: Transition): number | undefined {
+	const trigger = t.trigger;
+	if (trigger?.kind !== 'change' || !trigger.expr || !readsClock(trigger.expr)) return undefined;
+	const expr = trigger.expr;
+	const now = run.clock.time;
+	const at = (time: number) => {
+		const probe = run.env.clone();
+		probe.clock = { time };
+		try {
+			return evaluateCondition(expr, probe);
+		} catch {
+			return false;
+		}
+	};
+	if (at(now)) return undefined;
+	const edges = [...new Set(clockEdges(expr, run.env))].sort((a, b) => a - b);
+	for (const edge of edges) {
+		if (edge > now && at(edge)) return edge;
+		if (edge + JUST_AFTER > now && at(edge + JUST_AFTER)) return edge + JUST_AFTER;
+	}
+	return undefined;
+}
+
+/** The next time something comes due: a timer, or a condition on the clock turning true. */
+function nextAt(run: Run): number | undefined {
+	let next = nextDue(run.clock);
+	for (const t of candidates(run.chart, run.active)) {
+		const due = clockDue(run, t);
+		if (due !== undefined && due > run.clock.time && (next === undefined || due < next)) next = due;
+	}
+	return next;
+}
+
+/** Move the clock to `time`: the timers and conditions that come due then are taken, or lost. */
+function setTime(run: Run, time: number) {
+	run.clock.time = time;
+	expire(run, candidates(run.chart, run.active), run.env);
+	observe(run);
+}
+
 /**
  * A time signal that comes while its transition cannot take it (its guard
  * is false) is lost: the timer will not fire again until its state is
@@ -779,7 +901,11 @@ function check(run: Run, t: Transition, env: Env, payload?: Payload | null): Che
 		else {
 			try {
 				out.conditionResult = evaluateCondition(t.trigger.expr, env);
-				if (!out.conditionResult) out.reason = `condition \`${text}\` is false`;
+				const due = out.conditionResult ? undefined : clockDue(run, t);
+				if (due !== undefined) {
+					out.due = due;
+					out.reason = `\`when ${text}\` turns true at ${formatDuration(due)}`;
+				} else if (!out.conditionResult) out.reason = `condition \`${text}\` is false`;
 				else {
 					const signal = run.changes.get(t.index);
 					if (typeof signal === 'string') out.reason = signal;
@@ -830,6 +956,22 @@ function accepts(t: Transition, event: string | null): boolean {
 	if (trigger.kind === 'signal') return signalMatches(trigger.name, event);
 	return eventName(trigger) === event;
 }
+
+/**
+ * Whether a transition takes a waiting signal: it accepts the signal and,
+ * if it names a port (`accept Sig via p`), the signal came in at that port
+ * (`AcceptPerformance::receiver` is the port; one with no `via` receives at
+ * its part, `this`, whose ports a signal comes in at).
+ */
+function takesQueued(t: Transition, q: Queued): boolean {
+	if (!accepts(t, q.signal)) return false;
+	const via = t.source.via;
+	return !via || q.port === undefined || via === q.port;
+}
+
+/** Who sent a waiting signal, for messages: another part, or the machine itself. */
+const senderOf = (q: Queued) =>
+	q.part !== undefined ? (q.from ?? `\`${q.part}\``) : 'the machine';
 
 function eventName(trigger: Trigger): string {
 	return trigger.kind === 'signal'
@@ -907,7 +1049,7 @@ function enabled(run: Run, env: Env): Enabled[] {
 	const list = candidates(chart, active);
 	const head = run.queue[0];
 	const headPayload = head ? queuedPayload(head) : null;
-	const takesHead = (t: Transition) => !!head && accepts(t, head.signal);
+	const takesHead = (t: Transition) => !!head && takesQueued(t, head);
 	const checks = new Map(
 		list.map((t) => [t, check(run, t, env, takesHead(t) ? headPayload : undefined)])
 	);
@@ -938,7 +1080,7 @@ function enabled(run: Run, env: Env): Enabled[] {
 		preempt(ready.filter(takesHead), takesHead);
 		for (const t of ready) {
 			if (t.trigger?.kind === 'signal' && !takesHead(t))
-				waits.set(t, `\`${head.signal}\`, sent by the machine, comes first`);
+				waits.set(t, `\`${head.signal}\`, sent by ${senderOf(head)}, comes first`);
 		}
 	}
 	// Each event pre-empts among the transitions that accept it.
@@ -982,8 +1124,11 @@ interface Run {
 	clock: Clock;
 	/** Active states whose `do` action is still running. */
 	doing: Set<string>;
-	/** Signals the machine sent itself, oldest first. */
+	/** Signals waiting to be taken (sent by the machine itself, or by other parts), oldest first. */
 	queue: Queued[];
+	/** Signals this step sent out of the machine (with `outward`). */
+	sent: Sent[];
+	outward: boolean;
 	/** Change triggers: see `StateSession.changes`. */
 	changes: Map<number, boolean | string>;
 	terminated: boolean;
@@ -1031,7 +1176,8 @@ function markEntered(run: Run, name: string, e: Entering) {
 	if (state.do) {
 		e.dos.push(state.do);
 		const steps = actionOf(run.chart, state.do);
-		if (runsSomething(steps, run.chart.own))
+		const sends = run.outward && allSteps(steps).some((s) => s.kind === 'send');
+		if (sends || runsSomething(steps, run.chart.own))
 			runSteps(run, steps, run.env, `the do action of \`${state.label}\``, e);
 		else run.doing.add(name);
 	}
@@ -1271,7 +1417,7 @@ function queuedPayload(q: Queued): Payload {
 function dispatch(run: Run, list: Transition[], before: Env) {
 	const head = run.queue.shift()!;
 	const payload = queuedPayload(head);
-	const ready = list.filter((t) => accepts(t, head.signal) && check(run, t, before, payload).ready);
+	const ready = list.filter((t) => takesQueued(t, head) && check(run, t, before, payload).ready);
 	if (!ready.length) {
 		const where = leaves(run.chart, run.active).join(', ');
 		run.messages.push(
@@ -1310,6 +1456,9 @@ function session(run: Run, options: Options): StateSession {
 		enabled: enabled(run, run.env)
 	};
 	if (run.queue.length) out.queue = run.queue;
+	if (run.sent.length) out.sent = run.sent;
+	const next = nextAt(run);
+	if (next !== undefined) out.nextDue = next;
 	if (run.changes.size) {
 		out.changes = Object.fromEntries(
 			[...run.changes].sort((a, b) => a[0] - b[0]).map(([i, c]) => [String(i), c])
@@ -1321,7 +1470,12 @@ function session(run: Run, options: Options): StateSession {
 }
 
 /** Rebuild a run from a session (which may have gone through JSON) and variable changes. */
-function resume(chart: Chart, from: StateSession, variables: Variables | null | undefined): Run {
+function resume(
+	chart: Chart,
+	from: StateSession,
+	variables: Variables | null | undefined,
+	options: Options = {}
+): Run {
 	const unknown = from.current.find((s) => !chart.states.has(s));
 	if (unknown !== undefined) {
 		throw new Error(`session does not match \`${chart.machine.name}\`: no state \`${unknown}\``);
@@ -1343,12 +1497,15 @@ function resume(chart: Chart, from: StateSession, variables: Variables | null | 
 		clock,
 		doing: new Set((from.doing ?? []).filter((s) => active.has(s))),
 		queue: (from.queue ?? []).map((q) => ({ ...q })),
+		sent: [],
+		outward: options.outward === true,
 		changes: new Map(Object.entries(from.changes ?? {}).map(([i, c]) => [Number(i), c])),
 		terminated: from.terminated === true,
 		messages: [],
 		trace: [...from.trace],
 		step: from.step
 	};
+	env.clock = clock;
 	if (from.timers) {
 		for (const [index, due] of Object.entries(from.timers)) clock.timers.set(Number(index), due);
 	} else armStates(run, [...active], []);
@@ -1377,12 +1534,15 @@ export function start(
 		clock: { time: 0, entered: new Map(), timers: new Map() },
 		doing: new Set(),
 		queue: [],
+		sent: [],
+		outward: options.outward === true,
 		changes: new Map(),
 		terminated: false,
 		messages: [],
 		trace: [],
 		step: 0
 	};
+	run.env.clock = run.clock;
 	const e = entering();
 	if (machine.parallel) {
 		for (const region of childrenOf(chart, undefined)) {
@@ -1463,12 +1623,12 @@ function waitUntil(run: Run, target: number, options: Options) {
 			else dispatch(run, list, before);
 			continue;
 		}
-		const next = nextDue(clock);
+		const next = nextAt(run);
 		if (next !== undefined && next <= target) {
-			clock.time = next;
+			setTime(run, next);
 			continue;
 		}
-		clock.time = Math.max(clock.time, target);
+		if (target > clock.time) setTime(run, target);
 		return;
 	}
 }
@@ -1484,7 +1644,7 @@ export function step(
 	options: Options = {}
 ): StateSession {
 	const chart = compile(machine);
-	const run = resume(chart, from, choice.variables);
+	const run = resume(chart, from, choice.variables, options);
 	const where = leaves(chart, run.active).join(', ');
 	const now = status(run, options);
 	if (now === 'completed') {
@@ -1500,7 +1660,7 @@ export function step(
 
 	if ('wait' in choice) {
 		let target: number | undefined;
-		if (choice.wait === 'next') target = nextDue(run.clock);
+		if (choice.wait === 'next') target = nextAt(run);
 		else if (Number.isFinite(choice.wait) && choice.wait > 0) target = run.clock.time + choice.wait;
 		else throw new Error(`cannot wait for ${String(choice.wait)} seconds`);
 		if (target === undefined) {
@@ -1532,7 +1692,7 @@ export function step(
 		}
 		if (t.trigger?.kind === 'signal' && head) {
 			run.messages.push(
-				`\`${head.signal}\`, sent by the machine, comes first: Step, then \`${t.label}\``
+				`\`${head.signal}\`, sent by ${senderOf(head)}, comes first: Step, then \`${t.label}\``
 			);
 			return session(run, options);
 		}
@@ -1557,7 +1717,7 @@ export function step(
 		}
 		if (head) {
 			run.messages.push(
-				`\`${head.signal}\`, sent by the machine, comes first: Step, then send \`${event}\``
+				`\`${head.signal}\`, sent by ${senderOf(head)}, comes first: Step, then send \`${event}\``
 			);
 			return session(run, options);
 		}
@@ -1585,12 +1745,12 @@ export function step(
 	}
 	// Nothing to do now: time passes to the next timer.
 	if (!ready.length) {
-		const next = nextDue(run.clock);
+		const next = nextAt(run);
 		if (next === undefined) {
 			run.messages.push(`nothing is ready in ${where}, and no timer is running`);
 			return session(run, options);
 		}
-		run.clock.time = next;
+		setTime(run, next);
 		ready = readyNow(run, list, before);
 	}
 	expire(run, list, before);
@@ -1612,6 +1772,23 @@ export function withVariables(
 	variables: Variables,
 	options: Options = {}
 ): StateSession {
-	const run = resume(compile(machine), from, variables);
+	const run = resume(compile(machine), from, variables, options);
+	return session(run, options);
+}
+
+/**
+ * The session at a later time, with nothing fired: what comes due then
+ * (timers, conditions on the clock) is ready for the next Step, or lost when
+ * its guard is false. For parts run on one clock (`system.ts`), which moves
+ * every part to the earliest time something comes due in any of them.
+ */
+export function advance(
+	machine: StateMachine,
+	from: StateSession,
+	time: number,
+	options: Options = {}
+): StateSession {
+	const run = resume(compile(machine), from, null, options);
+	if (time > run.clock.time) setTime(run, time);
 	return session(run, options);
 }

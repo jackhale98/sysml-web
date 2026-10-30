@@ -483,6 +483,22 @@
 					{#if workspace.machines.length || runnableFlows.length}
 						<h3>Simulations</h3>
 						<ul class="flat">
+							{#each workspace.systems as s (s.qualifiedName)}
+								<li>
+									<button
+										type="button"
+										class="item"
+										title={s.doc ?? `Run the machines of ${s.name} together`}
+										onclick={() =>
+											ui.open({ kind: 'emulator', machine: s.qualifiedName, title: s.name })}
+									>
+										<Play size={14} />
+										<span class="label"
+											>Run {viewTitle(s.name)} ({s.parts.length} machines together)</span
+										>
+									</button>
+								</li>
+							{/each}
 							{#each workspace.machines as m (m.qualifiedName ?? m.name)}
 								<li>
 									<button

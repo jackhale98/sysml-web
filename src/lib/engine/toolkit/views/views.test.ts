@@ -932,7 +932,8 @@ describe('the demo’s tables', () => {
 
 	it('connections, allocations and the FMEA', () => {
 		const connections = table('ConnectionTable');
-		expect(shape(connections)).toEqual([21, 2]);
+		// GroundLink's command link is the 22nd.
+		expect(shape(connections)).toEqual([22, 2]);
 		expect(connections.rows[0]).toEqual(['battery.powerOut', 'powerDistribution.powerIn']);
 		// A named connection is the element behind its row (the earlier engine gave none).
 		expect(connections.sources[0]!.element).toBe('DroneArchitecture::drone::batteryPower');
@@ -1066,9 +1067,10 @@ describe('the demo’s tables', () => {
 
 	it('the bill of materials follows the toolkit’s types and SysML’s `::**`', () => {
 		const bom = table('BillOfMaterials');
-		// The whole model: the drone in its service context, then the product line and its two
-		// configurations (`DroneConfigurations`), each a drone of its own.
-		expect(shape(bom)).toEqual([134, 5]);
+		// The whole model: the drone in its service context, GroundLink's linkTest, its station
+		// and its controller, then the product line and its two configurations
+		// (`DroneConfigurations`), each a drone of its own.
+		expect(shape(bom)).toEqual([137, 5]);
 		// `part drone :> DroneArchitecture::drone` is a DeliveryDrone (the earlier engine said `drone`).
 		expect(bom.rows[1]!.slice(0, 2)).toEqual(['deliveryService.drone', 'DeliveryDrone']);
 		expect(bom.rows[8]).toEqual([
@@ -1117,8 +1119,8 @@ describe('the demo’s tables', () => {
 			'view def'
 		]);
 		const row = (kind: string) => stats.rows.find((r) => r[0] === kind);
-		// The drone's variation defs (`BatteryOption`, `RadioOption`) are two.
-		expect(row('part def')).toEqual(['part def', '21', '0']);
+		// The drone's variation defs (`BatteryOption`, `RadioOption`) are two, GroundLink's console one.
+		expect(row('part def')).toEqual(['part def', '22', '0']);
 		expect(row('requirement')).toEqual(['requirement', '0', '24']);
 		// The dependency matrices' metadata def has five; the reporting library's convention two;
 		// the long-range radio three; the uncertainty library's distributions eleven, and the
@@ -1135,7 +1137,7 @@ describe('the demo’s tables', () => {
 			24, 12
 		]);
 		expect(shape(table('ModelViews::InterfaceControlDocument::connectionsChapter'))).toEqual([
-			21, 2
+			22, 2
 		]);
 		expect(() => table('ModelViews::SpecificationDocument')).toThrow(/no @TableRendering/);
 	});

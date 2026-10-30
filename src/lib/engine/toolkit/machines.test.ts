@@ -124,12 +124,14 @@ describe('state machines from the toolkit', () => {
 			{ from: 'r1.entry', to: 'r1.a' },
 			// `accept Go then b;` after `state a;` leaves `a`.
 			{ from: 'r1.a', to: 'r1.b', trigger: 'Go' },
-			// `s : Sig`: the signal is named `s`, for guards and effects that read its values.
+			// `s : Sig`: the signal is named `s`, for guards and effects that read its values;
+			// `via p`: it must come in at the port `p`.
 			{
 				from: 'r1.b',
 				to: 'r1.a',
 				trigger: 'Sig',
 				payload: 's',
+				via: 'p',
 				guard: 'x > 2',
 				effect: 'assign x := 0'
 			},
@@ -172,7 +174,7 @@ describe('state machines from the toolkit', () => {
 
 	it('still reads the machines while another file does not parse', () => {
 		const files = [...demoFiles(), { path: 'broken.sysml', text: 'package Broken { part x : ; }' }];
-		expect(host.stateMachines(files).map((m) => m.name)).toEqual(['FlightModes']);
+		expect(host.stateMachines(files).map((m) => m.name)).toEqual(['FlightModes', 'console']);
 	});
 
 	it('costs a few ms on the demo once it is analysed', () => {
@@ -181,7 +183,8 @@ describe('state machines from the toolkit', () => {
 		const started = performance.now();
 		const machines = host.stateMachines(files);
 		const ms = performance.now() - started;
-		expect(machines).toHaveLength(1);
+		// FlightModes, and the ground station's console that commands it (`GroundLink`).
+		expect(machines.map((m) => m.name)).toEqual(['FlightModes', 'console']);
 		expect(ms).toBeLessThan(50);
 		// Asked again for the same text: the same answer, not read again.
 		expect(host.stateMachines(files)).toBe(machines);

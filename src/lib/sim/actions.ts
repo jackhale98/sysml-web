@@ -40,7 +40,14 @@ export type ActionStep = Written &
 				branches: { condition: string; steps: ActionStep[] }[];
 				otherwise: ActionStep[] | null;
 		  }
-		| { kind: 'send'; signal: string; args: string[]; to: string | null }
+		| {
+				kind: 'send';
+				signal: string;
+				args: string[];
+				to: string | null;
+				/** The port it goes out through (`via p`), if any. */
+				via?: string | null;
+		  }
 		| { kind: 'named' }
 		| { kind: 'other' }
 		/** `while c { … } until d;`, `loop { … } until d;` (no `while`: the test is `true`). */
@@ -215,8 +222,12 @@ function parseSend(text: string): ActionStep | null {
 		to = squash(rest.slice(at + 2)) || null;
 		rest = rest.slice(0, at).trim();
 	}
+	let port: string | null = null;
 	const via = keyword(rest, 'via');
-	if (via >= 0) rest = rest.slice(0, via).trim();
+	if (via >= 0) {
+		port = squash(rest.slice(via + 3)) || null;
+		rest = rest.slice(0, via).trim();
+	}
 	rest = rest.replace(/^new\b\s*/, '');
 	const m = /^((?:'[^']*'|[\w$]+)(?:\s*::\s*(?:'[^']*'|[\w$]+))*)\s*([\s\S]*)$/.exec(rest);
 	if (!m) return null;
@@ -235,7 +246,7 @@ function parseSend(text: string): ActionStep | null {
 			from = comma + 1;
 		}
 	}
-	return { kind: 'send', text: squash(text), signal, args, to };
+	return { kind: 'send', text: squash(text), signal, args, to, ...(port ? { via: port } : {}) };
 }
 
 const NAME = String.raw`(?:'[^']*'|[\w$]+)`;

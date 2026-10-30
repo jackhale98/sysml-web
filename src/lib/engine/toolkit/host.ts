@@ -45,6 +45,7 @@ import type {
 	DependencyMatrix,
 	RiskPolicy,
 	FmeaLineInfo,
+	MachineSystem,
 	StateMachine,
 	ActionFlow,
 	TradeStudy,
@@ -80,6 +81,7 @@ import {
 	type ExtractedModel,
 	type UnitInfo
 } from './model';
+import { extractSystems } from './systems';
 import { TextIndexCache } from './offsets';
 import { hasVariants } from './variability';
 import { RepairMap } from './repair';
@@ -112,6 +114,7 @@ interface Built {
 	machines?: StateMachine[];
 	/** The actions that run as flows, read on first ask. */
 	flows?: ActionFlow[];
+	systems?: MachineSystem[];
 	/** Values and verdicts (`evaluation.ts`), on first ask. */
 	evaluation?: Evaluation;
 	/** The model as the semantic diff reads it (`snapshot.ts`), on first ask. */
@@ -709,6 +712,14 @@ export class ToolkitHost {
 		const built = this.build(files);
 		built.flows ??= built.extracted ? extractFlows(built.extracted, built.units) : [];
 		return built.flows;
+	}
+
+	/** Parts whose parts' state machines run together (`systems.ts`), for the emulator. */
+	machineSystems(files: SourceFile[]): MachineSystem[] {
+		const machines = this.stateMachines(files);
+		const built = this.build(files);
+		built.systems ??= built.extracted ? extractSystems(built.extracted, machines) : [];
+		return built.systems;
 	}
 
 	/** The current session, built for `files` (for language services). */

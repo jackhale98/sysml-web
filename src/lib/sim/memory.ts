@@ -28,3 +28,16 @@ export function recall(key: string): SavedRun | undefined {
 export function forget(key: string) {
 	runs.delete(key);
 }
+
+/** Runs of several parts together (`SystemEmulator.svelte`), kept the same way. */
+const systemRuns = new Map<string, unknown>();
+
+export function rememberSystem<T>(key: string, run: T) {
+	systemRuns.delete(key);
+	systemRuns.set(key, run);
+	while (systemRuns.size > LIMIT) systemRuns.delete(systemRuns.keys().next().value!);
+}
+
+export function recallSystem<T>(key: string): T | undefined {
+	return systemRuns.get(key) as T | undefined;
+}

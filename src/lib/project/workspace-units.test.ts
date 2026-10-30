@@ -34,6 +34,7 @@ async function open(text = TEXT): Promise<Workspace> {
 		listViews: async () => [],
 		stateMachines: async () => [],
 		variability: async () => ({ points: [], configurations: [] }),
+		machineSystems: async () => [],
 		checks: async (f: SourceFile[]) => host.checks(f),
 		edit: async (request: EditRequest) => host.edit(request),
 		codeActions: async (f: SourceFile[], path: string, from: number, to: number) =>

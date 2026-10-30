@@ -16,6 +16,7 @@ import {
 	parseLiteral,
 	record,
 	sessionAt,
+	signalFields,
 	sliderRange,
 	stepOption,
 	stepsSince,
@@ -320,5 +321,24 @@ describe('trace and history', () => {
 		expect(findMachine([flightModes], 'FlightModes')).toBe(flightModes);
 		expect(findMachine([flightModes], 'Other::FlightModes')).toBe(flightModes);
 		expect(findMachine([flightModes], 'Nope')).toBeUndefined();
+	});
+});
+
+describe('signal values the person may give', () => {
+	it('lists the attributes of a signal a transition reads, and none for one it does not', () => {
+		const machine = {
+			name: 'G',
+			file: 'g.sysml',
+			line: 1,
+			states: [],
+			variables: [],
+			transitions: [
+				{ from: 'a', to: 'b', trigger: 'Readings::Reading', payload: 'r', line: 2 },
+				{ from: 'a', to: 'c', trigger: 'Go', line: 3 }
+			],
+			signals: { 'Readings::Reading': [{ name: 'v', type: 'Integer', value: '1' }], Go: [] }
+		};
+		expect(signalFields(machine, 'Reading')).toEqual([{ name: 'v', type: 'Integer', value: '1' }]);
+		expect(signalFields(machine, 'Go')).toEqual([]);
 	});
 });

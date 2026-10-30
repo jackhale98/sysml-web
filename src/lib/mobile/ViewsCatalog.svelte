@@ -168,6 +168,15 @@
 		<section>
 			{@render heading('Simulations')}
 			<ul>
+				{#each workspace.systems as s (s.qualifiedName)}
+					{@render row(
+						Play,
+						`Run ${viewTitle(s.name)} (${s.parts.length} machines together)`,
+						{ kind: 'emulator', machine: s.qualifiedName, title: s.name },
+						undefined,
+						'var(--kind-behavior)'
+					)}
+				{/each}
 				{#each workspace.machines as m (m.qualifiedName ?? m.name)}
 					{@render row(
 						Play,
