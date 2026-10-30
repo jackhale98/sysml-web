@@ -180,7 +180,9 @@ describe('on a new Small system project', { timeout: 60_000 }, () => {
 		const libraries = await riskLibrariesWrite(workspace, hostEngine(host));
 		expect(libraries.files?.map((f) => f.path)).toEqual([
 			'libraries/RiskAnalysis.sysml',
-			'libraries/HazardAnalysis.sysml'
+			'libraries/HazardAnalysis.sysml',
+			'libraries/Reliability.sysml',
+			'libraries/FaultTreeAnalysis.sysml'
 		]);
 		const plan = planFmea(
 			workspace,
