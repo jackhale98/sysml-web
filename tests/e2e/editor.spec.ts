@@ -78,7 +78,9 @@ test('completion offers the project’s definitions, and rename changes every fi
 		.getByRole('button', { name: /^Components\.sysml/ })
 		.first()
 		.click();
-	await expect(page.locator('.cm-content')).toContainText('part def PowerPack :> Component');
+	// Found by searching, as the editor draws only the lines in view.
+	await find(page, 'part def PowerPack :> Component');
+	await expect(page.locator('.cm-activeLine')).toContainText('part def PowerPack :> Component');
 });
 
 test('the editor runs without a part of it failing', async ({ page }) => {

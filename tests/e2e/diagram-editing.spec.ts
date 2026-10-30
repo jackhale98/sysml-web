@@ -405,7 +405,9 @@ test.describe('on a phone', () => {
 	test('related elements in the details are thumb-sized links', async ({ page }) => {
 		await openDemo(page);
 		const catalogue = await openPhoneView(page, 'Component catalogue');
-		await node(catalogue, 'Battery').tap();
+		// Where a thumb would: on the part of the box in view (it opens at a readable zoom, so
+		// a box can run off the edge of the screen).
+		await node(catalogue, 'Battery').tap({ position: { x: 24, y: 24 } });
 		await page
 			.getByRole('navigation', { name: 'Sections' })
 			.getByRole('button', { name: 'Details' })
