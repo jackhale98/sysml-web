@@ -30,6 +30,8 @@ export interface SysmlEdgeData extends Record<string, unknown> {
 	/** The line runs from a port's square, or to one (interconnection views): its ends sit on the squares. */
 	sourcePort?: boolean;
 	targetPort?: boolean;
+	/** Drawn straight between the two nodes' outlines (use case diagrams). */
+	straight?: boolean;
 	/** ELK's route, valid while the two nodes stay at `from` and `to` (their positions when it was made). */
 	route?: Route & { from: XY; to: XY };
 }

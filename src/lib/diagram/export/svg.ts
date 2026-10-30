@@ -333,6 +333,7 @@ export function edgeStyle(kind: string): {
 		case 'verify':
 		case 'allocate':
 		case 'dependency':
+		case 'include':
 			return { end: 'open', dashed: true };
 		case 'flow':
 		case 'transition':

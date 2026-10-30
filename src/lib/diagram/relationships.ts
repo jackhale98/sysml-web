@@ -40,7 +40,17 @@ export interface ModelContext {
 	analyses: Analysis[];
 }
 
-export type RelationKind = 'compose' | 'satisfy' | 'verify' | 'allocate' | 'connect' | 'specialize';
+export type RelationKind =
+	| 'compose'
+	| 'satisfy'
+	| 'verify'
+	| 'allocate'
+	| 'connect'
+	| 'specialize'
+	/** An actor (`from`, a part def or a typed part) takes part in a use case (`to`). */
+	| 'actor'
+	/** A use case (`from`) includes another (`to`, a use case def). */
+	| 'include';
 
 export interface RelationOption {
 	kind: RelationKind;
@@ -103,7 +113,35 @@ export function relationsFor(
 		add('verify', 'is verified by', target, source);
 	}
 	if (canAllocate(source, target)) add('allocate', 'is allocated to', source, target);
+	// Use cases: who takes part in one, and what one includes.
+	if (canTakePart(source, target)) add('actor', 'takes part in', source, target);
+	if (canTakePart(target, source)) add('actor', 'takes part in', target, source);
+	if (canInclude(source, target)) add('include', 'includes', source, target);
+	if (canInclude(target, source)) add('include', 'is included in', target, source);
 	return options;
+}
+
+const isUseCase = (e: ModelElement) => kindOf(e) === 'use case';
+
+/** A part def (or a typed part) as an actor of a use case of the project. */
+function canTakePart(actor: ModelElement, useCase: ModelElement): boolean {
+	return (
+		isUseCase(useCase) &&
+		!isLibrary(useCase) &&
+		kindOf(actor) === 'part' &&
+		(actor.isDefinition || !!actor.typeRef)
+	);
+}
+
+/** A use case of the project including a use case def (never itself). */
+function canInclude(by: ModelElement, included: ModelElement): boolean {
+	return (
+		isUseCase(by) &&
+		isUseCase(included) &&
+		included.isDefinition &&
+		!isLibrary(by) &&
+		simpleName(by.typeRef ?? by.name) !== simpleName(included.name)
+	);
 }
 
 function canSpecialize(from: ModelElement, to: ModelElement): boolean {
@@ -225,6 +263,13 @@ export function defaultChoice(option: RelationOption, ctx: ModelContext): Relati
 		const type = option.to.isDefinition ? option.to.name : (option.to.typeRef ?? option.to.name);
 		return { name: partName(type, memberNames(option.from, ctx)) };
 	}
+	if (option.kind === 'actor') {
+		const type = option.from.isDefinition ? option.from.name : (option.from.typeRef ?? '');
+		return { name: partName(type, memberNames(option.to, ctx)) };
+	}
+	if (option.kind === 'include') {
+		return { name: partName(option.to.name, memberNames(option.from, ctx)) };
+	}
 	if (option.kind === 'connect') {
 		const pair = bestPorts(option, ctx);
 		if (!pair) {
@@ -335,7 +380,7 @@ function hostOf(
  * Write `statement` right after the last statement starting with `keyword`
  * in `host`, so it joins its siblings; otherwise at the end of the body.
  */
-function besideStep(
+export function besideStep(
 	host: ModelElement,
 	keyword: string,
 	statement: string,
@@ -482,6 +527,37 @@ export function planRelation(
 			}
 			return step(owner, statement, `Connected ${a} to ${b}`);
 		}
+		case 'actor': {
+			const name = (choice.name ?? '').trim();
+			if (!name) return 'Give the actor a name.';
+			const type = from.isDefinition
+				? referenceFrom(from, to, ctx.owners, ctx.textOf)
+				: (from.typeRef ?? from.name);
+			const already = ctx.elements.find(
+				(e) =>
+					e.kind === 'actor' &&
+					ctx.owners.get(e.key)?.key === to.key &&
+					simpleName(e.typeRef ?? '') === simpleName(type)
+			);
+			if (already) return `${simpleName(type)} already takes part in ${to.label}.`;
+			return step(
+				to,
+				`actor ${formatName(name)} : ${type};`,
+				`${simpleName(type)} now takes part in ${to.label}`,
+				'actor'
+			);
+		}
+		case 'include': {
+			const name = (choice.name ?? '').trim();
+			if (!name) return 'Give the included use case a name.';
+			const type = referenceFrom(to, from, ctx.owners, ctx.textOf);
+			return step(
+				from,
+				`include use case ${formatName(name)} : ${type};`,
+				`${from.label} now includes ${to.label}`,
+				'include'
+			);
+		}
 		case 'specialize': {
 			const namespace = ctx.owners.get(from.key) ?? from;
 			const ref = referenceFrom(to, namespace, ctx.owners, ctx.textOf);
@@ -521,7 +597,9 @@ export function planEdgeRemoval(
 	label: string | null,
 	source: ModelElement,
 	target: ModelElement,
-	ctx: ModelContext
+	ctx: ModelContext,
+	/** Where the edge's own element is written, when it is one (an actor parameter, an include). */
+	written?: { file: string; start_byte: number }
 ): Plan | string {
 	const patchSpan = (element: { file: string; span: Span }, what: string): Plan | string => {
 		const text = ctx.textOf(element.file);
@@ -650,6 +728,28 @@ export function planEdgeRemoval(
 			}
 			return 'The allocate statement was not found.';
 		}
+		case 'actor':
+		case 'include': {
+			// The actor parameter, or the include, that the line draws.
+			const owner = kind === 'actor' ? target : source;
+			const other = kind === 'actor' ? source : target;
+			const member =
+				(written && ctx.elements.find((e) => e.key === `${written.file}@${written.start_byte}`)) ||
+				ctx.elements.find(
+					(e) =>
+						ctx.owners.get(e.key)?.key === owner.key &&
+						(kind === 'actor' ? e.kind === 'actor' : isUseCase(e)) &&
+						simpleName(e.typeRef ?? '') === simpleName(other.name)
+				);
+			if (!member || ctx.owners.get(member.key)?.key !== owner.key)
+				return `${owner.label} inherits this from its definition; change it there.`;
+			return removeElement(
+				member,
+				kind === 'actor'
+					? `${other.label} no longer takes part in ${owner.label}`
+					: `${owner.label} no longer includes ${other.label}`
+			);
+		}
 		default:
 			return `This ${kind.replace(/_/g, ' ')} line comes from the text; change it there.`;
 	}
@@ -659,7 +759,10 @@ export function planEdgeRemoval(
 export function describeHost(option: RelationOption, ctx: ModelContext): string {
 	switch (option.kind) {
 		case 'compose':
+		case 'include':
 			return `in ${option.from.label}`;
+		case 'actor':
+			return `in ${option.to.label}`;
 		case 'verify':
 			return `in the objective of ${option.from.label}`;
 		case 'specialize':
