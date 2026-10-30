@@ -515,7 +515,8 @@ export const HELP: HelpSection[] = [
 			{
 				id: 'import-excel',
 				title: 'Import from Excel',
-				keywords: 'spreadsheet xlsx csv paste requirements upload',
+				keywords:
+					'spreadsheet xlsx csv paste requirements upload reqif reqifz doors polarion jama codebeamer',
 				blocks: [
 					{
 						steps: [
@@ -523,7 +524,8 @@ export const HELP: HelpSection[] = [
 							'Pick an Excel or CSV file, or paste cells copied from a spreadsheet.',
 							'Match its columns to ID, title, statement and the rest, check the preview, and import. A row whose ID is already here updates that requirement.'
 						]
-					}
+					},
+					'**From DOORS, Polarion, Jama or another requirements tool**: export a ReqIF file (`.reqif`, or `.reqifz` with its attachments) there and pick it in step 2. You match its attributes instead of columns, and say which object types are headings and which relations are derivations or refinements; the preview names everything left out. Headings become packages. Import a later export of the same file and the requirements already imported are updated in place, not added again. To send requirements back, choose **Export** › **ReqIF** above the requirements table.'
 				],
 				action: { action: 'import-requirements', label: 'Import requirements' }
 			},

@@ -2,7 +2,8 @@
  * SysML text for imported requirements, written the way the engine's own
  * edits and the demo model write it: four-space indents, `doc /* … *\/`
  * comments aligned on their stars, `:>> attribute = Enum::literal;`
- * redefinitions, then `@StatusInfo`, `@Rationale` and `@Issue` metadata.
+ * redefinitions, then `@StatusInfo`, `@Rationale` and `@Issue` metadata, and
+ * `@ReqIF` for requirements imported from a ReqIF file.
  */
 
 export { sysmlName } from '#lib/project/names.ts';
@@ -84,6 +85,8 @@ export interface RequirementSpec {
 	originator?: string;
 	rationale?: string;
 	issues?: string[];
+	/** The IDENTIFIER of the ReqIF object it comes from, kept so a later import updates it. */
+	reqif?: string;
 }
 
 function attributeValue(value: AttributeValue): string {
@@ -127,7 +130,13 @@ export function requirementText(spec: RequirementSpec): string {
 	for (const issue of spec.issues ?? []) {
 		if (issue.trim()) body.push(`    @Issue { text = ${sysmlString(issue.trim())}; }`);
 	}
+	if (spec.reqif) body.push(`    ${reqifAnnotation(spec.reqif)}`);
 	return body.length ? `${header} {\n${body.join('\n')}\n}` : `${header};`;
+}
+
+/** `@ReqIF { identifier = "…"; }`: where an element came from in a ReqIF file. */
+export function reqifAnnotation(identifier: string): string {
+	return `@ReqIF { identifier = ${sysmlString(identifier)}; }`;
 }
 
 /** A derivation: the original requirement and the ones derived from it. */
