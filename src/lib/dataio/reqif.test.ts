@@ -500,6 +500,24 @@ describe('importing ReqIF', () => {
 		expect(safety.indexOf("'Geofence override'")).toBeLessThan(safety.indexOf('\n    }'));
 	});
 
+	it('finds requirements again by their ReqIF IDENTIFIER, when they have no ID', async () => {
+		const doc = await read(fixture('doors-next.reqif'), 'doors-next.reqif');
+		const noIds = (context: ImportContext) => {
+			const options = optionsFor(doc, context);
+			return { targets: options.targets.map((t) => (t === 'id' ? '' : t)) };
+		};
+		const first = await importInto(demo, doc, noIds(contextFor(demo)));
+		expect(first.plan.create.map((c) => c.spec.id)).toEqual([
+			undefined,
+			undefined,
+			undefined,
+			undefined
+		]);
+		const context = contextFor(first.files);
+		const again = planReqif(doc, optionsFor(doc, context, noIds(context)), context);
+		expect([again.create.length, again.update.length, again.unchanged]).toEqual([0, 0, 4]);
+	});
+
 	it('writes refinements and names the relations it leaves out (Polarion, no definition)', async () => {
 		const doc = await read(fixture('polarion.reqif'), 'polarion.reqif');
 		const files = { ...demo };

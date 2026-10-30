@@ -26,6 +26,7 @@
 		X
 	} from '@lucide/svelte';
 	import ExportMenu from '#lib/dataio/ExportMenu.svelte';
+	import type { ReqifProject } from '#lib/dataio/reqif-write.ts';
 	import type { ExportTable } from '#lib/dataio/export.ts';
 	import { tradeExport } from '#lib/engine/tradeExport.ts';
 	import type { Engine } from '#lib/engine/client.ts';
@@ -216,6 +217,16 @@
 			doc: info?.doc,
 			header: (table?.columns ?? []).map((c, i) => (isPivot && i > 0 ? c : heading(c))),
 			rows: rows.map((r) => r.cells)
+		};
+	}
+
+	/** The project, for exporting its requirements as ReqIF. */
+	function reqifProject(): ReqifProject {
+		return {
+			analyses: Object.values(workspace.analyses),
+			files: workspace.files,
+			requirements: workspace.requirements,
+			title: workspace.info?.name ?? 'Project'
 		};
 	}
 
@@ -951,6 +962,7 @@
 						table={exportData}
 						filtered={rows.length !== table.rows.length}
 						share={ui.phone}
+						reqif={listsRequirements ? reqifProject : undefined}
 					/>
 					{#if listsRequirements}
 						<button

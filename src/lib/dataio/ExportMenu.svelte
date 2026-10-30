@@ -1,16 +1,20 @@
 <script lang="ts">
-	import { Download, FileSpreadsheet, FileText, Printer } from '@lucide/svelte';
+	import { Download, FileCode, FileSpreadsheet, FileText, Printer } from '@lucide/svelte';
 	import { toasts } from '#lib/ui/toasts.svelte.ts';
 	import type { ExportTable } from './export.ts';
+	import type { ReqifProject } from './reqif-write.ts';
 
 	/**
 	 * Export a table view: CSV, an Excel workbook, or a printed page (which
-	 * the print dialog can save as PDF). The writers load on first use.
+	 * the print dialog can save as PDF). A table of requirements also offers
+	 * ReqIF, every requirement in the project for DOORS, Polarion, Jama and
+	 * other requirements tools. The writers load on first use.
 	 */
 	let {
 		table,
 		filtered = false,
-		share = false
+		share = false,
+		reqif
 	}: {
 		/** The table as shown (searched and sorted), read when exporting. */
 		table: () => ExportTable;
@@ -18,6 +22,8 @@
 		filtered?: boolean;
 		/** Offer the phone's share sheet instead of a download. */
 		share?: boolean;
+		/** The project, read when exporting its requirements as ReqIF (requirements tables only). */
+		reqif?: () => ReqifProject;
 	} = $props();
 
 	let open = $state(false);
@@ -27,10 +33,16 @@
 	let root: HTMLDivElement | undefined = $state();
 	const uid = $props.id();
 
-	async function run(kind: 'csv' | 'xlsx' | 'print') {
+	async function run(kind: 'csv' | 'xlsx' | 'print' | 'reqif') {
 		open = false;
 		busy = true;
 		try {
+			if (kind === 'reqif') {
+				if (!reqif) return;
+				const { exportReqif } = await import('./reqif-write.ts');
+				await exportReqif(reqif(), share);
+				return;
+			}
 			const io = await import('./export.ts');
 			const data = table();
 			if (kind === 'csv') await io.exportCsv(data, share);
@@ -128,6 +140,23 @@
 					<small id="{uid}-print">A page with the title and date</small>
 				</span>
 			</button>
+			{#if reqif}
+				<button
+					type="button"
+					role="menuitem"
+					aria-label="ReqIF"
+					aria-describedby="{uid}-reqif"
+					onclick={() => run('reqif')}
+				>
+					<FileCode size={15} />
+					<span>
+						<strong>ReqIF</strong>
+						<small id="{uid}-reqif"
+							>Every requirement in the project, for DOORS, Polarion, Jama and others</small
+						>
+					</span>
+				</button>
+			{/if}
 		</div>
 	{/if}
 </div>

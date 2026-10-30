@@ -13,10 +13,12 @@
  * IDENTIFIER it came with, the others one made from their ID (else their
  * qualified name), so the other tool updates rather than duplicates.
  */
+import type { Analysis } from '#lib/engine/types.ts';
 import type { RequirementRow } from '#lib/project/requirements.ts';
 import { unescapeName } from '#lib/project/names.ts';
 import {
 	attributeLabel,
+	buildContext,
 	REQIF_METADATA,
 	STATUS_KINDS,
 	type AttributeInfo,
@@ -516,6 +518,24 @@ export function writeReqif({ context, title, now = new Date() }: ReqifExportInpu
 	out.push('  </CORE-CONTENT>');
 	out.push('</REQ-IF>');
 	return `${out.join('\n')}\n`;
+}
+
+/** What the export menu hands over: the project as the workspace has it. */
+export interface ReqifProject {
+	analyses: Analysis[];
+	files: Record<string, string>;
+	requirements: RequirementRow[];
+	title: string;
+}
+
+/** Write the project's requirements as `<project> requirements.reqif` and hand it to the person. */
+export async function exportReqif(project: ReqifProject, share: boolean): Promise<void> {
+	const { fileName, saveFile } = await import('./export');
+	const context = buildContext(project.analyses, project.files, project.requirements);
+	if (!context.requirements.some((r) => !r.row.file.startsWith('libraries/')))
+		throw new Error('the project has no requirements to export');
+	const xml = writeReqif({ context, title: project.title });
+	await saveFile(fileName(`${project.title} requirements`, 'reqif'), xml, 'application/xml', share);
 }
 
 // ---------------------------------------------------------------------------
