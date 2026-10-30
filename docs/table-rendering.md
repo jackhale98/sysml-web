@@ -139,6 +139,17 @@ Row providers (the `rows` value):
                           and verifiedBy (what satisfies and
                           verifies those controls), failureModes
                           (the @Fmea lines whose `hazard` names it)
+  "variability"           one row per configuration of a product
+                          (a usage that specializes a product line
+                          and binds its variation points): field
+                          configuration, productLine, product,
+                          doc, file, line, and one per variation
+                          point (the column `variationPoints`
+                          stands for them all) holding the variant
+                          it chooses; a choice left open, made
+                          twice or of something that is not a
+                          variant is the cell's problem
+                          (docs/variants.md).
 
 Values are evaluated with their units by the tool's evaluator, as
 the model binds them; a value it cannot evaluate is left empty with

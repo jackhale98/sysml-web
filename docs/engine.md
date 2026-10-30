@@ -583,6 +583,18 @@ toolkit's `conforms`).
 - **Cost on the demo in Node**: about 60 ms for the study the first time in
   an analysis (the first `query` warms the toolkit up), then cached.
 
+## Variants and configurations
+
+`EngineApi.variability(files)` and the `variability` row provider are
+answered by `toolkit/variability.ts` (`VariabilityModel`, once per analysis,
+`ViewContext.variability`); a model without variants skips it. A call whose
+files include the pseudo-file `.tessera/configuration`
+(`engine/configuration.ts`) is answered for the model with that
+configuration's choices made, analysed in a session apart
+(`ToolkitHost.buildConfigured`); the analysed session is untouched. The
+configurations' problems are added to the analyses' diagnostics. See
+[variants.md](variants.md).
+
 ## Guided forms
 
 The forms that make views, roll-ups, limits, trade studies, FMEA
