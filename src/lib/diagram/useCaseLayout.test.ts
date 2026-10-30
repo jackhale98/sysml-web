@@ -1,9 +1,9 @@
 /**
  * The use case diagram's layout (`useCaseLayout.ts`) on the demo's delivery
- * use cases, laid out as the canvas lays them out: the use cases inside the
- * drone's boundary, the actors outside it on the left and the right, level
- * with their use cases; and where a straight line meets an ellipse or a
- * stick figure.
+ * use cases, laid out as the canvas lays them out: the use cases in a column
+ * inside the drone's boundary, the actors outside it on the left and the
+ * right, level with their use cases; a long list in more columns; and where
+ * a straight line meets an ellipse or a stick figure.
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { ToolkitHost } from '#lib/engine/toolkit/host.ts';
@@ -43,14 +43,52 @@ describe('use case layout', () => {
 		expect(at.get('Operator')!.x + at.get('Operator')!.width).toBeLessThan(frame!.x);
 		expect(at.get('Recipient')!.x).toBeGreaterThan(frame!.x + frame!.width);
 		expect(at.get('AviationAuthority')!.x).toBeGreaterThan(frame!.x + frame!.width);
-		// A use case sits left of the one it includes.
-		expect(at.get('DeliverParcel')!.x).toBeLessThan(at.get('VerifyDropZone')!.x);
+		// In a column, in the order they are written; the use case it includes right under one.
+		const ys = ['DeliverParcel', 'VerifyDropZone', 'PlanRoute', 'ChargeBattery'].map(
+			(id) => at.get(id)!.y
+		);
+		expect(ys).toEqual([...ys].sort((a, b) => a - b));
+		expect(at.get('VerifyDropZone')!.x).toBeGreaterThan(at.get('DeliverParcel')!.x);
 		// Nothing overlaps.
 		for (const a of nodes)
 			for (const b of nodes)
 				if (a !== b) expect(overlaps(a, b), `${a.node.id} ${b.node.id}`).toBe(false);
 		// The lines are drawn straight, wherever the nodes go: there are no routes.
 		expect(routes.size).toBe(0);
+	});
+
+	it('wraps a long list of use cases into columns, the actors still outside', async () => {
+		const many = Array.from({ length: 12 }, (_, i) => ({
+			id: `U${i}`,
+			label: `UseCase${i}`,
+			kind: 'use_case' as const,
+			stereotype: '<<use case def>>',
+			attributes: [],
+			is_definition: true
+		}));
+		const people = ['A', 'B'].map((id) => ({ ...many[0]!, id, label: id, kind: 'actor' as const }));
+		const { nodes } = await layout(
+			{
+				title: 'uc',
+				nodes: [...many, ...people],
+				edges: [
+					...many.map((u) => ({ source: 'A', target: u.id, label: null, kind: 'actor' as const })),
+					{ source: 'B', target: 'U0', label: null, kind: 'actor' as const }
+				],
+				subgraphs: [{ id: 's', label: 'S', node_ids: many.map((u) => u.id) }],
+				direction: 'left_right'
+			},
+			'RIGHT',
+			'usecases'
+		);
+		const xs = new Set(nodes.filter((p) => p.node.kind === 'use_case').map((p) => p.x));
+		expect(xs.size).toBe(2);
+		const [frame] = boundaries(
+			[{ id: 's', label: 'S', node_ids: many.map((u) => u.id) }],
+			nodes.map((p) => ({ ...p, id: p.node.id }))
+		);
+		for (const p of nodes.filter((n) => n.node.kind === 'actor'))
+			expect(overlaps(p, frame!), p.node.id).toBe(false);
 	});
 
 	it('sizes an ellipse to its name and objective, and a figure to its name', () => {

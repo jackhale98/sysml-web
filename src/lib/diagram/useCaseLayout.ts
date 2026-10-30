@@ -1,39 +1,44 @@
 /**
- * How a use case diagram is laid out and drawn: the use cases of each
- * subject inside its boundary (ELK lays them out, so a use case sits left of
- * those it includes), the boundaries one under another, and the actors in a
- * column on each side, outside, level with the use cases they take part in.
- * An actor stands on the left when it starts more of its use cases than
- * it joins (it is their first actor), else on the right.
+ * How a use case diagram is laid out and drawn, as use case diagrams are:
+ * the use cases of each subject in a column inside its boundary, in the
+ * order they are written, a use case another includes right under it (set
+ * in a little, the «include» arrow pointing down); the boundaries one under
+ * another; the actors in a column on each side, outside, level with the use
+ * cases they take part in. An actor stands on the left when it starts more
+ * of its use cases than it joins (it is their first actor), else on the
+ * right. A long list of use cases wraps into more columns.
  *
- * Lines are straight, from figure to ellipse, as use case diagrams draw
- * them; `straightLine` gives their ends wherever the nodes are dragged.
- * A boundary is not a node: it is drawn around its use cases where they
- * are (`boundaries`), so it grows when one is dragged out.
+ * Not ELK's layered layout: it puts an included use case beside the one
+ * that includes it, where the lines from the actors on the right cross it.
+ *
+ * Lines are straight, from figure to ellipse; `straightLine` gives their
+ * ends wherever the nodes are dragged. A boundary is not a node: it is
+ * drawn around its use cases where they are (`boundaries`), so it grows
+ * when one is dragged out.
  */
 import type { DiagramGraph, DiagramNode } from '#lib/engine/types.ts';
 import type { Layout, Placed, XY } from './layout.ts';
 
 /** Room around the use cases inside a boundary, and for its name on top. */
 export const BOUNDARY = { pad: 28, title: 30 };
-/** Between two boundaries, and between a boundary and the actors' columns. */
+/**
+ * Between two use cases (more above one that is included, for the «include»
+ * arrow and its label), two columns, two boundaries; an included one's indent.
+ */
+const ROW_GAP = 24;
+const INCLUDE_GAP = 44;
+const COLUMN_GAP = 56;
 const GROUP_GAP = 48;
+const INDENT = 44;
+/** Use cases in a column before the next one starts. */
+const PER_COLUMN = 7;
+/** Between a boundary and the actors' columns, and between two actors. */
 const ACTOR_GAP = 96;
 const ACTOR_SPACING = 28;
 
-interface Elk {
-	layout(graph: unknown): Promise<{
-		children?: { id: string; x?: number; y?: number }[];
-	}>;
-}
-
 type Size = { width: number; height: number };
 
-export async function useCaseLayout(
-	graph: DiagramGraph,
-	sizeOf: (node: DiagramNode) => Size,
-	elk: Elk
-): Promise<Layout> {
+export function useCaseLayout(graph: DiagramGraph, sizeOf: (node: DiagramNode) => Size): Layout {
 	const byId = new Map(graph.nodes.map((n) => [n.id, n]));
 	const sizes = new Map(graph.nodes.map((n) => [n.id, sizeOf(n)]));
 	const useCases = graph.nodes.filter((n) => n.kind !== 'actor');
@@ -45,44 +50,28 @@ export async function useCaseLayout(
 		})),
 		{ frame: false, ids: useCases.filter((n) => !framed.has(n.id)).map((n) => n.id) }
 	].filter((g) => g.ids.length);
+	const included = new Set(graph.edges.filter((e) => e.kind === 'include').map((e) => e.target));
 
 	const at = new Map<string, XY>();
 	let top = 0;
 	for (const group of groups) {
-		const members = new Set(group.ids);
-		const inside = graph.edges.filter(
-			(e) => members.has(e.source) && members.has(e.target) && e.source !== e.target
-		);
-		const result = await elk.layout({
-			id: 'group',
-			layoutOptions: {
-				'elk.algorithm': 'layered',
-				'elk.direction': 'RIGHT',
-				'elk.spacing.nodeNode': '28',
-				'elk.layered.spacing.nodeNodeBetweenLayers': '72',
-				'elk.spacing.componentComponent': '28',
-				// Use cases that include nothing stack in a column, not a row.
-				'elk.aspectRatio': '0.3',
-				'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES'
-			},
-			children: group.ids.map((id) => ({ id, ...sizes.get(id)! })),
-			edges: inside.map((e, i) => {
-				// A specialization reads from the general use case, left of the specific ones.
-				const [from, to] =
-					e.kind === 'specialization' ? [e.target, e.source] : [e.source, e.target];
-				return { id: `e${i}`, sources: [from], targets: [to] };
-			})
+		const y0 = top + (group.frame ? BOUNDARY.title + BOUNDARY.pad : 0);
+		const columns = Math.ceil(group.ids.length / PER_COLUMN);
+		const perColumn = Math.ceil(group.ids.length / columns);
+		let [x, y, columnWidth, bottom] = [0, y0, 0, y0];
+		group.ids.forEach((id, i) => {
+			if (i && i % perColumn === 0) {
+				x += columnWidth + COLUMN_GAP;
+				[y, columnWidth] = [y0, 0];
+			}
+			const indent = included.has(id) && i % perColumn ? INDENT : 0;
+			if (indent) y += INCLUDE_GAP - ROW_GAP;
+			const { width, height } = sizes.get(id)!;
+			at.set(id, { x: x + indent, y });
+			columnWidth = Math.max(columnWidth, indent + width);
+			y += height + ROW_GAP;
+			bottom = Math.max(bottom, y - ROW_GAP);
 		});
-		const placed = (result.children ?? []).map((c) => ({ id: c.id, x: c.x ?? 0, y: c.y ?? 0 }));
-		const minX = Math.min(...placed.map((p) => p.x));
-		const minY = Math.min(...placed.map((p) => p.y));
-		const offset = group.frame ? BOUNDARY.title + BOUNDARY.pad : 0;
-		let bottom = 0;
-		for (const p of placed) {
-			const y = top + offset + p.y - minY;
-			at.set(p.id, { x: p.x - minX, y });
-			bottom = Math.max(bottom, y + sizes.get(p.id)!.height);
-		}
 		top = bottom + (group.frame ? BOUNDARY.pad : 0) + GROUP_GAP;
 	}
 

@@ -224,9 +224,9 @@ export async function layout(
 	direction: Direction,
 	view = 'general'
 ): Promise<Layout> {
+	if (view === 'usecases') return useCaseLayout(graph, (n) => nodeSize(n, view));
 	const ids = new Set(graph.nodes.map((n) => n.id));
 	const engine = await getElk();
-	if (view === 'usecases') return useCaseLayout(graph, (n) => nodeSize(n, view), engine);
 	// Border ports, fixed where the box draws them, so lines run to them.
 	const anchors = new Map(graph.nodes.map((n) => [n.id, portAnchors(n, view)]));
 	const portId = (node: string, key: string | undefined) =>
