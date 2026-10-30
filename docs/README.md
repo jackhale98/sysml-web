@@ -25,6 +25,8 @@ What each document is for, and who it is for. New to Tessera? Start with the
 - [State machine simulator](simulator.md): what the simulator does with a state
   machine, its simulated clock and `do` actions, and where the specification
   leaves a choice open.
+- [Running actions](action-runs.md): how action flows and the actions of a state machine
+  run step by step: successions, forks and joins, decisions, loops, `perform`, signals.
 - [Model interchange](interchange.md): `.kpar`, SysML v2 JSON and Systems
   Modeling API servers; what round-trips, how Save to server merges, and what a
   server must allow.

@@ -237,7 +237,7 @@ Time is simulated: the clock starts at 0 and moves only when you Step or Wait. `
 
 Something that changes over time, like a battery running down, is a timed transition that changes a value: `accept after 5 [SI::min] do assign charge := charge - 0.1`. A state’s `do` action starts once the state is entered and stops when it is left.
 
-Actions run step by step, in the order written: `assign`, `if … { } else { }`, `then`, and signals a machine sends itself (`send new Ping() to self`), which the next **Step** takes. A transition to `terminate` ends the run.
+Actions run step by step: `assign`, `if … { } else { }`, loops (`while`, `for`, `loop … until`), `perform` of another action, `then` and `first a then b` to order steps, and signals a machine sends itself (`send new Ping() to self`), which the next **Step** takes. A state’s action runs within one step, so an `accept` in it does not wait: the simulator says so. A transition to `terminate` ends the run.
 
 Before a run, the simulator lists states that no transition can reach and transitions that can never fire. The **Timeline** says why each step happened (the event, the condition, the timer) and what its guard read; save it as CSV or JSON to keep the run with your evidence.
 
@@ -254,6 +254,10 @@ An action flow is a process, step by step: `then` for the next step, `fork` and 
 > **Action usage**: An action is a specific step in a behavior, like 'take off' within a delivery mission.
 
 > **Succession**: A succession says one step must finish before the next one starts.
+
+Run an action flow from **Simulations** in the explorer, or with **Run** on its diagram. Each **Step** ends the steps that are running and starts the ones that follow: the diagram shows what runs, what is done and what waits. A `fork` starts its branches together and a `join` waits for all of them; a `decide` takes the branch whose condition holds, `else` when none does. When none holds, or several do, the run stops at the decision and says so, rather than choosing for you: set a value under **Values**, or choose the branch.
+
+A step that waits for a signal (`accept TakeOffCommand`) waits until you send it with the button that appears; `accept after 5 [s]` waits for the time, which a Step lets pass. A `perform` runs the action it names, step by step, and the diagram follows it inside. Loops, `assign`, `if` and values passed along `flow`s run too; what the run cannot do is listed before it starts.
 
 In the app: **Draw an action flow**.
 
@@ -524,7 +528,7 @@ On a Mac, use ⌘ where it says Ctrl.
 | Keys | What they do |
 | --- | --- |
 | <kbd>1 to 9</kbd> | Send that event |
-| <kbd>S</kbd> | Step |
+| <kbd>S</kbd> | Step (state machines and action flows) |
 | <kbd>W</kbd> | Wait (let time pass) |
 | <kbd>B</kbd> | Back a step |
 | <kbd>P</kbd> | Play or pause |

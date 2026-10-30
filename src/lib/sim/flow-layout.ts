@@ -116,6 +116,15 @@ interface ElkEdge {
 	sections?: { startPoint: Point; endPoint: Point; bendPoints?: Point[] }[];
 }
 
+const CONTROL_KINDS = new Set<FlowNode['kind']>([
+	'start',
+	'done',
+	'fork',
+	'join',
+	'decide',
+	'merge'
+]);
+
 const edgeLabel = (e: FlowGraph['edges'][number]): string | null =>
 	e.kind === 'flow' ? (e.item ?? e.toFeature ?? null) : e.guard ? `[${e.guard}]` : null;
 
@@ -128,7 +137,8 @@ export function elkFlowGraph(graph: FlowGraph, direction: Direction): ElkNode {
 			'elk.algorithm': 'layered',
 			'elk.direction': direction,
 			'elk.edgeRouting': 'ORTHOGONAL',
-			'elk.padding': `[top=${m.margin},left=${m.margin},bottom=${m.margin},right=${m.margin}]`,
+			// Room at the top for the line that says what the run did.
+			'elk.padding': `[top=${m.margin + 36},left=${m.margin},bottom=${m.margin},right=${m.margin}]`,
 			'elk.spacing.nodeNode': '22',
 			'elk.spacing.edgeNode': '10',
 			'elk.spacing.edgeEdge': '8',
@@ -175,7 +185,8 @@ export function fromElkFlow(graph: FlowGraph, result: ElkNode, direction: Direct
 		return [
 			{
 				id: n.id,
-				label: boxLabel(n),
+				// Control nodes show only a name they were given (`merge readyToReturn`), not a number.
+				label: CONTROL_KINDS.has(n.kind) ? n.label : boxLabel(n),
 				kind: n.kind,
 				keyword: KEYWORDS[n.kind] ? `«${KEYWORDS[n.kind]}»` : null,
 				x: c.x ?? 0,

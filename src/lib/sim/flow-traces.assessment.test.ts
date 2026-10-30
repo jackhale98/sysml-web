@@ -144,7 +144,7 @@ describe('successions and control nodes', () => {
                 action quick;
                 then j;
                 join j;
-                then action after;
+                then action finish;
                 then done;
             }`,
 			'A'
@@ -153,12 +153,12 @@ describe('successions and control nodes', () => {
 		run.move();
 		// `quick` has ended; its token waits at the join for `slow`.
 		expect(run.ended).toEqual(['slow.assign#1 quick']);
-		expect(run.running).not.toContain('after');
+		expect(run.running).not.toContain('finish');
 		run.toEnd();
-		expect(run.ended.at(-1)).toBe('after');
+		expect(run.ended.at(-1)).toBe('finish');
 		expect(run.ended.slice(0, -1).join(' ')).toContain('slow');
 		expect(run.ended.findIndex((s) => s.split(' ').includes('slow'))).toBeLessThan(
-			run.ended.indexOf('after')
+			run.ended.indexOf('finish')
 		);
 		expect(run.value('x')).toBe(3);
 		expect(run.session.status).toBe('completed');
@@ -412,13 +412,13 @@ describe('accept and send', () => {
 	it('a signal sent to the action itself is taken by its `accept`, with its values', () => {
 		// SendAction to self; AcceptAction gives the payload (`r.v`).
 		const run = new Run(
-			`package S { item def Reading { attribute v : Integer = 1; }
+			`package S { private import ScalarValues::*; item def Reading { attribute v : Integer default 1; }
                 action def A { attribute last : Integer = 0;
                     first start;
                     then send new Reading(7) to self;
                     then wait;
                     action wait accept r : Reading;
-                    then assign last := r.v;
+                    then assign last := wait.r.v;
                 } }`,
 			'A'
 		);
@@ -430,7 +430,7 @@ describe('accept and send', () => {
 	it('`accept after` waits for its time: a Step lets the time pass', () => {
 		// 7.17 accept with a relative time trigger (`TriggerAfter`).
 		const run = new Run(
-			`action def T { first start; then accept after 5 [s]; then action go; then done; }`,
+			`action def T { first start; then accept after 5 [SI::s]; then action go; then done; }`,
 			'T'
 		);
 		const o = run.runner.outlook(run.session);
@@ -469,8 +469,8 @@ describe('values', () => {
                 action a { out attribute v : Integer default 5; }
                 then b;
                 action b { in attribute w : Integer; }
-                flow from a.v to b.w;
                 then done;
+                flow from a.v to b.w;
             }`,
 			'F'
 		).toEnd();
@@ -592,9 +592,13 @@ describe("a state machine's actions", () => {
 	it('a `perform` in an entry action runs the action it names, with its parameters', () => {
 		const m = machineOf(
 			`package P {
-                action def Charge { in attribute amount : Real; first start; then assign level := level + amount; }
+                action def Charge { in attribute current : Real; in attribute amount : Real; out attribute result : Real;
+                    first start; then assign result := current + amount; }
                 state def M { attribute level : Real = 0.5; entry; then s;
-                    state s { entry action { perform action c : Charge { in amount = 0.25; } } } }
+                    state s { entry action {
+                        perform action c : Charge { in current = level; in amount = 0.25; }
+                        then assign level := c.result;
+                    } } }
             }`,
 			'M'
 		);
@@ -620,7 +624,7 @@ describe("a state machine's actions", () => {
 
 	it('an effect with a loop and a send to the machine runs both', () => {
 		const m = machineOf(
-			`package P { item def Done;
+			`package P { item def Go; item def Done;
                 state def M { attribute n : Integer = 0; entry; then a; state a; state b; state c;
                     transition first a accept Go do action { for i in 1..3 { assign n := n + i; } then send new Done() to self; } then b;
                     transition first b accept Done then c; } }`,

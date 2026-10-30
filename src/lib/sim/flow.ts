@@ -901,7 +901,7 @@ class Stepper {
 				return;
 			}
 			case 'accept': {
-				const taken = this.accept(step, run, prefix);
+				const taken = this.accept(step, run, prefix, node.id);
 				if (taken) this.end(frame, graph, prefix, node, taken);
 				return;
 			}
@@ -1068,7 +1068,7 @@ class Stepper {
 	}
 
 	/** Take the signal, time or condition an `accept` waits for; what it took, or null. */
-	private accept(step: StepOf<'accept'>, run: NodeRun, prefix: string): string | null {
+	private accept(step: StepOf<'accept'>, run: NodeRun, prefix: string, id: string): string | null {
 		const trigger = step.trigger;
 		if (/^(after|at)\b/.test(trigger)) {
 			return typeof run.due === 'number' && run.due <= this.state.time ? trigger : null;
@@ -1085,19 +1085,22 @@ class Stepper {
 		if (at < 0) return null;
 		const [signal] = this.state.queue.splice(at, 1);
 		if (step.payload) {
-			// The accepted signal's values, by the name it is given (`r.v`).
-			const base = `${prefix}${step.payload}`;
-			this.declared.add(base);
+			// The accepted signal's values, by the name it is given: `wait.r.v` (the payload is the
+			// accept action's parameter), and `r.v` for short.
+			const values = new Map<string, Value>();
 			for (const a of this.host.signal?.(signal!.signal) ?? []) {
 				if (typeof a.value !== 'string') continue;
 				try {
-					this.vars.set(`${base}.${a.name}`, evaluate(this.expr(a.value), this.scope(prefix)));
+					values.set(a.name, evaluate(this.expr(a.value), this.scope(prefix)));
 				} catch {
 					// No default.
 				}
 			}
-			for (const [k, v] of Object.entries(signal!.values ?? {}))
-				this.vars.set(`${base}.${k}`, fromJson(v));
+			for (const [k, v] of Object.entries(signal!.values ?? {})) values.set(k, fromJson(v));
+			for (const base of [`${prefix}${id}.${step.payload}`, `${prefix}${step.payload}`]) {
+				this.declared.add(base);
+				for (const [k, v] of values) this.vars.set(`${base}.${k}`, v);
+			}
 		}
 		return `accepted ${signal!.signal}`;
 	}

@@ -100,6 +100,7 @@ Without them, people connect GitHub with a personal access token.
 | [Table rendering](docs/table-rendering.md) | How any SysML view becomes a table (`@TableRendering`), for views written by hand. | Modellers |
 | [Requirements, verification results and conventions](docs/verification.md) | The coverage rule, recorded test results (`@VerificationResult`) and when they are out of date, reports that name their commit, change impact, `@Convention` views. | Modellers |
 | [State machine simulator](docs/simulator.md) | What the simulator does with a state machine: steps, the simulated clock, `do` actions, what is not supported. | Modellers |
+| [Running actions](docs/action-runs.md) | How action flows run step by step: successions, forks and joins, decisions, loops, `perform`, signals; what is not run. | Modellers |
 | [Model interchange](docs/interchange.md) | `.kpar`, SysML v2 JSON and Systems Modeling API servers: what round-trips, merging on Save to server, what a server must allow. | Modellers, developers |
 | [Interchange reference](docs/reference/interchange.md) | Background research on the standards: KerML clause 10, `.kpar`, element identity, the API, XMI. | Developers |
 | [The engine](docs/engine.md) | How the app uses the sysml-toolkit: the engine interface, positions, views, edits, diagrams, checks, and requests for upstream. | Developers |

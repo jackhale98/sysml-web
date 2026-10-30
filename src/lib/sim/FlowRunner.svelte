@@ -822,10 +822,11 @@
 						<span>Step</span>
 					</button>
 					<button type="button" onclick={toggleAuto} disabled={!running} title="Auto-run (P)">
-						{#if auto}<Pause size={15} aria-hidden="true" /><span>Pause</span>{:else}<Play
-								size={15}
-								aria-hidden="true"
-							/><span>Auto-run</span>{/if}
+						{#if auto}<Pause size={15} aria-hidden="true" /><span class:visually-hidden={!wide}
+								>Pause</span
+							>{:else}<Play size={15} aria-hidden="true" /><span class:visually-hidden={!wide}
+								>Auto-run</span
+							>{/if}
 					</button>
 					<button
 						type="button"
