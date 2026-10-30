@@ -719,7 +719,8 @@ describe('the demo’s tables', () => {
 		// The risk library's worksheets for each kind of FMEA, the risk reduction and the
 		// demo's risk matrix and hazard log are six more; its saved review and risk
 		// reduction two more. The dependency matrices: four view defs and the demo's four.
-		expect(views).toHaveLength(67);
+		// The use case view: its view def and the demo's delivery use cases.
+		expect(views).toHaveLength(69);
 		expect(views.filter((v) => v.hasTable)).toHaveLength(43);
 		expect(views.every((v) => !v.builtin)).toBe(true);
 		expect(views.find((v) => v.name === 'droneBreakdown')).toEqual({
