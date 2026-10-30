@@ -15,6 +15,7 @@ import type {
 	Diagnostic,
 	EditRequest,
 	EditResult,
+	MachineSystem,
 	StateMachine,
 	ViewInfo
 } from '#lib/engine/types.ts';
@@ -137,6 +138,8 @@ export class Workspace {
 	views = $state.raw<ViewInfo[]>([]);
 	/** The project's state machines, for the emulator. */
 	machines = $state.raw<StateMachine[]>([]);
+	/** Parts whose parts' state machines run together, for the emulator. */
+	systems = $state.raw<MachineSystem[]>([]);
 	/** Constraint checks of the latest analysis (after it: they take a moment longer). */
 	checks = $state.raw<CheckReport | null>(null);
 	/** What breaks the project's conventions (views marked `@Convention`), found with the checks. */
@@ -303,9 +306,11 @@ export class Workspace {
 			if (!unchanged()) return;
 			const views = await engine.listViews(files);
 			const machines = await engine.stateMachines(files);
+			const systems = await engine.machineSystems(files);
 			if (files.every((f) => this.files[f.path] === f.text)) {
 				this.views = views;
 				this.machines = machines;
+				this.systems = systems;
 			}
 			void this.check(files, performance.now() - started);
 		} catch (error) {

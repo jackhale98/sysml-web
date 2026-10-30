@@ -810,6 +810,8 @@ export interface StateMachine {
 		trigger?: string;
 		/** The name the accepted signal is given (`accept r : Reading` → `r`), for guards and effects that read it. */
 		payload?: string;
+		/** The port the signal must arrive through (`accept Sig via p` → `p`); without one, any of its part's ports. */
+		via?: string;
 		guard?: string;
 		effect?: string;
 		line: number;
@@ -822,6 +824,31 @@ export interface StateMachine {
 	 * signal's name as written, in declaration order, with their defaults.
 	 */
 	signals?: Record<string, { name: string; type?: string; value?: unknown }[]>;
+	warnings?: string[];
+}
+
+/**
+ * A part whose parts' state machines run together, and how their ports are
+ * connected (`toolkit/systems.ts`, run by `sim/system.ts`).
+ */
+export interface MachineSystem {
+	/** The context: a part, or a part definition. */
+	name: string;
+	qualifiedName: string;
+	file: string;
+	line: number;
+	doc?: string;
+	/** Its parts that exhibit a state machine, in the order written, by path from the context (`drone.flightController`). */
+	parts: { path: string; machine: StateMachine; ports: string[] }[];
+	/** Every part inside the context, with a machine or not, by path. */
+	allParts: string[];
+	/** The context's own ports. */
+	ports: string[];
+	/**
+	 * Connections and interfaces between ports, and bindings that make two
+	 * names one port, with their ends as paths from the context (`station.commandLink`).
+	 */
+	links: { kind: 'connection' | 'binding'; ends: [string, string]; name?: string }[];
 	warnings?: string[];
 }
 
@@ -870,8 +897,25 @@ export interface StateSession {
 	timers?: Record<string, number | string>;
 	/** Active states whose `do` action is still running. */
 	doing?: string[];
-	/** Signals the machine sent to itself, waiting to be taken, oldest first. */
-	queue?: { signal: string; values?: Record<string, unknown>; from?: string }[];
+	/**
+	 * Signals waiting to be taken, oldest first: those the machine sent
+	 * itself and, when its part runs with others, those other parts sent it
+	 * (`part` is the one that sent it, `from` says how; `port` is the port it arrived at).
+	 */
+	queue?: {
+		signal: string;
+		values?: Record<string, unknown>;
+		from?: string;
+		part?: string;
+		port?: string;
+	}[];
+	/**
+	 * Signals the last step sent out of the machine (`send … via p`, `send … to
+	 * other`), for the parts around it to deliver. Only when run with `outward`.
+	 */
+	sent?: { signal: string; values?: Record<string, unknown>; via?: string; to?: string; from: string }[];
+	/** When the next timer comes due, or a condition on the clock turns true (seconds since the start). */
+	nextDue?: number;
 	/**
 	 * The change triggers of the active states, by transition index: `false`
 	 * while the condition is false, `true` once its signal came and waits to

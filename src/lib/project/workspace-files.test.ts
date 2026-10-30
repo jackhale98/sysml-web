@@ -20,6 +20,7 @@ const engine = () =>
 		analyzeProject: async (f: { path: string; text: string }[]) => host.analyzeProject(f),
 		listViews: async () => [],
 		stateMachines: async () => [],
+		machineSystems: async () => [],
 		checks: async () => null,
 		edit: async (request: EditRequest) => host.edit(request)
 	}) as unknown as Engine;

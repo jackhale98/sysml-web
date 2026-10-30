@@ -35,7 +35,8 @@ describe('the steps of an action', () => {
 				text: 'send new Ping(y, z = 2) via p to self',
 				signal: 'Ping',
 				args: ['y', 'z = 2'],
-				to: 'self'
+				to: 'self',
+				via: 'p'
 			},
 			{ kind: 'named', text: 'cleanup' },
 			{ kind: 'named', text: 'first a then b' }

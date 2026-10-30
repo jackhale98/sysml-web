@@ -188,6 +188,7 @@ interface Pending {
 	to: { path: string } | { text: string };
 	trigger?: string;
 	payload?: string;
+	via?: string;
 	guard?: string;
 	effect?: string;
 }
@@ -478,12 +479,14 @@ class Builder {
 
 		if (hasEffect) this.notRun(`effect of ${context}`, parts.effect!);
 		const payload = hasTrigger ? payloadName(parts.trigger!) : undefined;
+		const via = hasTrigger ? viaName(parts.trigger!) : undefined;
 		this.pending.push({
 			...base,
 			from,
 			to,
 			...(hasTrigger ? { trigger: triggerText(parts.trigger!) } : {}),
 			...(payload ? { payload } : {}),
+			...(via ? { via } : {}),
 			...(hasGuard ? { guard: parts.guard! } : {}),
 			...(hasEffect && actionText(parts.effect!) ? { effect: actionText(parts.effect!)! } : {})
 		});
@@ -531,6 +534,7 @@ class Builder {
 				to,
 				...(p.trigger ? { trigger: p.trigger } : {}),
 				...(p.payload ? { payload: p.payload } : {}),
+				...(p.via ? { via: p.via } : {}),
 				...(p.guard ? { guard: p.guard } : {}),
 				...(p.effect ? { effect: p.effect } : {}),
 				line: p.line
@@ -658,6 +662,14 @@ export function payloadName(trigger: string): string | undefined {
 	const text = trigger.trim();
 	if (/^(when|after|at)\b/.test(text)) return undefined;
 	return /^((?:'[^']*'|[\w$]+))\s*:(?!:)/.exec(text)?.[1];
+}
+
+/** The port a signal is accepted through: `s : Sig via commandLink` → `commandLink`. */
+export function viaName(trigger: string): string | undefined {
+	const text = trigger.trim();
+	if (/^(when|after|at)\b/.test(text)) return undefined;
+	const via = topLevelWords(text).find((w) => w.word === 'via');
+	return via ? text.slice(via.end).replace(/\s+/g, '').replace(/^self\./, '') || undefined : undefined;
 }
 
 /**

@@ -22,6 +22,7 @@ import type {
 	RenderedTable,
 	RiskPolicy,
 	FmeaLineInfo,
+	MachineSystem,
 	StateMachine,
 	TradeStudy,
 	ViewInfo
@@ -91,6 +92,8 @@ export interface EngineApi {
 	format(source: string): { changes: { from: number; to: number; insert: string }[] };
 	codeActions(files: SourceFile[], path: string, from: number, to: number): CodeAction[];
 	stateMachines(files: SourceFile[]): StateMachine[];
+	/** Parts whose parts' state machines run together, with the connections between their ports. */
+	machineSystems(files: SourceFile[]): MachineSystem[];
 	/** Every constraint and `satisfy` claim of the project, decided (cached per analysis). */
 	checks(files: SourceFile[]): CheckReport;
 	/** Elements' bound values, evaluated, by element id (cached per analysis). */

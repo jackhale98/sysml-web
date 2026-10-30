@@ -33,6 +33,7 @@ async function open(text = TEXT): Promise<Workspace> {
 		analyzeProject: async (f: SourceFile[]) => host.analyzeProject(f),
 		listViews: async () => [],
 		stateMachines: async () => [],
+		machineSystems: async () => [],
 		checks: async (f: SourceFile[]) => host.checks(f),
 		edit: async (request: EditRequest) => host.edit(request),
 		codeActions: async (f: SourceFile[], path: string, from: number, to: number) =>
