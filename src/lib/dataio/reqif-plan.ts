@@ -18,6 +18,7 @@ import {
 	detectTargets,
 	Notes,
 	planImport,
+	REQIF_METADATA,
 	targetOptions,
 	type ExistingRequirement,
 	type ImportContext,
@@ -493,6 +494,17 @@ export function planReqif(
 				'Requirements under another heading in the file than in the model, left where they are',
 				objectLabel(object, columns, targets)
 			);
+	}
+
+	// Requirements an earlier import of this file made that the file no longer has: left in the model.
+	for (const slot of top) {
+		if (!slot.existing) continue;
+		const prefix = `${slot.existing.qualifiedName}::`;
+		for (const r of context.requirements) {
+			const id = r.values[`metadata:${REQIF_METADATA}.identifier`];
+			if (id && r.qualifiedName.startsWith(prefix) && !doc.objects.has(id))
+				notes.add('Requirements no longer in the file, left in the model', r.row.id ?? r.row.title);
+		}
 	}
 
 	// Relations between requirements: derivations and refinements.

@@ -500,6 +500,21 @@ describe('importing ReqIF', () => {
 		expect(safety.indexOf("'Geofence override'")).toBeLessThan(safety.indexOf('\n    }'));
 	});
 
+	it('says which requirements imported before are no longer in the file', async () => {
+		const original = await read(fixture('doors-next.reqif'), 'doors-next.reqif');
+		const first = await importInto(demo, original);
+		const without = fixture('doors-next.reqif')
+			.replace(/<SPEC-OBJECT IDENTIFIER="_so_1007"[\s\S]*?<\/SPEC-OBJECT>/, '')
+			.replace(/<SPEC-RELATION IDENTIFIER="_sr_1"[\s\S]*?<\/SPEC-RELATION>/, '')
+			.replace(/<SPEC-HIERARCHY IDENTIFIER="_sh_7"[\s\S]*?<\/SPEC-HIERARCHY>/, '');
+		const doc = await read(without, 'doors-next.reqif');
+		expect(problemList(doc)).toEqual([]);
+		const context = contextFor(first.files);
+		const plan = planReqif(doc, optionsFor(doc, context), context);
+		expect(plan.notes).toContain('Requirements no longer in the file, left in the model: ‘1007’.');
+		expect(reqifHasWork(plan)).toBe(false);
+	});
+
 	it('finds requirements again by their ReqIF IDENTIFIER, when they have no ID', async () => {
 		const doc = await read(fixture('doors-next.reqif'), 'doors-next.reqif');
 		const noIds = (context: ImportContext) => {

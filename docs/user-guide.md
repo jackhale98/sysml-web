@@ -423,6 +423,8 @@ In the app: **New report**.
 2. Pick an Excel or CSV file, or paste cells copied from a spreadsheet.
 3. Match its columns to ID, title, statement and the rest, check the preview, and import. A row whose ID is already here updates that requirement.
 
+**From DOORS, Polarion, Jama or another requirements tool**: export a ReqIF file (`.reqif`, or `.reqifz` with its attachments) there and pick it in step 2. You match its attributes instead of columns, and say which object types are headings and which relations are derivations or refinements; the preview names everything left out. Headings become packages. Import a later export of the same file and the requirements already imported are updated in place, not added again. To send requirements back, choose **Export** › **ReqIF** above the requirements table.
+
 In the app: **Import requirements**.
 
 ### Save to GitHub
