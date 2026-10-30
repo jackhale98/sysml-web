@@ -27,7 +27,6 @@ test('a budget shows the spread of its totals and the share within the limit', a
 	const table = await openView(page, 'Drone mass budget');
 	await expect(table.getByText('28 rows')).toBeVisible({ timeout: 15_000 });
 	await expect(table.getByRole('columnheader', { name: 'Likely range' })).toBeVisible();
-	await expect(table.getByRole('columnheader', { name: 'Within limit' })).toBeVisible();
 	const row = (path: string) =>
 		table
 			.locator('tbody tr')
@@ -37,8 +36,9 @@ test('a budget shows the spread of its totals and the share within the limit', a
 	// An exact part has no range.
 	await expect(row('drone.airframe').locator('td').nth(5)).toHaveText('');
 	// The take-off mass: its range, and every sampled case within the 4 kg limit.
-	await expect(row('drone.takeOffMass')).toContainText('3.752 – 3.808 kg');
-	await expect(row('drone.takeOffMass').locator('td').last()).toHaveText('100 %');
+	await expect(row('drone.takeOffMass').locator('td').nth(5)).toHaveText(
+		'3.752 – 3.808 kg (100 % within limit)'
+	);
 	expect((await analyze(page)).violations.map((v) => v.id)).toEqual([]);
 
 	const checks = await openView(page, 'Design checks');

@@ -2,15 +2,16 @@
  * A budget's spread when values it adds up are uncertain (`../uncertainty.ts`):
  * each row's likely range (`likelyRange`, P5 to P95 of its total: 90 % of
  * cases) and, for a row a requirement limits, the share of cases within
- * the limit (`withinLimit`, the check's own). All rows come from one
+ * the limit (`withinLimit`, the check's own), which the range also says in
+ * brackets: `3.752 – 3.808 kg (100 % within limit)`. All rows come from one
  * sampling run, so an assembly's range and its parts' agree case by case:
  * each part's value is sampled once for each place it is used (four motors
  * vary independently), and an assembly with no value of its own adds up
  * its parts' samples.
  *
- * The two columns appear only in a budget that has a spread to show, after
- * `total` and after `check` (`withSpreadColumns`); a budget over exact
- * values renders as it always has.
+ * The range's column appears only in a budget that has a spread to show,
+ * after `total` (`withSpreadColumns`): one column, so the budget still fits
+ * beside the inspector. A budget over exact values renders as it always has.
  */
 import type { Quantity } from '../../quantity';
 import type { Check } from '../../types';
@@ -107,9 +108,12 @@ export function addSpreads(
 		const spread = found[i];
 		// In the unit the row's total is shown in, so the two read alike.
 		const unit = /^\S+ (.+)$/.exec(row.fields.get('total') ?? '')?.[1]?.replace(/·/g, '*');
-		row.fields.set('likelyRange', spread ? rangeText(spread, false, unit) : '');
 		const check = limitCheck(row, checks, attribute);
-		row.fields.set('withinLimit', check?.spread ? shareText(check.spread.met) : '');
+		const within = check?.spread ? shareText(check.spread.met) : '';
+		row.fields.set('withinLimit', within);
+		// With the share of cases within the row's limit, in brackets (it moves under a narrow cell).
+		const range = spread ? rangeText(spread, false, unit) : '';
+		row.fields.set('likelyRange', range && within ? `${range} (${within} within limit)` : range);
 	});
 }
 
@@ -129,9 +133,9 @@ function limitCheck(row: Row, checks: Check[], attribute: string): Check | undef
 }
 
 /**
- * A budget's columns with `likelyRange` after `total` and `withinLimit`
- * after `check` (else last), when its rows have them and the view doesn't
- * place them itself.
+ * A budget's columns with `likelyRange` after `total` (else last), when its
+ * rows have one and the view doesn't place it itself. (`withinLimit` is in
+ * it, and a field of its own a view can choose.)
  */
 export function withSpreadColumns(
 	rowsSpec: string,
@@ -147,6 +151,5 @@ export function withSpreadColumns(
 		out.splice(at < 0 ? out.length : at + 1, 0, [field, null]);
 	};
 	place('likelyRange', 'total');
-	place('withinLimit', 'check');
 	return out;
 }

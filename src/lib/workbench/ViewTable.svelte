@@ -712,10 +712,17 @@
 				><span style:width="{Math.round(shareOf(value) * 100)}%"></span></span
 			>{value}</span
 		>
-	{:else if kind === 'quantity' && / \(.+\)$/.test(value)}
-		<!-- `0.23 kg (5.8 %)`: the part in brackets moves under the value when the table is narrow. -->
-		{@const at = value.lastIndexOf(' (')}
-		{value.slice(0, at)}<span class="aside">{value.slice(at)}</span>
+	{:else if kind === 'quantity' && (/ \(.+\)$/.test(value) || value.includes(' – '))}
+		<!-- `0.23 kg (5.8 %)`: the part in brackets moves under the value when the table is narrow;
+		     so does a range's upper end (`3.752 – 3.808 kg (100 % within limit)`). -->
+		{@const at = / \(.+\)$/.test(value) ? value.lastIndexOf(' (') : value.length}
+		{@const main = value.slice(0, at)}
+		{@const dash = main.indexOf(' – ')}
+		{#if dash >= 0}{main.slice(0, dash)} –{' '}<span class="upto">{main.slice(dash + 3)}</span
+			>{:else}{main}{/if}{#if at < value.length}<span
+				class="aside"
+				class:within={value.endsWith(' within limit)')}>{value.slice(at)}</span
+			>{/if}
 	{:else if kind === 'trace'}
 		<TraceRefs {value} {workspace} {ui} />
 	{:else if kind === 'list' && value}
@@ -2096,6 +2103,14 @@
 			display: block;
 			color: var(--text-2);
 			font-size: var(--text-xs);
+		}
+		.upto {
+			display: block;
+		}
+		/* A range's share within its limit, and the headings of a tree's columns, wrap. */
+		.aside.within,
+		.th {
+			white-space: normal;
 		}
 	}
 	.share .bar span {

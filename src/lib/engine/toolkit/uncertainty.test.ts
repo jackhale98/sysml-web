@@ -107,24 +107,22 @@ describe('the demo’s uncertain values', () => {
 			'share',
 			'limit',
 			'margin',
-			'check',
-			'withinLimit'
+			'check'
 		]);
-		const kinds = table.columnKinds!;
-		expect([kinds[5], kinds[10]]).toEqual(['quantity', 'percent']);
+		expect(table.columnKinds![5]).toBe('quantity');
 		const row = (path: string) => table.rows.find((r) => r[0] === path)!;
 		expect(row('drone.battery').slice(4, 6)).toEqual(['1100 g', '1082 – 1138 g']);
 		// An exact part has no range; an assembly over the battery has the battery's spread.
 		expect(row('drone.airframe')[5]).toBe('');
 		expect(row('drone')[5]).toBe('2752 – 2808 g');
+		// With the share of cases within the take-off limit, the check's own.
 		expect(row('drone.takeOffMass').slice(4)).toEqual([
 			'3.77 kg',
-			'3.752 – 3.808 kg',
+			'3.752 – 3.808 kg (100 % within limit)',
 			'',
 			'≤ 4 kg',
 			'0.23 kg (5.8 %)',
-			'satisfied',
-			'100 %'
+			'satisfied'
 		]);
 	});
 

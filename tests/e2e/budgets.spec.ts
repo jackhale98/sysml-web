@@ -84,7 +84,6 @@ test('the mass budget adds up the parts tree, with units and the limit a require
 		'6.5 %',
 		'',
 		'',
-		'',
 		''
 	]);
 	// The drone's own masses, with the limit 'Maximum take-off mass' sets on one of them.
