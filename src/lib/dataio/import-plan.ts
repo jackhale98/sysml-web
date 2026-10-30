@@ -49,6 +49,8 @@ export interface PackageInfo {
 	line: number;
 	/** Names of members it owns directly, unescaped. */
 	members: string[];
+	/** The ReqIF IDENTIFIER of the specification or heading it was imported from (`@ReqIF`). */
+	reqif?: string;
 }
 
 export interface ExistingRequirement {
@@ -66,11 +68,18 @@ export interface ImportContext {
 	packages: PackageInfo[];
 	/** Existing requirements by ID. */
 	byId: Map<string, ExistingRequirement>;
+	/** Every requirement in the model, IDs or not, in the order of the files. */
+	requirements: ExistingRequirement[];
+	/** Requirements imported from ReqIF, by the IDENTIFIER they had there (`@ReqIF`). */
+	byReqif: Map<string, ExistingRequirement>;
 	/** Paths of the project's files. */
 	paths: string[];
 	/** Top-level package names (to pick a fresh one). */
 	topLevel: string[];
 }
+
+/** The metadata that keeps a ReqIF IDENTIFIER in the model (`ReqIFInterchange::ReqIF`). */
+export const REQIF_METADATA = 'ReqIF';
 
 /** `ModelingMetadata::StatusKind` from the standard library. */
 export const STATUS_KINDS = ['open', 'tbd', 'tbr', 'tbc', 'done', 'closed'];
@@ -263,23 +272,41 @@ export function buildContext(
 		used: usage.get(d.label) ?? 0
 	}));
 
+	const models = new Map(analyses.map((a) => [a.model.file, a.model]));
+	/** The `@ReqIF { identifier = "…"; }` an element carries itself. */
+	const reqifOf = (element: ModelElement): string | undefined => {
+		const annotation = (models.get(element.file)?.annotations ?? []).find(
+			(a) =>
+				lastSegment(a.metadata_type) === REQIF_METADATA &&
+				(a.target === element.name || unescapeName(a.target) === element.label) &&
+				a.span.start_byte >= element.span.start_byte &&
+				a.span.end_byte <= element.span.end_byte
+		);
+		const value = annotation?.values.find(([field]) => field === 'identifier')?.[1];
+		return value ? stringValue(value) : undefined;
+	};
+
 	const packages: PackageInfo[] = elements
 		.filter((e) => e.kind === 'package' && e.isDefinition && !e.file.startsWith('libraries/'))
-		.map((p) => ({
-			name: p.name,
-			qualifiedName: qualified(p, inFile(p)),
-			file: p.file,
-			line: p.span.start_row,
-			members: inFile(p)
-				.filter((e) => containers(e, inFile(p)).at(-1) === p)
-				.map((e) => e.label)
-		}));
+		.map((p) => {
+			const reqif = reqifOf(p);
+			return {
+				name: p.name,
+				qualifiedName: qualified(p, inFile(p)),
+				file: p.file,
+				line: p.span.start_row,
+				members: inFile(p)
+					.filter((e) => containers(e, inFile(p)).at(-1) === p)
+					.map((e) => e.label),
+				...(reqif ? { reqif } : {})
+			};
+		});
 
 	const byKey = new Map(elements.map((e) => [e.key, e]));
-	const models = new Map(analyses.map((a) => [a.model.file, a.model]));
 	const byId = new Map<string, ExistingRequirement>();
+	const byReqif = new Map<string, ExistingRequirement>();
+	const all: ExistingRequirement[] = [];
 	for (const row of requirements) {
-		if (!row.id || byId.has(row.id)) continue;
 		const element = byKey.get(`${row.file}@${row.span.start_byte}`);
 		if (!element) continue;
 		const model = models.get(row.file);
@@ -300,18 +327,24 @@ export function buildContext(
 				values[`metadata:${lastSegment(a.metadata_type)}.${field}`] = displayValue(value);
 			}
 		}
-		byId.set(row.id, {
+		const existing: ExistingRequirement = {
 			row,
 			qualifiedName: qualified(element, inFile(element)),
 			name: element.name,
 			values
-		});
+		};
+		all.push(existing);
+		if (row.id && !byId.has(row.id)) byId.set(row.id, existing);
+		const reqif = values[`metadata:${REQIF_METADATA}.identifier`];
+		if (reqif && !byReqif.has(reqif)) byReqif.set(reqif, existing);
 	}
 
 	return {
 		defs,
 		packages,
 		byId,
+		requirements: all,
+		byReqif,
 		paths: Object.keys(files),
 		topLevel: elements
 			.filter((e) => e.kind === 'package' && !containers(e, inFile(e)).length)
@@ -352,6 +385,7 @@ export type Target =
 	| 'rationale'
 	| 'issue'
 	| 'parent'
+	| 'heading'
 	| `attr:${string}`;
 
 export interface TargetOption {
@@ -507,6 +541,13 @@ export interface ImportOptions {
 		{ kind: 'package'; package: PackageInfo } | { kind: 'new'; path: string; name: string };
 	/** What to do with rows whose ID is already in the model. */
 	existing: 'skip' | 'update';
+	/**
+	 * A key per row that finds it in the model before its ID does: the ReqIF
+	 * IDENTIFIER of the object it comes from (`context.byReqif`).
+	 */
+	keys?: (string | undefined)[];
+	/** What the notes count: `rows` (the default) or `objects`. */
+	unit?: string;
 }
 
 export interface PlannedRequirement {
@@ -557,8 +598,10 @@ export function plainText(text: string): string {
 		.trim();
 }
 
-class Notes {
+export class Notes {
 	private groups = new Map<string, Map<string, number>>();
+	/** What is counted: rows of a sheet, objects of a ReqIF file. */
+	constructor(private readonly unit = 'rows') {}
 	add(group: string, value: string) {
 		const values = this.groups.get(group) ?? new Map<string, number>();
 		values.set(value, (values.get(value) ?? 0) + 1);
@@ -568,7 +611,7 @@ class Notes {
 		return [...this.groups].map(([group, values]) => {
 			const shown = [...values]
 				.slice(0, 5)
-				.map(([v, n]) => (n > 1 ? `‘${v}’ (${n} rows)` : `‘${v}’`))
+				.map(([v, n]) => (n > 1 ? `‘${v}’ (${n} ${this.unit})` : `‘${v}’`))
 				.join(', ');
 			const more = values.size > 5 ? ` and ${values.size - 5} more` : '';
 			return `${group}: ${shown}${more}.`;
@@ -597,7 +640,7 @@ export function planImport(
 	const taken = new Set(
 		options.destination.kind === 'package' ? options.destination.package.members : []
 	);
-	const notes = new Notes();
+	const notes = new Notes(options.unit);
 	const plan: ImportPlan = {
 		create: [],
 		update: [],
@@ -697,10 +740,12 @@ export function planImport(
 		if (get('issue')) spec.issues = [get('issue')];
 		const parents = splitList(get('parent').replace(/\//g, ','));
 
-		const existing = id ? context.byId.get(id) : undefined;
+		const key = options.keys?.[index];
+		const existing =
+			(key ? context.byReqif.get(key) : undefined) ?? (id ? context.byId.get(id) : undefined);
 		if (existing) {
 			if (options.existing === 'skip') {
-				plan.skipped.push({ line, reason: `${id} is already in the model` });
+				plan.skipped.push({ line, reason: `${id || title || 'it'} is already in the model` });
 				return;
 			}
 			const changes = changesFor(existing, spec, targets);

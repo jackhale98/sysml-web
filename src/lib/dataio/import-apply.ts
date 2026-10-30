@@ -98,13 +98,14 @@ export interface ImportResult {
 	path: string | null;
 }
 
-/** Apply the plan. Returns an error message, or the result. */
-export async function applyImport(
+/**
+ * Change the requirements already in the model that the plan updates.
+ * Returns an error message, or null.
+ */
+export async function applyUpdates(
 	workspace: ImportWorkspace,
-	plan: ImportPlan,
-	options: ImportOptions,
-	doc: string
-): Promise<ImportResult | string> {
+	plan: Pick<ImportPlan, 'update'>
+): Promise<string | null> {
 	// Updates first, from the bottom of each file up, so the lines of the
 	// requirements still to change stay where the analysis found them.
 	const updates = plan.update.toSorted(
@@ -154,6 +155,18 @@ export async function applyImport(
 		});
 		if (error) return `Could not rename ${qualifiedName}: ${error}`;
 	}
+	return null;
+}
+
+/** Apply the plan. Returns an error message, or the result. */
+export async function applyImport(
+	workspace: ImportWorkspace,
+	plan: ImportPlan,
+	options: ImportOptions,
+	doc: string
+): Promise<ImportResult | string> {
+	const failed = await applyUpdates(workspace, plan);
+	if (failed) return failed;
 
 	if (!plan.create.length) return { created: 0, updated: plan.update.length, path: null };
 
