@@ -35,6 +35,7 @@ describe('the help', () => {
 			'Make a report',
 			'Import from Excel',
 			'Save to GitHub',
+			'Mark a baseline (PDR, CDR…)',
 			'Exchange models with other tools',
 			'Install it on my phone',
 			'Switch projects'

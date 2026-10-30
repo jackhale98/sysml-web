@@ -3,7 +3,7 @@
  * and footer, the rules that print only the report (no app around it), and
  * the frame of the downloaded file.
  */
-import type { ReportDocument } from './document.ts';
+import { baselineText, type ReportDocument } from './document.ts';
 
 /** A CSS string literal. */
 function cssString(text: string): string {
@@ -17,7 +17,12 @@ function cssString(text: string): string {
 
 /** `@page`: A4 margins, project and title at the top, the revision and page numbers at the bottom. */
 export function pageCss(doc: ReportDocument): string {
-	const id = [doc.number, doc.version && `version ${doc.version}`, doc.revision]
+	const id = [
+		doc.number,
+		doc.version && `version ${doc.version}`,
+		doc.revision,
+		doc.baseline && baselineText(doc.baseline)
+	]
 		.filter(Boolean)
 		.join(' · ');
 	return `@page {

@@ -51,6 +51,9 @@ class Repo {
 			mergeBase: fail,
 			listPullRequests: fail,
 			listCommits: fail,
+			listTags: fail,
+			createTag: fail,
+			deleteTag: fail,
 			webUrl: () => '',
 			async head() {
 				return { commit: repo.head, tree: `tree-${repo.head}` };

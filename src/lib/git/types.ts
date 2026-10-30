@@ -126,6 +126,27 @@ export interface CommitSummary {
 	date: string | null;
 }
 
+/** An annotated tag: a name for a commit, with a message (a baseline is one). */
+export interface TagSummary {
+	/** Its name without `refs/tags/`: `baseline/PDR`. */
+	name: string;
+	/** The commit it names. */
+	commit: string;
+	/** Its message (empty for a lightweight tag, which has none). */
+	message: string;
+	/** When it was made (the tagger's date), when known. */
+	date: string | null;
+	/** Who made it, when known. */
+	tagger: string | null;
+}
+
+/** A tag to make. */
+export interface TagInput {
+	name: string;
+	message: string;
+	commit: string;
+}
+
 /** A repository branch chosen to open or connect. */
 export interface RepoChoice {
 	ref: RepoRef;
@@ -167,6 +188,12 @@ export interface GitProvider {
 	listPullRequests(ref: RepoRef): Promise<PullRequestSummary[]>;
 	/** A branch's latest commits, newest first. */
 	listCommits(ref: RepoRef, branch: string, count?: number): Promise<CommitSummary[]>;
+	/** The tags whose names start with `prefix` (`baseline/`). */
+	listTags(ref: RepoRef, prefix: string): Promise<TagSummary[]>;
+	/** Make an annotated tag; refused (`exists`) when the name is taken. */
+	createTag(ref: RepoRef, input: TagInput): Promise<TagSummary>;
+	/** Delete a tag from the repository (the commit it named stays). */
+	deleteTag(ref: RepoRef, name: string): Promise<void>;
 	/** The repository's page, or a branch's, on the host. */
 	webUrl(ref: RepoRef, branch?: string): string;
 }

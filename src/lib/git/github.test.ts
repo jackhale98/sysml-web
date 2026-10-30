@@ -41,7 +41,8 @@ function mockFetch(
 			return m === method && new RegExp(`^${pattern}$`).test(url);
 		});
 		const result = key ? routes[key]!(call) : { status: 404, body: { message: 'Not Found' } };
-		return new Response(JSON.stringify(result.body ?? {}), {
+		// A 204 has no body.
+		return new Response(result.status === 204 ? null : JSON.stringify(result.body ?? {}), {
 			status: result.status ?? 200,
 			headers: { 'content-type': 'application/json', ...result.headers }
 		});
@@ -451,5 +452,103 @@ describe('GitHub Enterprise Server', () => {
 			/pointed to another site \(api\.github\.com\)/
 		);
 		expect(sent).toHaveLength(1);
+	});
+});
+
+describe('GitHubProvider tags (baselines)', () => {
+	const annotated = (sha: string, commit: string, message: string) => ({
+		body: {
+			sha,
+			message,
+			tagger: { name: 'Ada', date: '2026-03-12T09:30:00Z' },
+			object: { sha: commit, type: 'commit' }
+		}
+	});
+
+	it('lists the tags under a prefix: annotated ones with their message, lightweight ones bare', async () => {
+		const { fetch, calls } = mockFetch({
+			'GET /repos/acme/drone/git/matching-refs/tags/baseline/': () => ({
+				body: [
+					{ ref: 'refs/tags/baseline/PDR', object: { sha: 'tag-pdr', type: 'tag' } },
+					{ ref: 'refs/tags/baseline/SRR', object: { sha: 'c-srr', type: 'commit' } },
+					// A tag of a tag names no commit directly: left out.
+					{ ref: 'refs/tags/baseline/odd', object: { sha: 'tag-odd', type: 'tag' } }
+				]
+			}),
+			'GET /repos/acme/drone/git/tags/tag-pdr': () =>
+				annotated('tag-pdr', 'c-pdr', 'PDR\n\nBaseline-date: 2026-03-12\n'),
+			'GET /repos/acme/drone/git/tags/tag-odd': () => ({
+				body: { sha: 'tag-odd', message: 'x', object: { sha: 'tag-pdr', type: 'tag' } }
+			})
+		});
+		const github = new GitHubProvider('tok', { fetch });
+		expect(await github.listTags(ref, 'baseline/')).toEqual([
+			{
+				name: 'baseline/PDR',
+				commit: 'c-pdr',
+				message: 'PDR\n\nBaseline-date: 2026-03-12\n',
+				date: '2026-03-12T09:30:00Z',
+				tagger: 'Ada'
+			},
+			{ name: 'baseline/SRR', commit: 'c-srr', message: '', date: null, tagger: null }
+		]);
+		expect(calls.every((c) => c.method === 'GET')).toBe(true);
+	});
+
+	it('makes an annotated tag: the tag object on the commit, then the ref that names it', async () => {
+		const { fetch, calls } = mockFetch({
+			'POST /repos/acme/drone/git/tags': (call) => ({
+				status: 201,
+				body: {
+					...annotated('tag-cdr', 'c7', (call.body as { message: string }).message).body
+				}
+			}),
+			'POST /repos/acme/drone/git/refs': () => ({ status: 201, body: {} })
+		});
+		const github = new GitHubProvider('tok', { fetch });
+		const tag = await github.createTag(ref, {
+			name: 'baseline/CDR',
+			message: 'CDR\n\nBaseline-date: 2026-06-01\n',
+			commit: 'c7'
+		});
+		expect(calls.map((c) => `${c.method} ${c.url}`)).toEqual([
+			'POST /repos/acme/drone/git/tags',
+			'POST /repos/acme/drone/git/refs'
+		]);
+		expect(calls[0]!.body).toEqual({
+			tag: 'baseline/CDR',
+			message: 'CDR\n\nBaseline-date: 2026-06-01\n',
+			object: 'c7',
+			type: 'commit'
+		});
+		expect(calls[1]!.body).toEqual({ ref: 'refs/tags/baseline/CDR', sha: 'tag-cdr' });
+		expect(tag).toMatchObject({ name: 'baseline/CDR', commit: 'c7', tagger: 'Ada' });
+	});
+
+	it('says plainly when the tag name is taken', async () => {
+		const { fetch } = mockFetch({
+			'POST /repos/acme/drone/git/tags': () => annotated('t', 'c7', 'CDR'),
+			'POST /repos/acme/drone/git/refs': () => ({
+				status: 422,
+				body: { message: 'Reference already exists' }
+			})
+		});
+		const github = new GitHubProvider('tok', { fetch });
+		const error = await github
+			.createTag(ref, { name: 'baseline/CDR', message: 'CDR', commit: 'c7' })
+			.catch((e: unknown) => e);
+		expect(error).toBeInstanceOf(GitError);
+		expect((error as GitError).kind).toBe('exists');
+	});
+
+	it('deletes a tag by its ref, keeping the slash in its name', async () => {
+		const { fetch, calls } = mockFetch({
+			'DELETE /repos/acme/drone/git/refs/tags/baseline/PDR-2': () => ({ status: 204 })
+		});
+		const github = new GitHubProvider('tok', { fetch });
+		await github.deleteTag(ref, 'baseline/PDR-2');
+		expect(calls.map((c) => `${c.method} ${c.url}`)).toEqual([
+			'DELETE /repos/acme/drone/git/refs/tags/baseline/PDR-2'
+		]);
 	});
 });

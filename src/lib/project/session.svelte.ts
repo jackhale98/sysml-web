@@ -6,6 +6,7 @@
 import { GitConnection } from '#lib/git/connection.svelte.ts';
 import type { Resolution } from '#lib/git/sync.ts';
 import { noteDownloaded } from '#lib/workbench/home/nextSteps.ts';
+import { ProjectBaselines } from './baselines.svelte.ts';
 import { demoProject } from './demo.ts';
 import { planFolderSave, sameConflicts, settleFolderSave, type FolderPlan } from './folderSync.ts';
 import { ProjectRevision } from './revision.svelte.ts';
@@ -47,6 +48,8 @@ export class ProjectSession {
 
 	/** The link to a git repository: changes, Save to GitHub, Get latest, … */
 	readonly git: GitConnection;
+	/** Named versions frozen at design reviews: tags on GitHub, or copies kept here. */
+	readonly baselines: ProjectBaselines;
 
 	private timer: ReturnType<typeof setTimeout> | undefined;
 	/** The folder's text of each file, as last read or written here. */
@@ -63,12 +66,27 @@ export class ProjectSession {
 
 	constructor(private workspace: Workspace) {
 		this.git = new GitConnection(this, workspace);
+		const provider = () => (this.git.account ? this.git.provider() : null);
+		this.baselines = new ProjectBaselines({
+			stored: () => this.record?.baselines ?? [],
+			store: async (baselines) => {
+				if (!this.record) return;
+				this.record = { ...this.record, baselines };
+				await this.save();
+			},
+			files: () => workspace.files,
+			git: () => this.record?.git ?? null,
+			provider,
+			uncommitted: () => workspace.revision?.uncommitted ?? false,
+			now: timestamp
+		});
 		// The project's version, as verification results and reports name it.
 		workspace.revision = new ProjectRevision({
 			git: () => this.record?.git ?? null,
 			files: () => workspace.files,
-			provider: () => (this.git.account ? this.git.provider() : null),
-			login: () => this.git.account?.user.login ?? null
+			provider,
+			login: () => this.git.account?.user.login ?? null,
+			baseline: () => this.baselines.status
 		});
 	}
 

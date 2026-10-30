@@ -435,6 +435,20 @@ Once a project is on GitHub, the project menu also has **Get latest** (bring in 
 
 In the app: **Save to GitHub**.
 
+### Mark a baseline (PDR, CDR…)
+
+A baseline freezes the model under a name at a design review, such as SRR, PDR or CDR, so everything afterwards can be judged against it. Open **Source control** (the branch button at the top) and find **Baselines**.
+
+1. Under **Mark a baseline**, give it a name and the date it stands for, and a description if you like, then choose **Mark baseline**.
+2. Later, **Changes since PDR** beside it opens **Review changes** against it: what changed in the model since, requirements first. **Go to** › **Requirements** jumps to the requirements that changed.
+3. **Remove** takes a baseline away, after asking.
+
+On a project saved to GitHub, a baseline is a tag on the version saved there (`baseline/PDR`), so your whole team sees it; save your changes first. Removing it deletes the tag on GitHub, for everyone; the version itself stays. On a project kept only in this browser, or opened from a folder, a baseline is a copy of the files kept with the project in this browser (nothing is written to the folder): to share baselines, save the project to GitHub.
+
+A report made when the model is exactly a baseline says **Baseline: CDR**; once the model has changed, it says which baseline it has changed since.
+
+In the app: **Open baselines**.
+
 ### Exchange models with other tools
 
 Other SysML v2 tools read and write models in three ways, and Tessera does all three. Your SysML text stays the source of truth: what comes in is written as text, and what goes out is made from it.

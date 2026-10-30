@@ -28,6 +28,25 @@ describe('stored project format', () => {
 		expect(Object.keys(parseShown(layout))).not.toHaveLength(0);
 	});
 
+	it('reads baselines kept with a project as they were, without a new format version', () => {
+		const v1 = fixture('stored-project-v1.json');
+		// Kept before there were baselines: none (the session reads a missing list as empty).
+		expect(readStored(v1)!.baselines).toBeUndefined();
+		const baselines = [
+			{
+				name: 'PDR',
+				date: '2026-03-12',
+				description: 'As presented',
+				at: '2026-03-12T16:00:00Z',
+				files: v1.files
+			}
+		];
+		const read = readStored({ ...v1, format: PROJECT_FORMAT, baselines })!;
+		expect(read.baselines).toEqual(baselines);
+		// An optional field: older builds read the record and leave it be, so the number stays.
+		expect(PROJECT_FORMAT).toBe(1);
+	});
+
 	it('opens its own version, and refuses a newer one rather than misread it', () => {
 		const v1 = fixture('stored-project-v1.json');
 		expect(readStored({ ...v1, format: PROJECT_FORMAT })?.format).toBe(PROJECT_FORMAT);

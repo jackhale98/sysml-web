@@ -26,6 +26,7 @@
 	import DiffView from '#lib/git/DiffView.svelte';
 	import type { CommitSummary, PullRequestSummary } from '#lib/git/types.ts';
 	import { pwa } from '#lib/offline/pwa.svelte.ts';
+	import { longDay } from '#lib/project/baselines.ts';
 	import type { ModelElement } from '#lib/project/elements.ts';
 	import type { ProjectSession } from '#lib/project/session.svelte.ts';
 	import type { Workspace } from '#lib/project/workspace.svelte.ts';
@@ -47,6 +48,10 @@
 	const git = $derived(session?.record?.git ?? null);
 	const summary = $derived(review.summary);
 	const reachable = $derived(!!accounts.accountFor(git?.account) && pwa.online);
+	/** Baselines to compare with: copies kept here, and tags when GitHub can be reached. */
+	const baselines = $derived(
+		(session?.baselines.list ?? []).filter((b) => b.where === 'browser' || reachable)
+	);
 
 	let open = $state<string | null>(null);
 	let pulls = $state.raw<PullRequestSummary[] | null>(null);
@@ -60,6 +65,16 @@
 		void loadChoices();
 	});
 
+	/** What "Your changes" are compared with when there is no repository. */
+	const localBase = $derived(session?.reviewBase().label ?? 'the version you opened');
+
+	/** Bring a group of changes (Requirements, Design, …) into view. */
+	function jump(category: string) {
+		const heading = document.getElementById(`${uid}-${category}`);
+		heading?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+		heading?.focus({ preventScroll: true });
+	}
+
 	/** The choice in the "Compare" menu. */
 	const choice = $derived.by(() => {
 		const s = review.source;
@@ -67,7 +82,9 @@
 			? `commit:${s.commit.sha}`
 			: s.kind === 'pull'
 				? `pull:${s.pr.number}`
-				: s.kind;
+				: s.kind === 'baseline'
+					? `baseline:${s.baseline.key}`
+					: s.kind;
 	});
 
 	async function loadChoices() {
@@ -96,6 +113,9 @@
 		} else if (value.startsWith('pull:')) {
 			const pr = pulls?.find((p) => `pull:${p.number}` === value);
 			if (pr) source = { kind: 'pull', pr };
+		} else if (value.startsWith('baseline:')) {
+			const baseline = baselines.find((b) => `baseline:${b.key}` === value);
+			if (baseline) source = { kind: 'baseline', baseline };
 		}
 		open = null;
 		void review.start({ workspace, session, engine }, source);
@@ -277,7 +297,7 @@
 			Comparing <strong>{review.subject}</strong> with
 			<strong>{review.against || '…'}</strong>.
 		</p>
-		{#if git}
+		{#if git || baselines.length || review.source.kind === 'baseline'}
 			<label class="compare">
 				<span>Compare</span>
 				<select
@@ -286,8 +306,10 @@
 					onpointerdown={loadChoices}
 					onchange={(e) => choose(e.currentTarget.value)}
 				>
-					<option value="local">Your changes, not yet on GitHub</option>
-					{#if git.branch !== git.defaultBranch}
+					<option value="local"
+						>{git ? 'Your changes, not yet on GitHub' : `Your changes, since ${localBase}`}</option
+					>
+					{#if git && git.branch !== git.defaultBranch}
 						<option value="branch" disabled={!reachable}
 							>Everything on “{git.branch}”, with {git.defaultBranch}</option
 						>
@@ -297,6 +319,18 @@
 					{/if}
 					{#if review.source.kind === 'pull'}
 						<option value={choice}>Proposal #{review.source.pr.number}</option>
+					{/if}
+					{#if review.source.kind === 'baseline' && !baselines.some((b) => `baseline:${b.key}` === choice)}
+						<option value={choice}>Since baseline {review.source.baseline.name}</option>
+					{/if}
+					{#if baselines.length}
+						<optgroup label="Since a baseline">
+							{#each baselines as b (b.key)}
+								<option value="baseline:{b.key}"
+									>{b.name}{b.date ? ` · ${longDay(b.date)}` : ''}</option
+								>
+							{/each}
+						</optgroup>
 					{/if}
 					{#if commits?.length}
 						<optgroup label="Since an earlier version">
@@ -314,7 +348,7 @@
 					{/if}
 				</select>
 			</label>
-			{#if !reachable}
+			{#if git && !reachable}
 				<p class="hint">Connect to GitHub (and be online) to compare branches and proposals.</p>
 			{:else if choicesError}
 				<p class="hint">{choicesError}</p>
@@ -383,9 +417,19 @@
 					</ul>
 				</section>
 			{/if}
+			{#if summary.groups.length > 1}
+				<nav class="jump" aria-label="Kinds of change">
+					<span>Go to</span>
+					{#each summary.groups as group (group.category)}
+						<button type="button" onclick={() => jump(group.category)}
+							>{group.title} <span class="n">{group.items.length}</span></button
+						>
+					{/each}
+				</nav>
+			{/if}
 			{#each summary.groups as group (group.category)}
 				<section class="group" aria-labelledby="{uid}-{group.category}">
-					<h3 id="{uid}-{group.category}">
+					<h3 id="{uid}-{group.category}" tabindex="-1">
 						{group.title} <span class="n">{group.items.length}</span>
 					</h3>
 					<ul class="items">
@@ -662,6 +706,35 @@
 		background: linear-gradient(145deg, var(--ok-weak), var(--surface));
 		color: var(--ok);
 		box-shadow: var(--shadow-md);
+	}
+	.jump {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: var(--space-1) var(--space-2);
+		color: var(--text-3);
+		font-size: var(--text-xs);
+	}
+	.jump button {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		min-height: 1.75rem;
+		padding: 0 var(--space-2);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-pill);
+		background: var(--surface);
+		color: var(--text-2);
+		font-size: var(--text-xs);
+		font-weight: 600;
+		cursor: pointer;
+	}
+	.jump button:hover {
+		border-color: var(--accent);
+		color: var(--accent);
+	}
+	.group h3:focus {
+		outline: none;
 	}
 	.group h3 {
 		display: flex;

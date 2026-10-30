@@ -10,6 +10,7 @@
  */
 import { SvelteMap } from 'svelte/reactivity';
 import type { GitProvider, GitRecord, RepoRef } from '#lib/git/types.ts';
+import type { BaselineStatus } from './baselines.ts';
 import {
 	isComparedFile,
 	sameCommit,
@@ -27,6 +28,8 @@ export interface RevisionSource {
 	provider(): GitProvider | null;
 	/** The signed-in person's GitHub login, to say who recorded a result. */
 	login(): string | null;
+	/** The baseline the model is at, or was last at. */
+	baseline?(): BaselineStatus | null;
 }
 
 export class ProjectRevision implements RevisionInfo {
@@ -54,6 +57,11 @@ export class ProjectRevision implements RevisionInfo {
 
 	get login(): string | null {
 		return this.source.login();
+	}
+
+	/** The baseline the model is at (`exact`), else the latest it was at; null for none. */
+	get baseline(): BaselineStatus | null {
+		return this.source.baseline?.() ?? null;
 	}
 
 	/** The model changed since the base commit (recorded results aside). */

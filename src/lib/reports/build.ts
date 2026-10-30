@@ -277,12 +277,20 @@ function introduction(ctx: ReportContext): Section {
 		type: 'paragraph',
 		text: [
 			t(
-				`Generated from the SysML model of ${ctx.project.name} on ${longDate(ctx.date)} (${lowerFirst(ctx.revision)}). The model is the reference: where this document and the model differ, the model is right.`
+				`Generated from the SysML model of ${ctx.project.name} on ${longDate(ctx.date)} (${lowerFirst(ctx.revision)}).${baselineSentence(ctx)} The model is the reference: where this document and the model differ, the model is right.`
 			)
 		],
 		muted: true
 	});
 	return { id: 'introduction', number: '', title: 'Introduction', blocks, sections: [] };
+}
+
+/** ` It is baseline CDR.`, ` It has changed since baseline CDR.`, or nothing. */
+function baselineSentence(ctx: ReportContext): string {
+	if (!ctx.baseline) return '';
+	return ctx.baseline.exact
+		? ` The model is baseline ${ctx.baseline.name}.`
+		: ` The model has changed since baseline ${ctx.baseline.name}.`;
 }
 
 /** `Commit 3f2a9c1 …` → `commit 3f2a9c1 …`, `Not committed` → `not committed`. */
@@ -315,6 +323,7 @@ export function buildReport(ctx: ReportContext): ReportDocument {
 		author: ctx.meta.author ?? null,
 		date: longDate(ctx.date),
 		revision: ctx.revision,
+		baseline: ctx.baseline,
 		scope: ctx.exposes,
 		summary,
 		sections: numberSections(sections)

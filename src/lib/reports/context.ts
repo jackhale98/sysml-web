@@ -5,6 +5,7 @@
 import type { Analysis, RenderedTable } from '#lib/engine/types.ts';
 import type { RequirementRow } from '#lib/project/requirements.ts';
 import type { RevisionInfo } from '#lib/project/verification.ts';
+import type { ReportBaseline } from './document.ts';
 import type { ReportKind } from './kinds.ts';
 import type { Expose, ModelIndex } from './model.ts';
 import type { Derivation } from './text.ts';
@@ -63,6 +64,8 @@ export interface ReportContext {
 	date: Date;
 	/** The version of the model it is made from: `Commit 3f2a9c1 of owner/repo (main)`, or `Not committed`. */
 	revision: string;
+	/** The baseline the model is (`exact`), or was last and has changed since; null for none. */
+	baseline: ReportBaseline | null;
 	/** What recorded verification results are compared with (null: not connected). */
 	revisionInfo: RevisionInfo | null;
 }

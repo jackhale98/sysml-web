@@ -1,5 +1,6 @@
 /** A report as Markdown (GitHub-flavoured tables), for wikis, pull requests and email. */
 import {
+	baselineText,
 	plain,
 	type Block,
 	type ReportDocument,
@@ -87,7 +88,8 @@ export function toMarkdown(doc: ReportDocument): string {
 		doc.status,
 		doc.author && `Author ${doc.author}`,
 		doc.date,
-		doc.revision
+		doc.revision,
+		doc.baseline && baselineText(doc.baseline)
 	].filter(Boolean) as string[];
 	const parts = [
 		`# ${escape(doc.title)}`,
