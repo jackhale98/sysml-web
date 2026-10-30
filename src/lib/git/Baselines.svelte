@@ -116,9 +116,8 @@
 		<p class="alert" role="alert"><CircleAlert size={16} aria-hidden="true" /> {error}</p>
 	{/if}
 	{#if git && baselines.error}
-		<p class="alert" role="alert">
-			<CircleAlert size={16} aria-hidden="true" /> The baselines on GitHub couldn't be listed: {baselines.error}
-		</p>
+		<!-- Quiet: it was asked for in passing, not by the person (and the sheet has its own alerts). -->
+		<p class="muted">The baselines on GitHub couldn't be listed: {baselines.error}</p>
 	{/if}
 
 	{#if baselines.list.length}

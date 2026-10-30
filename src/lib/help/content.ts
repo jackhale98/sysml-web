@@ -526,6 +526,25 @@ export const HELP: HelpSection[] = [
 				action: { action: 'save-github', label: 'Save to GitHub' }
 			},
 			{
+				id: 'baselines',
+				title: 'Mark a baseline (PDR, CDR…)',
+				keywords:
+					'baseline freeze design review srr pdr cdr milestone tag version snapshot since changed compare release',
+				blocks: [
+					'A baseline freezes the model under a name at a design review, such as SRR, PDR or CDR, so everything afterwards can be judged against it. Open **Source control** (the branch button at the top) and find **Baselines**.',
+					{
+						steps: [
+							'Under **Mark a baseline**, give it a name and the date it stands for, and a description if you like, then choose **Mark baseline**.',
+							'Later, **Changes since PDR** beside it opens **Review changes** against it: what changed in the model since, requirements first. **Go to** › **Requirements** jumps to the requirements that changed.',
+							'**Remove** takes a baseline away, after asking.'
+						]
+					},
+					'On a project saved to GitHub, a baseline is a tag on the version saved there (`baseline/PDR`), so your whole team sees it; save your changes first. Removing it deletes the tag on GitHub, for everyone; the version itself stays. On a project kept only in this browser, or opened from a folder, a baseline is a copy of the files kept with the project in this browser (nothing is written to the folder): to share baselines, save the project to GitHub.',
+					'A report made when the model is exactly a baseline says **Baseline: CDR**; once the model has changed, it says which baseline it has changed since.'
+				],
+				action: { action: 'save-github', label: 'Open baselines' }
+			},
+			{
 				id: 'exchange-models',
 				title: 'Exchange models with other tools',
 				keywords:

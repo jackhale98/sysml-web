@@ -99,6 +99,7 @@ Without them, people connect GitHub with a personal access token.
 | [Dependency matrices](docs/dsm.md) | The DSM and N² chart views: rows, links, suggested modules, change impact. | Modellers |
 | [Table rendering](docs/table-rendering.md) | How any SysML view becomes a table (`@TableRendering`), for views written by hand. | Modellers |
 | [Requirements, verification results and conventions](docs/verification.md) | The coverage rule, recorded test results (`@VerificationResult`) and when they are out of date, reports that name their commit, change impact, `@Convention` views. | Modellers |
+| [Baselines](docs/baselines.md) | Named versions frozen at design reviews (PDR, CDR…): git tags on GitHub or copies in this browser, comparing with one, how reports name them. | Modellers |
 | [State machine simulator](docs/simulator.md) | What the simulator does with a state machine: steps, the simulated clock, `do` actions, what is not supported. | Modellers |
 | [Model interchange](docs/interchange.md) | `.kpar`, SysML v2 JSON and Systems Modeling API servers: what round-trips, merging on Save to server, what a server must allow. | Modellers, developers |
 | [Interchange reference](docs/reference/interchange.md) | Background research on the standards: KerML clause 10, `.kpar`, element identity, the API, XMI. | Developers |

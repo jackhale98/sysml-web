@@ -71,16 +71,16 @@ export class ProjectBaselines {
 	constructor(private readonly source: BaselineSource) {}
 
 	/** Every baseline, newest first. */
-	list: Baseline[] = $derived.by(() =>
-		sortBaselines([
+	list: Baseline[] = $derived.by(() => {
+		this.autoload();
+		return sortBaselines([
 			...this.source.stored().map(fromStored),
 			...(this.tagsOf === this.repository() ? (this.tags ?? []) : [])
-		])
-	);
+		]);
+	});
 
 	/** Which baseline the model is at, else the latest it was at (null: none). */
 	status: BaselineStatus | null = $derived.by(() => {
-		this.autoload();
 		const git = this.source.git();
 		return baselineStatus(this.list, {
 			files: this.source.files(),
