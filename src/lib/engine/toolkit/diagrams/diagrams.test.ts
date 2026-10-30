@@ -208,14 +208,16 @@ describe('general view', () => {
 			.map((d) => d.name)
 			.sort();
 		// With the dependency matrices' library: a metadata def and four view defs; and the
-		// reporting library's convention marker (a metadata def and its severity enum def).
-		expect(definitions).toHaveLength(115);
+		// reporting library's convention marker (a metadata def and its severity enum def); and
+		// GroundLink's console (a part def and two item defs).
+		expect(definitions).toHaveLength(118);
 		expect(ids(tk)).toEqual(definitions);
 		expect(edges(tk, 'specialization')).toEqual([
 			'Airframe -specialization-> Component',
 			'ArmCommand -specialization-> FlightCommand',
 			'Battery -specialization-> Component',
 			'Camera -specialization-> Component',
+			'Console -specialization-> GroundStation',
 			'DesignFmeaWorksheet -specialization-> FmeaWorksheet',
 			'DisarmCommand -specialization-> FlightCommand',
 			'DroneRequirement -specialization-> EngineeringRequirement',
@@ -543,6 +545,7 @@ describe('package view', () => {
 			'DronePerformance',
 			'EngineeringBasics',
 			'FlightControl',
+			'GroundLink',
 			'HazardAnalysis',
 			'ModelViews',
 			'Reporting',

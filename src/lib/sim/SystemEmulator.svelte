@@ -10,7 +10,6 @@
 		selected: string | null;
 		speed: number;
 	}
-	const runs = new Map<string, SavedSystemRun>();
 </script>
 
 <script lang="ts">
@@ -32,6 +31,7 @@
 	import Pill from '#lib/ui/Pill.svelte';
 	import type { WorkbenchUi } from '#lib/workbench/ui.svelte.ts';
 	import EventPad from './EventPad.svelte';
+	import { recallSystem, rememberSystem } from './memory.ts';
 	import {
 		eventOptions,
 		isEventTrigger,
@@ -85,7 +85,7 @@
 	});
 
 	const memoryKey = () => `${workspace.info?.name ?? ''}\u0000system\u0000${name}`;
-	const saved = runs.get(memoryKey());
+	const saved = recallSystem<SavedSystemRun>(memoryKey());
 	let sessions = $state.raw<SystemSession[]>(saved?.sessions ?? []);
 	let cursor = $state(saved?.cursor ?? 0);
 	let startedKey = $state<string | null>(saved?.startedKey ?? null);
@@ -99,7 +99,14 @@
 	let announce = $state('');
 
 	$effect(() => {
-		runs.set(memoryKey(), { sessions, cursor, startedKey, pending, selected, speed });
+		rememberSystem<SavedSystemRun>(memoryKey(), {
+			sessions,
+			cursor,
+			startedKey,
+			pending,
+			selected,
+			speed
+		});
 	});
 
 	const keyOf = (s: MachineSystem) =>

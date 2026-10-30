@@ -930,7 +930,8 @@ describe('the demo’s tables', () => {
 
 	it('connections, allocations and the FMEA', () => {
 		const connections = table('ConnectionTable');
-		expect(shape(connections)).toEqual([21, 2]);
+		// GroundLink's command link is the 22nd.
+		expect(shape(connections)).toEqual([22, 2]);
 		expect(connections.rows[0]).toEqual(['battery.powerOut', 'powerDistribution.powerIn']);
 		// A named connection is the element behind its row (the earlier engine gave none).
 		expect(connections.sources[0]!.element).toBe('DroneArchitecture::drone::batteryPower');
@@ -1064,7 +1065,8 @@ describe('the demo’s tables', () => {
 
 	it('the bill of materials follows the toolkit’s types and SysML’s `::**`', () => {
 		const bom = table('BillOfMaterials');
-		expect(shape(bom)).toEqual([56, 5]);
+		// GroundLink's linkTest, its station and its controller are the last three.
+		expect(shape(bom)).toEqual([59, 5]);
 		// `part drone :> DroneArchitecture::drone` is a DeliveryDrone (the earlier engine said `drone`).
 		expect(bom.rows[1]!.slice(0, 2)).toEqual(['deliveryService.drone', 'DeliveryDrone']);
 		expect(bom.rows[8]).toEqual([
@@ -1113,7 +1115,7 @@ describe('the demo’s tables', () => {
 			'view def'
 		]);
 		const row = (kind: string) => stats.rows.find((r) => r[0] === kind);
-		expect(row('part def')).toEqual(['part def', '19', '0']);
+		expect(row('part def')).toEqual(['part def', '20', '0']);
 		expect(row('requirement')).toEqual(['requirement', '0', '24']);
 		// The dependency matrices' metadata def has five; the reporting library's convention two.
 		expect(row('attribute')).toEqual(['attribute', '0', '235']);
@@ -1127,7 +1129,7 @@ describe('the demo’s tables', () => {
 			24, 12
 		]);
 		expect(shape(table('ModelViews::InterfaceControlDocument::connectionsChapter'))).toEqual([
-			21, 2
+			22, 2
 		]);
 		expect(() => table('ModelViews::SpecificationDocument')).toThrow(/no @TableRendering/);
 	});
