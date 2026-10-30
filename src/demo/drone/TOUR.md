@@ -60,6 +60,11 @@ connections link each system requirement to the need it comes from, so every
 requirement can be traced to someone who asked for it.
 Diagram: **`DroneViews::requirementTree`**.
 
+Requirements often live in a requirements tool as well. To hand them to DOORS,
+Polarion or Jama, open **`DroneViews::systemRequirements`** and use **Export › ReqIF**;
+a `.reqif` file from one of those tools comes in through **Import requirements**, and a
+second import of the same file updates the requirements rather than adding them again.
+
 ## 5. A definition: `DroneComponents::Battery`
 
 A `part def` describes a kind of component, like a datasheet. `Battery`
@@ -113,6 +118,13 @@ next timer, so the clock goes 5, 10, 15 minutes and the charge goes down until t
 drone turns home. Press `ArrivedHome` and `TouchDown`, then Step (or **Wait**)
 until it has charged and is idle again.
 
+Machines can also run together. `GroundLink::linkTest` joins a ground console
+(`GroundLink::Console`) to a flight controller with a command link, and the console's
+own state machine sends `ArmCommand`, then `TakeOffCommand` ten seconds later, through
+its command link port. Run **Link test** from **Simulations**: both machines are drawn,
+on one clock, and the timeline says which part sent what to whom. (Switch the flight
+controller's `preflightChecksPassed` on first, or it refuses to arm.)
+
 ## 10. Meeting the requirements: `RequirementSatisfaction` and `DronePerformance`
 
 `satisfy 'Battery protection' by drone.battery` assigns each requirement to the part
@@ -131,6 +143,14 @@ check turns
 **violated** and shows up under Problems; Undo puts it back. The take-off mass check is
 met with 0.23 kg to spare (3.77 kg of 4 kg). Tables: **`DroneViews::droneMassBudget`** adds up what each part weighs (2.77 kg
 empty) and **`DroneViews::dronePowerBudget`** what each part draws in hover (397 W).
+
+Not every value is exact. A battery pack's mass varies from pack to pack, its capacity
+and the share of it that can be used too, so `DroneComponents::Battery` says by how much
+(a tolerance of +60/−40 g on its mass, a spread on its capacity), written with
+`libraries/Uncertainty.sysml`. The app samples those values thousands of times: the
+endurance check now reads **Met in 98.8 % of cases** (27.54 min, and in 90 % of cases
+between 25.59 and 29.54 min), and the mass budget's **Likely range** column shows the
+take-off mass between 3.752 and 3.808 kg, always within its limit.
 
 ## 12. Proving it: `DroneVerification::enduranceFlightTest`
 
@@ -184,6 +204,22 @@ policy says to reduce). **`DroneViews::riskReduction`** shows the risk before an
 controls, **`DroneViews::riskMatrix`** the lines by severity and likelihood coloured by the
 policy (its **Risk policy** button changes the zones), and **`DroneViews::hazardLog`** each
 hazard with its situations, harms, controls and what implements and verifies them.
+
+An FMEA starts from each part and asks what its failures lead to; a fault tree starts
+from what must not happen and asks what could cause it. `DroneFaultTree::droneFalls` is
+the top event for the hazard of an uncontrolled descent: an OR gate over losing thrust,
+losing control and the battery running flat, down to basic events with failure rates
+(a motor stopping, a blade breaking, the power board failing, ...). The power board's
+failure appears under two branches but is counted once. Per 30-minute flight it comes
+to 8.5E-6, under the 1E-5 the risk policy allows for a critical harm. Diagram:
+**`DroneViews::droneFallsTree`**; the six minimal cut sets, most likely first, are in
+**`DroneViews::droneFallsCutSets`**, and which basic events matter most in
+**`DroneViews::droneFallsImportance`**.
+
+The same failure rates add up to the drone's reliability. `DroneReliability::'Drone reliability'`
+(REL-001) asks for a mean time between failures of at least 2000 hours; the parts' rates
+sum to 215,000 FIT (failures per 10⁹ hours), an MTBF of 4651 hours, a margin of 133 %.
+Table: **`DroneViews::droneReliabilityBudget`**.
 
 ## 14. Documents for review: `DroneViews::droneSpecification`
 
@@ -256,3 +292,8 @@ A project of your own is kept in the browser until you
 [save it to GitHub](#do:save-github). From then on the review also compares a branch
 with where it started, an earlier version, or a proposal (a pull request) before it is
 merged.
+
+Before a design review, freeze what is being reviewed: **Source control › Baselines ›
+Mark a baseline** (say `PDR`). On a project saved to GitHub it is a git tag the whole
+team sees. Afterwards, **Changes since PDR** opens this review against it, and every
+report names the baseline it was made at, or says the model has changed since.
