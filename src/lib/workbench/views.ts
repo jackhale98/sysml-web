@@ -124,6 +124,7 @@ const FAMILY_OF: Record<string, ViewFamily> = {
 	RequirementsTraceMatrix: 'requirements',
 	GeneralView: 'structure',
 	BillOfMaterials: 'structure',
+	VariabilityMatrix: 'structure',
 	ModelStats: 'structure',
 	InterfaceTable: 'interfaces',
 	PortTable: 'interfaces',
