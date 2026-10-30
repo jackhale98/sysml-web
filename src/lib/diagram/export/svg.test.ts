@@ -211,6 +211,55 @@ describe('buildSvg', () => {
 		expect(svg).toContain('<rect width="72" height="8" rx="1"');
 	});
 
+	it('draws a use case diagram: ellipses, stick figures, the boundary and «include»', () => {
+		const deliver = graphNode({
+			id: 'DeliverParcel',
+			label: 'DeliverParcel',
+			kind: 'use_case',
+			stereotype: '<<use case def>>',
+			is_definition: true,
+			attributes: [['objective', 'Parcel delivered.']]
+		});
+		const verify = graphNode({
+			id: 'VerifyDropZone',
+			label: 'VerifyDropZone',
+			kind: 'use_case',
+			stereotype: '<<use case def>>',
+			is_definition: true
+		});
+		const operator = graphNode({ id: 'Operator', label: 'Operator', kind: 'actor' });
+		const { svg } = buildSvg({
+			title: 'uc [deliveryUseCases]',
+			view: 'usecases',
+			boundaries: [{ id: 's', label: 'DeliveryDrone', x: 172, y: -58, width: 600, height: 200 }],
+			nodes: [
+				placed(operator, 0, 0, 'usecases'),
+				placed(deliver, 200, 0, 'usecases'),
+				placed(verify, 520, 0, 'usecases')
+			],
+			edges: [
+				{ kind: 'actor', path: 'M 59 30 L 200 50', text: '' },
+				{ kind: 'include', path: 'M 430 50 L 520 36', text: '«include»' }
+			]
+		});
+		expect(count(svg, /<ellipse /g)).toBe(2);
+		// The figure's head and body, its name below.
+		expect(svg).toContain('<path d="M15 16.5 V37 M3 25 H27 M15 37 L4 58 M15 37 L26 58"');
+		for (const text of [
+			'Operator',
+			'DeliverParcel',
+			'«use case def»',
+			'Parcel delivered.',
+			'DeliveryDrone',
+			'«include»',
+			'uc [deliveryUseCases]'
+		])
+			expect(svg).toContain(`>${text}</text>`);
+		// The boundary is drawn first, under the rest; the include is dashed, the actor's line not.
+		expect(svg.indexOf('>DeliveryDrone</text>')).toBeLessThan(svg.indexOf('<ellipse'));
+		expect(count(svg, /stroke-dasharray="5 4"/g)).toBe(1);
+	});
+
 	it('paints a background unless asked not to, and can match the dark theme', () => {
 		const light = buildSvg(interconnection).svg;
 		expect(light).toMatch(/<rect width="\d+" height="\d+" fill="#ffffff"\/>/);
@@ -260,6 +309,8 @@ describe('edgeStyle', () => {
 		expect(edgeStyle('transition')).toEqual({ end: 'arrow' });
 		expect(edgeStyle('typing')).toEqual({ end: 'typing' });
 		expect(edgeStyle('binding')).toEqual({});
+		expect(edgeStyle('include')).toEqual({ end: 'open', dashed: true });
+		expect(edgeStyle('actor')).toEqual({});
 	});
 });
 

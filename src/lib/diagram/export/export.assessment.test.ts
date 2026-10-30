@@ -31,7 +31,8 @@ const VIEW_OF: Record<string, string> = {
 	actions: 'actions',
 	requirements: 'general',
 	packages: 'general',
-	trace: 'general'
+	trace: 'general',
+	usecases: 'usecases'
 };
 
 /** Lay a graph out and export it, as the canvas would draw it before anything is moved. */
@@ -91,7 +92,8 @@ const DEMO: [DiagramView, string | null][] = [
 	['states', 'FlightModes'],
 	['actions', 'DeliveryFlight'],
 	['packages', null],
-	['trace', null]
+	['trace', null],
+	['usecases', 'DroneViews::deliveryUseCases']
 ];
 
 describe('exported demo diagrams hold every name and label', () => {

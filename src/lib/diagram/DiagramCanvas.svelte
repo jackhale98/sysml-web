@@ -145,6 +145,9 @@
 	import { exposedName, presentationOf } from '#lib/workbench/views.ts';
 	import SysmlNode from './SysmlNode.svelte';
 	import type { SysmlEdgeData, SysmlNodeData } from './types.ts';
+	import UseCaseAddForm, { type UseCaseAddKind } from './UseCaseAddForm.svelte';
+	import { isUseCase, planAddActor, planAddUseCase, useCaseHost } from './useCaseEdits.ts';
+	import { boundaries } from './useCaseLayout.ts';
 	import { MARK_WORDS, reviewMarks, type ReviewMark } from '#lib/review/marks.svelte.ts';
 
 	let {
@@ -193,6 +196,8 @@
 	let hiddenHere = $state.raw<{ id: string; label: string; key: string | null }[]>([]);
 	/** The diagram frame's name, as SysML writes it: "gv [Scope]". */
 	let frameTitle = $state('');
+	/** Use case diagrams: the subjects' boundaries, by the use cases inside each. */
+	let frames = $state.raw<DiagramGraph['subgraphs']>([]);
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	let generation = 0;
 	let flow: FlowApi | null = null;
@@ -368,8 +373,67 @@
 	});
 	/** Add, opened from a state's menu, puts the new state inside it. */
 	let addInside = $state<string | null>(null);
+	// ---- Use case diagrams: boundaries drawn around their use cases, wherever they are ----
+
+	const useCaseView = $derived(view === 'usecases');
+	const drawnBoundaries = $derived(
+		useCaseView
+			? boundaries(
+					frames,
+					nodes.map((n) => ({
+						id: n.id,
+						x: n.position.x,
+						y: n.position.y,
+						width: n.width ?? 0,
+						height: n.height ?? 0
+					}))
+				)
+			: []
+	);
+	/** The elements drawn on a use case diagram: its use cases, and the part defs of its actors. */
+	const drawnElements = (kind: 'use_case' | 'actor') =>
+		nodes.flatMap((n) => {
+			const e =
+				n.data.node.kind === kind && n.data.elementKey
+					? workspace.elements.find((x) => x.key === n.data.elementKey)
+					: undefined;
+			return e ? [e] : [];
+		});
+	/** Where Add writes a new use case: beside the selected one, or the last one drawn. */
+	const useCasePlace = $derived.by(() => {
+		if (!useCaseView) return null;
+		const near = selected && isUseCase(selected) ? selected : undefined;
+		const fallback = owner?.kind === 'package' && !isLibrary(owner) ? owner : undefined;
+		return useCaseHost(drawnElements('use_case'), near, fallback, ctx);
+	});
+
+	function planUseCaseAdd(
+		kind: UseCaseAddKind,
+		name: string,
+		useCase: ModelElement | undefined
+	): Plan | string {
+		if (kind === 'actor') {
+			if (!useCase) return 'Choose the use case the actor takes part in.';
+			return planAddActor(name, fresh(useCase), drawnElements('actor'), ctx);
+		}
+		return useCasePlace ? planAddUseCase(name, useCasePlace, ctx) : 'Select a package first.';
+	}
+
+	async function addToUseCases(plan: Plan, kind: UseCaseAddKind, name: string) {
+		const error = await applySteps(workspace, plan.label, plan.steps, checkSyntax);
+		if (error) return error;
+		popover = null;
+		// Where it was clicked, else where the layout puts it (in the boundary, or beside it).
+		if (lastClick)
+			pendingPlace = { name: formatName(name), at: lastClick, until: Date.now() + 8000 };
+		if (kind === 'use case' && useCasePlace)
+			pendingSelect = { name: formatName(name), owner: useCasePlace.host.name };
+		lastClick = null;
+		return null;
+	}
+
 	/** Where the toolbar's Add puts things. */
-	const addOwner = $derived(behavior ? subject : owner);
+	const addOwner = $derived(behavior ? subject : useCaseView ? useCasePlace?.host : owner);
 
 	function elementOf(id: string): ModelElement | undefined {
 		const node = nodes.find((n) => n.id === id);
@@ -485,6 +549,10 @@
 			xs.push(n.position.x, n.position.x + (n.width ?? 0));
 			ys.push(n.position.y, n.position.y + (n.height ?? 0));
 		}
+		for (const b of focus ? [] : drawnBoundaries) {
+			xs.push(b.x, b.x + b.width);
+			ys.push(b.y, b.y + b.height);
+		}
 		for (const e of edges) {
 			const route = e.data?.route;
 			if (!route || (focus && !focus.lines.has(`${e.source}>${e.target}`))) continue;
@@ -592,7 +660,8 @@
 				lines: graph.edges.map((e) => `${e.source}>${e.target}`)
 			};
 			const shape = JSON.stringify(drawn);
-			const settle = behavior && !Object.keys(stored).length && shape !== lastShape;
+			const settle =
+				(behavior || useCaseView) && !Object.keys(stored).length && shape !== lastShape;
 			// What this drawing adds to the last one: where to look after an edit.
 			const before = lastShape ? (JSON.parse(lastShape) as typeof drawn) : null;
 			const newOf = (now: string[], then: string[]) => {
@@ -739,11 +808,13 @@
 							editable: canEditEdge(e, graph),
 							sourcePort: !!sourceHandle,
 							targetPort: !!targetHandle,
+							straight: useCaseView,
 							route: route && from && to ? { ...route, from, to } : undefined
 						}
 					};
 				});
 			frameTitle = graph.title;
+			frames = useCaseView ? graph.subgraphs : [];
 			status = 'ready';
 			drawnTexts = files.map((f) => f.text);
 
@@ -1871,7 +1942,14 @@
 		const source = elementOf(from);
 		const target = elementOf(to);
 		if (!source || !target || !edge.data) return;
-		const plan = planEdgeRemoval(edge.data.kind, edge.data.label, source, target, ctx);
+		const plan = planEdgeRemoval(
+			edge.data.kind,
+			edge.data.label,
+			source,
+			target,
+			ctx,
+			edge.data.element
+		);
 		if (typeof plan === 'string') {
 			toasts.show(plan);
 			return;
@@ -1901,7 +1979,7 @@
 	/** The whole drawing, for an SVG or PNG (the export code loads on first use). */
 	async function exportDiagram() {
 		const { collectDiagram } = await import('./export/collect.ts');
-		return collectDiagram(host, frameTitle, view, nodes, edges, labels.positions);
+		return collectDiagram(host, frameTitle, view, nodes, edges, labels.positions, drawnBoundaries);
 	}
 
 	// ---- Input ----
@@ -2093,6 +2171,8 @@
 					Add the states it can be in, then draw a transition from one to the next.
 				{:else if view === 'actions'}
 					Add the steps, then draw what comes next from each one.
+				{:else if useCaseView}
+					Add a use case, then the actors who take part in it: the diagram follows.
 				{:else}
 					Add a part, a requirement or a package here, or write it in the text: the diagram follows.
 				{/if}
@@ -2211,6 +2291,21 @@
 			<Panel position="bottom-center">
 				<HiddenPanel hidden={hiddenHere} onshow={(ids) => void showAgain(ids)} />
 			</Panel>
+		{/if}
+		{#if drawnBoundaries.length}
+			<!-- Each subject's boundary, behind its use cases (the actors stand outside). -->
+			<ViewportPortal target="back">
+				{#each drawnBoundaries as b (b.id)}
+					<div
+						class="boundary"
+						style:transform="translate({b.x}px, {b.y}px)"
+						style:width="{b.width}px"
+						style:height="{b.height}px"
+					>
+						<span class="boundary-name">{b.label}</span>
+					</div>
+				{/each}
+			</ViewportPortal>
 		{/if}
 		{#if lastClick && popover === 'add'}
 			<ViewportPortal target="front">
@@ -2340,7 +2435,18 @@
 				<div class="popover">
 					{@render behaviorAdd()}
 				</div>
-			{:else if popover === 'add' && owner && !behavior}
+			{:else if popover === 'add' && useCaseView && useCasePlace}
+				<div class="popover">
+					<UseCaseAddForm
+						hostLabel={useCasePlace.host.label}
+						useCases={drawnElements('use_case').filter((u) => !isLibrary(u))}
+						initialUseCase={selected && isUseCase(selected) ? selected.key : undefined}
+						plan={planUseCaseAdd}
+						onapply={addToUseCases}
+						oncancel={() => (popover = null)}
+					/>
+				</div>
+			{:else if popover === 'add' && owner && !behavior && !useCaseView}
 				<div class="popover">
 					<AddForm
 						ownerLabel={owner.label}
@@ -2706,6 +2812,28 @@
 	.toolbar button:disabled {
 		color: var(--text-3);
 		cursor: default;
+	}
+	/* A use case diagram's subject: a rectangle around its use cases, its name on top. */
+	.boundary {
+		position: absolute;
+		top: 0;
+		left: 0;
+		border: 1.5px solid color-mix(in oklab, var(--text-2) 70%, transparent);
+		border-radius: 2px;
+		background: color-mix(in oklab, var(--surface) 55%, transparent);
+		pointer-events: none;
+	}
+	.boundary-name {
+		display: block;
+		padding: 6px 12px 0;
+		overflow: hidden;
+		color: var(--text);
+		font-size: 13px;
+		font-weight: 650;
+		line-height: 18px;
+		text-align: center;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 	.popover {
 		display: flex;

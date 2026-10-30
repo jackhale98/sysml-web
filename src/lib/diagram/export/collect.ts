@@ -6,6 +6,7 @@
 import type { Edge, Node } from '@xyflow/svelte';
 import { edgeText } from '../layout.ts';
 import type { SysmlEdgeData, SysmlNodeData } from '../types.ts';
+import type { Boundary } from '../useCaseLayout.ts';
 import type { ExportDiagram, IconShape, XY } from './svg.ts';
 
 const ICON_ATTRS = [
@@ -50,7 +51,9 @@ export function collectDiagram(
 	view: string,
 	nodes: Node<SysmlNodeData>[],
 	edges: Edge<SysmlEdgeData>[],
-	labelPositions: Record<string, XY>
+	labelPositions: Record<string, XY>,
+	/** A use case diagram's subject boundaries, where they are drawn. */
+	boundaries: Boundary[] = []
 ): ExportDiagram {
 	const nodeEl = (id: string) =>
 		host.querySelector(`.svelte-flow__node[data-id="${CSS.escape(id)}"]`);
@@ -58,6 +61,7 @@ export function collectDiagram(
 	return {
 		title,
 		view,
+		...(boundaries.length ? { boundaries } : {}),
 		nodes: nodes.map((n) => ({
 			id: n.id,
 			x: n.position.x,
