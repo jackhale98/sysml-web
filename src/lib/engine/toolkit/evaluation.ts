@@ -480,7 +480,17 @@ export class Evaluation {
 		const session = this.session;
 		const started = performance.now();
 		const raw = JSON.parse(session.verify(null)) as TkVerifyReport;
-		const checks = [...this.mapReport(raw), ...(this.source.more?.() ?? [])];
+		const more = this.source.more?.() ?? [];
+		// A claim the app decides (a reliability requirement's, from its budget) stands for the toolkit's.
+		const decided = new Set(
+			more.filter((c) => c.kind === 'satisfy').map((c) => `${c.file}@${c.span.start_byte}`)
+		);
+		const checks = [
+			...this.mapReport(raw).filter(
+				(c) => c.kind !== 'satisfy' || !decided.has(`${c.file}@${c.span.start_byte}`)
+			),
+			...more
+		];
 		this.timings.verifyMs = Math.round(performance.now() - started);
 		const summary = { satisfied: 0, violated: 0, undecided: 0 };
 		for (const c of checks) summary[c.status]++;

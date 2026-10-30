@@ -12,13 +12,17 @@ import { collapseWhitespace, simpleName, splitPath, unescape, unquote, unquoteNa
 const isView = (r: ElementRecord) =>
 	r.metaclass === 'ViewUsage' || r.metaclass === 'ViewDefinition';
 
-/** The views the SysML standard library defines, which the app draws. */
+/**
+ * The views the SysML standard library defines, which the app draws, and the
+ * fault tree diagram (`FaultTreeAnalysis` library), drawn the same way.
+ */
 const STANDARD_VIEWS = new Set([
 	'GeneralView',
 	'InterconnectionView',
 	'StateTransitionView',
 	'ActionFlowView',
-	'SequenceView'
+	'SequenceView',
+	'FaultTreeDiagram'
 ]);
 
 /**

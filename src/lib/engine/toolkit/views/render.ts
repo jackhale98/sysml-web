@@ -25,6 +25,8 @@ import {
 import type { Scope, Value } from '#lib/sim/expr.ts';
 import type { ColumnEdit, Levels, RenderedTable, RowInfo, TraceMatrix } from '../../types';
 import { fieldKinds } from './budget';
+import { faultTreeFieldKinds } from './faultTrees';
+import { reliabilityFieldKinds } from './reliability';
 import { fieldDomain, fieldType, metadataDefinition, typeDomain, type Domain } from './domains';
 import type { ElementRecord } from '../model';
 import { findView, listViews, tableSpec, viewChain, viewClauses } from './catalog';
@@ -243,7 +245,11 @@ export function renderView(ctx: ViewContext, name: string): RenderedTable {
 	const editable: (ColumnEdit | null)[] = columns.map(([column, expr]) =>
 		edits.column(rowsSpec, probe, column, expr)
 	);
-	const kinds = fieldKinds(rowsSpec.trim());
+	const kinds = {
+		...fieldKinds(rowsSpec.trim()),
+		...faultTreeFieldKinds(rowsSpec.trim()),
+		...reliabilityFieldKinds(rowsSpec.trim())
+	};
 	// A column copied from a field reads like the field; `name = expression` columns are numbers.
 	const columnKinds = columns.map(([column, expr]) =>
 		expr === null ? (kinds[column] ?? null) : (kinds[expr] ?? null)
@@ -373,6 +379,27 @@ export function parseExpose(text: string): { kind: ExposeKind; base: string } {
 	if (t.endsWith('::**')) return { kind: 'recursive', base: t.slice(0, -4) };
 	if (t.endsWith('::*')) return { kind: 'members', base: t.slice(0, -3) };
 	return { kind: 'element', base: t };
+}
+
+/**
+ * The elements a view (by name) exposes, by its most specific `expose`
+ * list; null when it exposes nothing (it shows the whole model) or there is
+ * no such view. A drawing that isn't a table (a fault tree) scopes by it.
+ */
+export function viewExposure(ctx: ViewContext, name: string): Set<string> | null {
+	const view = findView(ctx, name);
+	if (!view) return null;
+	const exposing = viewChain(ctx, view)
+		.map((v) => ({ view: v, ...viewClauses(ctx.textOf(v)) }))
+		.find((c) => c.expose.length);
+	if (!exposing) return null;
+	const exposures: Exposure[] = [];
+	for (const text of exposing.expose) {
+		const { kind, base } = parseExpose(text);
+		const target = resolveTarget(ctx, base, exposing.view);
+		if (target) exposures.push({ kind, target });
+	}
+	return exposedElements(ctx, exposures);
 }
 
 /** Keep the rows the view exposes and its filters accept. */

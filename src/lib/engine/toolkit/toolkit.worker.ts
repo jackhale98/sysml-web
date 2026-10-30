@@ -187,6 +187,7 @@ const handlers: { [M in Method]: Handler } = {
 	viewLibraries: (host) => host.viewLibraries(),
 	riskPolicy: (host, files: SourceFile[]) => host.riskPolicy(files),
 	fmeaLines: (host, files: SourceFile[], id: string) => host.fmeaLines(files, id),
+	faultTrees: (host, files: SourceFile[], view: string) => host.faultTrees(files, view),
 	checks: (host, files: SourceFile[]) => host.checks(files),
 	evaluate: (host, files: SourceFile[], ids: string[]) => host.evaluate(files, ids),
 	tradeStudies: (host, files: SourceFile[]) => host.tradeStudies(files),

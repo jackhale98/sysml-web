@@ -43,6 +43,7 @@ import type {
 	RenderedTable,
 	DependencyMatrix,
 	RiskPolicy,
+	FaultTreeDrawing,
 	FmeaLineInfo,
 	StateMachine,
 	TradeStudy,
@@ -382,6 +383,15 @@ export class ToolkitHost {
 		return views.riskPolicy(this.viewContext(files));
 	}
 
+	/**
+	 * The fault trees a view draws (`views/faultTrees.ts`): those of the top
+	 * events it exposes, or of every top event when it exposes nothing.
+	 */
+	faultTrees(files: SourceFile[], view: string): FaultTreeDrawing[] {
+		const ctx = this.viewContext(files);
+		return views.faultTreeDrawings(ctx, views.viewExposure(ctx, view));
+	}
+
 	/** The FMEA lines about an element (by its id), for its details. */
 	fmeaLines(files: SourceFile[], id: string): FmeaLineInfo[] {
 		return views.fmeaLines(this.viewContext(files), id);
@@ -449,7 +459,14 @@ export class ToolkitHost {
 			session: built.session,
 			units: built.units,
 			extracted: built.extracted,
-			more: () => views.annotationChecks(this.viewContextOf(built, built.files))
+			more: () => {
+				const ctx = this.viewContextOf(built, built.files);
+				return [
+					...views.annotationChecks(ctx),
+					...views.faultTreeChecks(ctx),
+					...views.reliabilityChecks(ctx)
+				];
+			}
 		});
 		return built.evaluation;
 	}

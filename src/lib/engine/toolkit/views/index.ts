@@ -10,5 +10,8 @@ export { dependencyMatrix } from './dsm';
 export { featureValues } from './edits';
 export { elementFeatures } from './features';
 export { annotationChecks } from './annotationChecks';
+export { faultTreeChecks, faultTreeDrawings } from './faultTrees';
+export { reliabilityChecks } from './reliability';
+export { viewExposure } from './render';
 export { fmeaLines, riskPolicy } from './riskLines';
 export { dependantsOf, fmeaReferences } from './impact';

@@ -21,6 +21,7 @@ import type {
 	OutlineItem,
 	RenderedTable,
 	RiskPolicy,
+	FaultTreeDrawing,
 	FmeaLineInfo,
 	StateMachine,
 	TradeStudy,
@@ -65,6 +66,8 @@ export interface EngineApi {
 	viewLibraries(): SourceFile[];
 	/** The risk policy the project's risk library states: zones, RPN bands, what worksheets lead with. */
 	riskPolicy(files: SourceFile[]): RiskPolicy;
+	/** The fault trees a view draws (by its name): those of the top events it exposes. */
+	faultTrees(files: SourceFile[], view: string): FaultTreeDrawing[];
 	/** The FMEA lines about an element (by its id), with their figures and controls. */
 	fmeaLines(files: SourceFile[], id: string): FmeaLineInfo[];
 	elementDetails(
