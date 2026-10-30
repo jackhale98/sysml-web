@@ -326,6 +326,8 @@ In the app: **Open the requirements table**.
 2. Select the part they belong to, and next to its value choose **Add up**: it sums the value over its parts and can make a budget table.
 3. Choose **Set a limit** next to the total to write a requirement that checks it. The budget shows the margin and turns red when it is over.
 
+A **reliability budget** adds up how often the parts fail: give each kind of part a `failureRate`, in FIT (failures in a billion hours) or per hour. A system that fails when any part fails has the sum of the rates, and its **MTBF** (mean time between failures) is one over that. A `ReliabilityRequirement` that the system satisfies sets the least MTBF or the most failure rate; the budget shows the margin, and a system that fails too often is listed under **Problems**. The words come from `libraries/Reliability.sysml`.
+
 In the app: **New budget**.
 
 ### Compare options
@@ -366,6 +368,8 @@ In the app: **New FMEA**.
 4. In the **hazard log** that opens, choose a control, then **Add what satisfies it** and **Add a test that verifies it** in its details.
 
 The hazard log lists each hazard with its harms, the worst severity and its controls, with gaps left empty. The words come from `libraries/HazardAnalysis.sysml`.
+
+A **fault tree** shows how a hazard can come about: its top event is broken down through **AND**, **OR** and **k of n** gates into basic events, each a part failing in a given way, with a probability or a failure rate. **Minimal cut sets** lists the smallest combinations of basic events that cause the top event, most likely first; **Basic event importance** shows which matter most. The top event’s probability is worked out exactly from the tree, and one above what its hazard’s harms allow is listed under **Problems**. Write the tree in the text with the words from `libraries/FaultTreeAnalysis.sysml`; the demo’s **Drone falls tree** shows one.
 
 In the app: **New hazard**.
 

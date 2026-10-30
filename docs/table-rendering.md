@@ -139,6 +139,29 @@ Row providers (the `rows` value):
                           and verifiedBy (what satisfies and
                           verifies those controls), failureModes
                           (the @Fmea lines whose `hazard` names it)
+  "reliability:failureRate"
+                          a budget:failureRate (a series system's
+                          failure rate) with mtbf = 1 / total for
+                          each row, and limit, margin, check and
+                          requirement from a ReliabilityRequirement
+                          the row's element satisfies
+                          (maximumFailureRate, minimumMtbf)
+  "faultTrees"            one row per occurrence typed by
+                          FaultTreeAnalysis::TopEvent: hazard,
+                          probability (exact), rareEvent and
+                          upperBound (from the minimal cut sets),
+                          tolerable, margin, check, cutSets,
+                          smallestCutSet, exposure, basicEvents
+  "cutSets"               one row per minimal cut set of each top
+                          event, most likely first: topEvent, rank,
+                          order, events, probability, share (of the
+                          top event's), components
+  "basicEvents"           one row per basic event of each top
+                          event: topEvent, rank (by Fussell-Vesely),
+                          element, component, failureMode,
+                          probability, source, fussellVesely,
+                          birnbaum, achievementWorth,
+                          reductionWorth, inFmea (see fault-trees.md)
 
 Values are evaluated with their units by the tool's evaluator, as
 the model binds them; a value it cannot evaluate is left empty with
