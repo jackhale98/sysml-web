@@ -333,7 +333,7 @@ describe('broken text', () => {
 			analyse(original.replace('port powerOut : PowerPort;', 'port powerOut : PowerPort'))
 		);
 		expect(syntax).toHaveLength(1);
-		expect(syntax[0]!.span.start_row).toBe(40);
+		expect(syntax[0]!.span.start_row).toBe(50);
 		// `powerOut` (dropped by the repair) no longer resolving elsewhere is hidden too.
 		expect(diagnostics).toEqual([]);
 	});

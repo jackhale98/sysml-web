@@ -551,6 +551,51 @@ export interface Check {
 	 * itself), `open` when something is not given yet or can't be worked out.
 	 */
 	undecided?: 'fault' | 'open';
+	/**
+	 * When a value it reads is uncertain (`docs/uncertainty.md`): how often the
+	 * constraint holds over sampled values, and the spread of the value it
+	 * compares with a limit.
+	 */
+	spread?: CheckSpread;
+}
+
+/**
+ * How a value varies when values it is worked out from are uncertain: a
+ * Monte Carlo run's summary (`engine/toolkit/uncertainty.ts`), in `unit`.
+ */
+export interface Spread {
+	unit: string | null;
+	/** The value at the nominal values (what the model states). */
+	nominal: number;
+	mean: number;
+	/** Standard deviation. */
+	sd: number;
+	p5: number;
+	p50: number;
+	p95: number;
+	/** Every uncertain value at the end of its range that pushes this furthest each way. */
+	worstCase: { min: number; max: number };
+	histogram: { from: number; width: number; counts: number[] };
+	/** Samples evaluated, and seed and method, to reproduce the run. */
+	samples: number;
+	seed: number;
+	method: 'random' | 'latin-hypercube';
+	/** The uncertain values it is worked out from (their paths: `drone.battery.mass`). */
+	inputs: string[];
+	/** When a limit applies: the share of samples within it, with its 95 % interval. */
+	within?: { share: number; low: number; high: number; met: number; n: number };
+	/** What the spread leaves out, when part of the model could not be sampled. */
+	note?: string;
+}
+
+export interface CheckSpread {
+	/** The share of samples in which the constraint holds, with its 95 % interval. */
+	met: { share: number; low: number; high: number; met: number; n: number };
+	/** The spread of the value the constraint compares with a limit (`x <= 4 [kg]`), when it does. */
+	value?: Spread;
+	samples: number;
+	inputs: string[];
+	note?: string;
 }
 
 export interface CheckReport {

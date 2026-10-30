@@ -50,6 +50,12 @@
  *   attribute a usage inherits from its definition its value in the usage
  *   (`evaluate` on the definition's feature sees no usage values).
  *
+ * - **Uncertain values.** When a value a check reads is uncertain
+ *   (`uncertainty.ts`), the check also says how often it holds over
+ *   sampled values (`spread`), and its explanation leads with that
+ *   ("Met in 97.3 % of cases"). The verdict stays the one at the values the
+ *   model states.
+ *
  * Everything is cached per analysis (one `Evaluation` per built session).
  */
 import {
@@ -79,6 +85,7 @@ import type {
 	ValueSource
 } from '../types';
 import type { TkElement, TkLibrary, TkSession, TkSite, Toolkit } from './api';
+import { Spreads, spreadExplanation } from './uncertainty';
 import {
 	multiplicityOf,
 	toOriginalByte,
@@ -153,6 +160,9 @@ export class Evaluation {
 	private satisfies: Map<string, TraceRecord[]> | undefined;
 	/** The checks of definitions' assertions (`verify` decides them with the definition's values). */
 	private readonly ofDefinitions = new WeakSet<Check>();
+	/** Where a check's values are read (qualified paths), for their spread. */
+	private readonly pathOf = new WeakMap<CheckValue, string>();
+	private uncertain: Spreads | undefined;
 	/** Timings, for measurements. */
 	readonly timings = { sessionMs: 0, verifyMs: 0 };
 
@@ -176,6 +186,17 @@ export class Evaluation {
 	release() {
 		this.free();
 		this.opened = false;
+	}
+
+	/** The model's uncertain values and their spreads (`uncertainty.ts`), made on first use. */
+	get spreads(): Spreads {
+		this.uncertain ??= new Spreads({
+			extracted: this.source.extracted,
+			recordAt: (q) => this.recordAt(q),
+			valueFor: (c, f) => this.valueFor(c, f),
+			valueAt: (q) => this.valueAt(q)
+		});
+		return this.uncertain;
 	}
 
 	/** The session to evaluate in, opened on first use. */
@@ -454,7 +475,7 @@ export class Evaluation {
 		return this.evaluateHandle(handle, this.session.elementId(handle));
 	}
 
-	private recordAt(qualifiedName: string): ElementRecord | undefined {
+	recordAt(qualifiedName: string): ElementRecord | undefined {
 		const handle = this.session.resolve(qualifiedName);
 		if (!handle) return undefined;
 		try {
@@ -581,7 +602,10 @@ export class Evaluation {
 			span: at.span,
 			...(constraintAt ? { constraintAt } : {})
 		};
-		if (!s.negated) this.decideByApp(check, constraintTexts);
+		if (!s.negated) {
+			this.decideByApp(check, constraintTexts);
+			this.addSpread(check, constraintTexts);
+		}
 		if (s.constraints.length === 1) addMargin(check);
 		this.nameBySatisfier(check, requirement);
 		check.explanation = explain(check, s.vacuous);
@@ -645,6 +669,7 @@ export class Evaluation {
 			span: at.span
 		};
 		this.decideByApp(check, [at.text]);
+		this.addSpread(check, [at.text]);
 		addMargin(check);
 		check.explanation = explain(check, false);
 		if (owner?.isDefinition) this.ofDefinitions.add(check);
@@ -729,16 +754,17 @@ export class Evaluation {
 			by: name,
 			constraint: check.constraint,
 			name: check.name,
-			values: [...values].map(([feature, v]) => ({
-				feature,
-				value: v.shown,
-				...(v.from ? { from: v.from } : {})
-			})),
+			values: [...values].map(([feature, v]) => {
+				const value: CheckValue = { feature, value: v.shown, ...(v.from ? { from: v.from } : {}) };
+				this.pathOf.set(value, `${part.qualifiedName}::${feature.replace(/\./g, '::')}`);
+				return value;
+			}),
 			...this.whereChanged(part, [...values.keys()]),
 			constraintAt: { file: check.file, span: check.span },
 			assertedIn: definition.name ?? definition.qualifiedName ?? '',
 			byApp: `the app checked the assertion of ${definition.name} with the values of ${name}`
 		};
+		this.addSpread(out, [check.constraint]);
 		addMargin(out);
 		out.explanation = explain(out, false);
 		return out;
@@ -970,7 +996,25 @@ export class Evaluation {
 		else if (!value) value = { kind: 'undecided', reason: 'its value is not known' };
 		else if (value.kind === 'none') value = { kind: 'undecided', reason: NO_VALUE };
 		const from = path ? this.sourceOf(path, 0, { left: MAX_INPUTS }) : undefined;
-		return { feature: chain, value, ...(from ? { from } : {}) };
+		const out: CheckValue = { feature: chain, value, ...(from ? { from } : {}) };
+		if (path) this.pathOf.set(out, path);
+		return out;
+	}
+
+	/**
+	 * How often a decided check holds when values it reads are uncertain
+	 * (`uncertainty.ts`), with the values named as its constraints name them.
+	 */
+	private addSpread(check: Check, constraints: string[]) {
+		if (check.status === 'undecided' || !this.spreads.any) return;
+		const values = check.values.flatMap((v) => {
+			const path = this.pathOf.get(v);
+			return path ? [{ name: v.feature, path }] : [];
+		});
+		const texts = constraints.map((t) => t.replace(/^\{|\}$/g, '').trim());
+		const comparison = texts.length === 1 ? comparisonOf(texts[0]!) : null;
+		const spread = this.spreads.check(texts, values, check.status === 'satisfied', comparison);
+		if (spread) check.spread = spread;
 	}
 
 	/** A verdict's range in the person's text, with the text it covers. */
@@ -1284,6 +1328,8 @@ function explain(check: Check, vacuous: boolean): string {
 	const needs = check.limit
 		? ` (needs ${SYMBOL[check.limit.operator] ?? check.limit.operator} ${formatQuantity(check.limit)})`
 		: '';
+	if (check.spread && check.status !== 'undecided' && !vacuous)
+		return spreadExplanation(check.status, check.spread, valueText, needs);
 	switch (check.status) {
 		case 'satisfied':
 			if (vacuous) return 'Met only because an assumption of the requirement does not hold.';

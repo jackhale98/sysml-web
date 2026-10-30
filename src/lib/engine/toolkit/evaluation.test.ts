@@ -9,7 +9,7 @@ import type { SourceFile } from '../protocol';
 import type { Check } from '../types';
 import { chainsIn, comparisonOf, referencesIn } from './evaluation';
 import type { ToolkitHost } from './host';
-import { demoFiles, loadHost } from './testing';
+import { demoFiles, exactDemoFiles, loadHost } from './testing';
 
 let host: ToolkitHost;
 const files = demoFiles();
@@ -62,9 +62,12 @@ describe('the demo’s checks', () => {
 				qualifiedName: "SystemRequirements::'Flight endurance'",
 				id: 'SYS-001'
 			},
-			limit: { feature: 'drone.endurance', operator: '>=', value: 25, unit: 'min' },
-			explanation: 'Met: drone.endurance = 27.54 min (needs ≥ 25 min).'
+			limit: { feature: 'drone.endurance', operator: '>=', value: 25, unit: 'min' }
 		});
+		// The battery's capacity and usable fraction vary (docs/uncertainty.md): how often it is met first.
+		expect(endurance.explanation).toMatch(
+			/^Met in 9\d\.\d % of cases: drone\.endurance = 27\.54 min, in 90 % of cases between 25\.\d+ and 29\.\d+ min \(needs ≥ 25 min\)\.$/
+		);
 		// 216 W·h × 0.85 / 400 W = 0.459 h, with what each value is worked out from.
 		expect(endurance.values).toEqual([
 			{
@@ -125,9 +128,11 @@ describe('the demo’s checks', () => {
 		expect(mass).toMatchObject({
 			status: 'satisfied',
 			limit: { feature: 'drone.takeOffMass', operator: '<=', value: 4, unit: 'kg' },
-			values: [{ feature: 'drone.takeOffMass', value: { kind: 'number', value: 3770, unit: 'g' } }],
-			explanation: 'Met: drone.takeOffMass = 3.77 kg (needs ≤ 4 kg).'
+			values: [{ feature: 'drone.takeOffMass', value: { kind: 'number', value: 3770, unit: 'g' } }]
 		});
+		expect(mass.explanation).toMatch(
+			/^Met in all [\d,]+ sampled cases: drone\.takeOffMass = 3\.77 kg, in 90 % of cases between 3\.7\d+ and 3\.8\d+ kg \(needs ≤ 4 kg\)\.$/
+		);
 		// The toolkit adds the rotors up itself: `rotors` refers to four parts.
 		expect(mass.byApp).toBeUndefined();
 		expect(mass.margin!.value).toBeCloseTo(0.23);
@@ -152,7 +157,10 @@ describe('the demo’s checks', () => {
 		const endurance = byId(host.checks(edited).checks, 'SYS-001');
 		expect(endurance.status).toBe('violated');
 		expect(endurance.margin!.value).toBeCloseTo(-0.52);
-		expect(endurance.explanation).toBe('Not met: drone.endurance = 24.48 min (needs ≥ 25 min).');
+		// At the values given it is not met; with the battery's spread it is in about a third of cases.
+		expect(endurance.explanation).toMatch(
+			/^Met in only [23]\d\.\d % of cases; not met at the values given: drone\.endurance = 24\.48 min, in 90 % of cases between \d+\.\d+ and \d+\.\d+ min \(needs ≥ 25 min\)\.$/
+		);
 		host.analyzeProject(files);
 		expect(byId(host.checks(files).checks, 'SYS-001').status).toBe('satisfied');
 	});
@@ -358,8 +366,12 @@ describe('checks on small models', () => {
 });
 
 describe('the budget and checks tables', () => {
+	// The demo with its uncertain values made exact: the tables as they read without a spread
+	// (uncertainty.test.ts has them with it).
+	const exact = exactDemoFiles();
+
 	it('adds up the mass budget over the parts tree', () => {
-		const table = host.renderView(files, 'droneMassBudget');
+		const table = host.renderView(exact, 'droneMassBudget');
 		expect(table.columns).toEqual([
 			'path',
 			'type',
@@ -445,7 +457,7 @@ describe('the budget and checks tables', () => {
 	});
 
 	it('lists the checks that have something to check, violations first', () => {
-		const table = host.renderView(files, 'designChecks');
+		const table = host.renderView(exact, 'designChecks');
 		expect(table.opensText).toBe(true);
 		expect(table.rows.map((r) => [r[0], r[1]])).toEqual([
 			['violated', ''],

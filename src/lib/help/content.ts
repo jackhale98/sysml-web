@@ -404,6 +404,29 @@ export const HELP: HelpSection[] = [
 				action: { action: 'budget', label: 'New budget' }
 			},
 			{
+				id: 'uncertain-values',
+				title: 'Say how much a value varies',
+				keywords:
+					'uncertainty tolerance distribution normal uniform triangular spread range probability chance monte carlo sigma standard deviation worst case',
+				blocks: [
+					'A value that varies from part to part, or is only known roughly, can say by how much. Write it inside the value, with units, using the `Uncertainty` library (**Add the uncertainty library** puts it in your project’s `libraries` folder):',
+					{
+						code: 'attribute :>> mass = 1100 [g] {\n    attribute tolerance : Uncertainty::Tolerance { :>> plus = 60 [g]; :>> minus = 40 [g]; }\n}'
+					},
+					{
+						list: [
+							'**Tolerance**: the value +plus/−minus (leave out `minus` for ±plus). It is read as a bell curve whose band is ±3 standard deviations, unless you say `:>> reading = Uncertainty::ToleranceReading::uniform;` (any value in the band as likely as any other) or `triangular` (most likely at the value), or `:>> sigmas = 2.0;` for a band of ±2 standard deviations.',
+							'**Normal**: a `standardDeviation`, and a `mean` if it is not the value.',
+							'**Uniform**: a `min` and a `max`.',
+							'**Triangular**: a `min`, a `max`, and a most likely `mode` if it is not the value.'
+						]
+					},
+					'Any unit of the same kind works: a tolerance in g on a mass in kg. The value itself stays what the budgets add up and what the checks are decided with.',
+					'Budgets then show each total’s **Likely range** (90 % of cases fall inside it) and, where a requirement sets a limit, the share of cases **Within limit**. Design checks say how often they are met, such as “Met in 98.8 % of cases”. The app works this out by trying 10,000 combinations of the values that vary (a Monte Carlo simulation), the same ones each time, so the numbers don’t change unless the model does. Each part varies on its own: four motors are four separate draws. A model without such values looks as it always has.'
+				],
+				action: { action: 'uncertainty', label: 'Add the uncertainty library' }
+			},
+			{
 				id: 'compare-options',
 				title: 'Compare options',
 				keywords: 'trade study alternatives weighted score decision',

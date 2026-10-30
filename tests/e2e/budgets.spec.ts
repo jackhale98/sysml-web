@@ -79,6 +79,8 @@ test('the mass budget adds up the parts tree, with units and the limit a require
 		'1',
 		'180 g',
 		'180 g',
+		// Its likely range: none, nothing in a rotor varies (uncertainty.spec.ts has the battery's).
+		'',
 		'6.5 %',
 		'',
 		'',
@@ -112,11 +114,16 @@ test('the checks view says which requirements the design meets, and shows the cl
 	const mass = rows.filter({ hasText: 'SYS-003' });
 	await expect(mass).toContainText('Satisfied');
 	await expect(mass).toContainText('0.23 kg (5.8 %)');
-	await expect(mass).toContainText('Met: drone.takeOffMass = 3.77 kg (needs ≤ 4 kg).');
+	// The battery's values vary (docs/uncertainty.md): how often each is met comes first.
+	await expect(mass).toContainText(
+		'Met in all 10,000 sampled cases: drone.takeOffMass = 3.77 kg, in 90 % of cases between 3.752 and 3.808 kg (needs ≤ 4 kg).'
+	);
 	const endurance = rows.filter({ hasText: 'SYS-001' });
 	await expect(endurance).toContainText('Satisfied');
 	await expect(endurance).toContainText('2.54 min (10 %)');
-	await expect(endurance).toContainText('Met: drone.endurance = 27.54 min (needs ≥ 25 min).');
+	await expect(endurance).toContainText(
+		'Met in 98.8 % of cases: drone.endurance = 27.54 min, in 90 % of cases between 25.59 and 29.54 min (needs ≥ 25 min).'
+	);
 	// What the value is worked out from, and the values that go into it.
 	await expect(endurance).toContainText(
 		'drone.endurance = HoverEndurance(battery.usableEnergy, hoverPower), with battery.usableEnergy = 183.6 W·h'
@@ -153,7 +160,9 @@ test('a value that breaks a requirement is a violation and a problem, until undo
 	const table = await openView(page, 'Design checks');
 	const endurance = table.locator('tbody tr').filter({ hasText: 'SYS-001' });
 	await expect(endurance).toContainText('Violated');
-	await expect(endurance).toContainText('Not met: drone.endurance = 24.48 min (needs ≥ 25 min).');
+	await expect(endurance).toContainText(
+		/Met in only \d+\.\d % of cases; not met at the values given: drone\.endurance = 24\.48 min/
+	);
 	await expect(table.locator('tbody tr').first()).toContainText('Violated');
 	await problems(page).click();
 	await expect(page.locator('section.problems-pane')).toContainText(

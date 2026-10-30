@@ -61,3 +61,18 @@ export function demoFiles(): SourceFile[] {
 	walk(root);
 	return out.sort((a, b) => a.path.localeCompare(b.path));
 }
+
+/**
+ * The demo with its uncertain values made exact (`docs/uncertainty.md`):
+ * without the `Uncertainty` library and the distributions written inside
+ * values (each on a line of its own), so a test can show that a model
+ * without uncertainty reads as it always has.
+ */
+export function exactDemoFiles(): SourceFile[] {
+	return demoFiles()
+		.filter((f) => f.path !== 'libraries/Uncertainty.sysml')
+		.map((f) => ({
+			...f,
+			text: f.text.replace(/\n[ \t]*attribute \w+ : Uncertainty::[^\n]*/g, '')
+		}));
+}

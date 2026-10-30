@@ -210,8 +210,9 @@ describe('general view', () => {
 		// With the dependency matrices' library: a metadata def and four view defs; and the
 		// reporting library's convention marker (a metadata def and its severity enum def);
 		// the use case view def and the delivery service's three use cases besides the delivery;
-		// the drone's variation defs (`BatteryOption`, `RadioOption`) and the variability matrix.
-		expect(definitions).toHaveLength(122);
+		// the drone's variation defs (`BatteryOption`, `RadioOption`) and the variability matrix;
+		// the uncertainty library's distributions (five attribute defs and an enum def).
+		expect(definitions).toHaveLength(128);
 		expect(ids(tk)).toEqual(definitions);
 		expect(edges(tk, 'specialization')).toEqual([
 			'Airframe -specialization-> Component',
@@ -231,6 +232,7 @@ describe('general view', () => {
 			'HazardousSituation -specialization-> RiskEvent',
 			'InterfaceN2 -specialization-> DependencyMatrix',
 			'Motor -specialization-> Component',
+			'Normal -specialization-> Distribution',
 			'PayloadRelease -specialization-> Component',
 			'PowerDistributionBoard -specialization-> Component',
 			'ProcessFmeaWorksheet -specialization-> FmeaWorksheet',
@@ -241,6 +243,9 @@ describe('general view', () => {
 			'SpeedController -specialization-> Component',
 			'TakeOffCommand -specialization-> FlightCommand',
 			'TelemetryRadio -specialization-> Component',
+			'Tolerance -specialization-> Distribution',
+			'Triangular -specialization-> Distribution',
+			'Uniform -specialization-> Distribution',
 			'UseFmeaWorksheet -specialization-> FmeaWorksheet'
 		]);
 	});
@@ -553,7 +558,8 @@ describe('package view', () => {
 			'ModelViews',
 			'Reporting',
 			'RiskAnalysis',
-			'SystemRequirements'
+			'SystemRequirements',
+			'Uncertainty'
 		]);
 		expect(edges(tk, 'containment')).toContain('DroneComponents -containment-> Battery');
 	});
