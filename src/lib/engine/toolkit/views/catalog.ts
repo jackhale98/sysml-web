@@ -12,13 +12,17 @@ import { collapseWhitespace, simpleName, splitPath, unescape, unquote, unquoteNa
 const isView = (r: ElementRecord) =>
 	r.metaclass === 'ViewUsage' || r.metaclass === 'ViewDefinition';
 
-/** The views the SysML standard library defines, which the app draws. */
+/**
+ * The views the SysML standard library defines, which the app draws, and the
+ * use case view of `ModelViews` (a general view the standard has no name for).
+ */
 const STANDARD_VIEWS = new Set([
 	'GeneralView',
 	'InterconnectionView',
 	'StateTransitionView',
 	'ActionFlowView',
-	'SequenceView'
+	'SequenceView',
+	'UseCaseView'
 ]);
 
 /**

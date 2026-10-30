@@ -1,5 +1,5 @@
 /**
- * `EngineApi.diagram` over the toolkit's model: the eight standard views
+ * `EngineApi.diagram` over the toolkit's model: the standard views and the use case view
  * as `DiagramGraph`s (see each builder for what it draws).
  */
 import type { DiagramGraph, DiagramView } from '../../types';
@@ -9,6 +9,7 @@ import { interconnectionView } from './interconnection';
 import { actionView, stateView } from './behavior';
 import { sequenceView } from './sequence';
 import { packagesView, requirementsView, traceView } from './trace';
+import { useCaseView } from './usecases';
 
 export type { DiagramInput } from './context';
 
@@ -37,6 +38,8 @@ export function buildDiagram(
 			return packagesView(ctx);
 		case 'sequence':
 			return sequenceView(ctx, scope);
+		case 'usecases':
+			return useCaseView(ctx, scope);
 		default:
 			throw new Error(`unknown view ${JSON.stringify(view)}`);
 	}

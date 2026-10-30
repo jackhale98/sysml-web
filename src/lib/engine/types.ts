@@ -137,7 +137,8 @@ export type DiagramView =
 	| 'packages'
 	| 'trace'
 	| 'actions'
-	| 'sequence';
+	| 'sequence'
+	| 'usecases';
 
 /** A `view def` or `view` usage in the project or the bundled libraries. */
 export interface ViewInfo {
@@ -1047,7 +1048,10 @@ export type EdgeKind =
 	| 'dependency'
 	| 'containment'
 	| 'constraint_binding'
-	| 'message';
+	| 'message'
+	/** Use case views: an actor taking part in a use case, and an «include». */
+	| 'actor'
+	| 'include';
 
 export interface DiagramNode {
 	id: string;

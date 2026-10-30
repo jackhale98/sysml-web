@@ -1159,6 +1159,9 @@ describe('views written by hand', () => {
     view e : MyTable { expose M::*; }
     view def PartList { @Reporting::TableRendering { rows = "kind:part"; columns = "element; type"; } }
     view f : PartList { expose M::*; }
+    view g : UseCaseView { expose M::*; }
+    view def MyUseCases :> UseCaseView;
+    view h : MyUseCases { expose M::*; }
 }`;
 		const files: SourceFile[] = [
 			...host.viewLibraries().map((l) => ({ path: l.path, text: l.text })),
@@ -1179,7 +1182,9 @@ describe('views written by hand', () => {
 			c: 'general', // no view def, only `render asTreeDiagram`
 			d: 'interconnection',
 			e: 'table',
-			f: 'table'
+			f: 'table',
+			g: 'usecases', // ModelViews' general view of use cases
+			h: 'usecases'
 		});
 		expect(host.diagram('general', files, 'M::b').nodes.map((n) => n.id)).toContain('car');
 	});

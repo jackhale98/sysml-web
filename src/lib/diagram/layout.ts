@@ -5,6 +5,7 @@
 import type { DiagramGraph, DiagramNode } from '#lib/engine/types.ts';
 import { LABEL_HEIGHT, labelWidth } from './labels.svelte.ts';
 import { edgeLabelText, MAX_ROWS, notationOf, type BorderPort } from './notation.ts';
+import { useCaseLayout } from './useCaseLayout.ts';
 
 export interface Placed {
 	node: DiagramNode;
@@ -74,6 +75,14 @@ export function nodeSize(node: DiagramNode, view = 'general'): { width: number; 
 			return { width: 34, height: 34 };
 		case 'bar':
 			return { width: 72, height: 8 };
+		case 'actor':
+			// A stick figure with its name below.
+			return {
+				width: Math.round(Math.min(180, Math.max(72, node.label.length * NAME_CHAR + 12))),
+				height: 84
+			};
+		case 'usecase':
+			return useCaseSize(node.label, n.keyword, objectiveOf(n));
 	}
 	const m = METRICS;
 	const rows = n.compartments.flatMap((c) => c.rows);
@@ -106,6 +115,34 @@ export function nodeSize(node: DiagramNode, view = 'general'): { width: number; 
 		height += m.compartmentPad + (sideBySide ? Math.max(left, right) : left + right) * m.row;
 	}
 	return { width, height: Math.round(height) };
+}
+
+/** The text of a use case's objective, which its ellipse shows under its name. */
+export function objectiveOf(n: {
+	compartments: { title: string; rows: string[] }[];
+}): string | null {
+	return n.compartments.find((c) => c.title === 'objective')?.rows[0] ?? null;
+}
+
+/** Lines of objective a use case's ellipse shows at most. */
+export const OBJECTIVE_LINES = 3;
+const OBJECTIVE_CHAR = 6.1;
+
+/**
+ * A use case's ellipse: wide enough that its keyword, name and objective
+ * fit in the box inscribed in it (about 70% of its width and height).
+ */
+export function useCaseSize(
+	label: string,
+	keyword: string,
+	objective: string | null
+): { width: number; height: number } {
+	const text = Math.max(label.length * NAME_CHAR, (keyword.length + 2) * 6.4);
+	const width = Math.round(Math.min(300, Math.max(objective ? 230 : 160, text / 0.72 + 16)));
+	if (!objective) return { width, height: 72 };
+	const perLine = Math.max(10, Math.floor((width * 0.68) / OBJECTIVE_CHAR));
+	const lines = Math.min(OBJECTIVE_LINES, Math.ceil(objective.length / perLine));
+	return { width, height: 76 + lines * 15 };
 }
 
 /** Ports on both borders sit side by side on a row, when that fits; else the right ones go below. */
@@ -166,7 +203,7 @@ interface ElkResult {
 /** The text drawn on an edge, keyword first; shared with SysmlEdge.svelte. */
 export function edgeText(kind: string, label: string | null): string {
 	const keyword =
-		kind === 'satisfy' || kind === 'verify' || kind === 'allocate'
+		kind === 'satisfy' || kind === 'verify' || kind === 'allocate' || kind === 'include'
 			? `«${kind}»`
 			: kind === 'binding' || kind === 'constraint_binding'
 				? '='
@@ -189,6 +226,7 @@ export async function layout(
 ): Promise<Layout> {
 	const ids = new Set(graph.nodes.map((n) => n.id));
 	const engine = await getElk();
+	if (view === 'usecases') return useCaseLayout(graph, (n) => nodeSize(n, view), engine);
 	// Border ports, fixed where the box draws them, so lines run to them.
 	const anchors = new Map(graph.nodes.map((n) => [n.id, portAnchors(n, view)]));
 	const portId = (node: string, key: string | undefined) =>
