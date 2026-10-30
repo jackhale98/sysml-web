@@ -3,7 +3,7 @@ library package ModelViews {
     /*
      * Standard tables over any SysML v2 model: requirements, coverage gaps,
      * traceability, interfaces, the bill of materials, budgets (mass and
-     * power), constraint checks and trade studies.
+     * power), constraint checks, trade studies and product variants.
      *
      * Each table is an ordinary `view def` whose @TableRendering (from the
      * Reporting library) says which rows to collect and which columns to
@@ -130,6 +130,25 @@ library package ModelViews {
         @TableRendering {
             rows = "trade";
             columns = "criterion; weight; alternatives";
+        }
+    }
+
+    view def VariabilityMatrix {
+        doc
+        /*
+         * The product's configurations down the side, its variation points
+         * across the top, and in each cell the variant the configuration
+         * chooses. A choice left open, made twice, or of something that isn't
+         * one of the point's variants is marked. Expose the configurations
+         * to show (a view without `expose` shows them all):
+         *
+         *   view droneVariants : VariabilityMatrix {
+         *       expose DroneConfigurations::*;
+         *   }
+         */
+        @TableRendering {
+            rows = "variability";
+            columns = "configuration; variationPoints; description = doc";
         }
     }
 

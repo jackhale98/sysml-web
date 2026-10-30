@@ -42,7 +42,9 @@ describe('language services', () => {
 			// The battery trade study: its options, the evaluation function and the result.
 			...Array<string>(8).fill('analysis/BatteryTrade.sysml'),
 			'system/Components.sysml',
-			'system/DroneArchitecture.sysml'
+			'system/DroneArchitecture.sysml',
+			// The battery variants: `BatteryOption :> Battery` and `standardPack : Battery`.
+			...Array<string>(2).fill('system/DroneConfigurations.sysml')
 		]);
 	});
 
@@ -52,7 +54,9 @@ describe('language services', () => {
 		const used = text.indexOf(': Battery') + 2;
 		if (!('changes' in result)) throw new Error(result.error);
 		const elsewhere = result.changes.filter((c) => c.path === 'analysis/BatteryTrade.sysml');
-		expect(result.changes.filter((c) => !elsewhere.includes(c))).toEqual([
+		const variants = result.changes.filter((c) => c.path === 'system/DroneConfigurations.sysml');
+		expect(variants).toHaveLength(2);
+		expect(result.changes.filter((c) => !elsewhere.includes(c) && !variants.includes(c))).toEqual([
 			{ path: 'system/Components.sysml', from: declared, to: declared + 7, insert: 'Pack' },
 			{ path, from: used, to: used + 7, insert: 'Pack' }
 		]);

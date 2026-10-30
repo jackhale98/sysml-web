@@ -120,9 +120,9 @@ package DroneComponents {
     part def TelemetryRadio :> Component {
         doc /* Radio modem: passes commands from the ground station to the flight controller,
              * and telemetry back. */
-        attribute :>> mass = 30 [g];
-        attribute :>> powerDraw = 4 [W] { doc /* Transmitting telemetry once a second. */ }
-        attribute range :> distance = 8 [km];
+        attribute :>> mass default 30 [g];  // defaults: another radio can have its own (see DroneConfigurations)
+        attribute :>> powerDraw default 4 [W] { doc /* Transmitting telemetry once a second. */ }
+        attribute range :> distance default 8 [km];
         port airLink : ~CommandLinkPort;        // towards the ground station
         port controllerLink : CommandLinkPort;  // towards the flight controller
     }

@@ -10,6 +10,7 @@ import type { TkSession } from '../api';
 import type { Evaluation } from '../evaluation';
 import type { ElementRecord, ExtractedModel } from '../model';
 import { TradeStudies } from '../trade';
+import { VariabilityModel } from '../variability';
 import { ModelCalcs } from './calcs';
 import { splitPath, unquoteName } from './text';
 
@@ -105,6 +106,13 @@ export class ViewContext {
 		const evaluation = this.evaluation;
 		this.trades = evaluation ? new TradeStudies(this, evaluation).all() : [];
 		return this.trades;
+	}
+
+	private variants: VariabilityModel | undefined;
+
+	/** The model's variation points and configurations (`variability.ts`), once. */
+	get variability(): VariabilityModel {
+		return (this.variants ??= new VariabilityModel(this));
 	}
 
 	isContent(record: ElementRecord): boolean {

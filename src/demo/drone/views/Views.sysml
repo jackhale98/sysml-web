@@ -56,6 +56,11 @@ package DroneViews {
         expose BatteryTrade::batteryTradeStudy;
     }
 
+    view droneVariants : VariabilityMatrix {
+        doc /* The drone's configurations and the battery and radio each one chooses. */
+        expose DroneConfigurations::*;
+    }
+
     // Diagrams.
 
     view serviceContext : InterconnectionView {

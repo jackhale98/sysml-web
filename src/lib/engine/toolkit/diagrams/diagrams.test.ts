@@ -188,7 +188,7 @@ describe('general view', () => {
 
 	it('draws the view usages of a package with what they expose', () => {
 		const tk = toolkit('general', 'DroneViews');
-		expect(tk.nodes).toHaveLength(29);
+		expect(tk.nodes).toHaveLength(30);
 		expect(node(tk, 'componentCatalogue')).toMatchObject({
 			label: 'componentCatalogue : GeneralView',
 			stereotype: '<<view>>',
@@ -208,13 +208,15 @@ describe('general view', () => {
 			.map((d) => d.name)
 			.sort();
 		// With the dependency matrices' library: a metadata def and four view defs; and the
-		// reporting library's convention marker (a metadata def and its severity enum def).
-		expect(definitions).toHaveLength(115);
+		// reporting library's convention marker (a metadata def and its severity enum def); the
+		// drone's variation defs (`BatteryOption`, `RadioOption`) and the variability matrix.
+		expect(definitions).toHaveLength(118);
 		expect(ids(tk)).toEqual(definitions);
 		expect(edges(tk, 'specialization')).toEqual([
 			'Airframe -specialization-> Component',
 			'ArmCommand -specialization-> FlightCommand',
 			'Battery -specialization-> Component',
+			'BatteryOption -specialization-> Battery',
 			'Camera -specialization-> Component',
 			'DesignFmeaWorksheet -specialization-> FmeaWorksheet',
 			'DisarmCommand -specialization-> FlightCommand',
@@ -232,6 +234,7 @@ describe('general view', () => {
 			'PowerDistributionBoard -specialization-> Component',
 			'ProcessFmeaWorksheet -specialization-> FmeaWorksheet',
 			'Propeller -specialization-> Component',
+			'RadioOption -specialization-> TelemetryRadio',
 			'ReturnHomeCommand -specialization-> FlightCommand',
 			'Rotor -specialization-> Component',
 			'SpeedController -specialization-> Component',
@@ -539,6 +542,7 @@ describe('package view', () => {
 			'DependencyMatrices',
 			'DroneArchitecture',
 			'DroneComponents',
+			'DroneConfigurations',
 			'DroneInterfaces',
 			'DronePerformance',
 			'EngineeringBasics',

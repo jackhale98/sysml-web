@@ -18,6 +18,7 @@ import type {
 	WeaveResult
 } from '#lib/exchange/types.ts';
 import type { ModelComparison, ModelSnapshot } from '#lib/review/types.ts';
+import { splitConfiguration } from '../configuration';
 import type { SourceFile } from '../protocol';
 import type {
 	Analysis,
@@ -46,6 +47,7 @@ import type {
 	FmeaLineInfo,
 	StateMachine,
 	TradeStudy,
+	Variability,
 	ViewInfo
 } from '../types';
 import type {
@@ -68,8 +70,16 @@ import { ModelEditing } from './edits';
 import { Evaluation } from './evaluation';
 import { LanguageServices, SyntaxServices } from './language';
 import { extractMachines } from './machines';
-import { detailsOf, extractModel, findElement, type ExtractedModel, type UnitInfo } from './model';
+import {
+	detailsOf,
+	extractModel,
+	findElement,
+	type ElementRecord,
+	type ExtractedModel,
+	type UnitInfo
+} from './model';
 import { TextIndexCache } from './offsets';
+import { hasVariants } from './variability';
 import { RepairMap } from './repair';
 import { canonicalModel, exportModel, importModel } from './interchange';
 import { weaveModel } from './weave';
@@ -112,6 +122,8 @@ export class ToolkitHost {
 	readonly tk: Toolkit;
 	readonly library: TkLibrary;
 	private built: Built | null = null;
+	/** The analysed project with a configuration's choices made (`variability.ts`), when one is shown. */
+	private configured: Built | null = null;
 	/**
 	 * A session for `files` not analysed yet: the one an edit left, holding the
 	 * edited texts, or one opened for an edit. The next build or edit of those
@@ -436,6 +448,15 @@ export class ToolkitHost {
 		return this.evaluationOf(this.build(files))?.evaluate(ids) ?? {};
 	}
 
+	/** The project's variation points and configurations (`variability.ts`); cached per analysis. */
+	variability(files: SourceFile[]): Variability {
+		const built = this.build(files);
+		// No variants, no variability: the tables' index isn't needed.
+		if (!built.extracted || !hasVariants(built.extracted.elements))
+			return { points: [], configurations: [] };
+		return this.viewContextOf(built, files).variability.summary();
+	}
+
 	/** The project's trade studies, evaluated (`trade.ts`); cached per analysis. */
 	tradeStudies(files: SourceFile[]): TradeStudy[] {
 		return this.viewContext(files).tradeStudies();
@@ -684,12 +705,15 @@ export class ToolkitHost {
 	}
 
 	private build(files: SourceFile[], withViewLibraries = true): Built {
+		const shown = splitConfiguration(files);
+		if (shown.configuration) return this.buildConfigured(shown.files, shown.configuration);
 		if (this.built && sameFiles(this.built.files, files)) return this.built;
 		const started = performance.now();
 		const previous = this.built;
 		this.built = null;
 		previous?.evaluation?.free();
 		previous?.session?.free();
+		this.freeConfigured();
 		if (withViewLibraries) this.language.textsChanged(filesWithoutBom(files));
 		const { session, units, parse, lenient } = this.prepare(files, withViewLibraries);
 		const prepared = performance.now();
@@ -742,7 +766,89 @@ export class ToolkitHost {
 			adapterMs: Math.round(adapted - checked)
 		};
 		this.built = { files, session, units, analyses, extracted };
+		if (extracted && hasVariants(extracted.elements)) this.addVariabilityProblems(this.built);
 		return this.built;
+	}
+
+	/**
+	 * A configuration that leaves a variation point open, picks something
+	 * that isn't one of its variants, or picks two: warnings in Problems.
+	 */
+	private addVariabilityProblems(built: Built) {
+		const ctx = this.viewContextOf(built, built.files);
+		for (const problem of ctx.variability.problems()) {
+			const { record } = problem;
+			const unit = built.units.get(record.path);
+			const analysis = built.analyses.find((a) => a.model.file === record.path);
+			if (!unit || !analysis) continue;
+			const end = problem.headerOnly
+				? record.span.start_byte + new TextEncoder().encode(record.header.trimEnd()).length
+				: record.span.end_byte;
+			analysis.diagnostics.push({
+				file: record.path,
+				span: unit.original.spanOfBytes(record.span.start_byte, end),
+				severity: 'warning',
+				code: 'variability',
+				message: problem.message
+			});
+		}
+	}
+
+	/**
+	 * The project with a configuration's choices made (`variability.ts`),
+	 * analysed in a session of its own beside the analysed one, which stays
+	 * as written. Only the latest is kept. An unknown configuration, or one
+	 * that changes nothing, is the project as written.
+	 */
+	private buildConfigured(files: SourceFile[], name: string): Built {
+		const main = this.build(files);
+		if (!main.session || !main.extracted) return main;
+		const session = main.session;
+		const spell = (typeId: string, context: ElementRecord) => {
+			const target = session.elementById(typeId);
+			const at = context.ownerId ? session.elementById(context.ownerId) : undefined;
+			try {
+				return (
+					(at && target ? session.minimalSpelling(at, target) : undefined) ??
+					(target ? session.qualifiedName(target) : undefined) ??
+					null
+				);
+			} finally {
+				target?.free();
+				at?.free();
+			}
+		};
+		const changed = this.viewContextOf(main, files).variability.configuredFiles(name, spell);
+		if (!changed?.length) return main;
+		const texts = files.map((f) => changed.find((c) => c.path === f.path) ?? f);
+		if (this.configured && sameFiles(this.configured.files, texts)) return this.configured;
+		this.freeConfigured();
+		const all = [...texts, ...views.missingViewLibraries(texts)];
+		// Its own text indexes and no repair from earlier texts: the analysed project's stay as they are.
+		const { repaired, units } = this.repair(all, new TextIndexCache(), false);
+		const json = JSON.stringify(repaired);
+		let opened: TkSession | null = null;
+		if (this.settled)
+			try {
+				opened = this.tk.Session.fromSourcesSettled(json, this.library, this.settled);
+			} catch {
+				opened = null;
+			}
+		opened ??= this.tk.Session.fromSourcesWithPreparedLibrary(json, this.library);
+		const byIndex = new Map<number, UnitInfo>();
+		for (const u of JSON.parse(opened.units()) as { unit: number; name: string }[]) {
+			const unit = units.get(u.name);
+			if (unit) byIndex.set(u.unit, unit);
+		}
+		const extracted = extractModel(this.tk, opened, byIndex);
+		this.configured = { files: texts, session: opened, units, analyses: [], extracted };
+		return this.configured;
+	}
+
+	private freeConfigured() {
+		this.configured?.evaluation?.free();
+		this.configured?.session?.free();
+		this.configured = null;
 	}
 
 	/**

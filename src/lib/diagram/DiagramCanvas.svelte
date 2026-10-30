@@ -75,6 +75,13 @@
 	import BranchForm from './BranchForm.svelte';
 	import FormPanel from './FormPanel.svelte';
 	import HiddenPanel from './HiddenPanel.svelte';
+	import ConfigurationPicker from '#lib/workbench/ConfigurationPicker.svelte';
+	import {
+		changesDrawing,
+		chosenConfiguration,
+		describeChoices
+	} from '#lib/workbench/configurations.ts';
+	import { withConfiguration } from '#lib/engine/configuration.ts';
 	import StateActionsForm from './StateActionsForm.svelte';
 	import TransitionForm from './TransitionForm.svelte';
 	import {
@@ -555,14 +562,31 @@
 	/** The texts the diagram was last drawn from. */
 	let drawnTexts: string[] = [];
 
+	/** The files the drawn elements are written in (null before the first drawing). */
+	let drawnFiles = $state.raw<string[] | null>(null);
+	/**
+	 * A structure diagram of a product with configurations can show one of them
+	 * (`docs/variants.md`): its chosen variants instead of the model as written.
+	 */
+	const offersConfiguration = $derived(
+		(view === 'general' || view === 'interconnection') &&
+			changesDrawing(workspace.variability, drawnFiles)
+	);
+	const configuration = $derived(
+		offersConfiguration ? chosenConfiguration(workspace.variability, ui.configuration) : null
+	);
+
 	async function refresh(relayout = false) {
 		const current = ++generation;
 		try {
-			const files = workspace.sourceFiles();
+			// A configuration shown is the model worked out with its choices: nothing on it is edited.
+			const configured = untrack(() => configuration);
+			const files = withConfiguration(workspace.sourceFiles(), configured?.qualifiedName ?? null);
 			const hidden = untrack(() => shown.hidden);
 			const added = untrack(() => shown.added);
 			const full = await engine.diagram(view, files, scope, added.length ? added : undefined);
 			if (current !== generation) return;
+			drawnFiles = [...new Set(full.nodes.flatMap((n) => (n.element ? [n.element.file] : [])))];
 			const graph = withoutHidden(full, hidden);
 			hiddenHere = full.nodes
 				.filter((n) => hidden.includes(n.id))
@@ -694,7 +718,7 @@
 						selected: !!element && element.key === selectedKey,
 						direction,
 						view,
-						editable: !!element && !isLibrary(element),
+						editable: !configured && !!element && !isLibrary(element),
 						elementKey: element?.key ?? null,
 						name: element?.label ?? null,
 						elementId: element?.id ?? null,
@@ -736,7 +760,7 @@
 							label: e.label,
 							reversed,
 							...(e.element ? { element: e.element } : {}),
-							editable: canEditEdge(e, graph),
+							editable: !configured && canEditEdge(e, graph),
 							sourcePort: !!sourceHandle,
 							targetPort: !!targetHandle,
 							route: route && from && to ? { ...route, from, to } : undefined
@@ -817,6 +841,17 @@
 	// Not on every run above: a write to another file (the layout) in the meantime
 	// would cancel the redraw the model text asked for.
 	$effect(() => () => clearTimeout(timer));
+
+	// Redraw when another configuration is chosen.
+	let lastConfiguration: string | null | undefined;
+	$effect(() => {
+		const name = configuration?.qualifiedName ?? null;
+		if (lastConfiguration !== undefined && lastConfiguration !== name) {
+			clearTimeout(timer);
+			timer = setTimeout(() => void refresh(), 0);
+		}
+		lastConfiguration = name;
+	});
 
 	// Redraw when what the diagram hides or adds changes (also by undo).
 	let lastShown: string | null = null;
@@ -2207,6 +2242,14 @@
 				</div>
 			</Panel>
 		{/if}
+		{#if configuration}
+			<Panel position="bottom-left" style="left: 3.25rem">
+				<p class="configured" role="status">
+					Showing <strong>{configuration.name}</strong>: {describeChoices(configuration)}. Read
+					only: the model as written is unchanged.
+				</p>
+			</Panel>
+		{/if}
 		{#if hiddenHere.length}
 			<Panel position="bottom-center">
 				<HiddenPanel hidden={hiddenHere} onshow={(ids) => void showAgain(ids)} />
@@ -2262,7 +2305,7 @@
 						actionError = null;
 						popover = popover === 'add' ? null : 'add';
 					}}
-					disabled={!addOwner}
+					disabled={!addOwner || !!configuration}
 					aria-expanded={popover === 'add'}
 					title={addOwner
 						? `Add to ${addOwner.label}${lastClick ? ', where you last clicked' : ''}`
@@ -2288,7 +2331,7 @@
 				<button
 					type="button"
 					onclick={startRenameSelected}
-					disabled={!selected || isLibrary(selected)}
+					disabled={!selected || isLibrary(selected) || !!configuration}
 					aria-expanded={popover === 'rename'}
 					title="Rename (F2, or double-click the name)"
 				>
@@ -2301,11 +2344,18 @@
 						(behavior && selectedNode
 							? askDeleteNode(selectedNode.id)
 							: askDeleteElement(selected, selectedNode?.id))}
-					disabled={!selected || isLibrary(selected)}
+					disabled={!selected || isLibrary(selected) || !!configuration}
 					title="Delete (Delete key)"
 				>
 					<Trash2 size={14} /> <span>Delete</span>
 				</button>
+				{#if offersConfiguration}
+					<ConfigurationPicker
+						variability={workspace.variability}
+						bind:value={ui.configuration}
+						compact
+					/>
+				{/if}
 				<button
 					type="button"
 					onclick={() => {
@@ -2706,6 +2756,17 @@
 	.toolbar button:disabled {
 		color: var(--text-3);
 		cursor: default;
+	}
+	.configured {
+		max-width: 28rem;
+		margin: 0;
+		padding: var(--space-1) var(--space-3);
+		border: 1px solid var(--border);
+		border-left: 3px solid var(--accent);
+		border-radius: var(--radius-sm);
+		background: var(--surface);
+		color: var(--text-2);
+		font-size: var(--text-sm);
 	}
 	.popover {
 		display: flex;

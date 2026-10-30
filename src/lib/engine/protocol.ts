@@ -24,6 +24,7 @@ import type {
 	FmeaLineInfo,
 	StateMachine,
 	TradeStudy,
+	Variability,
 	ViewInfo
 } from './types';
 import type { ModelComparison } from '#lib/review/types.ts';
@@ -97,6 +98,8 @@ export interface EngineApi {
 	evaluate(files: SourceFile[], ids: string[]): Record<string, Evaluated>;
 	/** Every trade study of the project, evaluated (cached per analysis). */
 	tradeStudies(files: SourceFile[]): TradeStudy[];
+	/** The project's variation points and configurations (cached per analysis). */
+	variability(files: SourceFile[]): Variability;
 	/** What changed from `base` to `current`, element by element (`#lib/review/semantic.ts`). */
 	compareModels(base: SourceFile[], current: SourceFile[]): ModelComparison;
 	/** The project as SysML v2 JSON (KerML 10.4 element JSON). */
