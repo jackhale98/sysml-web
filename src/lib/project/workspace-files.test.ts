@@ -22,6 +22,7 @@ const engine = () =>
 		stateMachines: async () => [],
 		variability: async () => ({ points: [], configurations: [] }),
 		machineSystems: async () => [],
+		actionFlows: async () => [],
 		checks: async () => null,
 		edit: async (request: EditRequest) => host.edit(request)
 	}) as unknown as Engine;
