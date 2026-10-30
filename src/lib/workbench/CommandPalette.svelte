@@ -66,6 +66,7 @@
 				isLibraryFile
 			),
 			...machineItems(workspace.machines),
+			...machineItems(workspace.systems),
 			...commandItems(theme.choice),
 			...openFileItems(ui.activeTab?.kind === 'file' ? ui.activeTab.path : null),
 			...newViewItems(VIEW_KINDS)
