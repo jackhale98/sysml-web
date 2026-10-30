@@ -209,13 +209,15 @@ describe('general view', () => {
 			.sort();
 		// With the dependency matrices' library: a metadata def and four view defs; and the
 		// reporting library's convention marker (a metadata def and its severity enum def);
-		// the use case view def and the delivery service's three use cases besides the delivery.
-		expect(definitions).toHaveLength(119);
+		// the use case view def and the delivery service's three use cases besides the delivery;
+		// the drone's variation defs (`BatteryOption`, `RadioOption`) and the variability matrix.
+		expect(definitions).toHaveLength(122);
 		expect(ids(tk)).toEqual(definitions);
 		expect(edges(tk, 'specialization')).toEqual([
 			'Airframe -specialization-> Component',
 			'ArmCommand -specialization-> FlightCommand',
 			'Battery -specialization-> Component',
+			'BatteryOption -specialization-> Battery',
 			'Camera -specialization-> Component',
 			'DesignFmeaWorksheet -specialization-> FmeaWorksheet',
 			'DisarmCommand -specialization-> FlightCommand',
@@ -233,6 +235,7 @@ describe('general view', () => {
 			'PowerDistributionBoard -specialization-> Component',
 			'ProcessFmeaWorksheet -specialization-> FmeaWorksheet',
 			'Propeller -specialization-> Component',
+			'RadioOption -specialization-> TelemetryRadio',
 			'ReturnHomeCommand -specialization-> FlightCommand',
 			'Rotor -specialization-> Component',
 			'SpeedController -specialization-> Component',
@@ -541,6 +544,7 @@ describe('package view', () => {
 			'DependencyMatrices',
 			'DroneArchitecture',
 			'DroneComponents',
+			'DroneConfigurations',
 			'DroneInterfaces',
 			'DronePerformance',
 			'EngineeringBasics',

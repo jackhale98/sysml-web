@@ -42,6 +42,7 @@ export function toolkitEngine(toolkit: ToolkitClient): Engine {
 		checks: (...params) => toolkit.call('checks', ...params),
 		evaluate: (...params) => toolkit.call('evaluate', ...params),
 		tradeStudies: (...params) => toolkit.call('tradeStudies', ...params),
+		variability: (...params) => toolkit.call('variability', ...params),
 		compareModels: (...params) => toolkit.call('compareModels', ...params),
 		exportInterchange: (...params) => toolkit.call('exportInterchange', ...params),
 		importInterchange: (...params) => toolkit.call('importInterchange', ...params),

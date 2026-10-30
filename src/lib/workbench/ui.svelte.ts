@@ -165,6 +165,12 @@ export class WorkbenchUi {
 	satisfyRequest = $state<string | null>(null);
 	/** A value of an element (`ModelElement.key`) to start editing in its details. */
 	valueRequest = $state.raw<{ element: string; name: string } | null>(null);
+	/**
+	 * The product configuration the bill of materials, budgets, checks and
+	 * structure diagrams show (its qualified name), or null for the model as
+	 * written. One choice for every table and diagram, so they agree.
+	 */
+	configuration = $state<string | null>(null);
 
 	/** Open the help, at a topic (`add-part`) or at the start. */
 	showHelp(topic: string | null = null) {

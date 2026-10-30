@@ -262,6 +262,7 @@ export function renderView(ctx: ViewContext, name: string): RenderedTable {
 		...(columnLevels.some((l) => l) ? { columnLevels } : {}),
 		...(described ? { rowInfo: table.map((t) => t.info ?? {}) } : {}),
 		...(rowsSpec.trim() === 'checks' ? { opensText: true } : {}),
+		...(/^(composition|budget:|checks$)/.test(rowsSpec.trim()) ? { configurable: true } : {}),
 		...(study ? { trade: study } : {}),
 		...(annotations ? { annotations } : {})
 	};

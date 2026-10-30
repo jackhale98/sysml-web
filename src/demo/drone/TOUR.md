@@ -204,7 +204,23 @@ drone over 4 kg and scores nothing. Raise the semi-solid-state pack's price,
 `semiSolidState::price`, to `2500.0` and today's battery comes out on top; Undo puts it back.
 Table: **`DroneViews::batteryTrade`**.
 
-## 16. What depends on what: `DroneViews::droneDsm`
+## 16. One design, several products: `DroneConfigurations::droneFamily`
+
+The trade study picks a pack, but a customer who wants range may take a different
+drone from the one that delivers in town. `droneFamily` is the drone with two choices
+left open, its battery and its radio. Each is typed by a variation definition,
+`DroneConfigurations::BatteryOption` and `DroneConfigurations::RadioOption`, whose
+variants are the possible answers. `DroneConfigurations::standardDrone` and
+`DroneConfigurations::longRangeDrone` are configurations: each specializes the family
+and picks one variant for each choice (`part :>> radio = RadioOption::longRangeRadio;`).
+Open the drone mass budget and choose **longRangeDrone** in **Configuration**: the
+semi-solid-state pack and the long-range radio make it 2.715 kg empty instead of
+2.77 kg, and the design checks give it 35.1 min of endurance instead of 27.5 min. The
+power budget, the bill of materials and the drone's diagrams follow the same choice;
+**As written** goes back to the model as it is written. Table:
+**`DroneViews::droneVariants`**.
+
+## 17. What depends on what: `DroneViews::droneDsm`
 
 A dependency matrix (DSM) lists the drone's parts down the side and across the top.
 The cell in the battery's row and the power distribution board's column says the
@@ -221,7 +237,7 @@ as an N² chart, naming the interfaces and items in each cell;
 `DroneViews::requirementDsm` the requirements derived from each need.
 Matrix: **`DroneViews::droneDsm`**.
 
-## 17. Changing the design together: **Review changes**
+## 18. Changing the design together: **Review changes**
 
 The model is plain text in git, so a change is reviewed like code, but in the model's
 terms. Raise SYS-001's limit in `SystemRequirements::'Flight endurance'` to

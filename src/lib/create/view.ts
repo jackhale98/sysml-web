@@ -128,6 +128,18 @@ export const VIEW_KINDS: readonly ViewKind[] = [
 		title: 'Verification matrix'
 	},
 	{
+		id: 'variants',
+		group: 'tables',
+		label: 'Variability matrix',
+		description:
+			'Each configuration of a product down the side, its open choices across the top, and the variant it picks.',
+		definition: 'VariabilityMatrix',
+		library: 'ModelViews',
+		covers: 'packages',
+		optional: true,
+		title: 'Variants'
+	},
+	{
 		id: 'general',
 		group: 'diagrams',
 		label: 'General diagram',

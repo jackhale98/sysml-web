@@ -406,9 +406,28 @@ export const HELP: HelpSection[] = [
 				title: 'Compare options',
 				keywords: 'trade study alternatives weighted score decision',
 				blocks: [
-					'**New trade study** compares alternatives (parts, or kinds of part) on criteria you weight, such as mass, cost and power, and ranks them. The study is saved in the model, so it updates when a value changes.'
+					'**New trade study** compares alternatives (parts, or kinds of part) on criteria you weight, such as mass, cost and power, and ranks them. The study is saved in the model, so it updates when a value changes.',
+					'Kinds of part are written as the **variants** of a variation, the same way a product writes its choices: once a study has picked one, a configuration of the product can choose it (see **Show one configuration of a product**).'
 				],
 				action: { action: 'trade', label: 'New trade study' }
+			},
+			{
+				id: 'configurations',
+				title: 'Show one configuration of a product',
+				keywords:
+					'variant variation variability configuration product line option choice matrix long range',
+				blocks: [
+					'One design often makes several products: a standard drone and a long-range one, with another battery and radio. SysML writes the choices into the model. A **variation** lists the answers to one choice, each a **variant** (`variation part def RadioOption { variant part standardRadio; variant part longRangeRadio; }`); a part typed by it is a **variation point**, a choice left open. A **configuration** is a product with every choice made: it specializes the product line and picks one variant for each point (`part longRangeDrone :> droneFamily { part :>> radio = RadioOption::longRangeRadio; }`).',
+					{
+						steps: [
+							'Open the bill of materials, a mass or power budget, the design checks, or a structure or connections diagram of the product.',
+							'Choose a configuration in **Configuration** above it. The values, totals and verdicts are that product’s, with its chosen variants; every table and diagram that can show it follows the same choice.',
+							'Choose **As written** to see the model as it is written again. While a configuration is shown nothing can be edited there: it is worked out from the model, not written in it.'
+						]
+					},
+					'The **variability matrix** lists each configuration down the side, its choices across the top and the variant it picks in each cell. **Problems** lists a configuration that leaves a choice open, picks something that is not one of its variants, or picks two.'
+				],
+				action: { action: 'variants', label: 'New variability matrix' }
 			},
 			{
 				id: 'fmea',

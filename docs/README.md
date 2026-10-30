@@ -19,6 +19,9 @@ What each document is for, and who it is for. New to Tessera? Start with the
   and N² charts; links, suggested modules and change impact.
 - [Table rendering](table-rendering.md): the `@TableRendering` convention that
   turns any SysML view into a table.
+- [Variants and configurations](variants.md): variation points, product lines
+  and configurations in standard SysML; showing one configuration, the
+  variability matrix and the problems Tessera reports.
 - [Requirements, verification results and conventions](verification.md): the
   coverage rule, `@VerificationResult` and when a result is out of date,
   reports that name their commit, change impact, and `@Convention` views.

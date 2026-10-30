@@ -323,6 +323,8 @@ export interface RenderedTable {
 	 * lowest first, for sorting and filtering by level.
 	 */
 	columnLevels?: (Levels | null)[];
+	/** The rows read the product's values (a bill of materials, a budget, the checks): a configuration can be shown. */
+	configurable?: boolean;
 }
 
 /** Values in an order: an enum's literals as declared, lowest first. */
@@ -578,6 +580,51 @@ export type Evaluated =
 	| { kind: 'text'; text: string }
 	| { kind: 'none' }
 	| { kind: 'undecided'; reason: string };
+
+// ---- Variants and configurations ----------------------------------------------------
+
+/** A choice a design leaves open: a `variation` usage, or a usage typed by a `variation` def. */
+export interface VariationPoint {
+	id: string;
+	name: string;
+	qualifiedName: string;
+	/** The usage or definition it is a feature of (the product line); null for one in a package. */
+	productLine: string | null;
+	/** Where its variants are listed: the point itself, or the variation def it is typed by. */
+	variation: string;
+	variants: { id: string; name: string; qualifiedName: string }[];
+	file: string;
+	line: number;
+}
+
+/** A product with its choices made: a usage that specializes a product line and picks a variant per point. */
+export interface VariabilityConfiguration {
+	id: string;
+	name: string;
+	qualifiedName: string;
+	doc?: string;
+	productLines: string[];
+	/** The product as written that showing this configuration changes (`drone`). */
+	product: string;
+	/** One per variation point: the variant chosen (null when none is), and what is wrong, if anything. */
+	choices: {
+		point: string;
+		pointId: string;
+		variant: string | null;
+		variantId: string | null;
+		problem?: string;
+	}[];
+	/** The files showing it changes (where the declarations its choices replace are written). */
+	changes: string[];
+	file: string;
+	line: number;
+}
+
+/** The variability of a model (`toolkit/variability.ts`). */
+export interface Variability {
+	points: VariationPoint[];
+	configurations: VariabilityConfiguration[];
+}
 
 // ---- Trade studies ---------------------------------------------------------------
 

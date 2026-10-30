@@ -190,6 +190,7 @@ const handlers: { [M in Method]: Handler } = {
 	checks: (host, files: SourceFile[]) => host.checks(files),
 	evaluate: (host, files: SourceFile[], ids: string[]) => host.evaluate(files, ids),
 	tradeStudies: (host, files: SourceFile[]) => host.tradeStudies(files),
+	variability: (host, files: SourceFile[]) => host.variability(files),
 	compareModels: (host, base: SourceFile[], current: SourceFile[]) =>
 		host.compareModels(base, current),
 	exportInterchange: (host, files: SourceFile[], options: InterchangeExportOptions) =>

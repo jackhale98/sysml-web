@@ -18,6 +18,8 @@ import { hazardRows, severityProblem } from './hazards';
 import { isFmeaLine, lineRisk, riskFields, riskProblems } from './riskLines';
 import type { Annotation, Link, ViewContext } from './context';
 import { tradeRows } from './trade';
+import { isVariation } from '../variability';
+import { variabilityRows } from './variants';
 import {
 	collapseWhitespace,
 	displayValue,
@@ -96,6 +98,8 @@ export function provideRows(ctx: ViewContext, spec: string, warnings: string[]):
 			return tradeRows(ctx);
 		case 'hazards':
 			return hazardRows(ctx);
+		case 'variability':
+			return variabilityRows(ctx);
 		case 'uncertainty':
 			warnings.push(
 				'uncertainty analyses are not worked out yet (planned: worst-case and RSS ranges over tolerances), so the table is empty'
@@ -103,7 +107,7 @@ export function provideRows(ctx: ViewContext, spec: string, warnings: string[]):
 			return [];
 		default:
 			throw new Error(
-				`unknown row provider \`${spec}\` (expected @Metadata, type:, kind:, relation:, composition, budget:, requirements, trace, checks, trade, hazards, kindcounts, or uncertainty)`
+				`unknown row provider \`${spec}\` (expected @Metadata, type:, kind:, relation:, composition, budget:, requirements, trace, checks, trade, hazards, variability, kindcounts, or uncertainty)`
 			);
 	}
 }
@@ -819,7 +823,3 @@ function attributeValues(
 	if (typeId) for (const t of [typeId, ...ctx.supers(typeId)]) take(t);
 	return out;
 }
-
-/** `variation part x …`: the choices a design can make, each a `variant`. */
-const isVariation = (r: ElementRecord) =>
-	/^\s*(?:(?:abstract|derived|readonly|individual)\s+)*variation\b/.test(r.header);

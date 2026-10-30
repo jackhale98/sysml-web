@@ -42,6 +42,9 @@
 	import type { WorkbenchUi } from './ui.svelte.ts';
 	import { removeAnnotation, renameElement, setField, setTableColumns } from './actions.ts';
 	import ColumnChooser from './ColumnChooser.svelte';
+	import ConfigurationPicker from './ConfigurationPicker.svelte';
+	import { chosenConfiguration, describeChoices } from './configurations.ts';
+	import { withConfiguration } from '#lib/engine/configuration.ts';
 	import SheetDialog from '#lib/ui/SheetDialog.svelte';
 	import CellEditor from './CellEditor.svelte';
 	import TradeMatrix from './TradeMatrix.svelte';
@@ -229,13 +232,35 @@
 			title: workspace.info?.name ?? 'Project'
 		};
 	}
+	/**
+	 * Whether the table reads the product's values (a bill of materials, a
+	 * budget, the checks), so it can show a configuration; learnt from its
+	 * last rendering.
+	 */
+	let configurable = $state(false);
+	/** The configuration the table shows, if one is chosen and the table can show it. */
+	const configuration = $derived(
+		configurable ? chosenConfiguration(workspace.variability, ui.configuration) : null
+	);
 
 	async function refresh() {
 		const current = ++generation;
 		try {
-			const result = await engine.renderView(workspace.sourceFiles(), name);
+			const files = workspace.sourceFiles();
+			const chosen = untrack(() => chosenConfiguration(workspace.variability, ui.configuration));
+			const known = untrack(() => configurable);
+			const render = (shown: string | null) =>
+				engine.renderView(withConfiguration(files, shown), name);
+			let result = await render(known && chosen ? chosen.qualifiedName : null);
+			// Learnt now that the table can show the chosen configuration: show it.
+			if (result.configurable && chosen && !known) result = await render(chosen.qualifiedName);
 			if (current !== generation) return;
-			table = result;
+			configurable = !!result.configurable;
+			// A configuration is the model worked out with its choices, not the text: nothing to edit.
+			table =
+				result.configurable && chosen
+					? { ...result, editable: result.editable?.map(() => null) }
+					: result;
 			error = null;
 		} catch (e) {
 			if (current !== generation) return;
@@ -246,6 +271,7 @@
 	$effect(() => {
 		void workspace.files;
 		void name;
+		void ui.configuration;
 		const delay = untrack(() => table) ? 300 : 0;
 		clearTimeout(timer);
 		timer = setTimeout(() => void refresh(), delay);
@@ -262,6 +288,7 @@
 		untrack(() => {
 			filters = [];
 			filtersOpen = false;
+			configurable = false;
 		});
 	});
 
@@ -865,7 +892,22 @@
 			{/if}
 		</div>
 		{#if info?.doc}<p class="doc">{info.doc}</p>{/if}
+		{#if configuration}
+			<p class="configured" role="status">
+				Showing the configuration <strong>{configuration.name}</strong> ({describeChoices(
+					configuration
+				)}). The values are its chosen variants'; the model as written is unchanged, so cells can't
+				be edited here.
+			</p>
+		{/if}
 		<div class="tools">
+			{#if configurable}
+				<ConfigurationPicker
+					variability={workspace.variability}
+					bind:value={ui.configuration}
+					compact={ui.phone}
+				/>
+			{/if}
 			{#if !table?.trade && !table?.counts}
 				<label class="search">
 					<Search size={14} />
@@ -1543,6 +1585,15 @@
 	.doc {
 		max-width: 70ch;
 		color: var(--text-2);
+	}
+	.configured {
+		max-width: 70ch;
+		margin: var(--space-2) 0 0;
+		padding: var(--space-2) var(--space-3);
+		border-left: 3px solid var(--accent);
+		background: var(--surface);
+		color: var(--text-2);
+		font-size: var(--text-sm);
 	}
 	.tools {
 		display: flex;

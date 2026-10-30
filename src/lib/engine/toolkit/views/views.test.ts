@@ -719,9 +719,10 @@ describe('the demo’s tables', () => {
 		// The risk library's worksheets for each kind of FMEA, the risk reduction and the
 		// demo's risk matrix and hazard log are six more; its saved review and risk
 		// reduction two more. The dependency matrices: four view defs and the demo's four.
-		// The use case view: its view def and the demo's delivery use cases.
-		expect(views).toHaveLength(69);
-		expect(views.filter((v) => v.hasTable)).toHaveLength(43);
+		// The use case view (its view def and the demo's delivery use cases) and the
+		// variability matrix (a view def and the demo's usage).
+		expect(views).toHaveLength(71);
+		expect(views.filter((v) => v.hasTable)).toHaveLength(45);
 		expect(views.every((v) => !v.builtin)).toBe(true);
 		expect(views.find((v) => v.name === 'droneBreakdown')).toEqual({
 			name: 'droneBreakdown',
@@ -1065,7 +1066,9 @@ describe('the demo’s tables', () => {
 
 	it('the bill of materials follows the toolkit’s types and SysML’s `::**`', () => {
 		const bom = table('BillOfMaterials');
-		expect(shape(bom)).toEqual([56, 5]);
+		// The whole model: the drone in its service context, then the product line and its two
+		// configurations (`DroneConfigurations`), each a drone of its own.
+		expect(shape(bom)).toEqual([134, 5]);
 		// `part drone :> DroneArchitecture::drone` is a DeliveryDrone (the earlier engine said `drone`).
 		expect(bom.rows[1]!.slice(0, 2)).toEqual(['deliveryService.drone', 'DeliveryDrone']);
 		expect(bom.rows[8]).toEqual([
@@ -1114,10 +1117,12 @@ describe('the demo’s tables', () => {
 			'view def'
 		]);
 		const row = (kind: string) => stats.rows.find((r) => r[0] === kind);
-		expect(row('part def')).toEqual(['part def', '19', '0']);
+		// The drone's variation defs (`BatteryOption`, `RadioOption`) are two.
+		expect(row('part def')).toEqual(['part def', '21', '0']);
 		expect(row('requirement')).toEqual(['requirement', '0', '24']);
-		// The dependency matrices' metadata def has five; the reporting library's convention two.
-		expect(row('attribute')).toEqual(['attribute', '0', '235']);
+		// The dependency matrices' metadata def has five; the reporting library's convention two;
+		// the long-range radio three.
+		expect(row('attribute')).toEqual(['attribute', '0', '238']);
 		// Enum literals count as usages (the convention severities, three), metadata annotations are anonymous.
 		expect(row('enum')).toEqual(['enum', '0', '46']);
 		expect(row('metadata')).toBeUndefined();

@@ -27,6 +27,7 @@ describe('the help', () => {
 			'Record a test result',
 			'Check a budget',
 			'Compare options',
+			'Show one configuration of a product',
 			'Analyse what can fail (FMEA)',
 			'Log hazards and their controls',
 			'See what depends on what (DSM)',
@@ -65,6 +66,8 @@ describe('the help', () => {
 		expect(searchHelp('state machine')[0]?.id).toBe('concept-state-machine');
 		expect(searchHelp('fmea')[0]?.id).toBe('fmea');
 		expect(searchHelp('hazard')[0]?.id).toBe('hazards');
+		expect(searchHelp('configuration')[0]?.id).toBe('configurations');
+		expect(searchHelp('variant').map((t) => t.id)).toContain('configurations');
 		expect(searchHelp('xyzzy')).toEqual([]);
 		expect(searchHelp('')).toHaveLength(ALL_TOPICS.length);
 	});
