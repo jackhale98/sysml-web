@@ -454,7 +454,9 @@
 		value === 'satisfied' || value === 'violated' || value === 'undecided';
 
 	/** `23 %` → 0.23, for the share bar. */
-	const shareOf = (value: string) => Math.max(0, Math.min(1, (parseFloat(value) || 0) / 100));
+	// `40 %`, or a share of sampled cases: `over 99.9 %`.
+	const shareOf = (value: string) =>
+		Math.max(0, Math.min(1, (parseFloat(value.replace(/^[a-z ]+/, '')) || 0) / 100));
 
 	/** Copy the bundled view libraries into the project so they can be edited. */
 	async function addToModel() {

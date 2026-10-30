@@ -31,10 +31,20 @@ package DroneComponents {
 
     part def Battery :> Component {
         doc /* Six-cell lithium-ion pack with a built-in battery management system. */
-        attribute :>> mass default 1100 [g];  // defaults: another pack can have its own (see BatteryTrade)
+        // Defaults: another pack can have its own (see BatteryTrade). Values that vary from pack to pack
+        // say how (the Uncertainty library), so the budgets and checks show a likely range.
+        attribute :>> mass default 1100 [g] {
+            attribute tolerance : Uncertainty::Tolerance { :>> plus = 60 [g]; :>> minus = 40 [g]; }
+        }
         attribute nominalVoltage :> voltage default 21.6 [V];
-        attribute capacity :> energy default 216 [W*h];
-        attribute usableFraction : Real default 0.85 { doc /* Share of the capacity used in flight; the rest is the landing reserve. */ }
+        attribute capacity :> energy default 216 [W*h] {
+            attribute uncertainty : Uncertainty::Normal { :>> standardDeviation = 6 [W*h]; }
+        }
+        attribute usableFraction : Real default 0.85 {
+            doc /* Share of the capacity used in flight; the rest is the landing reserve. It depends on
+                 * the temperature and the age of the cells. */
+            attribute uncertainty : Uncertainty::Uniform { :>> min = 0.8; :>> max = 0.9; }
+        }
         attribute usableEnergy :> energy = capacity * usableFraction;
         attribute price : Real default 420.0 { doc /* Purchase price per pack, in euros. */ }
         port powerOut : PowerPort;
@@ -85,7 +95,10 @@ package DroneComponents {
     part def Motor :> Component {
         doc /* Brushless outrunner motor. */
         attribute :>> mass = 120 [g];
-        attribute :>> powerDraw = 92 [W] { doc /* At hover thrust with the full take-off mass. */ }
+        attribute :>> powerDraw = 92 [W] {
+            doc /* At hover thrust with the full take-off mass. */
+            attribute uncertainty : Uncertainty::Normal { :>> standardDeviation = 4 [W]; }
+        }
         attribute maxPower :> power = 450 [W];
     }
 

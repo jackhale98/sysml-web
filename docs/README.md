@@ -17,6 +17,9 @@ What each document is for, and who it is for. New to Tessera? Start with the
   policy; reviews saved as views.
 - [Dependency matrices](dsm.md): the `DependencyMatrices` library behind DSMs
   and N² charts; links, suggested modules and change impact.
+- [Uncertain values](uncertainty.md): the `Uncertainty` library (tolerances and
+  distributions), Monte Carlo, first-order and worst-case propagation, their
+  accuracy, and the path to tolerance stack-ups.
 - [Table rendering](table-rendering.md): the `@TableRendering` convention that
   turns any SysML view into a table.
 - [Requirements, verification results and conventions](verification.md): the

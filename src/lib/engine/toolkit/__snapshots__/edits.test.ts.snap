@@ -61,8 +61,8 @@ exports[`edits > changes a string field 1`] = `
 `;
 
 exports[`edits > changes a value 1`] = `
-"-         attribute capacity :> energy default 216 [W*h];
-+         attribute capacity :> energy default 300 [W*h];"
+"-         attribute capacity :> energy default 216 [W*h] {
++         attribute capacity :> energy default 300 [W*h] {"
 `;
 
 exports[`edits > chooses the columns of a view def 1`] = `
@@ -85,8 +85,8 @@ exports[`edits > gives a declaration without a body a doc comment 1`] = `
 `;
 
 exports[`edits > keeps the unit of a number 1`] = `
-"-         attribute :>> mass default 1100 [g];  // defaults: another pack can have its own (see BatteryTrade)
-+         attribute :>> mass default 1150 [g];  // defaults: another pack can have its own (see BatteryTrade)"
+"-         attribute :>> mass default 1100 [g] {
++         attribute :>> mass default 1150 [g] {"
 `;
 
 exports[`edits > lays out a doc comment like the one it replaces 1`] = `
@@ -129,8 +129,8 @@ exports[`edits > removes a type, keeping the multiplicity 1`] = `
 `;
 
 exports[`edits > removes a value 1`] = `
-"-         attribute capacity :> energy default 216 [W*h];
-+         attribute capacity :> energy;"
+"-         attribute capacity :> energy default 216 [W*h] {
++         attribute capacity :> energy {"
 `;
 
 exports[`edits > removes an annotation whose only field is cleared 1`] = `"-         @Rationale { text = "A 3 km delivery and return takes about 10 minutes; the rest covers hover at the drop point, headwind and battery ageing."; }"`;
@@ -168,7 +168,10 @@ exports[`edits > renames a definition in its file 1`] = `
 -     part def Motor :> Component {
 -         doc /* Brushless outrunner motor. */
 -         attribute :>> mass = 120 [g];
--         attribute :>> powerDraw = 92 [W] { doc /* At hover thrust with the full take-off mass. */ }
+-         attribute :>> powerDraw = 92 [W] {
+-             doc /* At hover thrust with the full take-off mass. */
+-             attribute uncertainty : Uncertainty::Normal { :>> standardDeviation = 4 [W]; }
+-         }
 -         attribute maxPower :> power = 450 [W];
 -     }
 - 
@@ -198,7 +201,10 @@ exports[`edits > renames a definition in its file 1`] = `
 +     part def Motor :> Component {
 +         doc /* Brushless outrunner motor. */
 +         attribute :>> mass = 120 [g];
-+         attribute :>> powerDraw = 92 [W] { doc /* At hover thrust with the full take-off mass. */ }
++         attribute :>> powerDraw = 92 [W] {
++             doc /* At hover thrust with the full take-off mass. */
++             attribute uncertainty : Uncertainty::Normal { :>> standardDeviation = 4 [W]; }
++         }
 +         attribute maxPower :> power = 450 [W];
 +     }
 + 

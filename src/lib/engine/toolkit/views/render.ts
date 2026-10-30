@@ -25,6 +25,7 @@ import {
 import type { Scope, Value } from '#lib/sim/expr.ts';
 import type { ColumnEdit, Levels, RenderedTable, RowInfo, TraceMatrix } from '../../types';
 import { fieldKinds } from './budget';
+import { withSpreadColumns } from './budgetSpread';
 import { fieldDomain, fieldType, metadataDefinition, typeDomain, type Domain } from './domains';
 import type { ElementRecord } from '../model';
 import { findView, listViews, tableSpec, viewChain, viewClauses } from './catalog';
@@ -180,6 +181,8 @@ export function renderView(ctx: ViewContext, name: string): RenderedTable {
 			? groups[column].map((f): [string, null] => [f, null])
 			: [[column, expr]]
 	);
+	// A budget's likely range and share within its limit, when it has values that vary.
+	columns = withSpreadColumns(rowsSpec, columns, rows);
 	const compiled = columns.map(([, expr]) => (expr === null ? null : parse(expr)));
 
 	let table = rows.map((r) => ({

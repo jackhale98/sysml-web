@@ -20,7 +20,11 @@
  * that don't add up (g and m, a plain number, °C) give no sum and say why;
  * a value not in the total's unit has no share.
  *
- * **Checks.** One row per check of `Evaluation.checks()`.
+ * When a value it adds up is uncertain, each row also gets its likely range
+ * and the share of cases within its limit (`budgetSpread.ts`).
+ *
+ * **Checks.** One row per check of `Evaluation.checks()`; `metIn` is the
+ * share of sampled cases that meet it, when a value it reads is uncertain.
  */
 import { inputsText } from '#lib/project/checks.ts';
 import {
@@ -36,7 +40,9 @@ import {
 import type { Check, ColumnKind, Evaluated } from '../../types';
 import { multiplicityOf, type ElementRecord } from '../model';
 import { referencesIn } from '../evaluation';
+import { shareText } from '../uncertainty';
 import type { ViewContext } from './context';
+import { addSpreads } from './budgetSpread';
 import { compositionRows, type Row } from './rows';
 import { simpleName, splitPath, unquoteName } from './text';
 
@@ -52,7 +58,9 @@ export function fieldKinds(spec: string): Record<string, ColumnKind> {
 			share: 'percent',
 			limit: 'quantity',
 			margin: 'quantity',
-			check: 'check'
+			check: 'check',
+			likelyRange: 'quantity',
+			withinLimit: 'percent'
 		};
 	if (spec === 'checks') return { status: 'check', limit: 'quantity', margin: 'quantity' };
 	if (spec === 'requirements' || spec === 'trace') return { check: 'check' };
@@ -206,6 +214,14 @@ export function budgetRows(ctx: ViewContext, attribute: string): Row[] {
 		// After a root and its parts: the root's own values of this quantity.
 		if (depth === 0) rootAttributes(ctx, line, name, rows, checks, unit, kept);
 	}
+	// Uncertain values (`budgetSpread.ts`): each row's likely range and the share within its limit.
+	addSpreads(
+		ctx,
+		name,
+		order.map((l) => ({ ...l, chain: l.row.chain! })),
+		rows,
+		checks
+	);
 	return reorder(rows);
 }
 
@@ -478,6 +494,7 @@ export function checkRows(ctx: ViewContext): Row[] {
 			['detail', check.explanation],
 			['inputs', inputsText(check)],
 			['verdict', check.detail],
+			['metIn', check.spread ? shareText(check.spread.met) : ''],
 			['checkable', check.checkable ? '1' : '0'],
 			['file', check.file],
 			['line', String(check.span.start_row)]

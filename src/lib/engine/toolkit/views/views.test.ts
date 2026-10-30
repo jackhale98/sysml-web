@@ -1078,7 +1078,7 @@ describe('the demo’s tables', () => {
 		expect(bom.sources[8]).toEqual({
 			element: 'DroneComponents::Rotor::motor',
 			file: 'system/Components.sysml',
-			line: 62
+			line: 72
 		});
 		// `ref part rotors` refers to the four rotors: they are counted once, where they are owned.
 		expect(col(bom, 'path')).not.toContain('deliveryService.drone.rotors');
@@ -1115,10 +1115,12 @@ describe('the demo’s tables', () => {
 		const row = (kind: string) => stats.rows.find((r) => r[0] === kind);
 		expect(row('part def')).toEqual(['part def', '19', '0']);
 		expect(row('requirement')).toEqual(['requirement', '0', '24']);
-		// The dependency matrices' metadata def has five; the reporting library's convention two.
-		expect(row('attribute')).toEqual(['attribute', '0', '235']);
-		// Enum literals count as usages (the convention severities, three), metadata annotations are anonymous.
-		expect(row('enum')).toEqual(['enum', '0', '46']);
+		// The dependency matrices' metadata def has five; the reporting library's convention two; the
+		// uncertainty library's distributions eleven, and the demo's uncertain values ten.
+		expect(row('attribute')).toEqual(['attribute', '0', '256']);
+		// Enum literals count as usages (the convention severities, three; the tolerance readings,
+		// three), metadata annotations are anonymous.
+		expect(row('enum')).toEqual(['enum', '0', '49']);
 		expect(row('metadata')).toBeUndefined();
 	});
 

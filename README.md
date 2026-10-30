@@ -97,6 +97,7 @@ Without them, people connect GitHub with a personal access token.
 | [User guide](docs/user-guide.md) | Starting a project, the ideas in plain words, how to do the common jobs, shortcuts, where your data is kept. The same text as **Help** in the app. | Users |
 | [Risk analysis](docs/risk-analysis.md) | The FMEA and hazard libraries: each definition, the risk policy, reviews saved as views, how another tool reads them. | Modellers |
 | [Dependency matrices](docs/dsm.md) | The DSM and N² chart views: rows, links, suggested modules, change impact. | Modellers |
+| [Uncertain values](docs/uncertainty.md) | Tolerances and distributions in the model, Monte Carlo, first-order and worst-case propagation, accuracy, the path to stack-ups. | Modellers, developers |
 | [Table rendering](docs/table-rendering.md) | How any SysML view becomes a table (`@TableRendering`), for views written by hand. | Modellers |
 | [Requirements, verification results and conventions](docs/verification.md) | The coverage rule, recorded test results (`@VerificationResult`) and when they are out of date, reports that name their commit, change impact, `@Convention` views. | Modellers |
 | [State machine simulator](docs/simulator.md) | What the simulator does with a state machine: steps, the simulated clock, `do` actions, what is not supported. | Modellers |

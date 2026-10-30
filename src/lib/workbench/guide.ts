@@ -4,6 +4,8 @@
  * one of these, and the workbench runs it the same way wherever it is asked.
  */
 import { resolve } from '$app/paths';
+import { write } from '#lib/create/apply.ts';
+import { missingUncertaintyLibrary } from '#lib/create/uncertaintyLibrary.ts';
 import type { Engine } from '#lib/engine/client.ts';
 import { pwa } from '#lib/offline/pwa.svelte.ts';
 import type { ModelElement } from '#lib/project/elements.ts';
@@ -26,6 +28,7 @@ export const GUIDE_ACTIONS = [
 	'limit',
 	'trade',
 	'fmea',
+	'uncertainty',
 	'risk-policy',
 	'hazard',
 	'dsm',
@@ -248,6 +251,21 @@ export async function runGuideAction(action: GuideAction, context: GuideContext)
 		case 'risk-policy':
 			ui.create = { kind: 'riskPolicy' };
 			return;
+		case 'uncertainty': {
+			// The library a value's tolerance or distribution is written with (docs/uncertainty.md).
+			const files = missingUncertaintyLibrary(workspace);
+			if (!files.length) {
+				toasts.show('The project has the Uncertainty library: write a tolerance inside a value.');
+				return;
+			}
+			const error = await write(workspace, 'Add the uncertainty library', { files });
+			if (error) toasts.show(error, { tone: 'error' });
+			else
+				toasts.show(
+					'Added libraries/Uncertainty.sysml: now write a tolerance or a distribution inside a value.'
+				);
+			return;
+		}
 		case 'import-requirements':
 			ui.importOpen = true;
 			return;

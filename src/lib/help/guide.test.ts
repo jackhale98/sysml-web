@@ -26,6 +26,7 @@ describe('the help', () => {
 			'Link a requirement to the design',
 			'Record a test result',
 			'Check a budget',
+			'Say how much a value varies',
 			'Compare options',
 			'Analyse what can fail (FMEA)',
 			'Log hazards and their controls',

@@ -208,8 +208,9 @@ describe('general view', () => {
 			.map((d) => d.name)
 			.sort();
 		// With the dependency matrices' library: a metadata def and four view defs; and the
-		// reporting library's convention marker (a metadata def and its severity enum def).
-		expect(definitions).toHaveLength(115);
+		// reporting library's convention marker (a metadata def and its severity enum def); the
+		// uncertainty library's distributions (five attribute defs and an enum def).
+		expect(definitions).toHaveLength(121);
 		expect(ids(tk)).toEqual(definitions);
 		expect(edges(tk, 'specialization')).toEqual([
 			'Airframe -specialization-> Component',
@@ -228,6 +229,7 @@ describe('general view', () => {
 			'HazardousSituation -specialization-> RiskEvent',
 			'InterfaceN2 -specialization-> DependencyMatrix',
 			'Motor -specialization-> Component',
+			'Normal -specialization-> Distribution',
 			'PayloadRelease -specialization-> Component',
 			'PowerDistributionBoard -specialization-> Component',
 			'ProcessFmeaWorksheet -specialization-> FmeaWorksheet',
@@ -237,6 +239,9 @@ describe('general view', () => {
 			'SpeedController -specialization-> Component',
 			'TakeOffCommand -specialization-> FlightCommand',
 			'TelemetryRadio -specialization-> Component',
+			'Tolerance -specialization-> Distribution',
+			'Triangular -specialization-> Distribution',
+			'Uniform -specialization-> Distribution',
 			'UseFmeaWorksheet -specialization-> FmeaWorksheet'
 		]);
 	});
@@ -547,7 +552,8 @@ describe('package view', () => {
 			'ModelViews',
 			'Reporting',
 			'RiskAnalysis',
-			'SystemRequirements'
+			'SystemRequirements',
+			'Uncertainty'
 		]);
 		expect(edges(tk, 'containment')).toContain('DroneComponents -containment-> Battery');
 	});
