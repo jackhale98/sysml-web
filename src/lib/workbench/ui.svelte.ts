@@ -12,6 +12,8 @@ export type Tab =
 	| { kind: 'view'; name: string; title: string }
 	/** Run a state machine interactively. `machine` is its (qualified) name. */
 	| { kind: 'emulator'; machine: string; title: string }
+	/** Run an action flow step by step. `action` is its (qualified) name. */
+	| { kind: 'flow'; action: string; title: string }
 	/** A read-only file of the OMG standard library, at a line. */
 	| { kind: 'library'; path: string; line?: number }
 	/** What changed in the model since another version (review mode). */
@@ -105,6 +107,8 @@ export function tabId(tab: Tab): string {
 			return `view:${tab.name}`;
 		case 'emulator':
 			return `emulator:${tab.machine}`;
+		case 'flow':
+			return `flow:${tab.action}`;
 		case 'library':
 			return `library:${tab.path}`;
 		default:
@@ -124,6 +128,7 @@ export function tabTitle(tab: Tab): string {
 		case 'view':
 			return tab.title;
 		case 'emulator':
+		case 'flow':
 			return tab.title;
 		case 'library':
 			return tab.path.split('/').pop() ?? tab.path;

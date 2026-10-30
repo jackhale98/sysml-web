@@ -17,6 +17,7 @@ import type {
 	EditResult,
 	StateMachine,
 	Variability,
+	ActionFlow,
 	ViewInfo
 } from '#lib/engine/types.ts';
 import { checkProblems } from './checks';
@@ -140,6 +141,8 @@ export class Workspace {
 	machines = $state.raw<StateMachine[]>([]);
 	/** The project's variation points and configurations (`toolkit/variability.ts`). */
 	variability = $state.raw<Variability>({ points: [], configurations: [] });
+	/** The project's actions, for the action flow runner (`runnable` ones are offered to run). */
+	flows = $state.raw<ActionFlow[]>([]);
 	/** Constraint checks of the latest analysis (after it: they take a moment longer). */
 	checks = $state.raw<CheckReport | null>(null);
 	/** What breaks the project's conventions (views marked `@Convention`), found with the checks. */
@@ -307,10 +310,12 @@ export class Workspace {
 			const views = await engine.listViews(files);
 			const machines = await engine.stateMachines(files);
 			const variability = await engine.variability(files);
+			const flows = await engine.actionFlows(files);
 			if (files.every((f) => this.files[f.path] === f.text)) {
 				this.views = views;
 				this.machines = machines;
 				this.variability = variability;
+				this.flows = flows;
 			}
 			void this.check(files, performance.now() - started);
 		} catch (error) {

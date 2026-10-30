@@ -6,7 +6,8 @@ specifications leave a choice open. References are to the SysML v2.0
 specification (Part 1, "SysML") and KerML 1.0, and to the semantic library
 packages that ship with the toolkit (`static/toolkit/stdlib`):
 `StatePerformances`, `TransitionPerformances`, `Triggers`, `Clocks` and the
-Systems Library's `States`.
+Systems Library's `States`. How actions run, in a machine and as action
+flows run on their own, is in [Running actions](action-runs.md).
 
 ## Steps
 
@@ -68,24 +69,33 @@ v2's terminate action replaces: the performance ends, it is not exited.
 
 ## Actions
 
-Entry, `do` and exit actions and transition effects run their steps in the
-order written:
+Entry, `do` and exit actions and transition effects run their steps as
+[Running actions](action-runs.md) describes, within the step of the
+machine that runs them:
 
 - `assign x := e` changes a variable;
 - `if c { … } else if d { … } else { … }` runs the first branch whose
   condition holds;
+- `while c { … } until d`, `loop { … } until d` and `for v in seq { … }`
+  run their body as the library's `LoopPerformance` and `ForLoopAction`
+  say (a loop stops after 1000 passes, with a message);
 - `then <step>`, a succession inside the action, runs the step after the
-  one before it;
+  one before it, and `first a then b` orders named actions (`action a {
+  … }`) whatever order they are written in;
+- `perform x` (`perform action c : Charge { in amount = 0.25; }`) runs the
+  action it names, with its parameters, when the project has it;
 - `send new Sig(…) to self` (or to the part that exhibits the machine)
   sends the machine a signal (below);
-- `action { … }` runs its steps; a named action (`do monitor`) changes
-  nothing the simulator keeps.
+- `action { … }` runs its steps; a named action with nothing to run (`do
+  monitor`) changes nothing the simulator keeps.
 
 SysML performs the actions of a body that no succession orders
 concurrently; the simulator takes the written order, so `assign y := 5;
-if x > 5 { assign y := 7; }` leaves 7 when `x` is above 5. Anything else
-(`accept`, loops, `perform`, a `send` to another part) is not run, and the
-machine says so before it runs.
+if x > 5 { assign y := 7; }` leaves 7 when `x` is above 5. A whole action
+runs within one step of the machine, so an `accept` inside it cannot wait:
+the action ends there, the steps after it are not run, and the machine says
+so before it runs and when it happens. A `send` to another part is not run,
+and the machine says so before it runs.
 
 ## Signals the machine sends itself
 
@@ -229,9 +239,11 @@ event, timer or condition, and before later untriggered ones.
 The simulator lists what it cannot run in a note above the diagram ("may
 not run as written") before the run starts.
 
-- Steps of an action other than those under [Actions](#actions)
-  (`accept`, loops, `perform`, a `send` to another part or through a
-  port): each one is named in the note.
+- Steps of an action other than those under [Actions](#actions) (an
+  `accept`, which cannot wait within a step; a `perform` of an action the
+  project does not have; a `send` to another part or through a port): each
+  one is named in the note. Actions run on their own, as action flows,
+  are in [Running actions](action-runs.md).
 - Change triggers that read the time, and clocks other than the default
   one.
 - History states and deferred signals: SysML v2 has no notation for them.

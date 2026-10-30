@@ -365,6 +365,27 @@ export function machineItems(
 	});
 }
 
+/** One command per action flow that can run: run it step by step. */
+export function flowItems(
+	flows: readonly { name: string; qualifiedName?: string; runnable: boolean }[]
+): PaletteItem[] {
+	return flows
+		.filter((f) => f.runnable)
+		.map((f) => {
+			const action = f.qualifiedName ?? f.name;
+			return {
+				id: `run-flow:${action}`,
+				group: 'commands' as const,
+				label: `Run ${f.name}`,
+				keyword: 'action flow',
+				aliases: `simulate run action flow ${action}`,
+				kind: 'action',
+				isDefinition: true,
+				action: { type: 'open' as const, tab: { kind: 'flow' as const, action, title: f.name } }
+			};
+		});
+}
+
 /** The model's own views (saved diagrams and tables) and the standard tables. */
 export function modelViewItems(views: readonly ViewInfo[]): PaletteItem[] {
 	return (

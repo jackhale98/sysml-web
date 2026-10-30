@@ -57,7 +57,9 @@ package DeliveryMission {
 
         action checkDropZone {
             doc /* Look down with the camera to check that nobody is in the drop zone. */
-            out attribute isClear : Boolean;
+            out attribute isClear : Boolean default true {
+                doc /* Clear unless the camera sees someone: a run of the flow can say otherwise. */
+            }
         }
         then atDropPoint;
 

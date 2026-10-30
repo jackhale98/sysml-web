@@ -346,6 +346,18 @@
 			? workspace.machines.find((m) => m.name === scope || m.qualifiedName === scope)
 			: undefined
 	);
+	/** On an action flow diagram, the action it draws, so it can be run. */
+	const runnableFlow = $derived(
+		view === 'actions' && scope
+			? workspace.flows.find(
+					(f) =>
+						f.runnable &&
+						(f.name === scope ||
+							f.qualifiedName === scope ||
+							f.qualifiedName?.endsWith(`::${scope}`))
+				)
+			: undefined
+	);
 
 	// ---- Behaviour: state machines and action flows are drawn, not only shown ----
 
@@ -2389,6 +2401,21 @@
 								kind: 'emulator',
 								machine: runnable.qualifiedName ?? runnable.name,
 								title: runnable.name
+							})}
+					>
+						<Play size={14} /> <span>Run</span>
+					</button>
+				{:else if runnableFlow}
+					<button
+						type="button"
+						class="run"
+						title="Run this action flow step by step"
+						onclick={() =>
+							runnableFlow &&
+							ui.open({
+								kind: 'flow',
+								action: runnableFlow.qualifiedName ?? runnableFlow.name,
+								title: runnableFlow.name
 							})}
 					>
 						<Play size={14} /> <span>Run</span>

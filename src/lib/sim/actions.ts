@@ -23,17 +23,65 @@
  * for the notes) and the simulator (`emulator.ts`, to run them).
  */
 
-export type ActionStep =
-	| { kind: 'assign'; text: string; target: string; value: string }
-	| {
-			kind: 'if';
-			text: string;
-			branches: { condition: string; steps: ActionStep[] }[];
-			otherwise: ActionStep[] | null;
-	  }
-	| { kind: 'send'; text: string; signal: string; args: string[]; to: string | null }
-	| { kind: 'named'; text: string }
-	| { kind: 'other'; text: string };
+/** What every step carries: its text as written, its name (`action a accept Go`) and whether `then` puts it after the step before. */
+interface Written {
+	text: string;
+	/** The step's own name, when it has one (`action release assign open := true`). */
+	name?: string;
+	/** Written `then <step>`: a succession from the step declared before it. */
+	after?: true;
+}
+
+export type ActionStep = Written &
+	(
+		| { kind: 'assign'; target: string; value: string }
+		| {
+				kind: 'if';
+				branches: { condition: string; steps: ActionStep[] }[];
+				otherwise: ActionStep[] | null;
+		  }
+		| { kind: 'send'; signal: string; args: string[]; to: string | null }
+		| { kind: 'named' }
+		| { kind: 'other' }
+		/** `while c { … } until d;`, `loop { … } until d;` (no `while`: the test is `true`). */
+		| { kind: 'loop'; condition: string | null; until: string | null; steps: ActionStep[] }
+		/** `for i in seq { … }`. */
+		| { kind: 'for'; variable: string; collection: string; steps: ActionStep[] }
+		/** `accept Sig`, `accept r : Sig via p`, `accept when c`, `accept after d`, `accept at t`. */
+		| { kind: 'accept'; trigger: string; payload: string | null }
+		/** `perform a;`, `perform action a : A { in x = 1; }`: the action it performs, and the body's bindings. */
+		| { kind: 'perform'; target: string; steps: ActionStep[] }
+		/** A named action with a body or a type: `action a { … }`, `action a : A;`. */
+		| { kind: 'action'; type: string | null; steps: ActionStep[] }
+		/** A control node: `fork;`, `join j;`, `merge m;`, `decide;`. */
+		| { kind: 'control'; node: 'fork' | 'join' | 'merge' | 'decide' }
+		/** `first start;`: the step the next `then` comes after. */
+		| { kind: 'first'; target: string }
+		/**
+		 * A succession: `first a then b`, `then b` (from the step before, when
+		 * `from` is null), or a decision's branch `if c then b` / `else b`
+		 * (`guard` is the condition, or `else`).
+		 */
+		| { kind: 'succession'; from: string | null; to: string; guard: string | null }
+		/** An item flow, `flow of T from a.x to b.y;` (`succession flow`: also a succession). */
+		| { kind: 'flow'; from: string; to: string; item: string | null; succession: boolean }
+		/**
+		 * A parameter or attribute: `in item plan : Plan = p;`, `out attribute ok :
+		 * Boolean default true;`. `binding`: `=` (a bound value), else an initial
+		 * or default value.
+		 */
+		| {
+				kind: 'feature';
+				direction: 'in' | 'out' | 'inout' | null;
+				type: string | null;
+				value: string | null;
+				binding: boolean;
+		  }
+		/** Something an action may declare that is not a step (`subject`, `actor`, `objective`, …). */
+		| { kind: 'declaration' }
+	);
+
+export type StepOf<K extends ActionStep['kind']> = Extract<ActionStep, { kind: K }>;
 
 /** Index of the quote closing the one at `start` (backslash escapes). */
 function closing(text: string, start: number): number {
@@ -96,7 +144,7 @@ const squash = (text: string) => text.replace(/\s+/g, ' ').trim();
 
 /**
  * The statements of a body, in order: each ends at a `;`, or at the `}` of a
- * block (`if c { … }`) unless an `else` follows.
+ * block (`if c { … }`) unless an `else` or `until` follows.
  */
 export function statements(body: string): string[] {
 	const out: string[] = [];
@@ -113,7 +161,7 @@ export function statements(body: string): string[] {
 		else if (c === '(' || c === '[' || c === '{') depth++;
 		else if (c === ')' || c === ']' || c === '}') {
 			depth--;
-			if (depth === 0 && c === '}' && !/^\s*else\b/.test(body.slice(i + 1))) {
+			if (depth === 0 && c === '}' && !/^\s*(else|until)\b/.test(body.slice(i + 1))) {
 				// A block ends the statement; a `;` right after it is an empty one.
 				out.push(body.slice(from, i + 1).trim());
 				from = i + 1;
@@ -190,35 +238,299 @@ function parseSend(text: string): ActionStep | null {
 	return { kind: 'send', text: squash(text), signal, args, to };
 }
 
+const NAME = String.raw`(?:'[^']*'|[\w$]+)`;
+const QUALIFIED = String.raw`${NAME}(?:\s*(?:::|\.)\s*${NAME})*`;
 const NAMED = /^(?:'[^']*'|[\w$.:]+)(?:\s*:\s*(?:'[^']*'|[\w$.:]+))?$/;
+/** A reference to a step: `descend`, `drone.deliveryFlight`, `'drop parcel'`. */
+const REFERENCE = new RegExp(`^${QUALIFIED}$`);
+const KEYWORDS = /^(accept|perform|terminate|while|loop|for|then|first|if|else|send|assign)\b/;
+
+const unquote = (name: string) => name.replace(/\s+/g, '').replace(/^'(.*)'$/, '$1');
+
+/** `name : Type` (each optional) at the start of a declaration, and what follows. */
+function header(text: string): { name: string | null; type: string | null; rest: string } {
+	const m = new RegExp(
+		String.raw`^(?:(${NAME})\s*)?(?:(?::(?![:>])|:>|defined\s+by\b)\s*(${QUALIFIED}))?(?:\s*\[[^\]]*\])?`
+	).exec(text)!;
+	return {
+		name: m[1] && !KEYWORDS.test(m[1]) ? m[1] : null,
+		type: m[2] ? m[2].replace(/\s+/g, '') : null,
+		rest: text.slice(m[1] && KEYWORDS.test(m[1]) ? 0 : m[0].length).trim()
+	};
+}
+
+/** A trailing `{ … }` body: its text, and what comes before it. */
+function trailingBlock(text: string): { head: string; body: string | null } {
+	const open = topLevel(text, '{');
+	if (open < 0) return { head: text, body: null };
+	const { body, end } = block(text, open);
+	if (text.slice(end).trim()) return { head: text, body: null };
+	return { head: text.slice(0, open).trim(), body };
+}
+
+/** `while c { … } until d`, `loop { … } until d`. */
+function parseLoop(text: string): ActionStep | null {
+	const loop = /^loop\b/.test(text);
+	const rest = text.replace(/^(while|loop)\b\s*/, '');
+	const open = topLevel(rest, '{');
+	if (open < 0) return null;
+	const condition = squash(rest.slice(0, open)) || null;
+	if (!loop && !condition) return null;
+	if (loop && condition && !/^action\b/.test(condition)) return null;
+	const { body, end } = block(rest, open);
+	const tail = rest.slice(end).trim().replace(/;$/, '');
+	let until: string | null = null;
+	if (tail) {
+		const m = /^until\b\s*([\s\S]+)$/.exec(tail);
+		if (!m) return null;
+		until = squash(m[1]!);
+	}
+	return {
+		kind: 'loop',
+		text: squash(text),
+		condition: loop ? null : condition,
+		until,
+		steps: parseSteps(body)
+	};
+}
+
+/** `for i in seq { … }`, `for i : Integer in seq { … }`. */
+function parseFor(text: string): ActionStep | null {
+	const rest = text.replace(/^for\b\s*/, '');
+	const at = keyword(rest, 'in');
+	const open = topLevel(rest, '{');
+	if (at < 0 || open < at) return null;
+	const variable = /^('[^']*'|[\w$]+)/.exec(rest.trim())?.[1];
+	if (!variable) return null;
+	const { body, end } = block(rest, open);
+	if (rest.slice(end).trim()) return null;
+	return {
+		kind: 'for',
+		text: squash(text),
+		variable,
+		collection: squash(rest.slice(at + 2, open)),
+		steps: parseSteps(body)
+	};
+}
+
+/** `accept r : Sig via p`, `accept when c`, `accept after d`. */
+function parseAccept(text: string): ActionStep {
+	let rest = squash(text.replace(/^accept\b/, ''));
+	if (/^(when|after|at)\b/.test(rest))
+		return { kind: 'accept', text: squash(text), trigger: rest, payload: null };
+	const via = keyword(rest, 'via');
+	if (via >= 0) rest = rest.slice(0, via).trim();
+	const typed = /^((?:'[^']*'|[\w$]+))\s*:(?!:)\s*([\s\S]+)$/.exec(rest);
+	return {
+		kind: 'accept',
+		text: squash(text),
+		trigger: (typed ? typed[2]! : rest).replace(/\s+/g, ''),
+		payload: typed ? typed[1]! : null
+	};
+}
+
+/** `flow of T from a.x to b.y`, `flow a.x to b.y` (after `flow` or `succession flow`). */
+function parseFlow(text: string, succession: boolean): ActionStep | null {
+	let rest = text.replace(/^(succession\s+)?flow\b\s*/, '');
+	let item: string | null = null;
+	const of = keyword(rest, 'of');
+	const from = keyword(rest, 'from');
+	const to = keyword(rest, 'to');
+	if (to < 0) return null;
+	if (of >= 0) {
+		const end = from >= 0 ? from : to;
+		item = squash(rest.slice(of + 2, end)).replace(/^(?:'[^']*'|[\w$]+)\s*:\s*/, '') || null;
+	}
+	const source =
+		from >= 0
+			? rest.slice(from + 4, to)
+			: of >= 0
+				? ''
+				: rest.slice(0, to).replace(new RegExp(`^${NAME}\\s+(?=${NAME})`), '');
+	rest = rest.slice(to + 2);
+	const target = squash(trailingBlock(rest).head);
+	if (!squash(source) || !target) return null;
+	return {
+		kind: 'flow',
+		text: squash(text),
+		from: squash(source).replace(/\s+/g, ''),
+		to: target.replace(/\s+/g, ''),
+		item,
+		succession
+	};
+}
+
+/** `in item plan : Plan = p`, `attribute x : Real := 0`, `out ok : Boolean default true`. */
+function parseFeature(text: string): ActionStep | null {
+	const statement = squash(text);
+	let rest = trailingBlock(statement).head;
+	const direction = /^(in|out|inout)\b/.exec(rest)?.[1] as 'in' | 'out' | 'inout' | undefined;
+	if (direction) rest = rest.slice(direction.length).trim();
+	rest = rest.replace(/^(?:(?:ref|derived|readonly|constant|var|end)\s+)*/, '');
+	rest = rest.replace(/^(attribute|item|part|occurrence|port|ref|action)\b\s*/, '');
+	rest = rest.replace(/^(?::>>|redefines\b)\s*/, '');
+	const { name, type, rest: tail } = header(rest);
+	if (!name) return null;
+	const value = /^(:=|=|default\b\s*=?)\s*([\s\S]+)$/.exec(tail);
+	return {
+		kind: 'feature',
+		text: statement,
+		name,
+		direction: direction ?? null,
+		type,
+		value: value ? squash(value[2]!) : null,
+		binding: value?.[1] === '='
+	};
+}
+
+/** `action a { … }`, `action a : A;`, `action a accept Go`: a named step, or the steps of an unnamed body. */
+function parseNamedAction(text: string, statement: string): ActionStep[] {
+	const rest = text.replace(/^action\b\s*/, '');
+	const { head, body } = trailingBlock(rest);
+	const { name, type, rest: tail } = header(head);
+	if (!tail) {
+		if (!name && !type)
+			return body === null ? [{ kind: 'named', text: statement }] : parseSteps(body);
+		if (name && (type || body !== null))
+			return [
+				{
+					kind: 'action',
+					text: statement,
+					name,
+					type,
+					steps: body === null ? [] : parseSteps(body)
+				}
+			];
+		return [{ kind: 'named', text: statement, ...(name ? { name } : {}) }];
+	}
+	// `action a accept Go;`: the step, with its name.
+	if (name && /^(accept|send|assign|if|while|loop|for|perform)\b/.test(tail)) {
+		return parseStep(tail).map((s) => ({ ...s, name }));
+	}
+	if (!rest || NAMED.test(rest)) return [{ kind: 'named', text: statement }];
+	return parseStep(rest);
+}
+
+/** `perform a`, `perform action a : A { in x = 1; }`. */
+function parsePerform(text: string, statement: string): ActionStep {
+	const rest = text.replace(/^perform\b\s*/, '').replace(/^action\b\s*/, '');
+	const { head, body } = trailingBlock(rest);
+	const reference = new RegExp(`^(${QUALIFIED})$`).exec(head);
+	if (reference) {
+		return {
+			kind: 'perform',
+			text: statement,
+			target: reference[1]!.replace(/\s+/g, ''),
+			steps: body === null ? [] : parseSteps(body)
+		};
+	}
+	const { name, type, rest: tail } = header(head);
+	const target = type ?? name;
+	if (!target || tail) return { kind: 'other', text: statement };
+	return {
+		kind: 'perform',
+		text: statement,
+		...(name && type ? { name } : {}),
+		target,
+		steps: body === null ? [] : parseSteps(body)
+	};
+}
+
+/** `first a then b`, after `first` or `succession [name]`. */
+function parseSuccession(text: string, statement: string): ActionStep {
+	const rest = text.replace(/^succession\b\s*(?:(?:'[^']*'|[\w$]+)\s+(?=first\b))?/, '');
+	const m = /^first\s+([\s\S]+?)\s+then\s+([\s\S]+)$/.exec(rest);
+	if (m && REFERENCE.test(m[1]!.trim()) && REFERENCE.test(m[2]!.trim()))
+		return {
+			kind: 'succession',
+			text: statement,
+			from: unquote(m[1]!),
+			to: unquote(m[2]!),
+			guard: null
+		};
+	const first = /^first\s+([\s\S]+)$/.exec(rest);
+	if (first && REFERENCE.test(first[1]!.trim()))
+		return { kind: 'first', text: statement, target: unquote(first[1]!) };
+	return { kind: 'other', text: statement };
+}
 
 function parseStep(raw: string): ActionStep[] {
-	let text = raw.trim();
-	// `then x`: a succession from the step before; the steps run in order anyway.
+	let text = raw.trim().replace(/^(private|public|protected)\s+/, '');
+	// `doc` whose comment is already gone.
+	text = text.replace(/^doc\b\s*(?:locale\s+"[^"]*"\s*)?/, '');
+	// `then x`: a succession from the step before.
 	const then = /^then\b\s*/.exec(text);
 	if (then) text = text.slice(then[0].length);
 	if (!text) return [];
 	const statement = squash(text);
-	if (/^action\b/.test(text)) {
-		const rest = text.replace(/^action\b\s*/, '');
-		const open = topLevel(rest, '{');
-		if (open >= 0 && !rest.slice(0, open).includes('=')) {
-			const { body, end } = block(rest, open);
-			if (!rest.slice(end).trim()) return parseSteps(body);
-		}
-		if (!rest || NAMED.test(rest)) return [{ kind: 'named', text: statement }];
-		return parseStep(rest);
+	const control = /^(fork|join|merge|decide)\b/.test(text);
+	if (then && !control && (REFERENCE.test(text) || text === 'done')) {
+		return [
+			{ kind: 'succession', text: `then ${statement}`, from: null, to: unquote(text), guard: null }
+		];
 	}
+	const steps = parseOne(text, statement);
+	return then ? steps.map((s, i) => (i === 0 ? { ...s, after: true } : s)) : steps;
+}
+
+function parseOne(text: string, statement: string): ActionStep[] {
+	if (/^action\b/.test(text)) return parseNamedAction(text, statement);
 	const assign = /^assign\s+([\s\S]+?)\s*:=\s*([\s\S]+)$/.exec(text);
 	if (assign) {
 		const value = squash(assign[2]!);
 		const target = squash(assign[1]!);
 		return [{ kind: 'assign', text: `assign ${target} := ${value}`, target, value }];
 	}
-	if (/^if\b/.test(text)) return [parseIf(text) ?? { kind: 'other', text: statement }];
+	if (/^if\b/.test(text)) {
+		const then = keyword(text, 'then');
+		const open = topLevel(text, '{');
+		if (then >= 0 && (open < 0 || then < open)) {
+			const to = squash(text.slice(then + 4));
+			if (REFERENCE.test(to) || to === 'done')
+				return [
+					{
+						kind: 'succession',
+						text: statement,
+						from: null,
+						to: unquote(to),
+						guard: squash(text.slice(2, then))
+					}
+				];
+		}
+		return [parseIf(text) ?? { kind: 'other', text: statement }];
+	}
+	const otherwise = /^else\s+([\s\S]+)$/.exec(text);
+	if (otherwise && (REFERENCE.test(otherwise[1]!.trim()) || otherwise[1]!.trim() === 'done'))
+		return [
+			{ kind: 'succession', text: statement, from: null, to: unquote(otherwise[1]!), guard: 'else' }
+		];
 	if (/^send\b/.test(text)) return [parseSend(text) ?? { kind: 'other', text: statement }];
-	// `first a then b`: the order of named actions, which change nothing the simulator runs.
-	if (/^first\b/.test(text) && !/[{]/.test(text)) return [{ kind: 'named', text: statement }];
+	if (/^accept\b/.test(text)) return [parseAccept(text)];
+	if (/^(while|loop)\b/.test(text)) return [parseLoop(text) ?? { kind: 'other', text: statement }];
+	if (/^for\b/.test(text)) return [parseFor(text) ?? { kind: 'other', text: statement }];
+	if (/^perform\b/.test(text)) return [parsePerform(text, statement)];
+	if (/^(succession\s+)?flow\b/.test(text))
+		return [parseFlow(text, /^succession\b/.test(text)) ?? { kind: 'other', text: statement }];
+	if (/^(first|succession)\b/.test(text)) return [parseSuccession(text, statement)];
+	const control = /^(fork|join|merge|decide)\b\s*([\s\S]*)$/.exec(text);
+	if (control && (!control[2] || new RegExp(`^${NAME}$`).test(control[2].trim()))) {
+		return [
+			{
+				kind: 'control',
+				text: statement,
+				node: control[1] as StepOf<'control'>['node'],
+				...(control[2] ? { name: unquote(control[2]) } : {})
+			}
+		];
+	}
+	if (/^(in|out|inout|attribute|item|ref|part|occurrence|port|redefines)\b|^:>>/.test(text))
+		return [parseFeature(text) ?? { kind: 'declaration', text: statement }];
+	if (
+		/^(subject|actor|objective|stakeholder|return|require|assume|include|requirement|constraint|calc|state|exhibit|allocate|satisfy|connect|connection|interface|bind|binding|comment|metadata|alias|import|enum|individual|snapshot|timeslice|event|use|view|viewpoint|rendering|concern|verify|analysis|verification)\b|^[@#]/.test(
+			text
+		)
+	)
+		return [{ kind: 'declaration', text: statement }];
 	if (NAMED.test(text) && !/^(accept|perform|terminate|while|loop|for)\b/.test(text))
 		return [{ kind: 'named', text: statement }];
 	return [{ kind: 'other', text: statement }];
@@ -237,13 +549,23 @@ export function parseAction(text: string): ActionStep[] {
 	return parseSteps(text);
 }
 
-/** Every step, nested ones (inside `if`) included, depth first. */
+/** The steps nested in a step: an `if`'s branches, a loop's body, an action's body. */
+export function innerSteps(step: ActionStep): ActionStep[] {
+	if (step.kind === 'if')
+		return [...step.branches.flatMap((b) => b.steps), ...(step.otherwise ?? [])];
+	if (
+		step.kind === 'loop' ||
+		step.kind === 'for' ||
+		step.kind === 'action' ||
+		step.kind === 'perform'
+	)
+		return step.steps;
+	return [];
+}
+
+/** Every step, nested ones (inside `if`, loops and actions) included, depth first. */
 export function allSteps(steps: ActionStep[]): ActionStep[] {
-	return steps.flatMap((s) =>
-		s.kind === 'if'
-			? [s, ...s.branches.flatMap((b) => allSteps(b.steps)), ...allSteps(s.otherwise ?? [])]
-			: [s]
-	);
+	return steps.flatMap((s) => [s, ...allSteps(innerSteps(s))]);
 }
 
 /** Whether a `send` goes to the machine itself: `self`, `this`, or one of `own` (its part). */
@@ -254,19 +576,59 @@ export function sendsToSelf(step: ActionStep, own: readonly string[]): boolean {
 }
 
 /**
- * The steps the simulator does not run (named actions aside): any `other`
- * step, and a `send` to anything but the machine itself. An `if` with such
- * a step inside is run; the step inside is listed.
+ * Steps that need more than the plain written order: loops, `perform`,
+ * named actions with bodies, accepts, successions, control nodes and flows.
+ * The simulator runs a body with any of them as a small action flow
+ * (`flow.ts`); a body of assignments, `if` and sends runs in the order written.
  */
-export function notRunSteps(steps: ActionStep[], own: readonly string[]): string[] {
+export function needsFlow(steps: ActionStep[]): boolean {
+	return allSteps(steps).some(
+		(s) =>
+			s.after ||
+			s.kind === 'loop' ||
+			s.kind === 'for' ||
+			s.kind === 'perform' ||
+			s.kind === 'action' ||
+			s.kind === 'accept' ||
+			s.kind === 'control' ||
+			s.kind === 'first' ||
+			s.kind === 'succession' ||
+			s.kind === 'flow'
+	);
+}
+
+/**
+ * The steps a state machine's actions do not run (named actions aside): any
+ * `other` step, a `send` to anything but the machine itself, an `accept`
+ * (a state's actions run within one step, so they do not wait for a
+ * signal) and a `perform` of an action `performs` does not know. An `if`
+ * with such a step inside is run; the step inside is listed.
+ */
+export function notRunSteps(
+	steps: ActionStep[],
+	own: readonly string[],
+	performs: (target: string) => boolean = () => false
+): string[] {
 	return allSteps(steps)
-		.filter((s) => s.kind === 'other' || (s.kind === 'send' && !sendsToSelf(s, own)))
+		.filter(
+			(s) =>
+				s.kind === 'other' ||
+				s.kind === 'accept' ||
+				(s.kind === 'perform' && !performs(s.target)) ||
+				(s.kind === 'send' && !sendsToSelf(s, own))
+		)
 		.map((s) => s.text);
 }
 
 /** Whether running the action changes anything the simulator keeps (variables, signals). */
 export function runsSomething(steps: ActionStep[], own: readonly string[]): boolean {
 	return allSteps(steps).some(
-		(s) => s.kind === 'assign' || s.kind === 'if' || (s.kind === 'send' && sendsToSelf(s, own))
+		(s) =>
+			s.kind === 'assign' ||
+			s.kind === 'if' ||
+			s.kind === 'loop' ||
+			s.kind === 'for' ||
+			s.kind === 'perform' ||
+			(s.kind === 'send' && sendsToSelf(s, own))
 	);
 }

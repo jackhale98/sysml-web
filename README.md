@@ -103,6 +103,7 @@ Without them, people connect GitHub with a personal access token.
 | [ReqIF import and export](docs/reqif.md) | Exchanging requirements with DOORS, Polarion, Jama and other tools: what maps to what, re-imports that update, what is left out. | Modellers |
 | [Baselines](docs/baselines.md) | Named versions frozen at design reviews (PDR, CDR…): git tags on GitHub or copies in this browser, comparing with one, how reports name them. | Modellers |
 | [State machine simulator](docs/simulator.md) | What the simulator does with a state machine: steps, the simulated clock, `do` actions, what is not supported. | Modellers |
+| [Running actions](docs/action-runs.md) | How action flows run step by step: successions, forks and joins, decisions, loops, `perform`, signals; what is not run. | Modellers |
 | [Model interchange](docs/interchange.md) | `.kpar`, SysML v2 JSON and Systems Modeling API servers: what round-trips, merging on Save to server, what a server must allow. | Modellers, developers |
 | [Interchange reference](docs/reference/interchange.md) | Background research on the standards: KerML clause 10, `.kpar`, element identity, the API, XMI. | Developers |
 | [The engine](docs/engine.md) | How the app uses the sysml-toolkit: the engine interface, positions, views, edits, diagrams, checks, and requests for upstream. | Developers |
