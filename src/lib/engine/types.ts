@@ -1034,7 +1034,13 @@ export interface StateSession {
 	 * Signals the last step sent out of the machine (`send … via p`, `send … to
 	 * other`), for the parts around it to deliver. Only when run with `outward`.
 	 */
-	sent?: { signal: string; values?: Record<string, unknown>; via?: string; to?: string; from: string }[];
+	sent?: {
+		signal: string;
+		values?: Record<string, unknown>;
+		via?: string;
+		to?: string;
+		from: string;
+	}[];
 	/** When the next timer comes due, or a condition on the clock turns true (seconds since the start). */
 	nextDue?: number;
 	/**

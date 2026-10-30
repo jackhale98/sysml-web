@@ -669,7 +669,12 @@ export function viaName(trigger: string): string | undefined {
 	const text = trigger.trim();
 	if (/^(when|after|at)\b/.test(text)) return undefined;
 	const via = topLevelWords(text).find((w) => w.word === 'via');
-	return via ? text.slice(via.end).replace(/\s+/g, '').replace(/^self\./, '') || undefined : undefined;
+	return via
+		? text
+				.slice(via.end)
+				.replace(/\s+/g, '')
+				.replace(/^self\./, '') || undefined
+		: undefined;
 }
 
 /**
