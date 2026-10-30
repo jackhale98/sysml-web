@@ -6,8 +6,10 @@ exports[`a redefinition left without its feature > on the demo, deleting the Cam
     "Drone power budget: 397 W -> 394 W",
   ],
   "semantic": [
+    "added other attribute :>> failureRate = 4000 [FIT] (in Camera)",
     "added other attribute :>> powerDraw = 3 [W] (in Camera)",
     "changed part def DroneComponents::Camera {specializes: Component -> -}",
+    "removed attribute DroneComponents::Camera::failureRate",
     "removed attribute DroneComponents::Camera::powerDraw",
   ],
 }

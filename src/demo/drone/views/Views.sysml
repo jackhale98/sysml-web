@@ -165,6 +165,35 @@ package DroneViews {
         expose DroneFmea::*;
     }
 
+    // The fault tree of uncontrolled descent (risk/FaultTree.sysml) and the reliability
+    // budget (analysis/Reliability.sysml), from libraries/FaultTreeAnalysis.sysml and
+    // libraries/Reliability.sysml.
+
+    view droneFallsTree : FaultTreeAnalysis::FaultTreeDiagram {
+        doc /* How the drone can come to fall: the fault tree of uncontrolled descent. */
+        expose DroneFaultTree::droneFalls;
+    }
+
+    view faultTreeSummary : FaultTreeAnalysis::FaultTreeSummary {
+        doc /* The top events, how likely each is per flight, and the most each may be. */
+        expose DroneFaultTree::*;
+    }
+
+    view droneFallsCutSets : FaultTreeAnalysis::MinimalCutSets {
+        doc /* The smallest combinations of failures that make the drone fall, most likely first. */
+        expose DroneFaultTree::*;
+    }
+
+    view droneFallsImportance : FaultTreeAnalysis::BasicEventImportance {
+        doc /* Which failures matter most to the drone falling. */
+        expose DroneFaultTree::*;
+    }
+
+    view droneReliabilityBudget : Reliability::ReliabilityBudget {
+        doc /* How often each part of the drone fails, and the drone's failure rate and MTBF. */
+        expose DroneArchitecture::drone::**;
+    }
+
     // Reports: documents to send for review, built from the views above.
     // What each contains is defined in libraries/ModelViews.sysml.
 

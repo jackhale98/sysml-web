@@ -196,6 +196,7 @@ describe('the demo’s battery trade study', () => {
 		// The inputs: each pack's own values, as its definition orders them.
 		expect(rows.filter((r) => r[0] === 'input')).toEqual([
 			['input', 'mass', 'g', '', '', '1100', '1250', '1480', '1000'],
+			['input', 'failureRate', 'FIT', '', '', '50000', '50000', '50000', '50000'],
 			['input', 'nominalVoltage', 'V', '', '', '21.6', '22.2', '21.6', '21.6'],
 			['input', 'capacity', 'W·h', '', '', '216', '222', '324', '260'],
 			['input', 'usableFraction', '', '', '', '0.85', '0.8', '0.85', '0.9'],

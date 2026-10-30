@@ -173,7 +173,7 @@ describe('the toolkit’s element ids', () => {
 		}
 		const records = extractModel(host.tk, session!, byIndex).elements;
 		return new Map(
-			records.map((r) => [r.qualifiedName ?? `${r.metaclass}@${r.span.start_row}`, r.id])
+			records.map((r) => [r.qualifiedName ?? `${r.metaclass}@${r.path}:${r.span.start_row}`, r.id])
 		);
 	};
 	const before = () => ids(demo);
@@ -208,10 +208,14 @@ describe('the toolkit’s element ids', () => {
 		expect(now.get('DroneComponents::Battery')).toBe(was.get('DroneComponents::Battery'));
 	});
 
-	it('of unnamed elements go by position, so a statement added before another takes its id', () => {
+	// Keyed by file and line: the claims of Satisfaction.sysml only (keyed by line alone, the first
+	// claim in the model was another file's, which the edit doesn't move).
+	it('of unnamed elements stay with their statements when one is added before them', () => {
 		const S = 'system/Satisfaction.sysml';
 		const satisfyIds = (files: SourceFile[]) =>
-			[...ids(files)].filter(([k]) => k.startsWith('SatisfyRequirementUsage@')).map(([, id]) => id);
+			[...ids(files)]
+				.filter(([k]) => k.startsWith(`SatisfyRequirementUsage@${S}:`))
+				.map(([, id]) => id);
 		const was = satisfyIds(demo);
 		const now = satisfyIds(
 			asList(
@@ -223,9 +227,9 @@ describe('the toolkit’s element ids', () => {
 				)
 			)
 		);
-		// The new first claim has the old first claim's id: ids can't tell them apart.
-		expect(now[0]).toBe(was[0]);
-		expect(now).toHaveLength(was.length + 1);
+		// The new first claim has an id of its own; the others keep theirs.
+		expect(was).not.toContain(now[0]);
+		expect(now.slice(1)).toEqual(was);
 	});
 });
 

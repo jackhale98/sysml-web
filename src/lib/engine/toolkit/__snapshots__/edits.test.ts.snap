@@ -161,6 +161,7 @@ exports[`edits > renames a definition in its file 1`] = `
 -         doc /* Turns battery power into motor current at the commanded speed. */
 -         attribute :>> mass = 35 [g];
 -         attribute :>> powerDraw = 3 [W] { doc /* Switching losses at hover throttle. */ }
+-         attribute :>> failureRate = 5000 [FIT];
 -         port powerIn : ~PowerPort;
 -         port control : ~MotorControlPort;
 -     }
@@ -170,6 +171,7 @@ exports[`edits > renames a definition in its file 1`] = `
 -         attribute :>> mass = 120 [g];
 -         attribute :>> powerDraw = 92 [W] { doc /* At hover thrust with the full take-off mass. */ }
 -         attribute maxPower :> power = 450 [W];
+-         attribute :>> failureRate = 20000 [FIT];
 -     }
 - 
 -     part def Propeller :> Component {
@@ -191,6 +193,7 @@ exports[`edits > renames a definition in its file 1`] = `
 +         doc /* Turns battery power into motor current at the commanded speed. */
 +         attribute :>> mass = 35 [g];
 +         attribute :>> powerDraw = 3 [W] { doc /* Switching losses at hover throttle. */ }
++         attribute :>> failureRate = 5000 [FIT];
 +         port powerIn : ~PowerPort;
 +         port control : ~MotorControlPort;
 +     }
@@ -200,6 +203,7 @@ exports[`edits > renames a definition in its file 1`] = `
 +         attribute :>> mass = 120 [g];
 +         attribute :>> powerDraw = 92 [W] { doc /* At hover thrust with the full take-off mass. */ }
 +         attribute maxPower :> power = 450 [W];
++         attribute :>> failureRate = 20000 [FIT];
 +     }
 + 
 +     part def Prop :> Component {"

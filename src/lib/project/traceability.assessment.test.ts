@@ -26,11 +26,11 @@ beforeAll(async () => {
 type File = { path: string; text: string };
 const demo: File[] = demoFiles();
 /**
- * The demo's coverage by the one rule (home, tables, report): 16 requirements satisfied and 13
+ * The demo’s coverage by the one rule (home, tables, report): 17 requirements satisfied and 13
  * verified directly, and the stakeholder needs whose derived requirements all are (four
  * satisfied, three verified); no test results recorded.
  */
-const DEMO_COVERAGE = { total: 24, satisfied: 20, verified: 16, passed: 0 };
+const DEMO_COVERAGE = { total: 25, satisfied: 21, verified: 16, passed: 0 };
 const R = 'requirements/SystemRequirements.sysml';
 const S = 'system/Satisfaction.sysml';
 const V = 'verification/VerificationPlan.sysml';
@@ -161,7 +161,7 @@ describe('requirement identity: rename, move, file rename, merge', { timeout: 12
 		// requirement that isn't there.
 		expect(row(ws, 'SYS-001')).toMatchObject({ satisfiedBy: [], verifiedBy: [] });
 		expect(row(ws, 'STK-001')).toMatchObject({ satisfied: null, verified: null });
-		expect(ws.coverage).toEqual({ total: 24, satisfied: 18, verified: 14, passed: 0 });
+		expect(ws.coverage).toEqual({ total: 25, satisfied: 19, verified: 14, passed: 0 });
 	});
 
 	it('a move to another package and file, with references updated, keeps ID, links and coverage', async () => {
@@ -281,7 +281,7 @@ describe('traceability and gaps', { timeout: 120_000 }, () => {
 		// SYS-010 is derived from (STK-001) no longer verified.
 		expect(row(ws, 'STK-003')!.satisfied).toBe('derived');
 		expect(row(ws, 'STK-001')!.verified).toBeNull();
-		expect(ws.coverage).toEqual({ total: 24, satisfied: 22, verified: 14, passed: 0 });
+		expect(ws.coverage).toEqual({ total: 25, satisfied: 23, verified: 14, passed: 0 });
 	});
 
 	it('the home view’s gaps and the Requirement gaps table name the same requirements', async () => {

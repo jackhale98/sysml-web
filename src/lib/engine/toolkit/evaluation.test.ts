@@ -33,7 +33,9 @@ describe('the demo’s checks', () => {
 		expect(checkable.map((c) => [c.requirement?.id, c.status])).toEqual([
 			['SYS-001', 'satisfied'],
 			['SYS-002', 'satisfied'],
-			['SYS-003', 'satisfied']
+			['SYS-003', 'satisfied'],
+			// A reliability requirement: decided from the reliability budget (`views/reliability.ts`).
+			['REL-001', 'satisfied']
 		]);
 		// Requirements in words only are listed, with nothing to check.
 		const words = report.checks.filter((c) => !c.checkable);
@@ -45,7 +47,7 @@ describe('the demo’s checks', () => {
 			'drone::camera',
 			'drone::camera'
 		]);
-		expect(report.summary).toEqual({ satisfied: 3, violated: 2, undecided: 13 });
+		expect(report.summary).toEqual({ satisfied: 4, violated: 2, undecided: 13 });
 	});
 
 	it('gives the values, the limit and the margin of a met requirement', () => {
@@ -452,7 +454,8 @@ describe('the budget and checks tables', () => {
 			['violated', ''],
 			['satisfied', 'SYS-001'],
 			['satisfied', 'SYS-002'],
-			['satisfied', 'SYS-003']
+			['satisfied', 'SYS-003'],
+			['satisfied', 'REL-001']
 		]);
 		expect(table.rows[2]).toEqual([
 			'satisfied',
