@@ -110,10 +110,14 @@ test('mark a baseline of a project in this browser, change the model, compare wi
 	await page.getByRole('button', { name: 'SystemRequirements.sysml', exact: true }).click();
 	await page.getByRole('button', { name: 'Text', exact: true }).click();
 	await replaceInText(page, 'StatusKind::closed', 'StatusKind::done');
+	// And a part: the motor's mass.
+	await page.getByRole('button', { name: 'Components.sysml', exact: true }).click();
+	await replaceInText(page, 'mass = 120 [g]', 'mass = 190 [g]');
 	await page.getByRole('tab', { name: 'Model' }).click();
 	await expect(await reportBaseline(page)).toHaveText('PDR, changed since', { timeout: 15_000 });
 
-	// Kept with the project: still there after a reload.
+	// Kept with the project: still there after a reload (once the edits are saved here).
+	await expect(page.locator('.save[role="status"]')).toHaveText('Saved');
 	await page.reload();
 	await expect(page.getByRole('status').filter({ hasText: 'Model ready' })).toBeVisible({
 		timeout: 30_000
@@ -130,9 +134,18 @@ test('mark a baseline of a project in this browser, change the model, compare wi
 	await expect(requirements).toContainText('SYS-002 ‘Payload capacity’: status closed → done', {
 		timeout: 30_000
 	});
+	await expect(review.getByRole('region', { name: /^Design/ })).toContainText(
+		'Motor.mass changed 120 g → 190 g'
+	);
 	await expect(review.getByRole('combobox', { name: 'Compare' })).toHaveValue(
 		'baseline:browser:PDR'
 	);
+	// The requirements that changed, in one click.
+	await review
+		.getByRole('navigation', { name: 'Kinds of change' })
+		.getByRole('button', { name: /^Requirements/ })
+		.click();
+	await expect(review.getByRole('heading', { name: /^Requirements/ })).toBeFocused();
 	await expectAccessible(page);
 
 	// Removing it asks first.
