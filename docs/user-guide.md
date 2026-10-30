@@ -239,6 +239,10 @@ Something that changes over time, like a battery running down, is a timed transi
 
 Actions run step by step, in the order written: `assign`, `if … { } else { }`, `then`, and signals a machine sends itself (`send new Ping() to self`), which the next **Step** takes. A transition to `terminate` ends the run.
 
+Machines that talk to each other run together: a part with two or more parts that have a state machine is listed in **Simulations** as “machines together”. Each machine is drawn (side by side, or one at a time on a phone) on one clock. `send new ArmCommand() via commandLink` goes along the connection from that port to the part at the other end, which takes it on the next **Step**; the **Timeline** says which part sent what to whom, and when a signal reached nobody.
+
+A condition can read the clock: `accept when localClock.currentTime >= 30 [SI::s]` fires at 30 s. To send an event with values of your own (a reading of 7 instead of its default), press the sliders button beside it.
+
 Before a run, the simulator lists states that no transition can reach and transitions that can never fire. The **Timeline** says why each step happened (the event, the condition, the timer) and what its guard read; save it as CSV or JSON to keep the run with your evidence.
 
 In the app: **Draw a state machine**.

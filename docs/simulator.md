@@ -5,8 +5,10 @@ does with a state machine, which parts of SysML v2 it follows, and where the
 specifications leave a choice open. References are to the SysML v2.0
 specification (Part 1, "SysML") and KerML 1.0, and to the semantic library
 packages that ship with the toolkit (`static/toolkit/stdlib`):
-`StatePerformances`, `TransitionPerformances`, `Triggers`, `Clocks` and the
-Systems Library's `States`.
+`StatePerformances`, `TransitionPerformances`, `Triggers`, `Clocks`,
+`Transfers`, `Occurrences` and the Systems Library's `States` and `Ports`.
+[Several parts together](#several-parts-together) covers machines that
+send each other signals (`src/lib/sim/system.ts`).
 
 ## Steps
 
@@ -77,15 +79,19 @@ order written:
 - `then <step>`, a succession inside the action, runs the step after the
   one before it;
 - `send new Sig(…) to self` (or to the part that exhibits the machine)
-  sends the machine a signal (below);
+  sends the machine a signal (below); `send new Sig(…) via port` or `to`
+  another part sends it to another part, when the parts run together
+  ([Several parts together](#several-parts-together));
 - `action { … }` runs its steps; a named action (`do monitor`) changes
   nothing the simulator keeps.
 
 SysML performs the actions of a body that no succession orders
 concurrently; the simulator takes the written order, so `assign y := 5;
 if x > 5 { assign y := 7; }` leaves 7 when `x` is above 5. Anything else
-(`accept`, loops, `perform`, a `send` to another part) is not run, and the
-machine says so before it runs.
+(`accept`, loops, `perform`) is not run, and the machine says so before it
+runs. A `send` to another part or through a port is run only when the
+machine runs with its part's neighbours; a machine run on its own says it
+is not sent.
 
 ## Signals the machine sends itself
 
@@ -104,7 +110,11 @@ r.v > 3 do assign last := r.v then b;`) reads its values in its guard and
 effect. The values are the ones it was sent with (`send new Reading(7) to
 self`, in the order of the signal's attributes, or `Reading(v = 7)`), else
 the defaults the signal's definition gives (`item def Reading { attribute
-v : Integer = 5; }`). An event sent with the buttons carries the defaults.
+v : Integer default 5; }`). An event sent with its button carries the
+defaults; the sliders button beside it opens the signal's attributes, to
+send it with values of your own (numbers, true/false, text; a number left
+empty keeps the default). The values form is offered for a signal a
+transition reads (`accept r : Reading`): only those can make a difference.
 A guard that reads a value the signal does not carry does not hold, and
 says which value is missing.
 
@@ -131,6 +141,20 @@ active state was entered. The timeline shows the time of each step.
   passing alone, so a condition is read at the current time before time
   moves on: a condition an assignment makes true is taken before the next
   timer, wherever it is written.
+- A condition may read the clock: `localClock.currentTime`,
+  `universalClock.currentTime` or `Time::universalClock.currentTime` (every
+  occurrence's `localClock` defaults to the `universalClock`,
+  `Occurrences`; its `currentTime` advances with time, `Clocks::Clock`).
+  Its value is the simulated time, in seconds. Such a condition turns true
+  as time passes, so it is due like a timer: `accept when
+  localClock.currentTime >= 30 [SI::s]` fires at 30 s on a Step or a Wait,
+  and the transition shows "turns true at 30 s" before then. The simulator
+  works out when from each comparison with the clock (`currentTime >=
+  start + 30 [SI::s]` with `start` a variable is due at its value + 30 s); a
+  strict comparison (`> 30 [SI::s]`) has no first instant at which it holds,
+  so it is taken 1 ms after. A condition that reads the clock in another
+  way (inside arithmetic, `currentTime * 2 > t`) is read at each step only,
+  as conditions on variables are.
 - A time or change signal that comes while its transition's guard is false
   is not taken (the guard is part of whether the transition accepts it)
   and is lost (no signal is deferred): a timer does not fire again until
@@ -154,6 +178,83 @@ signals a state may accept by when they arrive
 equal-priority conflicts to the implementation (14.2.3.9.4). The simulator
 takes the one written first. It adds no rule of its own, such as "change
 before time": the timing decides everything else.
+
+## Several parts together
+
+A part (or part definition) with two or more parts, at any depth, that
+exhibit a state machine (`exhibit state s : M;`, or `exhibit state s { … }`
+with states of its own, in the part, its definition or the definition's
+supertypes) is listed in **Simulations** as "machines together". The demo's
+`GroundLink::linkTest` is one: the ground station's console commands the
+flight controller (`FlightModes`) over a command link.
+`toolkit/systems.ts` reads the parts, their ports (their own and their
+definitions') and the connections, interfaces and bindings between ports
+written in the context or in any part inside it; `sim/system.ts` runs them.
+Each part's machine runs as it would alone, with these additions.
+
+**Delivery.**
+
+- `send S via p` is a `SendPerformance` whose sender is the port `p`. A
+  port's outgoing transfers go to the ports connected to it by an interface
+  (Systems Library `Ports`: `outgoingTransfersFromSelf :>
+  interfacingPorts.incomingTransfersToSelf`); the simulator takes plain
+  `connect` connections between ports the same way. So the signal goes
+  along each connection of `p` to the port at its other end, and to the
+  part that port belongs to. A `bind a = b.c` makes one port of two names
+  (KerML binding connectors), so a signal reaching `a` reaches `b.c` too,
+  and goes on into the part inside.
+- `send S to x` names its receiver (`SendPerformance::receiver`, bound to
+  its `incomingTransfersToSelf`): the signal goes to the part `x`, found
+  from the sending part outwards, or to the part whose port `x` is.
+- `accept S via p` takes `S` only if it came in at `p` (the accepter's
+  `receiver` is the port). `accept S` with no `via` has the default
+  receiver, `this`, its part; SysML does not say in so many words whether
+  a transfer to one of a part's ports is also one to the part, and the
+  simulator takes it that it is (a port is the part's connection point,
+  `Ports::Port`), so `accept S` takes `S` at whichever port it came in.
+  A signal a machine sends itself, or one sent with the event buttons,
+  comes in at no particular port: any transition that accepts the signal
+  takes it.
+
+**Ordering.** Each part keeps its own queue of the signals that came to it
+(`Occurrence::incomingTransfers`). A part takes them one per step, in the
+order they arrived (`earlierFirstIncomingTransferSort`), after what is ready
+without a signal, exactly as [signals a machine sends
+itself](#signals-the-machine-sends-itself); signals from other parts and
+from itself share that one queue. A signal arrives after it is sent
+(`SendPerformance`: `succession self then sentTransfer`), so the receiver
+takes it on a later Step, never in the step that sent it. The model gives a
+transfer no duration, so it arrives at the same simulated time. An event
+sent with a part's buttons comes after the signals already waiting there.
+
+**What is lost.** A signal that reaches no part with a machine is lost when
+it is sent, and the Timeline says why: the port is connected to nothing,
+the part at the other end has no state machine (the demo's radio, which has
+no behaviour, would stop a command on its way to the flight controller in
+`deliveryService`), the receiving machine has finished, or the `send` names
+no port and no receiver. A signal that reaches a machine but that none of
+its transitions accepts when its turn comes is dropped, with a note (no
+signal is deferred: SysML v2 has no deferral, and `StatePerformance`'s
+accepters take only what they accept).
+
+**Steps and time.** All parts share one clock (every occurrence's
+`localClock` defaults to the `universalClock`). A **Step** takes one
+run-to-completion step in every part that has something ready now (a
+transition without a trigger, a condition that holds, a timer that is due,
+a signal waiting). Parts run concurrently; the simulator lists their steps
+in the order the parts are written, and since a signal sent in a step is
+taken on a later one, that order changes nothing else. When no part has
+anything ready, time passes for all of them to the earliest time something
+comes due in any of them, and what comes due then fires. **Wait** goes on
+that way to its time (and stops after 200 steps if the parts keep moving
+without time passing). Variables are set per part (the Variables panel
+shows the selected part's), and events are sent to the selected part.
+
+**On screen.** On a wide screen every part's machine is drawn side by side;
+on a phone, tabs above the diagram switch between them, each tab with the
+part's current state. One Timeline lists each part's steps, each signal
+sent (from which part, through which port, to which part and port, with its
+values) and each one lost or dropped.
 
 ## `do` actions
 
@@ -230,10 +331,22 @@ The simulator lists what it cannot run in a note above the diagram ("may
 not run as written") before the run starts.
 
 - Steps of an action other than those under [Actions](#actions)
-  (`accept`, loops, `perform`, a `send` to another part or through a
-  port): each one is named in the note.
-- Change triggers that read the time, and clocks other than the default
-  one.
+  (`accept`, loops, `perform`): each one is named in the note. A `send` to
+  another part or through a port is noted on a machine run alone; it is run
+  when its part runs with the others ([Several parts
+  together](#several-parts-together)).
+- Clocks other than the default one. A model may define its own `Clock`,
+  but SysML says only that its `currentTime` advances monotonically, not
+  how fast, and `accept after` / `accept at` have no notation for naming a
+  clock, so the simulator has nothing to run it by.
 - History states and deferred signals: SysML v2 has no notation for them.
-- Values for a signal sent with the event buttons other than its
-  definition's defaults.
+- Flows (`flow of X from a.p.x to b.q.x`) between parts do not carry the
+  signals a machine sends: a flow is itself a transfer of its item, made
+  when the item is available, not a path for `send`. Signals go along
+  connections and interfaces.
+- A part with multiplicity (`part rotors : Rotor[4]`) runs one machine, not
+  one per rotor. A part that exhibits two state machines runs the first,
+  with a note.
+- A part's own values for its machine's attributes (`exhibit state :>>
+  modes { attribute :>> x = 1; }`) are not read; set them in the Variables
+  panel.

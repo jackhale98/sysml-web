@@ -26,6 +26,9 @@
  * written (`actions.ts`): assignments, `if`, successions and signals sent
  * to the machine itself, which wait in a queue and are taken one per Step,
  * in the order sent. A transition to a `terminate` action ends the machine.
+ * With `outward`, signals sent elsewhere (`via` a port, `to` another part)
+ * come out in `session.sent` for `system.ts` to deliver, and signals other
+ * parts sent wait in the same queue, with the port they came in at.
  *
  * Time is simulated: the session keeps the time and when each active state
  * was entered. A time trigger is the library's `TriggerAfter` / `TriggerAt`
@@ -40,6 +43,8 @@
  * change signal once, when the condition turns true): a timer until its
  * state is entered again, a change trigger until its condition turns false
  * and true again.
+ * A condition may read the clock (`localClock.currentTime`, the simulated
+ * time): it is due, like a timer, at the first time it holds.
  * Durations are numbers with time units (`5 [s]`, `2 [SI::min]`); a bare
  * number counts seconds. One that cannot be evaluated is noted in the trace
  * and does not fire; values given to variables later (in the Variables
