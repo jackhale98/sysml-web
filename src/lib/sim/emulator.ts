@@ -59,13 +59,7 @@
  * `at …`; an action is its statements as written.
  */
 import type { SimStep, StateMachine, StateSession } from '#lib/engine/types.ts';
-import {
-	allSteps,
-	parseAction,
-	runsSomething,
-	sendsToSelf,
-	type ActionStep
-} from './actions.ts';
+import { allSteps, parseAction, runsSomething, sendsToSelf, type ActionStep } from './actions.ts';
 import {
 	EnumLiteral,
 	EvalError,
@@ -933,7 +927,8 @@ function takesQueued(t: Transition, q: Queued): boolean {
 }
 
 /** Who sent a waiting signal, for messages: another part, or the machine itself. */
-const senderOf = (q: Queued) => (q.part !== undefined ? (q.from ?? `\`${q.part}\``) : 'the machine');
+const senderOf = (q: Queued) =>
+	q.part !== undefined ? (q.from ?? `\`${q.part}\``) : 'the machine';
 
 function eventName(trigger: Trigger): string {
 	return trigger.kind === 'signal'

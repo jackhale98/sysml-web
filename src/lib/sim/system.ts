@@ -237,7 +237,13 @@ const partOptions = (options: SystemOptions) => ({
 const stepsTaken = (run: Run) => Object.values(run.parts).reduce((sum, s) => sum + s.step, 0);
 
 /** Record what a part's machine did (its new steps, its messages) and deliver what it sent. */
-function settle(run: Run, part: string, before: StateSession | null, next: StateSession) {
+function settle(
+	run: Run,
+	part: string,
+	before: StateSession | null,
+	next: StateSession,
+	send = true
+) {
 	const known = before?.trace.length ?? 0;
 	for (const s of next.trace.slice(known)) {
 		run.timeline.push({ kind: 'step', part, time: s.time ?? run.time, step: s });
@@ -248,7 +254,7 @@ function settle(run: Run, part: string, before: StateSession | null, next: State
 	}
 	const sent = next.sent ?? [];
 	run.parts[part] = kept(next);
-	for (const s of sent) deliver(run, part, s);
+	if (send) for (const s of sent) deliver(run, part, s);
 }
 
 /** A part's session as the system keeps it: what it sent is delivered, its messages reported. */
@@ -401,7 +407,8 @@ export function start(system: MachineSystem, options: SystemOptions = {}): Syste
 	);
 	// Every machine exists before any signal is delivered.
 	for (const [p, s] of started) run.parts[p.path] = s;
-	for (const [p, s] of started) settle(run, p.path, null, s);
+	for (const [p, s] of started) settle(run, p.path, null, s, false);
+	for (const [p, s] of started) for (const sent of s.sent ?? []) deliver(run, p.path, sent);
 	return session(run);
 }
 
@@ -470,7 +477,10 @@ export function step(
 			return session(run);
 		}
 		for (let rounds = 0; ;) {
-			if (status(run) !== 'running') break;
+			const now = status(run);
+			// Time goes on for parts that are stuck, not for ones that finished or hit the limit.
+			if (now === 'deadlocked') advanceAll(run, target);
+			if (now !== 'running') break;
 			if (Object.values(run.parts).some(readyNow)) {
 				if (rounds++ >= WAIT_STEPS) {
 					run.messages.push(
