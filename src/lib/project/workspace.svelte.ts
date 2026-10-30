@@ -16,6 +16,7 @@ import type {
 	EditRequest,
 	EditResult,
 	StateMachine,
+	ActionFlow,
 	ViewInfo
 } from '#lib/engine/types.ts';
 import { checkProblems } from './checks';
@@ -137,6 +138,8 @@ export class Workspace {
 	views = $state.raw<ViewInfo[]>([]);
 	/** The project's state machines, for the emulator. */
 	machines = $state.raw<StateMachine[]>([]);
+	/** The project's actions, for the action flow runner (`runnable` ones are offered to run). */
+	flows = $state.raw<ActionFlow[]>([]);
 	/** Constraint checks of the latest analysis (after it: they take a moment longer). */
 	checks = $state.raw<CheckReport | null>(null);
 	/** What breaks the project's conventions (views marked `@Convention`), found with the checks. */
@@ -303,9 +306,11 @@ export class Workspace {
 			if (!unchanged()) return;
 			const views = await engine.listViews(files);
 			const machines = await engine.stateMachines(files);
+			const flows = await engine.actionFlows(files);
 			if (files.every((f) => this.files[f.path] === f.text)) {
 				this.views = views;
 				this.machines = machines;
+				this.flows = flows;
 			}
 			void this.check(files, performance.now() - started);
 		} catch (error) {

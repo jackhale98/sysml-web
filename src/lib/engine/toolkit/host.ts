@@ -45,6 +45,7 @@ import type {
 	RiskPolicy,
 	FmeaLineInfo,
 	StateMachine,
+	ActionFlow,
 	TradeStudy,
 	ViewInfo
 } from '../types';
@@ -67,6 +68,7 @@ import { Relations } from './diagrams/related';
 import { ModelEditing } from './edits';
 import { Evaluation } from './evaluation';
 import { LanguageServices, SyntaxServices } from './language';
+import { extractFlows, withPerformed } from './flows';
 import { extractMachines } from './machines';
 import { detailsOf, extractModel, findElement, type ExtractedModel, type UnitInfo } from './model';
 import { TextIndexCache } from './offsets';
@@ -98,6 +100,8 @@ interface Built {
 	views?: views.ViewContext;
 	/** The state machines, read on first ask. */
 	machines?: StateMachine[];
+	/** The actions that run as flows, read on first ask. */
+	flows?: ActionFlow[];
 	/** Values and verdicts (`evaluation.ts`), on first ask. */
 	evaluation?: Evaluation;
 	/** The model as the semantic diff reads it (`snapshot.ts`), on first ask. */
@@ -672,9 +676,18 @@ export class ToolkitHost {
 		const built = this.build(files);
 		built.machines ??=
 			built.session && built.extracted
-				? extractMachines(built.session, built.extracted, built.units)
+				? withPerformed(extractMachines(built.session, built.extracted, built.units), () =>
+						this.actionFlows(files)
+					)
 				: [];
 		return built.machines;
+	}
+
+	/** The project's actions (`flows.ts`), for the action flow runner. */
+	actionFlows(files: SourceFile[]): ActionFlow[] {
+		const built = this.build(files);
+		built.flows ??= built.extracted ? extractFlows(built.extracted, built.units) : [];
+		return built.flows;
 	}
 
 	/** The current session, built for `files` (for language services). */

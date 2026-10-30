@@ -92,6 +92,7 @@
 			.filter((v) => v.presentation.kind !== 'none' || v.report)
 	);
 	const viewGroups = $derived(groupViews(savedViews, (v) => v.info));
+	const runnableFlows = $derived(workspace.flows.filter((f) => f.runnable));
 	/** The "New" menu (a view, a trade study). */
 	let newOpen = $state(false);
 	function create(request: NonNullable<WorkbenchUi['create']>) {
@@ -479,7 +480,7 @@
 							date.
 						</EmptyState>
 					{/each}
-					{#if workspace.machines.length}
+					{#if workspace.machines.length || runnableFlows.length}
 						<h3>Simulations</h3>
 						<ul class="flat">
 							{#each workspace.machines as m (m.qualifiedName ?? m.name)}
@@ -496,6 +497,23 @@
 											})}
 									>
 										<Play size={14} /> <span class="label">Run {viewTitle(m.name)}</span>
+									</button>
+								</li>
+							{/each}
+							{#each runnableFlows as f (f.qualifiedName ?? f.name)}
+								<li>
+									<button
+										type="button"
+										class="item"
+										title={f.doc ?? `Run ${f.name} step by step`}
+										onclick={() =>
+											ui.open({
+												kind: 'flow',
+												action: f.qualifiedName ?? f.name,
+												title: f.name
+											})}
+									>
+										<Play size={14} /> <span class="label">Run {viewTitle(f.name)}</span>
 									</button>
 								</li>
 							{/each}

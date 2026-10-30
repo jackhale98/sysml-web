@@ -59,7 +59,7 @@
  * `at …`; an action is its statements as written.
  */
 import type { SimStep, StateMachine, StateSession } from '#lib/engine/types.ts';
-import { parseAction, runsSomething, sendsToSelf, type ActionStep } from './actions.ts';
+import { needsFlow, parseAction, runsSomething, sendsToSelf, type ActionStep } from './actions.ts';
 import {
 	EnumLiteral,
 	EvalError,
@@ -72,6 +72,7 @@ import {
 	type Scope,
 	type Value
 } from './expr.ts';
+import { runBody } from './flow.ts';
 import { convert, formatDuration } from './units.ts';
 
 export type Enabled = StateSession['enabled'][number];
@@ -422,6 +423,10 @@ interface Doing {
  */
 function runSteps(run: Run, steps: ActionStep[], scope: Scope, where: string, doing: Doing) {
 	const { chart } = run;
+	if (needsFlow(steps)) {
+		runFlowBody(run, steps, scope, where, doing);
+		return;
+	}
 	for (const step of steps) {
 		if (step.kind === 'assign') {
 			const target = step.target.replace(/^self\./, '');
@@ -483,6 +488,32 @@ function runSteps(run: Run, steps: ActionStep[], scope: Scope, where: string, do
 		}
 		// Named actions change nothing the simulator keeps; other steps are noted on the machine.
 	}
+}
+
+/**
+ * A body with loops, `perform`, successions, control nodes or accepts: run
+ * in one go as a small action flow (`flow.ts`), its assignments and sends
+ * taken as `runSteps` takes them. An `accept` cannot wait within a step of
+ * the machine: the run ends there, with a message.
+ */
+function runFlowBody(run: Run, steps: ActionStep[], scope: Scope, where: string, doing: Doing) {
+	const { chart } = run;
+	const notes = runBody(steps, {
+		outer: scope,
+		assignOuter(step, inner) {
+			runSteps(run, [{ ...step, after: undefined }], inner, where, doing);
+			return true;
+		},
+		send(step, _values, inner) {
+			runSteps(run, [{ ...step, after: undefined }], inner, where, doing);
+			return sendsToSelf(step, chart.own) ? 'sent to the machine' : 'not sent';
+		},
+		resolve(target) {
+			const text = chart.machine.actions?.[target];
+			return text === undefined ? null : { name: target, steps: actionOf(chart, text) };
+		}
+	});
+	for (const note of notes) run.messages.push(`${where}: ${note}`);
 }
 
 function runAction(run: Run, text: string, scope: Scope, where: string, doing: Doing) {

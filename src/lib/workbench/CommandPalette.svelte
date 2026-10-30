@@ -18,6 +18,7 @@
 		helpItems,
 		fileItems,
 		machineItems,
+		flowItems,
 		modelViewItems,
 		newViewItems,
 		openFileItems,
@@ -66,6 +67,7 @@
 				isLibraryFile
 			),
 			...machineItems(workspace.machines),
+			...flowItems(workspace.flows),
 			...commandItems(theme.choice),
 			...openFileItems(ui.activeTab?.kind === 'file' ? ui.activeTab.path : null),
 			...newViewItems(VIEW_KINDS)

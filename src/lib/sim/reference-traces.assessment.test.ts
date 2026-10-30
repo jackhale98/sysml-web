@@ -872,7 +872,8 @@ describe('constructs the simulator once departed on (fixed)', () => {
 		);
 	});
 
-	it('a step the simulator does not run is still noted: a send elsewhere, a loop', () => {
+	// Loops run since action bodies run as flows (`flow.ts`); the `while` is no longer noted.
+	it('a step the simulator does not run is still noted: a send elsewhere', () => {
 		const m = machineOf(
 			`package G9b {
                 item def Timeout;
@@ -893,7 +894,6 @@ describe('constructs the simulator once departed on (fixed)', () => {
 			'M'
 		);
 		expect(m.warnings).toEqual([
-			'entry action of `c`: `while n < 3 { assign n := n + 1; }` is not run',
 			'effect of transition t3: `send new Timeout() to ground` is not run; only signals sent to the machine itself are'
 		]);
 	});

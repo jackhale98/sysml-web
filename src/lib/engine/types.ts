@@ -823,6 +823,34 @@ export interface StateMachine {
 	 */
 	signals?: Record<string, { name: string; type?: string; value?: unknown }[]>;
 	warnings?: string[];
+	/**
+	 * The actions its actions `perform`, by the name they are performed by
+	 * (`perform monitor`), with their steps as written, so the emulator can run them.
+	 */
+	actions?: Record<string, string>;
+}
+
+/**
+ * An action that can be run as a flow (`engine/toolkit/flows.ts`, run by
+ * `sim/flow-run.ts`): an action definition or usage, or a kind of action
+ * (a use case, a calculation), with the statements of its body.
+ */
+export interface ActionFlow {
+	name: string;
+	qualifiedName?: string;
+	file: string;
+	line: number;
+	doc?: string;
+	/** `action def`, `action`, `use case def`, … */
+	keyword: string;
+	/** The statements of its body, comments removed. */
+	body: string;
+	/** A usage's definition (qualified name), whose steps it runs when it has none of its own. */
+	type?: string;
+	/** Listed to run: declared in a package, with steps to run. */
+	runnable: boolean;
+	/** The attributes of the signals its `accept`s and `send`s name, with their defaults. */
+	signals?: Record<string, { name: string; type?: string; value?: unknown }[]>;
 }
 
 export interface SimStep {

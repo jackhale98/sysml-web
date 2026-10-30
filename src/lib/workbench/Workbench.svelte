@@ -110,6 +110,7 @@
 		if (ui.apiServerOpen) apiServerPrimed = true;
 	});
 	const loadEmulator = () => import('#lib/sim/StateEmulator.svelte').then((m) => m.default);
+	const loadFlowRunner = () => import('#lib/sim/FlowRunner.svelte').then((m) => m.default);
 	const loadLibraryFile = () => import('./LibraryFile.svelte').then((m) => m.default);
 	const loadReport = () => import('#lib/reports/ReportView.svelte').then((m) => m.default);
 	const loadMatrix = () => import('./DsmView.svelte').then((m) => m.default);
@@ -133,6 +134,16 @@
 		const machine = decodeURIComponent(match[1]!);
 		history.replaceState(null, '', location.pathname + location.search);
 		ui.open({ kind: 'emulator', machine, title: machine.split('::').pop() ?? machine });
+	});
+
+	// Deep link: `#run=Package::Action` opens the action flow runner once the model is read.
+	$effect(() => {
+		if (workspace.state.phase !== 'ready') return;
+		const match = /^#run=(.+)$/.exec(location.hash);
+		if (!match) return;
+		const action = decodeURIComponent(match[1]!);
+		history.replaceState(null, '', location.pathname + location.search);
+		ui.open({ kind: 'flow', action, title: action.split('::').pop() ?? action });
 	});
 
 	const tab = $derived(ui.activeTab);
@@ -370,6 +381,7 @@
 			(section === 'model' ||
 				(section === 'views' &&
 					tab?.kind !== 'emulator' &&
+					tab?.kind !== 'flow' &&
 					tab?.kind !== 'library' &&
 					!reportTab &&
 					!(tab?.kind === 'file' && showText))) &&
@@ -587,7 +599,7 @@
 									{:else if t.kind === 'requirements'}<ListChecks size={14} />
 									{:else if t.kind === 'diagram'}<Network size={14} />
 									{:else if t.kind === 'view'}<Eye size={14} />
-									{:else if t.kind === 'emulator'}<Play size={14} />
+									{:else if t.kind === 'emulator' || t.kind === 'flow'}<Play size={14} />
 									{:else if t.kind === 'library'}<BookLock size={14} />
 									{:else if t.kind === 'review'}<GitCompareArrows size={14} />
 									{:else}<FileCode size={14} />{/if}
@@ -707,6 +719,14 @@
 							<p class="empty">Loading the emulator…</p>
 						{:then StateEmulator}
 							<StateEmulator machine={tab.machine} {workspace} {ui} {engine} git={session?.git} />
+						{/await}
+					{/key}
+				{:else if tab.kind === 'flow'}
+					{#key tab.action}
+						{#await loadFlowRunner()}
+							<p class="empty">Loading the action flow…</p>
+						{:then FlowRunner}
+							<FlowRunner action={tab.action} {workspace} {ui} {engine} />
 						{/await}
 					{/key}
 				{:else if tab.kind === 'review'}

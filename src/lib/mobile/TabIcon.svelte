@@ -20,7 +20,7 @@
 {:else if tab.kind === 'requirements'}<ListChecks {size} aria-hidden="true" />
 {:else if tab.kind === 'diagram'}<Network {size} aria-hidden="true" />
 {:else if tab.kind === 'view'}<Eye {size} aria-hidden="true" />
-{:else if tab.kind === 'emulator'}<Play {size} aria-hidden="true" />
+{:else if tab.kind === 'emulator' || tab.kind === 'flow'}<Play {size} aria-hidden="true" />
 {:else if tab.kind === 'library'}<BookLock {size} aria-hidden="true" />
 {:else if tab.kind === 'review'}<GitCompareArrows {size} aria-hidden="true" />
 {:else if tab.path.endsWith('.md')}<FileText {size} aria-hidden="true" />

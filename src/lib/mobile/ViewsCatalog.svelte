@@ -164,7 +164,7 @@
 		</section>
 	{/each}
 
-	{#if workspace.machines.length}
+	{#if workspace.machines.length || workspace.flows.some((f) => f.runnable)}
 		<section>
 			{@render heading('Simulations')}
 			<ul>
@@ -173,6 +173,15 @@
 						Play,
 						`Run ${viewTitle(m.name)}`,
 						{ kind: 'emulator', machine: m.qualifiedName ?? m.name, title: m.name },
+						undefined,
+						'var(--kind-behavior)'
+					)}
+				{/each}
+				{#each workspace.flows.filter((f) => f.runnable) as f (f.qualifiedName ?? f.name)}
+					{@render row(
+						Play,
+						`Run ${viewTitle(f.name)}`,
+						{ kind: 'flow', action: f.qualifiedName ?? f.name, title: f.name },
 						undefined,
 						'var(--kind-behavior)'
 					)}
