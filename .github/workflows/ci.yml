@@ -32,7 +32,7 @@ jobs:
 
       # The sysml-toolkit engine (pinned in toolkit.json): the app's engine, and the unit tests'.
       - name: Cache toolkit download
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .cache/toolkit
           key: toolkit-${{ hashFiles('toolkit.json') }}
@@ -64,7 +64,7 @@ jobs:
       - run: npm ci
 
       - name: Cache toolkit download
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .cache/toolkit
           key: toolkit-${{ hashFiles('toolkit.json') }}
@@ -80,7 +80,7 @@ jobs:
 
       - name: Upload Playwright report
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report-${{ matrix.shard }}
           path: playwright-report/
