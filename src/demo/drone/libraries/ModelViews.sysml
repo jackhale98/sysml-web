@@ -133,6 +133,26 @@ library package ModelViews {
         }
     }
 
+    // --- Diagrams the standard views don't name ---------------------------
+
+    view def UseCaseView :> StandardViewDefinitions::GeneralView {
+        doc
+        /*
+         * A use case diagram: what a system does for the people and systems
+         * around it. Each use case is an ellipse inside the boundary of its
+         * subject, its actors stand outside, joined to the use cases they
+         * take part in, and an «include» arrow runs to a use case that is
+         * part of another. SysML v2 has no view of its own for this: it is a
+         * general view that keeps the use cases. Expose the members of the
+         * package or the part that has them:
+         *
+         *   view deliveryUseCases : UseCaseView {
+         *       expose DeliveryUseCases::*;
+         *   }
+         */
+        filter @SysML::UseCaseDefinition or @SysML::UseCaseUsage;
+    }
+
     // --- Reports: documents to read and send for review ------------------
     // A report is a view rendered `asDocument`: a title page and contents,
     // then a chapter per subview. Names are qualified so this section can

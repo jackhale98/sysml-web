@@ -181,4 +181,12 @@ package DroneViews {
         expose DroneArchitecture::drone::*;
         expose DroneInterfaces::*;
     }
+
+    // A use case diagram (UseCaseView, libraries/ModelViews.sysml): who takes part in what.
+
+    view deliveryUseCases : UseCaseView {
+        doc /* What the delivery service does, and who takes part: the operator, the recipient and the aviation authority. */
+        expose DeliveryMission::DeliverParcel;
+        expose DeliveryUseCases::*;
+    }
 }

@@ -50,6 +50,15 @@ describe('presentationOf', () => {
 		expect(
 			presentationOf(view({ definition: 'GeneralView', builtin: true, exposes: ['A::*'] }))
 		).toEqual({ kind: 'diagram', view: 'general', scope: 'A' });
+		// A use case view too; one whose view def specializes UseCaseView is one.
+		expect(
+			presentationOf(
+				view({ definition: 'UseCaseView', qualifiedName: 'Views::uses', exposes: ['A::*'] })
+			)
+		).toEqual({ kind: 'diagram', view: 'usecases', scope: 'Views::uses' });
+		expect(
+			presentationOf(view({ definition: 'MyUseCases', standard: 'UseCaseView', exposes: [] }))
+		).toEqual({ kind: 'diagram', view: 'usecases', scope: null });
 		expect(presentationOf(view({ definition: 'InterconnectionView' }))).toEqual({ kind: 'none' });
 		expect(presentationOf(view({ isUsage: false }))).toEqual({ kind: 'none' });
 	});
@@ -74,6 +83,7 @@ describe('families', () => {
 		expect(family('BillOfMaterials')).toBe('structure');
 		expect(family('InterconnectionView')).toBe('interfaces');
 		expect(family('StateTransitionView')).toBe('behaviour');
+		expect(family('UseCaseView')).toBe('behaviour');
 		expect(family('MassBudget')).toBe('analysis');
 		expect(family('FmeaWorksheet')).toBe('risk');
 		expect(family('SpecificationDocument')).toBe('documents');

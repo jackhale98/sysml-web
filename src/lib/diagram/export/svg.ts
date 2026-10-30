@@ -10,8 +10,9 @@
  */
 import { escapeXml } from '#lib/dataio/xml.ts';
 import type { DiagramNode } from '#lib/engine/types.ts';
-import { METRICS } from '../layout.ts';
+import { METRICS, objectiveOf, OBJECTIVE_LINES } from '../layout.ts';
 import { MAX_ROWS, notationOf, type Notation } from '../notation.ts';
+import { FIGURE, type Boundary } from '../useCaseLayout.ts';
 import {
 	familyColors,
 	TOKENS,
@@ -57,6 +58,8 @@ export interface ExportDiagram {
 	view: string;
 	nodes: ExportNode[];
 	edges: ExportEdge[];
+	/** A use case diagram's subjects: a rectangle around their use cases, named on top. */
+	boundaries?: Boundary[];
 }
 
 export interface FontSpec {
@@ -109,6 +112,10 @@ export function buildSvg(diagram: ExportDiagram, options: SvgOptions = {}): Buil
 	const draw = new Drawing(t, measure);
 
 	const bounds = new Bounds();
+	for (const b of diagram.boundaries ?? []) {
+		bounds.add(b.x, b.y);
+		bounds.add(b.x + b.width, b.y + b.height);
+	}
 	for (const n of diagram.nodes) {
 		bounds.add(n.x, n.y);
 		bounds.add(n.x + n.width, n.y + n.height);
@@ -125,6 +132,7 @@ export function buildSvg(diagram: ExportDiagram, options: SvgOptions = {}): Buil
 	}
 
 	const body: string[] = [];
+	for (const b of diagram.boundaries ?? []) body.push(draw.boundary(b));
 	for (const { edge, geometry } of edges) body.push(draw.edge(edge, geometry));
 	for (const { edge, geometry } of edges) {
 		const at = edge.labelAt ?? geometry.middle;
@@ -333,6 +341,7 @@ export function edgeStyle(kind: string): {
 		case 'verify':
 		case 'allocate':
 		case 'dependency':
+		case 'include':
 			return { end: 'open', dashed: true };
 		case 'flow':
 		case 'transition':
@@ -449,7 +458,9 @@ const F = {
 	more: { size: 11 },
 	doc: { size: 11.5 },
 	port: { size: 11, mono: true },
-	label: { size: 11 }
+	label: { size: 11 },
+	objective: { size: 11, italic: true },
+	boundary: { size: 13, weight: 600 }
 } satisfies Record<string, FontSpec>;
 
 class Drawing {
@@ -514,6 +525,23 @@ class Drawing {
 			),
 			`</g>`
 		].join('');
+	}
+
+	/** A subject's boundary (DiagramCanvas's `.boundary`): a rectangle, its name on top. */
+	boundary(b: Boundary): string {
+		const t = this.t;
+		return (
+			`<g><rect x="${r1(b.x + 0.75)}" y="${r1(b.y + 0.75)}" width="${r1(b.width - 1.5)}" height="${r1(b.height - 1.5)}" rx="2" fill="${t.surface}" fill-opacity="0.55" stroke="${t.text2}" stroke-opacity="0.7" stroke-width="1.5"/>` +
+			text(
+				b.x + b.width / 2,
+				b.y + 6 + 9,
+				this.fit(b.label, F.boundary, b.width - 24),
+				F.boundary,
+				t.text,
+				'middle'
+			) +
+			'</g>'
+		);
 	}
 
 	edge(edge: ExportEdge, g: PathGeometry): string {
@@ -595,9 +623,60 @@ class Drawing {
 				return {
 					markup: open + `<rect width="${w}" height="${h}" rx="1" fill="${t.text}"/></g>`
 				};
+			case 'actor': {
+				// The stick figure of SysmlNode.svelte, centred, its name below.
+				const fx = w / 2 - FIGURE.width / 2;
+				const ink = `stroke="${colors.line}" stroke-width="2" stroke-linecap="round"`;
+				return {
+					markup:
+						open +
+						`<g transform="translate(${r1(fx)} 0)">` +
+						`<circle cx="15" cy="9" r="7.5" fill="${colors.tint}" ${ink}/>` +
+						`<path d="M15 16.5 V37 M3 25 H27 M15 37 L4 58 M15 37 L26 58" fill="none" ${ink}/>` +
+						'</g>' +
+						text(
+							w / 2,
+							FIGURE.height + 4 + 8.5,
+							this.fit(n.node.label, F.name, w),
+							F.name,
+							t.text,
+							'middle'
+						) +
+						'</g>'
+				};
+			}
+			case 'usecase':
+				return { markup: open + this.useCase(n, notation, colors) + '</g>' };
 			default:
 				return { markup: open + this.box(n, notation, colors) + '</g>' };
 		}
+	}
+
+	/** A use case's ellipse: its keyword, name and objective in the middle. */
+	private useCase(n: ExportNode, notation: Notation, colors: FamilyColors): string {
+		const t = this.t;
+		const { width: w, height: h } = n;
+		const room = w * 0.72;
+		const keyword = `«${notation.isAbstract ? 'abstract ' : ''}${notation.keyword}»`;
+		const nameFont = { ...F.name, italic: notation.isAbstract };
+		const objective = objectiveOf(notation);
+		const lines = objective ? this.wrap(objective, F.objective, room, OBJECTIVE_LINES) : [];
+		// Keyword 14px, name 17px, objective 15px a line: the block is centred.
+		const block = 14 + 1 + 17 + (lines.length ? 2 + lines.length * 15 : 0);
+		let y = h / 2 - block / 2;
+		const out = [
+			`<ellipse cx="${r1(w / 2)}" cy="${r1(h / 2)}" rx="${r1(w / 2 - 0.75)}" ry="${r1(h / 2 - 0.75)}" fill="${colors.tint}" stroke="${colors.line}" stroke-width="1.5"/>`,
+			text(w / 2, y + 7, this.fit(keyword, F.keyword, room), F.keyword, t.text2, 'middle')
+		];
+		y += 15;
+		out.push(
+			text(w / 2, y + 8.5, this.fit(n.node.label, nameFont, room), nameFont, t.text, 'middle')
+		);
+		y += 19;
+		lines.forEach((line, k) =>
+			out.push(text(w / 2, y + k * 15 + 7.5, line, F.objective, t.text2, 'middle'))
+		);
+		return out.join('');
 	}
 
 	/** A definition or usage box, with its compartments and border ports. */

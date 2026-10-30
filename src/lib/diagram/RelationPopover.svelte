@@ -138,7 +138,8 @@
 					<span class="sentence">
 						{o.label.startsWith('is part') ||
 						o.label.startsWith('is satisfied') ||
-						o.label.startsWith('is verified')
+						o.label.startsWith('is verified') ||
+						o.label.startsWith('is included')
 							? `${o.to.label} ${o.label} ${o.from.label}`
 							: `${o.from.label} ${o.label} ${o.to.label}`}
 					</span>
@@ -149,6 +150,15 @@
 		{#if option.kind === 'compose'}
 			<label class="field">
 				<span>Name of the new part in {option.from.label}</span>
+				<input bind:value={choice.name} autocomplete="off" spellcheck="false" required />
+			</label>
+		{:else if option.kind === 'actor' || option.kind === 'include'}
+			<label class="field">
+				<span
+					>{option.kind === 'actor'
+						? `Name of the actor in ${option.to.label}`
+						: `Name of the included use case in ${option.from.label}`}</span
+				>
 				<input bind:value={choice.name} autocomplete="off" spellcheck="false" required />
 			</label>
 		{:else if option.kind === 'connect' && ports && (ports.from.length || ports.to.length)}

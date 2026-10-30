@@ -26,6 +26,9 @@ package DeliveryMission {
         }
         then perform drone.deliveryFlight;
         then done;
+
+        // Checking the drop zone is part of every delivery (behaviour/DeliveryUseCases.sysml).
+        include use case verifyDropZone : DeliveryUseCases::VerifyDropZone;
     }
 
     action def DeliveryFlight {

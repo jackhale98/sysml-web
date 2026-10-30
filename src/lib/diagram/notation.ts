@@ -7,7 +7,17 @@ import type { DiagramNode } from '#lib/engine/types.ts';
 import { familyOf, type Family } from '#lib/ui/kinds.ts';
 
 export type Shape =
-	'box' | 'package' | 'port' | 'initial' | 'final' | 'decision' | 'bar' | 'actor' | 'note';
+	| 'box'
+	| 'package'
+	| 'port'
+	| 'initial'
+	| 'final'
+	| 'decision'
+	| 'bar'
+	| 'actor'
+	| 'note'
+	/** A use case's ellipse (use case views). */
+	| 'usecase';
 
 export interface Compartment {
 	/** Compartment name as SysML writes it: "parts", "ports", "attributes"… */
@@ -83,7 +93,7 @@ function splitKeyword(keyword: string): { base: string; direction: string | null
 	return { base: keyword.trim(), direction: null };
 }
 
-function shapeOf(node: DiagramNode): Shape {
+function shapeOf(node: DiagramNode, view: string): Shape {
 	switch (node.kind) {
 		case 'package':
 			return 'package';
@@ -98,8 +108,11 @@ function shapeOf(node: DiagramNode): Shape {
 		case 'fork':
 		case 'join':
 			return 'bar';
+		// A use case diagram draws use cases as ellipses and actors as stick figures.
+		case 'use_case':
+			return view === 'usecases' ? 'usecase' : 'box';
 		case 'actor':
-			return 'actor';
+			return view === 'usecases' ? 'actor' : 'box';
 		case 'note':
 			return 'note';
 		default:
@@ -121,7 +134,7 @@ export function notationOf(node: DiagramNode, view: 'general' | 'interconnection
 	const isDefinition = node.is_definition || /\bdef$/.test(keywordSource);
 	const base = keywordSource.replace(/\s*def$/, '').trim() || fallback;
 	const keyword = isDefinition && base !== 'package' ? `${base} def` : base;
-	const shape = base === 'package' ? 'package' : shapeOf(node);
+	const shape = base === 'package' ? 'package' : shapeOf(node, view);
 
 	let isAbstract = false;
 	let doc: string | null = null;

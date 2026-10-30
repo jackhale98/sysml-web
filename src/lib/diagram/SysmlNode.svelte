@@ -3,6 +3,7 @@
 	import { iconOf } from '#lib/ui/kinds.ts';
 	import { MARK_WORDS } from '#lib/review/marks.svelte.ts';
 	import { useEditing } from './editing.svelte.ts';
+	import { objectiveOf } from './layout.ts';
 	import { MAX_ROWS, notationOf } from './notation.ts';
 	import type { SysmlNodeData } from './types.ts';
 
@@ -14,6 +15,7 @@
 	const vertical = $derived(data.direction === 'DOWN');
 	const left = $derived(n.ports.filter((p) => p.side === 'left'));
 	const right = $derived(n.ports.filter((p) => p.side === 'right'));
+	const objective = $derived(n.shape === 'usecase' ? objectiveOf(n) : null);
 
 	const editing = useEditing();
 	const renaming = $derived(editing?.renaming === id);
@@ -97,6 +99,20 @@
 		<div class="decision" title="decision {node.label}"></div>
 	{:else if n.shape === 'bar'}
 		<div class="bar" title="{node.kind} {node.label}"></div>
+	{:else if n.shape === 'actor'}
+		<!-- An actor: a stick figure, its name below. -->
+		<svg class="figure" viewBox="0 0 30 60" width="30" height="60" aria-hidden="true">
+			<circle cx="15" cy="9" r="7.5" />
+			<path d="M15 16.5 V37 M3 25 H27 M15 37 L4 58 M15 37 L26 58" />
+		</svg>
+		<div class="actor-name">{@render name()}</div>
+	{:else if n.shape === 'usecase'}
+		<!-- A use case: an ellipse with its keyword, name and objective. -->
+		<div class="ellipse">
+			<span class="keyword">«{n.isAbstract ? 'abstract ' : ''}{n.keyword}»</span>
+			{@render name()}
+			{#if objective}<p class="objective" title="Objective: {objective}">{objective}</p>{/if}
+		</div>
 	{:else}
 		{#if n.shape === 'package'}<div class="tab" aria-hidden="true"></div>{/if}
 		<div
@@ -110,28 +126,7 @@
 					<Icon size={12} strokeWidth={2.25} aria-hidden="true" />
 					«{n.isAbstract ? 'abstract ' : ''}{n.keyword}»
 				</span>
-				{#if renaming}
-					<input
-						class="name-input nodrag nopan nowheel"
-						aria-label="New name for {data.name ?? node.label}"
-						bind:value={draft}
-						{@attach focusInput}
-						{onkeydown}
-						onblur={() => void save()}
-						ondblclick={(e) => e.stopPropagation()}
-					/>
-					{#if editing?.renameError}
-						<span class="rename-error" role="alert">{editing.renameError}</span>
-					{/if}
-				{:else}
-					<!-- svelte-ignore a11y_no_static_element_interactions -->
-					<span
-						class="name"
-						class:abstract={n.isAbstract}
-						title={editable ? 'Double-click to rename' : undefined}
-						ondblclick={startRename}>{node.label}</span
-					>
-				{/if}
+				{@render name()}
 			</div>
 			{#if n.doc}
 				<div class="compartment doc"><p>{n.doc}</p></div>
@@ -191,6 +186,31 @@
 		</div>
 	{/if}
 </div>
+{#snippet name()}
+	{#if renaming}
+		<input
+			class="name-input nodrag nopan nowheel"
+			aria-label="New name for {data.name ?? node.label}"
+			bind:value={draft}
+			{@attach focusInput}
+			{onkeydown}
+			onblur={() => void save()}
+			ondblclick={(e) => e.stopPropagation()}
+		/>
+		{#if editing?.renameError}
+			<span class="rename-error" role="alert">{editing.renameError}</span>
+		{/if}
+	{:else}
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<span
+			class="name"
+			class:abstract={n.isAbstract}
+			title={editable ? 'Double-click to rename' : undefined}
+			ondblclick={startRename}>{node.label}</span
+		>
+	{/if}
+{/snippet}
+
 {#if editable}
 	<!-- Drag from any of these onto another node to draw a relationship. -->
 	{#each [Position.Top, Position.Right, Position.Bottom, Position.Left] as side (side)}
@@ -231,6 +251,7 @@
 	}
 	/* Connected to the selected node. */
 	.linked .box,
+	.linked .ellipse,
 	.linked .port-node,
 	.linked .pseudo,
 	.linked .decision {
@@ -239,6 +260,7 @@
 		outline-offset: 2px;
 	}
 	.selected .box,
+	.selected .ellipse,
 	.selected .port-node,
 	.selected .pseudo,
 	.selected .decision {
@@ -263,7 +285,9 @@
 			var(--shadow-sm);
 	}
 	.review-added .box,
-	.review-changed .box {
+	.review-changed .box,
+	.review-added .ellipse,
+	.review-changed .ellipse {
 		border-color: var(--review);
 	}
 	.review-badge {
@@ -473,6 +497,72 @@
 		white-space: nowrap;
 	}
 
+	/* Use case diagrams: a use case is an ellipse, an actor a stick figure. */
+	.ellipse {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 1px;
+		width: 100%;
+		height: 100%;
+		padding: 0 14%;
+		background: var(--tint);
+		border: 1.5px solid var(--line);
+		border-radius: 50%;
+		box-shadow: var(--shadow-sm);
+		text-align: center;
+		transition: box-shadow var(--duration) var(--ease);
+	}
+	.node:hover .ellipse {
+		box-shadow: var(--shadow-md);
+	}
+	.ellipse .name {
+		white-space: normal;
+		overflow-wrap: anywhere;
+	}
+	.objective {
+		display: -webkit-box;
+		max-width: 100%;
+		margin: 2px 0 0;
+		overflow: hidden;
+		color: var(--text-2);
+		font-size: 11px;
+		font-style: italic;
+		line-height: 15px;
+		-webkit-box-orient: vertical;
+		-webkit-line-clamp: 3;
+		line-clamp: 3;
+	}
+	.figure {
+		display: block;
+		margin: 0 auto;
+		overflow: visible;
+		fill: none;
+		stroke: var(--line);
+		stroke-width: 2;
+		stroke-linecap: round;
+	}
+	.figure circle {
+		fill: var(--tint);
+	}
+	.selected .figure,
+	.source .figure {
+		stroke: var(--accent);
+	}
+	.linked .figure {
+		stroke: color-mix(in oklab, var(--accent) 70%, var(--line));
+	}
+	.actor-name {
+		display: grid;
+		justify-items: center;
+		margin-top: 4px;
+		text-align: center;
+	}
+	.selected .actor-name .name {
+		color: var(--accent);
+	}
+
 	/* Behaviour pseudo-nodes. */
 	.pseudo {
 		width: 100%;
@@ -545,6 +635,7 @@
 
 	/* Connecting: the source glows, possible targets answer the pointer. */
 	.source .box,
+	.source .ellipse,
 	.source .port-node,
 	.source .pseudo,
 	.source .decision {
@@ -556,7 +647,9 @@
 		cursor: crosshair;
 	}
 	.pickable:hover .box,
-	:global(.svelte-flow.connecting) .node:hover .box {
+	.pickable:hover .ellipse,
+	:global(.svelte-flow.connecting) .node:hover .box,
+	:global(.svelte-flow.connecting) .node:hover .ellipse {
 		outline: 2px dashed var(--accent);
 		outline-offset: 3px;
 		box-shadow: var(--shadow-md);
@@ -568,6 +661,7 @@
 	}
 	@media (prefers-reduced-motion: reduce) {
 		.source .box,
+		.source .ellipse,
 		.source .port-node,
 		.source .pseudo,
 		.source .decision {

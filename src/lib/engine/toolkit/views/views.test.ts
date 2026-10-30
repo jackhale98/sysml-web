@@ -719,7 +719,8 @@ describe('the demo’s tables', () => {
 		// The risk library's worksheets for each kind of FMEA, the risk reduction and the
 		// demo's risk matrix and hazard log are six more; its saved review and risk
 		// reduction two more. The dependency matrices: four view defs and the demo's four.
-		expect(views).toHaveLength(67);
+		// The use case view: its view def and the demo's delivery use cases.
+		expect(views).toHaveLength(69);
 		expect(views.filter((v) => v.hasTable)).toHaveLength(43);
 		expect(views.every((v) => !v.builtin)).toBe(true);
 		expect(views.find((v) => v.name === 'droneBreakdown')).toEqual({
@@ -1159,6 +1160,9 @@ describe('views written by hand', () => {
     view e : MyTable { expose M::*; }
     view def PartList { @Reporting::TableRendering { rows = "kind:part"; columns = "element; type"; } }
     view f : PartList { expose M::*; }
+    view g : UseCaseView { expose M::*; }
+    view def MyUseCases :> UseCaseView;
+    view h : MyUseCases { expose M::*; }
 }`;
 		const files: SourceFile[] = [
 			...host.viewLibraries().map((l) => ({ path: l.path, text: l.text })),
@@ -1179,7 +1183,9 @@ describe('views written by hand', () => {
 			c: 'general', // no view def, only `render asTreeDiagram`
 			d: 'interconnection',
 			e: 'table',
-			f: 'table'
+			f: 'table',
+			g: 'usecases', // ModelViews' general view of use cases
+			h: 'usecases'
 		});
 		expect(host.diagram('general', files, 'M::b').nodes.map((n) => n.id)).toContain('car');
 	});

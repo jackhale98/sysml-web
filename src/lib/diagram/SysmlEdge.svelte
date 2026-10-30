@@ -12,7 +12,8 @@
 	import { useLabels } from './labels.svelte.ts';
 	import { edgeText } from './layout.ts';
 	import type { XY } from './layout.ts';
-	import type { SysmlEdgeData } from './types.ts';
+	import type { SysmlEdgeData, SysmlNodeData } from './types.ts';
+	import { outlineOf, straightLine } from './useCaseLayout.ts';
 
 	interface EdgeStyle {
 		start?: string;
@@ -126,16 +127,29 @@
 			);
 		});
 	});
-	const path = $derived(points ? roundedPath(points, 6) : smooth[0]);
+	/** A use case diagram's line: straight, from one node's outline to the other's, wherever they are. */
+	const straight = $derived.by(() => {
+		const [a, b] = [from.current, to.current];
+		if (!data?.straight || !a || !b) return null;
+		const outline = (n: typeof a) =>
+			outlineOf((n.data as SysmlNodeData).node, {
+				...n.internals.positionAbsolute,
+				width: n.measured.width ?? n.width ?? 0,
+				height: n.measured.height ?? n.height ?? 0
+			});
+		const [p, q] = straightLine(outline(a), outline(b));
+		return `M${p.x} ${p.y} L${q.x} ${q.y}`;
+	});
+	const path = $derived(straight ?? (points ? roundedPath(points, 6) : smooth[0]));
 	const kind = $derived(data?.kind ?? 'dependency');
 	/**
 	 * SysML v2 notation per relationship kind: specialization ends in a hollow
 	 * triangle at the general end, typing ("defined by") in a hollow triangle
 	 * after two dots; composition has a filled diamond at the
-	 * owner; membership a circled plus at the owner; satisfy, verify, allocate
-	 * and dependencies are dashed with an open arrow; flows and transitions
-	 * end in a filled arrow; connections are plain lines, bindings plain
-	 * lines marked `=`.
+	 * owner; membership a circled plus at the owner; satisfy, verify, allocate,
+	 * «include» and dependencies are dashed with an open arrow; flows and
+	 * transitions end in a filled arrow; connections (and an actor's line to
+	 * its use case) are plain lines, bindings plain lines marked `=`.
 	 */
 	const style = $derived.by((): EdgeStyle => {
 		switch (kind) {
@@ -150,6 +164,7 @@
 			case 'allocate':
 				return { end: 'url(#sysml-open-arrow)', dashed: true };
 			case 'dependency':
+			case 'include':
 				return { end: 'url(#sysml-open-arrow)', dashed: true };
 			case 'flow':
 			case 'transition':

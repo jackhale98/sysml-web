@@ -316,6 +316,19 @@ its resolver recorded, reparses, and refuses an edit that doesn't parse
   doc, events). The page draws it with its own canvas
   (`diagram/SequenceCanvas.svelte`, laid out by `sequenceLayout.ts`), not
   Svelte Flow and ELK.
+- **usecases** (`usecases.ts`) — from the records, for a view typed by
+  `ModelViews::UseCaseView` (a `GeneralView` kept to use cases; the standard
+  library has no use case view). Use case defs and usages are `use_case`
+  nodes with their objective as a row; an actor is one `actor` node per part
+  def its `actor` parameters are typed by (through what they redefine), with
+  an `actor` edge to each use case carrying the parameter's extent; `include
+  use case` is an `include` edge (carrying the include's extent) and draws
+  what it includes even when the view doesn't expose it; specialization
+  between drawn use cases and actors. Each subject (the type of the use
+  case's own or inherited `subject`, else for a usage the part it belongs to)
+  is a subgraph, which the canvas draws as a boundary around its use cases
+  (`diagram/useCaseLayout.ts`, which also lays the diagram out in columns
+  rather than with ELK).
 
 Node ids are names as written, because `layout/diagrams.json` keys positions
 by them (and the nodes a diagram hides, its `#hidden` list; see

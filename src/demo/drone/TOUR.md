@@ -28,8 +28,13 @@ spreadsheet. Requirements kept in a spreadsheet come in the other way:
 
 ## 3. How it will be used: `DeliveryMission::DeliverParcel` and `DeliveryMission::DeliveryFlight`
 
-Before deciding what the drone must do, model how it will be used. The use case says who is involved and what success means (its `objective`). The
-delivery flight says how, step by step: `then` for the next step, `fork`/`join` for
+Before deciding what the drone must do, model how it will be used. The use case says who is involved and what success means (its `objective`).
+`DeliveryUseCases` adds what else the service does: plan a route, charge the battery, and
+check the drop zone, which every delivery includes (`include use case`).
+Diagram: **`DroneViews::deliveryUseCases`** (Use Case View: the drone's use cases in its
+boundary, the people who take part outside it).
+
+The delivery flight says how, step by step: `then` for the next step, `fork`/`join` for
 steps at the same time, and `decide`/`merge` for a choice (drop the parcel only if
 the drop zone is clear).
 Diagram: **`DroneViews::deliveryFlightFlow`** (Action Flow View).

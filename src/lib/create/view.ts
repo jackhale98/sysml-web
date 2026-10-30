@@ -183,6 +183,17 @@ export const VIEW_KINDS: readonly ViewKind[] = [
 		title: 'Sequence'
 	},
 	{
+		id: 'usecases',
+		group: 'diagrams',
+		label: 'Use case diagram',
+		description: 'What the system does for the people around it, and who takes part in what.',
+		definition: 'UseCaseView',
+		library: 'ModelViews',
+		covers: 'packagesAndParts',
+		optional: true,
+		title: 'Use cases'
+	},
+	{
 		id: 'budget',
 		group: 'analysis',
 		label: 'Budget',

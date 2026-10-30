@@ -46,6 +46,11 @@ export function presentationOf(view: ViewInfo): Presentation {
 			return { kind: 'diagram', view: 'actions', scope };
 		case 'SequenceView':
 			return { kind: 'diagram', view: 'sequence', scope };
+		case 'UseCaseView':
+			// Like a general view: the view itself is the scope, so its filter applies.
+			if (exposes.length && !view.builtin)
+				return { kind: 'diagram', view: 'usecases', scope: view.qualifiedName ?? view.name };
+			return { kind: 'diagram', view: 'usecases', scope };
 		default:
 			return { kind: 'none' };
 	}
@@ -137,6 +142,7 @@ const FAMILY_OF: Record<string, ViewFamily> = {
 	StateTransitionView: 'behaviour',
 	ActionFlowView: 'behaviour',
 	SequenceView: 'behaviour',
+	UseCaseView: 'behaviour',
 	MassBudget: 'analysis',
 	PowerBudget: 'analysis',
 	ConstraintChecks: 'analysis',
