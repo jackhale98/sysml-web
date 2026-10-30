@@ -126,18 +126,10 @@
 		conditioning: 'Condition'
 	};
 
-	function eventName(p: PlacedEvent): string {
-		const e = p.event;
-		const gate = e.gate
-			? `, ${gateWords(e)} gate over ${e.inputs.map((i) => names.get(i) ?? i).join(', ')}`
-			: '';
-		const repeated = p.repeated ? ', repeated elsewhere in the tree' : '';
-		return `${KIND_WORDS[e.kind]} ${e.name}${gate}, probability ${probability(e.probability)}${repeated}`;
-	}
-
 	function eventTitle(e: FaultTreeEvent): string | undefined {
 		const parts = [
 			e.description,
+			e.gate ? `${gateWords(e)} of ${e.inputs.map((i) => names.get(i) ?? i).join(', ')}` : null,
 			e.source && e.source !== 'given' ? `Probability from ${e.source}` : null,
 			e.component ? `Part: ${e.component}` : null,
 			e.failureMode ? `Failure mode: ${e.failureMode}` : null
@@ -361,16 +353,20 @@
 								style:top="{p.y}px"
 								style:width="{FAULT_TREE.boxWidth}px"
 								style:height="{FAULT_TREE.boxHeight}px"
-								aria-label={eventName(p)}
 								aria-current={keyOf(p.event) === selected ? 'true' : undefined}
 								title={eventTitle(p.event)}
 								onclick={() => select(p.event)}
 								onfocus={() => reveal(p)}
 							>
-								<span class="name">{p.event.name}</span>
+								<span class="name"
+									><span class="visually-hidden">{KIND_WORDS[p.event.kind]}: </span>{p.event
+										.name}</span
+								>
 								{#if p.event.description}<span class="description">{p.event.description}</span>{/if}
 								<span class="figures">
-									{#if p.event.gate}<span class="gate-word">{gateWords(p.event)}</span>{/if}
+									{#if p.event.gate}<span class="gate-word"
+											>{gateWords(p.event)}<span class="visually-hidden"> gate,</span></span
+										>{/if}
 									<span class="p">P = {probability(p.event.probability)}</span>
 									{#if p.repeated}<span class="repeat">repeated</span>{/if}
 								</span>

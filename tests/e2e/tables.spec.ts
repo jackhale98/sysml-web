@@ -77,7 +77,7 @@ test('a trace matrix made with New view renders from the view library', async ({
 	await form.getByRole('button', { name: 'Create' }).click();
 	const table = page.getByRole('region', { name: 'Design trace view' });
 	// Every requirement is a row, linked or not; the columns are named in words.
-	await expect(table.getByText('24 rows')).toBeVisible({ timeout: 15_000 });
+	await expect(table.getByText('25 rows')).toBeVisible({ timeout: 15_000 });
 	await expect(table.getByRole('columnheader', { name: 'Payload release (drone)' })).toBeVisible();
 	await expectAccessible(page);
 });
