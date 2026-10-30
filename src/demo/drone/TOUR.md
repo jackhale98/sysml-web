@@ -33,6 +33,11 @@ delivery flight says how, step by step: `then` for the next step, `fork`/`join` 
 steps at the same time, and `decide`/`merge` for a choice (drop the parcel only if
 the drop zone is clear).
 Diagram: **`DroneViews::deliveryFlightFlow`** (Action Flow View).
+Run it: **Run Delivery flight** under **Simulations** (or **Run** on the diagram) takes it
+step by step, showing which steps run at the same time, where the join waits, and which
+branch the decision takes. Set `checkDropZone.isClear` to false under **Values** before the
+decision and the drone keeps the parcel. **Run Deliver parcel** runs the use case, which
+performs the delivery flight.
 
 Who tells whom what, and when: `DeliverySequence::ParcelDelivery` is the same delivery
 as an interaction between the operator, the ground station, the drone and the recipient.

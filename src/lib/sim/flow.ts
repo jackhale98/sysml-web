@@ -451,8 +451,14 @@ class Stepper {
 	readonly notes: string[] = [];
 	/** Variable → who set it this step (for the note on steps that set the same one). */
 	private readonly writers = new Map<string, string[]>();
-	private readonly ending: { frame: Frame; graph: FlowGraph; prefix: string; node: FlowNode }[] =
-		[];
+	/** Nodes that ended this step; `again`: tokens that came while it ran, for which it runs again. */
+	private readonly ending: {
+		frame: Frame;
+		graph: FlowGraph;
+		prefix: string;
+		node: FlowNode;
+		again?: number;
+	}[] = [];
 	private readonly exprs = new Map<string, Expr | null>();
 	moved = false;
 
@@ -636,15 +642,8 @@ class Stepper {
 		this.moved = true;
 		this.events.push({ node: prefix + node.id, what: 'ended', ...(text ? { text } : {}) });
 		this.ending.push({ frame, graph, prefix, node });
-		if (run?.again) {
-			// It runs again for the token that came while it ran.
-			this.ending.push({
-				frame,
-				graph,
-				prefix,
-				node: { ...node, id: `\u0000again:${node.id}:${run.again}` }
-			});
-		}
+		// It runs again for the tokens that came while it ran.
+		if (run?.again) this.ending.push({ frame, graph, prefix, node, again: run.again });
 	}
 
 	// ------------------------------------------------------------ tokens
@@ -659,13 +658,10 @@ class Stepper {
 			this.ending.splice(0, this.ending.length, ...this.ending.filter((e) => e.frame !== only));
 		else this.ending.length = 0;
 		for (let i = 0; i < now.length; i++) {
-			const { frame, graph, prefix, node } = now[i]!;
-			const again = /^\u0000again:(.*):(\d+)$/.exec(node.id);
+			const { frame, graph, prefix, node, again } = now[i]!;
 			if (again) {
-				const original = graph.nodes.find((n) => n.id === again[1])!;
-				const left = Number(again[2]) - 1;
-				this.start(frame, graph, prefix, original);
-				if (left > 0) frame.running[original.id]!.again = left;
+				this.start(frame, graph, prefix, node);
+				if (again > 1) frame.running[node.id]!.again = again - 1;
 				continue;
 			}
 			this.flows(graph, prefix, node);
@@ -772,7 +768,8 @@ class Stepper {
 			}
 		}
 		if (frame.held?.[node.id]) {
-			const { [node.id]: _, ...rest } = frame.held;
+			const rest = { ...frame.held };
+			delete rest[node.id];
 			frame.held = rest;
 		}
 		if (note) this.note(path, note);
@@ -814,7 +811,8 @@ class Stepper {
 				const arrived = [...new Set([...(frame.joins?.[target.id] ?? []), edge.index])];
 				const needed = incoming(graph, target.id).map((e) => e.index);
 				if (needed.every((i) => arrived.includes(i))) {
-					const { [target.id]: _, ...rest } = frame.joins ?? {};
+					const rest = { ...frame.joins };
+					delete rest[target.id];
 					frame.joins = rest;
 					this.emit(frame, graph, prefix, target, now);
 				} else frame.joins = { ...frame.joins, [target.id]: arrived };
@@ -1294,7 +1292,6 @@ export function graphAt(
 	const s = new Stepper({ step: 0, time: 0, root, variables: {}, queue: [] }, host);
 	let g = graph;
 	let f = root;
-	let prefix = '';
 	for (const id of splitPath(path)) {
 		const node = g.nodes.find((n) => n.id === id);
 		const run = f.running[id];
@@ -1303,7 +1300,6 @@ export function graphAt(
 		if (!inner) return null;
 		g = inner;
 		f = run.child;
-		prefix += id + '.';
 	}
 	return { graph: g, frame: f };
 }

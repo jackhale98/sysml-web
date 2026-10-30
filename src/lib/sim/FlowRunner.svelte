@@ -192,6 +192,7 @@
 
 	// What each node of the shown body is doing.
 	const statuses = $derived.by(() => {
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- built afresh each time, never changed after
 		const map = new Map<string, NodeStatus>();
 		const frame = shown?.frame;
 		if (!frame || !shownGraph || !outlook) return map;
@@ -209,6 +210,7 @@
 		return map;
 	});
 	const notes = $derived.by(() => {
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- built afresh each time, never changed after
 		const map = new Map<string, string>();
 		const frame = shown?.frame;
 		if (!frame || !outlook) return map;
@@ -220,6 +222,7 @@
 		return map;
 	});
 	const joins = $derived.by(() => {
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- built afresh each time, never changed after
 		const map = new Map<string, string>();
 		const frame = shown?.frame;
 		if (!frame || !shownGraph) return map;
