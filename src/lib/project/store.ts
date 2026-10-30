@@ -148,6 +148,7 @@ export async function saveProject(
 		transaction.onerror = transaction.onabort = () =>
 			reject(transaction.error ?? new Error('Browser storage failed.'));
 	});
+	void keepStorage();
 	return updated;
 }
 
@@ -190,6 +191,20 @@ export async function persistStorage(): Promise<boolean> {
 	} catch {
 		return false;
 	}
+}
+
+let keepAsked: Promise<boolean> | null = null;
+
+/**
+ * Once per page load, ask the browser to keep this site's storage for good
+ * (not clear it when space runs low, or after weeks unused), unless it
+ * already does. Every save asks, so a project kept before this was asked,
+ * or one saved after the browser first said no, still gets it; the browser
+ * decides (Chrome by how much the site is used, Firefox by asking the person).
+ */
+export function keepStorage(): Promise<boolean> {
+	keepAsked ??= isStoragePersisted().then((kept) => kept || persistStorage());
+	return keepAsked;
 }
 
 /** Whether the browser has agreed to keep this site's storage. */
