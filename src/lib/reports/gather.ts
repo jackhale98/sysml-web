@@ -15,6 +15,7 @@ import { describingPackage, docSummary } from '#lib/workbench/home/model.ts';
 import { viewTitle } from '#lib/workbench/views.ts';
 import { chapterKind, STANDARD_CHAPTERS } from './build.ts';
 import type { Chapter, DocumentMeta, ReportContext } from './context.ts';
+import type { ReportBaseline } from './document.ts';
 import { diagramScope } from './icd.ts';
 import { reportKindOf, standardReport, STANDARD_REPORTS } from './kinds.ts';
 import { indexModel, parseExpose } from './model.ts';
@@ -34,7 +35,12 @@ export interface ReportSource {
 	 * owner/repo (main)`) and what results are compared with. Without one,
 	 * the report says it is not committed.
 	 */
-	revision?: { stamp: string; info: RevisionInfo | null } | null;
+	revision?: {
+		stamp: string;
+		info: RevisionInfo | null;
+		/** The baseline the model is, or was last at (`Baseline: CDR` on the title page). */
+		baseline?: ReportBaseline | null;
+	} | null;
 }
 
 /** How analysis lists a view (`Model.views`), for its `filter` conditions. */
@@ -142,6 +148,7 @@ export function prepareReport(
 		diagram: null,
 		date,
 		revision: source.revision?.stamp ?? 'Not committed',
+		baseline: source.revision?.baseline ?? null,
 		revisionInfo: source.revision?.info ?? null
 	};
 }

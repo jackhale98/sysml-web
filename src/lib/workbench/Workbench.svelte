@@ -32,6 +32,7 @@
 	import Logo from '#lib/ui/Logo.svelte';
 	import ThemeToggle from '#lib/ui/ThemeToggle.svelte';
 	import Toaster from '#lib/ui/Toaster.svelte';
+	import type { Baseline } from '#lib/project/baselines.ts';
 	import type { ProjectSession } from '#lib/project/session.svelte.ts';
 	import Explorer from './Explorer.svelte';
 	import ProjectMenu from './ProjectMenu.svelte';
@@ -114,6 +115,14 @@
 	const loadReport = () => import('#lib/reports/ReportView.svelte').then((m) => m.default);
 	const loadMatrix = () => import('./DsmView.svelte').then((m) => m.default);
 	const loadReview = () => import('#lib/review/ReviewView.svelte').then((m) => m.default);
+
+	/** "Changes since PDR": the review, comparing the model with that baseline. */
+	async function compareWithBaseline(baseline: Baseline) {
+		const { review } = await import('#lib/review/review.svelte.ts');
+		// Started before the tab opens, so the review doesn't start on its usual comparison.
+		void review.start({ workspace, session, engine }, { kind: 'baseline', baseline });
+		ui.open({ kind: 'review' });
+	}
 
 	// Tabs follow a file that is renamed or moved, and close when it goes.
 	$effect(() => workspace.onFileMoved((from, to) => ui.followFile(from, to)));
@@ -887,6 +896,7 @@
 				{engine}
 				bind:open={ui.sourceControlOpen}
 				onreview={() => ui.open({ kind: 'review' })}
+				oncompare={(baseline) => void compareWithBaseline(baseline)}
 			/>
 		{/await}
 	{/if}

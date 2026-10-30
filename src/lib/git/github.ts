@@ -22,6 +22,8 @@ import type {
 	RemoteTree,
 	RepoRef,
 	RepoSummary,
+	TagInput,
+	TagSummary,
 	TreeEntry
 } from './types.ts';
 
@@ -170,6 +172,24 @@ function summary(r: GitHubRepo): RepoSummary {
 		pushedAt: r.pushed_at,
 		canPush: !!(r.permissions?.push || r.permissions?.admin),
 		htmlUrl: r.html_url
+	};
+}
+
+/** An annotated tag object, as the git data API gives it. */
+interface GitHubTag {
+	sha: string;
+	message?: string;
+	tagger?: { name?: string; date?: string } | null;
+	object: { sha: string; type: string };
+}
+
+function tagSummary(name: string, tag: GitHubTag): TagSummary {
+	return {
+		name,
+		commit: tag.object.sha,
+		message: tag.message ?? '',
+		date: tag.tagger?.date ?? null,
+		tagger: tag.tagger?.name ?? null
 	};
 }
 
@@ -516,6 +536,64 @@ export class GitHubProvider implements GitProvider {
 			author: c.author?.login ?? c.commit.author?.name ?? null,
 			date: c.commit.author?.date ?? null
 		}));
+	}
+
+	/**
+	 * Tags by name prefix: the matching refs, then each annotated tag's
+	 * object for its message, date and the commit it names (a lightweight
+	 * tag names the commit itself and has no message).
+	 */
+	async listTags(ref: RepoRef, prefix: string): Promise<TagSummary[]> {
+		const refs = await this.request<{ ref: string; object: { sha: string; type: string } }[]>(
+			'GET',
+			`${path(ref)}/git/matching-refs/tags/${branchPath(prefix)}`,
+			undefined,
+			'the tags'
+		);
+		const out: TagSummary[] = [];
+		for (const r of refs) {
+			const name = r.ref.replace(/^refs\/tags\//, '');
+			if (r.object.type === 'commit') {
+				out.push({ name, commit: r.object.sha, message: '', date: null, tagger: null });
+				continue;
+			}
+			if (r.object.type !== 'tag') continue;
+			const tag = await this.request<GitHubTag>(
+				'GET',
+				`${path(ref)}/git/tags/${r.object.sha}`,
+				undefined,
+				`the tag “${name}”`
+			);
+			if (tag.object.type === 'commit') out.push(tagSummary(name, tag));
+		}
+		return out;
+	}
+
+	/** A tag object, then the ref that names it (both need “Contents: Read and write”). */
+	async createTag(ref: RepoRef, input: TagInput): Promise<TagSummary> {
+		const what = `a tag named “${input.name}”`;
+		const tag = await this.request<GitHubTag>(
+			'POST',
+			`${path(ref)}/git/tags`,
+			{ tag: input.name, message: input.message, object: input.commit, type: 'commit' },
+			what
+		);
+		await this.request(
+			'POST',
+			`${path(ref)}/git/refs`,
+			{ ref: `refs/tags/${input.name}`, sha: tag.sha },
+			what
+		);
+		return tagSummary(input.name, tag);
+	}
+
+	async deleteTag(ref: RepoRef, name: string): Promise<void> {
+		await this.request(
+			'DELETE',
+			`${path(ref)}/git/refs/tags/${branchPath(name)}`,
+			undefined,
+			`the tag “${name}”`
+		);
 	}
 
 	webUrl(ref: RepoRef, branch?: string): string {

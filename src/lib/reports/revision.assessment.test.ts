@@ -3,7 +3,8 @@
  * function of the model files (and the date it is stamped with), so the same
  * files give the same document byte for byte, and the files of an older
  * revision give that revision's figures. The report names the commit it
- * was built from (from the GitHub connection), or says it is not committed.
+ * was built from (from the GitHub connection), or says it is not committed,
+ * and the design-review baseline the model is, or has changed since.
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { ToolkitHost } from '#lib/engine/toolkit/host.ts';
@@ -13,6 +14,7 @@ import { collectRequirements } from '#lib/project/requirements.ts';
 import { revisionStamp, type RevisionStamp } from '#lib/project/revision.svelte.ts';
 import { isLibraryFile } from '#lib/project/workspace.svelte.ts';
 import { buildReport } from './build.ts';
+import type { ReportBaseline } from './document.ts';
 import { prepareReport, type ReportSource } from './gather.ts';
 import { toMarkdown } from './markdown.ts';
 
@@ -24,7 +26,11 @@ beforeAll(async () => {
 const DATE = new Date('2026-10-21T12:00:00Z');
 const demo = Object.fromEntries(demoFiles().map((f) => [f.path, f.text]));
 
-function report(texts: Record<string, string>, revision: RevisionStamp | null = null) {
+function report(
+	texts: Record<string, string>,
+	revision: RevisionStamp | null = null,
+	baseline: ReportBaseline | null = null
+) {
 	const list = Object.entries(texts).map(([path, text]) => ({ path, text }));
 	const analyses = host.analyzeProject(list);
 	const source: ReportSource = {
@@ -35,7 +41,7 @@ function report(texts: Record<string, string>, revision: RevisionStamp | null = 
 		requirements: collectRequirements(analyses),
 		project: { name: 'Drone UAV', version: '0.2.0' },
 		isLibrary: isLibraryFile,
-		revision: revision ? { stamp: revisionStamp(revision), info: null } : null
+		revision: revision ? { stamp: revisionStamp(revision), info: null, baseline } : null
 	};
 	return buildReport(prepareReport('droneSpecification', source, DATE));
 }
@@ -84,6 +90,23 @@ describe('a report regenerated from a revision', { timeout: 60_000 }, () => {
 		expect(report(demo, { ...at, changed: true }).revision).toBe(
 			'Commit 3f2a9c1 of acme/drone (main), with changes not committed'
 		);
+	});
+
+	it('says it is a baseline when the model is exactly one', () => {
+		const doc = report(demo, { commit: null, changed: false }, { name: 'CDR', exact: true });
+		expect(doc.baseline).toEqual({ name: 'CDR', exact: true });
+		const md = toMarkdown(doc);
+		expect(md).toContain('21 October 2026 · Not committed · Baseline: CDR');
+		expect(md).toContain('(not committed). The model is baseline CDR.');
+	});
+
+	it('says which baseline it was last at when the model has changed since', () => {
+		const at = { commit: '3f2a9c1d0b4e5f60718293a4b5c6d7e8f9012345', changed: true };
+		const md = toMarkdown(report(demo, at, { name: 'PDR', exact: false }));
+		expect(md).toContain('with changes not committed · Changed since baseline PDR');
+		expect(md).toContain('The model has changed since baseline PDR.');
+		// No baseline: none named.
+		expect(markdown(demo, at)).not.toMatch(/baseline/i);
 	});
 
 	it('says it is not committed when the project has no commit', () => {

@@ -27,6 +27,7 @@
 	import type { ProjectSession } from '#lib/project/session.svelte.ts';
 	import { toasts } from '#lib/ui/toasts.svelte.ts';
 	import { accounts } from './account.svelte.ts';
+	import Baselines from './Baselines.svelte';
 	import ConflictChoices from './ConflictChoices.svelte';
 	import ConnectGitHub from './ConnectGitHub.svelte';
 	import { defaultMessage } from './connection.svelte.ts';
@@ -50,6 +51,7 @@
 		summarize,
 		type ReviewSummary
 	} from '#lib/review/summary.ts';
+	import type { Baseline } from '#lib/project/baselines.ts';
 	import { isModelFile } from '#lib/project/workspace.svelte.ts';
 	import type { BranchSummary, Progress, RepoChoice } from './types.ts';
 
@@ -57,13 +59,16 @@
 		session,
 		engine,
 		open = $bindable(false),
-		onreview
+		onreview,
+		oncompare
 	}: {
 		session: ProjectSession;
 		engine: Engine;
 		open?: boolean;
 		/** Opens the full review of the changes (shown when the host can). */
 		onreview?: () => void;
+		/** Opens the review of the changes since a baseline (shown when the host can). */
+		oncompare?: (baseline: Baseline) => void;
 	} = $props();
 
 	const uid = $props.id();
@@ -325,6 +330,19 @@
 
 {#snippet term(text: string)}<small class="term">{text}</small>{/snippet}
 
+{#snippet baselines()}
+	<Baselines
+		{session}
+		{reachable}
+		oncompare={oncompare
+			? (baseline) => {
+					open = false;
+					oncompare(baseline);
+				}
+			: undefined}
+	/>
+{/snippet}
+
 <!-- A backdrop click closes it; so does Escape. -->
 <dialog
 	bind:this={dialog}
@@ -501,6 +519,7 @@
 						<GitHubMark size={16} /> Choose a repository…
 					</button>
 				</section>
+				{@render baselines()}
 			{:else if pending}
 				<section class="conflicts" aria-labelledby="{uid}-conflicts">
 					<h3 id="{uid}-conflicts">
@@ -824,6 +843,8 @@
 						</form>
 					{/if}
 				</details>
+
+				{@render baselines()}
 
 				<footer class="foot">
 					<span class="muted small">

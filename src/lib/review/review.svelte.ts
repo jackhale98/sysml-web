@@ -13,12 +13,15 @@
  * - **An earlier version** (`commit`): against a commit of the branch.
  * - **A proposal** (`pull`): a pull request's latest commit against where
  *   its branch started from the branch it would be merged into.
+ * - **A baseline** (`baseline`): the project now against a version frozen
+ *   at a design review (its tag on GitHub, or its copy kept here).
  */
 import { untrack } from 'svelte';
 import type { Engine } from '#lib/engine/client.ts';
 import { accounts } from '#lib/git/account.svelte.ts';
 import { messageOf } from '#lib/git/errors.ts';
 import type { CommitSummary, GitRecord, PullRequestSummary } from '#lib/git/types.ts';
+import { longDay, type Baseline } from '#lib/project/baselines.ts';
 import type { ProjectSession } from '#lib/project/session.svelte.ts';
 import { isModelFile, type Workspace } from '#lib/project/workspace.svelte.ts';
 import { reviewMarks } from './marks.svelte.ts';
@@ -30,7 +33,8 @@ export type ReviewSource =
 	| { kind: 'local' }
 	| { kind: 'branch' }
 	| { kind: 'commit'; commit: CommitSummary }
-	| { kind: 'pull'; pr: PullRequestSummary };
+	| { kind: 'pull'; pr: PullRequestSummary }
+	| { kind: 'baseline'; baseline: Baseline };
 
 export interface ReviewContext {
 	workspace: Workspace;
@@ -173,6 +177,14 @@ class Review {
 				canMarkReviewed: !!ctx.session
 			};
 		}
+		if (source.kind === 'baseline' && source.baseline.files)
+			return {
+				base: modelTexts(source.baseline.files),
+				current: null,
+				against: baselineWords(source.baseline),
+				subject: 'your version',
+				canMarkReviewed: false
+			};
 		if (!git) throw new Error('This project isn’t connected to a GitHub repository.');
 		knowBlobs(git.files);
 		const provider = accounts.provider(git.account);
@@ -187,6 +199,14 @@ class Review {
 				canMarkReviewed: false
 			};
 		}
+		if (source.kind === 'baseline')
+			return {
+				base: await modelFilesAt(provider, ref, source.baseline.commit ?? git.base, progress),
+				current: null,
+				against: baselineWords(source.baseline),
+				subject: 'your version',
+				canMarkReviewed: false
+			};
 		if (source.kind === 'commit')
 			return {
 				base: await modelFilesAt(provider, ref, source.commit.sha, progress),
@@ -254,6 +274,12 @@ class Review {
 			});
 		});
 	}
+}
+
+/** `baseline “PDR” (12 March 2026)`. */
+function baselineWords(baseline: Baseline): string {
+	const day = longDay(baseline.date);
+	return `baseline “${baseline.name}”${day ? ` (${day})` : ''}`;
 }
 
 function modelTexts(files: { path: string; text: string }[]): Record<string, string> {

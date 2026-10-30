@@ -79,11 +79,25 @@ export interface ReportDocument {
 	 * had changed since, or `Not committed`.
 	 */
 	revision: string;
+	/** The baseline the model is (`exact`), or was last and has changed since; null for none. */
+	baseline?: ReportBaseline | null;
 	/** What the report covers: the view's `expose` targets; empty for the whole model. */
 	scope: string[];
 	/** Key figures for the title page. */
 	summary: { label: string; value: string }[];
 	sections: Section[];
+}
+
+/** A design-review baseline (PDR, CDR, …), as a report names it. */
+export interface ReportBaseline {
+	name: string;
+	/** The model is exactly the baseline; false: it has changed since. */
+	exact: boolean;
+}
+
+/** `Baseline: CDR`, or `Changed since baseline CDR`. */
+export function baselineText(baseline: ReportBaseline): string {
+	return baseline.exact ? `Baseline: ${baseline.name}` : `Changed since baseline ${baseline.name}`;
 }
 
 /** Plain text of a run list. */

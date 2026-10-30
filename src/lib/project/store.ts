@@ -5,6 +5,7 @@
  * repository keeps where it came from and the version its files are based on.
  */
 import type { GitRecord } from '#lib/git/types.ts';
+import type { StoredBaseline } from './baselines.ts';
 import { changesNotInFolder, changesNotOnGitHub } from './pending.ts';
 import type { ProjectFile, ProjectInfo } from './workspace.svelte.ts';
 
@@ -26,6 +27,12 @@ export interface StoredProject {
 	git?: GitRecord;
 	/** The version "Review changes" compares with when there is no repository: set by "Mark as reviewed". */
 	checkpoint?: { files: ProjectFile[]; at: string };
+	/**
+	 * Baselines kept in this browser (projects not connected to GitHub when
+	 * they were marked; those connected keep theirs as tags there), oldest
+	 * first. Missing in projects kept before there were baselines: none.
+	 */
+	baselines?: StoredBaseline[];
 	/** For `folder` projects: files changed here and not yet written back to the folder. */
 	unsavedToFolder?: string[];
 	/**
