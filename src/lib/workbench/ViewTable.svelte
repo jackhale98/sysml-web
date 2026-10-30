@@ -718,7 +718,7 @@
 		{@const at = / \(.+\)$/.test(value) ? value.lastIndexOf(' (') : value.length}
 		{@const main = value.slice(0, at)}
 		{@const dash = main.indexOf(' – ')}
-		{#if dash >= 0}{main.slice(0, dash)} –{' '}<span class="upto">{main.slice(dash + 3)}</span
+		{#if dash >= 0}{main.slice(0, dash)} –&#32;<span class="upto">{main.slice(dash + 3)}</span
 			>{:else}{main}{/if}{#if at < value.length}<span
 				class="aside"
 				class:within={value.endsWith(' within limit)')}>{value.slice(at)}</span
