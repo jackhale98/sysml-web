@@ -82,7 +82,7 @@ interface BudgetLine {
 	variable?: { path: string; range: string; count: number }[];
 }
 
-export function budgetRows(ctx: ViewContext, attribute: string): Row[] {
+export function budgetRows(ctx: ViewContext, attribute: string, limits = true): Row[] {
 	const evaluation = ctx.evaluation;
 	const name = unquoteName(simpleName(attribute));
 	const base = compositionRows(ctx, null);
@@ -181,7 +181,8 @@ export function budgetRows(ctx: ViewContext, attribute: string): Row[] {
 
 	const kept = order.filter((l) => included.has(l));
 	const unit = commonUnit(kept.filter((l) => l.each && !l.rolledUp).map((l) => l.each!));
-	const checks = evaluation?.checks().checks ?? [];
+	// Without limits for the checks' own use (the reliability budget's, `reliability.ts`).
+	const checks = limits ? (evaluation?.checks().checks ?? []) : [];
 	const rows: Row[] = [];
 	let rootTotal: Quantity | null = null;
 	for (const line of kept) {
@@ -203,6 +204,7 @@ export function budgetRows(ctx: ViewContext, attribute: string): Row[] {
 		const row: Row = {
 			...line.row,
 			fields,
+			total,
 			info: {
 				depth,
 				...(line.rolledUp ? { role: 'rollup' as const } : {}),

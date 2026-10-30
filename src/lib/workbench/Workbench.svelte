@@ -85,6 +85,15 @@
 			throw error;
 		}));
 	const loadDiagram = (view?: DiagramView) => (view === 'sequence' ? loadSequence() : loadCanvas());
+	// A fault tree too (`FaultTreeAnalysis::FaultTreeDiagram`).
+	let faultTree: ReturnType<typeof importFaultTree> | undefined;
+	const importFaultTree = () =>
+		import('#lib/diagram/FaultTreeCanvas.svelte').then((m) => m.default);
+	const loadFaultTree = () =>
+		(faultTree ??= importFaultTree().catch((error) => {
+			faultTree = undefined;
+			throw error;
+		}));
 	// Dialogs mount on first use and then stay, so they keep their state.
 	let palettePrimed = $state(false);
 	let sourceControlPrimed = $state(false);
@@ -696,6 +705,20 @@
 									view={presentation.view}
 									scope={presentation.scope}
 									{...presentation.view === 'sequence' ? {} : { viewName: tab.name }}
+									label="{tab.title} diagram"
+									{workspace}
+									{ui}
+									{engine}
+								/>
+							{/await}
+						{/key}
+					{:else if presentation.kind === 'faultTree'}
+						{#key tabId(tab)}
+							{#await loadFaultTree()}
+								<p class="empty">Loading the diagram…</p>
+							{:then FaultTreeCanvas}
+								<FaultTreeCanvas
+									view={presentation.view}
 									label="{tab.title} diagram"
 									{workspace}
 									{ui}

@@ -46,7 +46,7 @@ async function openView(page: Page, name: string) {
 			.getByRole('button', { name, exact: true })
 			.click();
 	const view = page.getByRole('region', { name: `${name} view` });
-	await expect(view.getByText('24 rows')).toBeVisible({ timeout: 15_000 });
+	await expect(view.getByText('25 rows')).toBeVisible({ timeout: 15_000 });
 	return view;
 }
 
@@ -71,8 +71,8 @@ test.describe('on a desktop', () => {
 			grid.getByRole('columnheader', { name: 'Battery management system' })
 		).toBeVisible();
 		await expect(grid.getByRole('columnheader', { name: /flightController/ })).toHaveCount(0);
-		// Every requirement is a row: 24, and a total row.
-		await expect(grid.getByRole('rowheader')).toHaveCount(25);
+		// Every requirement is a row: 25, and a total row.
+		await expect(grid.getByRole('rowheader')).toHaveCount(26);
 		const gap = grid.getByRole('row').filter({ hasText: 'SYS-005' });
 		await expect(gap.getByRole('rowheader')).toContainText('Ingress protection');
 		await expect(gap.getByRole('rowheader')).toContainText('Not satisfied');
@@ -84,20 +84,20 @@ test.describe('on a desktop', () => {
 			})
 		).toBeVisible();
 		await expect(met.getByRole('rowheader')).not.toContainText('Not satisfied');
-		// By the coverage rule: the 16 linked, and the 4 needs satisfied through the requirements
+		// By the coverage rule: the 17 linked, and the 4 needs satisfied through the requirements
 		// derived from them (flagged as such, not as gaps).
-		await expect(view.getByText('20 of 24')).toBeVisible();
+		await expect(view.getByText('21 of 25')).toBeVisible();
 		await expect(view.getByText('4 not satisfied')).toBeVisible();
 		const need = grid.getByRole('row').filter({ hasText: 'STK-001' });
 		await expect(need.getByRole('rowheader')).toContainText('Through derived requirements');
 		await expect(need.getByRole('rowheader')).not.toContainText('Not satisfied');
-		// The column totals: the drone satisfies three.
+		// The column totals: the drone satisfies four.
 		const totals = grid
 			.getByRole('row')
 			.filter({ has: page.getByRole('rowheader', { name: 'Total' }) });
 		await expect(totals.getByRole('cell')).toHaveText([
 			'1',
-			'3',
+			'4',
 			'1',
 			'3',
 			'2',
@@ -107,7 +107,7 @@ test.describe('on a desktop', () => {
 			'1',
 			'1',
 			'1',
-			'16'
+			'17'
 		]);
 		await expectAccessible(page);
 	});
@@ -154,7 +154,7 @@ test.describe('on a desktop', () => {
 		await view.getByRole('checkbox', { name: 'Hide empty columns' }).check();
 		await expect(grid.locator('thead th[data-c]')).toHaveCount(0);
 		await view.getByRole('checkbox', { name: 'Show only gaps' }).uncheck();
-		await expect(body).toHaveCount(24);
+		await expect(body).toHaveCount(25);
 		await expect(grid.locator('thead th[data-c]')).toHaveCount(11);
 
 		// Sorted by how many: the most first, then fewest first.
@@ -194,7 +194,7 @@ test.describe('on a desktop', () => {
 		expect(header).toBe(
 			'ID,Requirement,Battery abuse test,Endurance flight test,Failsafe flight test,Hand over warning review,Link range test,Mass and payload check,Propeller guard inspection,Release interlock test,Rotor failure test,Wind hold test,Total'
 		);
-		expect(lines).toHaveLength(24);
+		expect(lines).toHaveLength(25);
 		expect(lines).toContain(`SYS-001,Flight endurance,,✓${','.repeat(8)},1`);
 		expect(lines).toContain(`SYS-011,Controlled parcel release${','.repeat(10)},0`);
 		// Two risk controls are not verified yet, on purpose.
@@ -260,7 +260,7 @@ test.describe('on a phone', () => {
 		await openSaved(page, 'Trace matrix');
 		const view = page.getByRole('region', { name: 'Trace matrix view' });
 		const cards = view.getByRole('list', { name: /Requirements and what they are satisfied by/ });
-		await expect(cards.locator(':scope > li')).toHaveCount(24, { timeout: 15_000 });
+		await expect(cards.locator(':scope > li')).toHaveCount(25, { timeout: 15_000 });
 		const wind = cards.locator(':scope > li').filter({ hasText: 'SYS-004' });
 		await expect(wind).toContainText('Wind tolerance');
 		await expect(

@@ -107,8 +107,9 @@ test('the checks view says which requirements the design meets, and shows the cl
 	await openDemo(page);
 	const table = await openView(page, 'Design checks');
 	const rows = table.locator('tbody tr');
-	// The three requirement claims, after the risk review's two (the camera's FMEA line).
-	await expect(rows).toHaveCount(5, { timeout: 15_000 });
+	// The four requirement claims (the reliability requirement's decided by its budget), after
+	// the risk review's two (the camera's FMEA line).
+	await expect(rows).toHaveCount(6, { timeout: 15_000 });
 	await expect(rows.first()).toContainText('Violated');
 	await expect(rows.first()).toContainText('drone::camera');
 	const mass = rows.filter({ hasText: 'SYS-003' });

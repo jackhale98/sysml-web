@@ -719,10 +719,11 @@ describe('the demo’s tables', () => {
 		// The risk library's worksheets for each kind of FMEA, the risk reduction and the
 		// demo's risk matrix and hazard log are six more; its saved review and risk
 		// reduction two more. The dependency matrices: four view defs and the demo's four.
-		// The use case view (its view def and the demo's delivery use cases) and the
-		// variability matrix (a view def and the demo's usage).
-		expect(views).toHaveLength(71);
-		expect(views.filter((v) => v.hasTable)).toHaveLength(45);
+		// The use case view (its view def and the demo's delivery use cases), the
+		// variability matrix (a view def and the demo's usage), and the reliability budget
+		// and the fault tree's diagram and three tables (five view defs and the demo's five).
+		expect(views).toHaveLength(81);
+		expect(views.filter((v) => v.hasTable)).toHaveLength(53);
 		expect(views.every((v) => !v.builtin)).toBe(true);
 		expect(views.find((v) => v.name === 'droneBreakdown')).toEqual({
 			name: 'droneBreakdown',
@@ -746,7 +747,7 @@ describe('the demo’s tables', () => {
 	it('requirements: the same rows, cells, sources and editing', () => {
 		const t = table('ModelViews::RequirementsTable');
 		// The columns end with how each requirement's verification went.
-		expect(shape(t)).toEqual([24, 12]);
+		expect(shape(t)).toEqual([25, 12]);
 		expect(t.columns.at(-1)).toBe('result');
 		expect(col(t, 'result')[col(t, 'id').indexOf('SYS-001')]).toBe('not run');
 		expect(col(t, 'result')[col(t, 'id').indexOf('SYS-005')]).toBe('');
@@ -758,7 +759,7 @@ describe('the demo’s tables', () => {
 			'RC-005',
 			'RC-006',
 			'RC-007',
-			'STK-001'
+			'REL-001'
 		]);
 		expect(record(t, col(t, 'id').indexOf('SYS-001'))).toEqual({
 			id: 'SYS-001',
@@ -804,13 +805,19 @@ describe('the demo’s tables', () => {
 			kind: 'enumList',
 			options: ['test', 'analysis', 'inspection', 'demonstration']
 		});
-		expect(t.availableFields?.slice(-3)).toEqual(['verificationMethod', 'hierarchy', 'hazard']);
+		expect(t.availableFields?.slice(-4)).toEqual([
+			'verificationMethod',
+			'minimumMtbf',
+			'hierarchy',
+			'hazard'
+		]);
 	});
 
 	it('gaps, coverage and the trace and verification matrices', () => {
 		// By the coverage rule: three stakeholder needs whose derived requirements are all
-		// satisfied and verified are not gaps (STK-001, STK-002, STK-004).
-		expect(shape(table('RequirementGaps'))).toEqual([8, 8]);
+		// satisfied and verified are not gaps (STK-001, STK-002, STK-004). The reliability
+		// requirement (REL-001) is not verified yet.
+		expect(shape(table('RequirementGaps'))).toEqual([9, 8]);
 		expect(col(table('RequirementGaps'), 'id')).not.toContain('STK-001');
 		const gaps = table('RequirementGaps');
 		expect(col(gaps, 'id').filter((id) => id.startsWith('SYS'))).toEqual([
@@ -829,7 +836,7 @@ describe('the demo’s tables', () => {
 			'K. Novak'
 		]);
 		const coverage = table('requirementCoverage');
-		expect(shape(coverage)).toEqual([24, 4]);
+		expect(shape(coverage)).toEqual([25, 4]);
 		// Who satisfies and verifies each requirement; an empty cell is a gap.
 		expect(coverage.columns).toEqual(['requirement', 'id', 'satisfiedBy', 'verifiedBy']);
 		expect(coverage.rows[0]).toEqual(['Acoustic noise', 'SYS-006', '', '']);
@@ -841,7 +848,7 @@ describe('the demo’s tables', () => {
 		]);
 		// Every requirement is a row of the matrices, linked or not.
 		const trace = table('TraceMatrix');
-		expect(shape(trace)).toEqual([24, 12]);
+		expect(shape(trace)).toEqual([25, 12]);
 		expect(trace.columns.slice(1)).toEqual([
 			'batteryManagementSystem',
 			'drone',
@@ -882,9 +889,9 @@ describe('the demo’s tables', () => {
 			name: 'flightController',
 			path: ['drone']
 		});
-		expect(trace.matrix?.links).toHaveLength(16);
+		expect(trace.matrix?.links).toHaveLength(17);
 		const verification = table('VerificationMatrix');
-		expect(shape(verification)).toEqual([24, 11]);
+		expect(shape(verification)).toEqual([25, 11]);
 		expect(verification.rows.find((r) => r[0] === 'SYS-010 Command and telemetry link')).toEqual([
 			'SYS-010 Command and telemetry link',
 			'',
@@ -932,8 +939,8 @@ describe('the demo’s tables', () => {
 
 	it('connections, allocations and the FMEA', () => {
 		const connections = table('ConnectionTable');
-		// GroundLink's command link is the 22nd.
-		expect(shape(connections)).toEqual([22, 2]);
+		// GroundLink's command link, and the fault tree's eleven Causation connections.
+		expect(shape(connections)).toEqual([33, 2]);
 		expect(connections.rows[0]).toEqual(['battery.powerOut', 'powerDistribution.powerIn']);
 		// A named connection is the element behind its row (the earlier engine gave none).
 		expect(connections.sources[0]!.element).toBe('DroneArchitecture::drone::batteryPower');
@@ -1084,7 +1091,7 @@ describe('the demo’s tables', () => {
 		expect(bom.sources[8]).toEqual({
 			element: 'DroneComponents::Rotor::motor',
 			file: 'system/Components.sysml',
-			line: 72
+			line: 80
 		});
 		// `ref part rotors` refers to the four rotors: they are counted once, where they are owned.
 		expect(col(bom, 'path')).not.toContain('deliveryService.drone.rotors');
@@ -1121,23 +1128,24 @@ describe('the demo’s tables', () => {
 		const row = (kind: string) => stats.rows.find((r) => r[0] === kind);
 		// The drone's variation defs (`BatteryOption`, `RadioOption`) are two, GroundLink's console one.
 		expect(row('part def')).toEqual(['part def', '22', '0']);
-		expect(row('requirement')).toEqual(['requirement', '0', '24']);
+		expect(row('requirement')).toEqual(['requirement', '0', '25']);
 		// The dependency matrices' metadata def has five; the reporting library's convention two;
 		// the long-range radio three; the uncertainty library's distributions eleven, and the
-		// demo's uncertain values ten.
-		expect(row('attribute')).toEqual(['attribute', '0', '259']);
+		// demo's uncertain values ten; the reliability and fault tree libraries and the demo's
+		// failure rates and fault tree 43.
+		expect(row('attribute')).toEqual(['attribute', '0', '302']);
 		// Enum literals count as usages (the convention severities, three; the tolerance readings,
-		// three), metadata annotations are anonymous.
-		expect(row('enum')).toEqual(['enum', '0', '49']);
+		// three; the fault tree's gates, four), metadata annotations are anonymous.
+		expect(row('enum')).toEqual(['enum', '0', '53']);
 		expect(row('metadata')).toBeUndefined();
 	});
 
 	it('report chapters render from the library’s subviews', () => {
 		expect(shape(table('ModelViews::SpecificationDocument::requirementsChapter'))).toEqual([
-			24, 12
+			25, 12
 		]);
 		expect(shape(table('ModelViews::InterfaceControlDocument::connectionsChapter'))).toEqual([
-			22, 2
+			33, 2
 		]);
 		expect(() => table('ModelViews::SpecificationDocument')).toThrow(/no @TableRendering/);
 	});

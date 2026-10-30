@@ -188,7 +188,7 @@ describe('general view', () => {
 
 	it('draws the view usages of a package with what they expose', () => {
 		const tk = toolkit('general', 'DroneViews');
-		expect(tk.nodes).toHaveLength(31);
+		expect(tk.nodes).toHaveLength(36);
 		expect(node(tk, 'componentCatalogue')).toMatchObject({
 			label: 'componentCatalogue : GeneralView',
 			stereotype: '<<view>>',
@@ -211,28 +211,34 @@ describe('general view', () => {
 		// reporting library's convention marker (a metadata def and its severity enum def);
 		// the use case view def and the delivery service's three use cases besides the delivery;
 		// the drone's variation defs (`BatteryOption`, `RadioOption`) and the variability matrix;
-		// the uncertainty library's distributions (five attribute defs and an enum def); and
-		// GroundLink's console (a part def and two item defs).
-		expect(definitions).toHaveLength(131);
+		// the uncertainty library's distributions (five attribute defs and an enum def);
+		// GroundLink's console (a part def and two item defs); and the reliability and fault
+		// tree libraries' 3 and 13.
+		expect(definitions).toHaveLength(147);
 		expect(ids(tk)).toEqual(definitions);
 		expect(edges(tk, 'specialization')).toEqual([
 			'Airframe -specialization-> Component',
 			'ArmCommand -specialization-> FlightCommand',
+			'BasicEvent -specialization-> FaultEvent',
 			'Battery -specialization-> Component',
 			'BatteryOption -specialization-> Battery',
 			'Camera -specialization-> Component',
+			'ConditioningEvent -specialization-> BasicEvent',
 			'Console -specialization-> GroundStation',
 			'DesignFmeaWorksheet -specialization-> FmeaWorksheet',
 			'DisarmCommand -specialization-> FlightCommand',
 			'DroneRequirement -specialization-> EngineeringRequirement',
 			'FailureMode -specialization-> RiskEvent',
+			'FaultEvent -specialization-> RiskEvent',
 			'FlightController -specialization-> Component',
 			'FlightPlan -specialization-> FlightCommand',
+			'GateEvent -specialization-> FaultEvent',
 			'GnssReceiver -specialization-> Component',
 			'Harm -specialization-> RiskEvent',
 			'Hazard -specialization-> RiskEvent',
 			'HazardousSituation -specialization-> RiskEvent',
 			'InterfaceN2 -specialization-> DependencyMatrix',
+			'IntermediateEvent -specialization-> GateEvent',
 			'Motor -specialization-> Component',
 			'Normal -specialization-> Distribution',
 			'PayloadRelease -specialization-> Component',
@@ -246,7 +252,9 @@ describe('general view', () => {
 			'TakeOffCommand -specialization-> FlightCommand',
 			'TelemetryRadio -specialization-> Component',
 			'Tolerance -specialization-> Distribution',
+			'TopEvent -specialization-> GateEvent',
 			'Triangular -specialization-> Distribution',
+			'UndevelopedEvent -specialization-> BasicEvent',
 			'Uniform -specialization-> Distribution',
 			'UseFmeaWorksheet -specialization-> FmeaWorksheet'
 		]);
@@ -456,6 +464,7 @@ describe('requirement views', () => {
 			"'Battery thermal protection'",
 			"'Command and telemetry link'",
 			"'Controlled parcel release'",
+			"'Drone reliability'",
 			"'Drop-zone clearance check'",
 			"'Flight endurance'",
 			"'Flying in typical weather'",
@@ -476,6 +485,7 @@ describe('requirement views', () => {
 			"'Wind tolerance'",
 			'DroneRequirement',
 			'EngineeringRequirement',
+			'ReliabilityRequirement',
 			'RiskControl'
 		]);
 		// Satisfiers are named by their path from the design (`drone.battery`).
@@ -486,6 +496,7 @@ describe('requirement views', () => {
 		expect(edges(tk, 'satisfy').map(last).sort()).toEqual([
 			"battery -satisfy-> 'Battery protection' (<<satisfy>>)",
 			"batteryManagementSystem -satisfy-> 'Battery thermal protection' (<<satisfy>>)",
+			"drone -satisfy-> 'Drone reliability' (<<satisfy>>)",
 			"drone -satisfy-> 'Flight endurance' (<<satisfy>>)",
 			"drone -satisfy-> 'Maximum take-off mass' (<<satisfy>>)",
 			"drone -satisfy-> 'Payload capacity' (<<satisfy>>)",
@@ -527,7 +538,7 @@ describe('requirement views', () => {
 				.map(([, v]) => v);
 		expect(status("'Acoustic noise'")).toEqual(['UNSATISFIED', 'UNVERIFIED']);
 		expect(status("'Flight endurance'")).toEqual([]);
-		expect(edges(tk, 'satisfy')).toHaveLength(16);
+		expect(edges(tk, 'satisfy')).toHaveLength(17);
 		expect(edges(tk, 'verify')).toHaveLength(13);
 	});
 });
@@ -555,10 +566,12 @@ describe('package view', () => {
 			'DroneInterfaces',
 			'DronePerformance',
 			'EngineeringBasics',
+			'FaultTreeAnalysis',
 			'FlightControl',
 			'GroundLink',
 			'HazardAnalysis',
 			'ModelViews',
+			'Reliability',
 			'Reporting',
 			'RiskAnalysis',
 			'SystemRequirements',

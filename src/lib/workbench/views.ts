@@ -11,6 +11,8 @@ export type Presentation =
 	| { kind: 'table' }
 	| { kind: 'matrix' }
 	| { kind: 'diagram'; view: DiagramView; scope: string | null }
+	/** A fault tree (`FaultTreeAnalysis::FaultTreeDiagram`): the trees of the top events the view exposes. */
+	| { kind: 'faultTree'; view: string }
 	| { kind: 'none' };
 
 /** `DroneArchitecture::drone::*` → `drone`; quotes removed. */
@@ -51,6 +53,8 @@ export function presentationOf(view: ViewInfo): Presentation {
 			if (exposes.length && !view.builtin)
 				return { kind: 'diagram', view: 'usecases', scope: view.qualifiedName ?? view.name };
 			return { kind: 'diagram', view: 'usecases', scope };
+		case 'FaultTreeDiagram':
+			return { kind: 'faultTree', view: view.qualifiedName ?? view.name };
 		default:
 			return { kind: 'none' };
 	}
@@ -146,6 +150,11 @@ const FAMILY_OF: Record<string, ViewFamily> = {
 	UseCaseView: 'behaviour',
 	MassBudget: 'analysis',
 	PowerBudget: 'analysis',
+	ReliabilityBudget: 'analysis',
+	FaultTreeDiagram: 'risk',
+	FaultTreeSummary: 'risk',
+	MinimalCutSets: 'risk',
+	BasicEventImportance: 'risk',
 	ConstraintChecks: 'analysis',
 	TradeStudyTable: 'analysis',
 	SpecificationDocument: 'documents',

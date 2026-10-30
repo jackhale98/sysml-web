@@ -92,7 +92,7 @@ test.describe('on a phone', () => {
 			.getByRole('button', { name: 'Views' })
 			.click();
 		await page.getByText('Requirements', { exact: true }).first().click();
-		await expect(page.getByText('24 rows')).toBeVisible();
+		await expect(page.getByText('25 rows')).toBeVisible();
 
 		await searchFor(page, 'geofencing');
 		await expect(page.getByRole('group', { name: 'In this table' })).toBeVisible();
@@ -109,7 +109,7 @@ test.describe('on a phone', () => {
 		const label = (await filter.textContent()) ?? '';
 		const count = Number(label.match(/(\d+) rows/)?.[1]);
 		await filter.click();
-		await expect(page.getByText(`${count} of 24 rows`)).toBeVisible();
+		await expect(page.getByText(`${count} of 25 rows`)).toBeVisible();
 		await expect(page.locator('.cards .card')).toHaveCount(count);
 	});
 });

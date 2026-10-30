@@ -1266,6 +1266,46 @@ export interface SequenceMessage {
 	targetEvent?: string;
 }
 
+/**
+ * A fault tree to draw (`FaultTreeAnalysis` library, `toolkit/views/faultTrees.ts`):
+ * its events top-down, each with its gate or its probability, and what the
+ * analysis made of it.
+ */
+export interface FaultTreeDrawing {
+	/** The top event's id. */
+	top: string;
+	events: FaultTreeEvent[];
+	/** The top event's probability over its exposure time, exactly; null when it can't be worked out. */
+	probability: number | null;
+	/** The most it may be, and where that comes from. */
+	tolerable: { value: number; from: string } | null;
+	status: CheckStatus | null;
+	/** How many minimal cut sets, and the smallest's order. */
+	cutSets: number;
+	smallestCutSet: number | null;
+	/** What keeps the tree from being worked out. */
+	problems: string[];
+}
+
+export interface FaultTreeEvent {
+	id: string;
+	name: string;
+	kind: 'top' | 'intermediate' | 'basic' | 'undeveloped' | 'conditioning';
+	description: string | null;
+	gate?: 'and' | 'or' | 'atLeast' | 'inhibit';
+	k?: number;
+	/** The events below its gate, by id. */
+	inputs: string[];
+	/** Over the exposure time: a basic event's own, or a gate event's worked out from the tree. */
+	probability: number | null;
+	/** Where a basic event's probability comes from (`2000 FIT over 30 min`). */
+	source?: string;
+	/** For a basic event: the part that fails, as written. */
+	component?: string;
+	failureMode?: string;
+	element?: { file: string; start_byte: number };
+}
+
 export interface DiagramGraph {
 	title: string;
 	nodes: DiagramNode[];

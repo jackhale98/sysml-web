@@ -485,15 +485,15 @@ describe('addressing', () => {
 	});
 
 	it('picks the element declared on the given line among same-named ones', () => {
-		// Several components declare `powerIn`; line 57 is the distribution board's.
+		// Several components declare `powerIn`; line 65 is the distribution board's.
 		const { text } = ours({
 			op: 'setDeclaration',
 			path: C,
 			element: 'powerIn',
-			line: 57,
+			line: 65,
 			set: { direction: 'in' }
 		});
-		expect(text.split('\n')[56]).toBe('        in port powerIn : ~PowerPort;');
+		expect(text.split('\n')[64]).toBe('        in port powerIn : ~PowerPort;');
 	});
 });
 

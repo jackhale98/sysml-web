@@ -119,6 +119,7 @@ describe('the demo, analysed by the toolkit', () => {
 			'usableFraction',
 			'usableEnergy',
 			'price',
+			'failureRate',
 			'powerOut'
 		]);
 	});
@@ -141,8 +142,8 @@ describe('the demo, analysed by the toolkit', () => {
 
 	it('reads satisfy, verify and metadata from the resolved model', () => {
 		const requirements = collectRequirements(analyses);
-		// 6 stakeholder needs, 11 system requirements, 7 risk controls.
-		expect(requirements).toHaveLength(24);
+		// 6 stakeholder needs, 11 system requirements, 7 risk controls, a reliability requirement.
+		expect(requirements).toHaveLength(25);
 		const endurance = requirements.find((r) => r.id === 'SYS-001')!;
 		expect(endurance).toMatchObject({
 			title: 'Flight endurance',
@@ -333,7 +334,7 @@ describe('broken text', () => {
 			analyse(original.replace('port powerOut : PowerPort;', 'port powerOut : PowerPort'))
 		);
 		expect(syntax).toHaveLength(1);
-		expect(syntax[0]!.span.start_row).toBe(50);
+		expect(syntax[0]!.span.start_row).toBe(57);
 		// `powerOut` (dropped by the repair) no longer resolving elsewhere is hidden too.
 		expect(diagnostics).toEqual([]);
 	});

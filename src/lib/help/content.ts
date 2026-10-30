@@ -393,7 +393,8 @@ export const HELP: HelpSection[] = [
 			{
 				id: 'check-budget',
 				title: 'Check a budget',
-				keywords: 'mass power cost roll-up add up sum limit margin',
+				keywords:
+					'mass power cost roll-up add up sum limit margin reliability failure rate fit mtbf',
 				blocks: [
 					{
 						steps: [
@@ -401,7 +402,8 @@ export const HELP: HelpSection[] = [
 							'Select the part they belong to, and next to its value choose **Add up**: it sums the value over its parts and can make a budget table.',
 							'Choose **Set a limit** next to the total to write a requirement that checks it. The budget shows the margin and turns red when it is over.'
 						]
-					}
+					},
+					'A **reliability budget** adds up how often the parts fail: give each kind of part a `failureRate`, in FIT (failures in a billion hours) or per hour. A system that fails when any part fails has the sum of the rates, and its **MTBF** (mean time between failures) is one over that. A `ReliabilityRequirement` that the system satisfies sets the least MTBF or the most failure rate; the budget shows the margin, and a system that fails too often is listed under **Problems**. The words come from `libraries/Reliability.sysml`.'
 				],
 				action: { action: 'budget', label: 'New budget' }
 			},
@@ -483,7 +485,7 @@ export const HELP: HelpSection[] = [
 				id: 'hazards',
 				title: 'Log hazards and their controls',
 				keywords:
-					'hazard harm severity hazardous situation risk control mitigation hazard log iso 14971 safety',
+					'hazard harm severity hazardous situation risk control mitigation hazard log iso 14971 safety fault tree fta cut set gate basic event probability importance',
 				blocks: [
 					'**New hazard** records a source of harm, when people are exposed to it (optional), the harms it can cause with how severe each is, and the **risk controls** that lower the risk. Each control is a requirement, so what implements it and the test that proves it are linked as for any requirement.',
 					{
@@ -494,7 +496,8 @@ export const HELP: HelpSection[] = [
 							'In the **hazard log** that opens, choose a control, then **Add what satisfies it** and **Add a test that verifies it** in its details.'
 						]
 					},
-					'The hazard log lists each hazard with its harms, the worst severity and its controls, with gaps left empty. The words come from `libraries/HazardAnalysis.sysml`.'
+					'The hazard log lists each hazard with its harms, the worst severity and its controls, with gaps left empty. The words come from `libraries/HazardAnalysis.sysml`.',
+					'A **fault tree** shows how a hazard can come about: its top event is broken down through **AND**, **OR** and **k of n** gates into basic events, each a part failing in a given way, with a probability or a failure rate. **Minimal cut sets** lists the smallest combinations of basic events that cause the top event, most likely first; **Basic event importance** shows which matter most. The top event’s probability is worked out exactly from the tree, and one above what its hazard’s harms allow is listed under **Problems**. Write the tree in the text with the words from `libraries/FaultTreeAnalysis.sysml`; the demo’s **Drone falls tree** shows one.'
 				],
 				action: { action: 'hazard', label: 'New hazard' }
 			},

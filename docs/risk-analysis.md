@@ -225,6 +225,21 @@ requirement <'RC-001'> 'Thermal cut-off' : RiskControl {
 satisfy 'Thermal cut-off' by drone::battery;
 ```
 
+## Fault trees and failure rates
+
+Two more libraries go with these: `FaultTreeAnalysis` (a fault tree
+below a hazard: top, intermediate and basic events, AND, OR, k-of-n and
+inhibit gates, minimal cut sets, the top event's probability and the
+basic events' importance) and `Reliability` (failure rates in FIT or per
+hour, the reliability budget and the reliability requirement). A fault
+tree is written with the same `Causation` connections as the hazard log:
+each event's `gate` says how its causes combine. A top event names its
+`hazard`, and a basic event the part that fails and its FMEA failure mode,
+so the tree, the FMEA and the hazard log meet; the most probability a top
+event may have comes from the worst severity of its hazard's harms
+(`TolerableProbability`), like the risk policy. See
+[fault-trees.md](fault-trees.md).
+
 ## The rules the app checks
 
 Each is flagged in the cell and listed under Problems (a warning at the

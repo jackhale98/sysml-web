@@ -8,11 +8,14 @@
  */
 import { coverageRule } from '#lib/project/coverage.ts';
 import { outcomeOf, readResult, type RecordedResult } from '#lib/project/verification.ts';
+import type { Quantity } from '../../quantity';
 import type { ElementRecord } from '../model';
 import { connectionEnds, isReference, multiplicityOf } from '../model';
 import type { LineControl, LineMitigation, TradeStudy } from '../../types';
 import { valueProblems } from './assertions';
 import { budgetRows, checkRows } from './budget';
+import { basicEventRows, cutSetRows, faultTreeRows } from './faultTrees';
+import { reliabilityRows } from './reliability';
 import { declaredFeature, metadataDefinition } from './domains';
 import { hazardRows, severityProblem } from './hazards';
 import { isFmeaLine, lineRisk, riskFields, riskProblems } from './riskLines';
@@ -60,6 +63,8 @@ export interface Row {
 	trade?: TradeStudy;
 	/** For a `relation:satisfy` or `relation:verify` row: the link. */
 	link?: Link;
+	/** For a budget row: its total as a number with its unit (the cells are rounded for reading). */
+	total?: Quantity | null;
 }
 
 const row = (fields: [string, string][], anchors: string[], element = ''): Row => ({
@@ -83,6 +88,7 @@ export function provideRows(ctx: ViewContext, spec: string, warnings: string[]):
 	if (spec.startsWith('relation:')) return relationRows(ctx, spec.slice(9).trim());
 	if (spec.startsWith('composition:')) return compositionRows(ctx, spec.slice(12).trim());
 	if (spec.startsWith('budget:')) return budgetRows(ctx, spec.slice(7).trim());
+	if (spec.startsWith('reliability:')) return reliabilityRows(ctx, spec.slice(12).trim());
 	switch (spec) {
 		case 'composition':
 			return compositionRows(ctx, null);
@@ -100,6 +106,12 @@ export function provideRows(ctx: ViewContext, spec: string, warnings: string[]):
 			return hazardRows(ctx);
 		case 'variability':
 			return variabilityRows(ctx);
+		case 'faultTrees':
+			return faultTreeRows(ctx);
+		case 'cutSets':
+			return cutSetRows(ctx);
+		case 'basicEvents':
+			return basicEventRows(ctx);
 		case 'uncertainty':
 			warnings.push(
 				'uncertainty analyses are not worked out yet (planned: worst-case and RSS ranges over tolerances), so the table is empty'
@@ -107,7 +119,7 @@ export function provideRows(ctx: ViewContext, spec: string, warnings: string[]):
 			return [];
 		default:
 			throw new Error(
-				`unknown row provider \`${spec}\` (expected @Metadata, type:, kind:, relation:, composition, budget:, requirements, trace, checks, trade, hazards, variability, kindcounts, or uncertainty)`
+				`unknown row provider \`${spec}\` (expected @Metadata, type:, kind:, relation:, composition, budget:, reliability:, requirements, trace, checks, trade, hazards, faultTrees, cutSets, basicEvents, variability, kindcounts, or uncertainty)`
 			);
 	}
 }

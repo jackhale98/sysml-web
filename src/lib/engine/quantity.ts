@@ -67,6 +67,11 @@ const SUPERSCRIPT: Record<string, string> = {
 	'⁹': '9'
 };
 
+/** Units of the libraries the app adds to projects, beside the standard library's. */
+const EXTRA_UNITS: [string, UnitInfo, string][] = [
+	['FIT', { factor: 1e-9 / 3600, dimension: D(0, 0, -1), offset: 0 }, 'Reliability']
+];
+
 /** The table by normalized symbol (`m*s^-2` for the library's `m⋅s⁻²`), with the library's other spellings. */
 const BY_SYMBOL = (() => {
 	const out = new Map<string, { info: UnitInfo; symbol: string; pkg: string }>();
@@ -80,6 +85,10 @@ const BY_SYMBOL = (() => {
 		const target = out.get(normalizeUnit(symbol));
 		if (target && !out.has(alias)) out.set(alias, target);
 	}
+	// The failure rate unit of the risk libraries (`libraries/Reliability.sysml`): 1 FIT is one
+	// failure in 10⁹ hours.
+	for (const [symbol, info, pkg] of EXTRA_UNITS)
+		if (!out.has(symbol)) out.set(symbol, { info, symbol, pkg });
 	return out;
 })();
 
@@ -265,9 +274,9 @@ export function formatMagnitude(value: number): string {
 	return trimmed === '-0' ? '0' : trimmed;
 }
 
-/** A unit symbol for display: `W*h` → `W·h`. */
+/** A unit symbol for display: `W*h` → `W·h`, `h**-1` → `h^-1`. */
 export function displayUnit(unit: string): string {
-	return unit.replace(/\s*\*\s*/g, '·');
+	return unit.replace(/\*\*/g, '^').replace(/\s*\*\s*/g, '·');
 }
 
 /** `0.42 kg`; a plain number without a unit. */

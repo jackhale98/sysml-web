@@ -15,6 +15,23 @@ import {
 } from './quantity';
 
 describe('units', () => {
+	it('knows FIT, the failure rate unit the Reliability library declares', () => {
+		// 1 FIT is one failure in 10⁹ hours: 1000 FIT is 10⁻⁶ per hour.
+		expect(convert(1000, 'FIT', 'h^-1')).toBeCloseTo(1e-6, 18);
+		expect(convert(2.5e-6, 'h**-1', 'FIT')).toBeCloseTo(2500, 9);
+		expect(sameDimension('FIT', 'Hz')).toBe(true);
+		expect(qualifiedUnit('FIT')).toBe('Reliability::FIT');
+		// A power as the toolkit gives it (`h**-1`) reads as written in SysML.
+		expect(formatQuantity({ value: 2, unit: 'h**-1' })).toBe('2 h^-1');
+		// Failure rates in either unit add up, as a reliability budget adds them.
+		expect(
+			sumQuantities([
+				{ value: 200, unit: 'FIT' },
+				{ value: 3e-6, unit: 'h**-1' }
+			])
+		).toEqual({ value: expect.closeTo(3200, 9), unit: 'FIT' });
+	});
+
 	it('reads the library’s units, compound and qualified', () => {
 		expect(parseUnit('kg')?.factor).toBe(1);
 		expect(parseUnit('g')?.factor).toBe(1e-3);

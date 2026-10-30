@@ -14,7 +14,8 @@ const isView = (r: ElementRecord) =>
 
 /**
  * The views the SysML standard library defines, which the app draws, and the
- * use case view of `ModelViews` (a general view the standard has no name for).
+ * use case view of `ModelViews` (a general view the standard has no name for) and the
+ * fault tree diagram (`FaultTreeAnalysis` library), drawn the same way.
  */
 const STANDARD_VIEWS = new Set([
 	'GeneralView',
@@ -22,7 +23,8 @@ const STANDARD_VIEWS = new Set([
 	'StateTransitionView',
 	'ActionFlowView',
 	'SequenceView',
-	'UseCaseView'
+	'UseCaseView',
+	'FaultTreeDiagram'
 ]);
 
 /**
