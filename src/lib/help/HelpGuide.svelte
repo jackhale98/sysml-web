@@ -73,7 +73,9 @@
 			{#each b.steps as item, i (i)}<li>{@render text(item)}</li>{/each}
 		</ol>
 	{:else if 'code' in b}
-		<pre><code>{b.code}</code></pre>
+		<!-- Focusable so keyboard users can scroll wide code. -->
+		<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+		<pre tabindex="0"><code>{b.code}</code></pre>
 	{:else if 'keys' in b}
 		<table class="keys">
 			<tbody>

@@ -15,6 +15,9 @@ What each document is for, and who it is for. New to Tessera? Start with the
 - [Risk analysis](risk-analysis.md): the `RiskAnalysis` and `HazardAnalysis`
   libraries behind FMEA worksheets, hazard logs and the risk matrix; the risk
   policy; reviews saved as views.
+- [Fault trees and reliability](fault-trees.md): the `FaultTreeAnalysis` and
+  `Reliability` libraries; gates, cut sets, probabilities and importance, and
+  the reliability budget.
 - [Dependency matrices](dsm.md): the `DependencyMatrices` library behind DSMs
   and N² charts; links, suggested modules and change impact.
 - [Uncertain values](uncertainty.md): the `Uncertainty` library (tolerances and

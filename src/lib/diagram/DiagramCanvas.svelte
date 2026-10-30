@@ -2845,6 +2845,10 @@
 	}
 	.toolbar {
 		display: flex;
+		/* Never wider than the canvas (it grows leftwards from the corner): wrap instead. */
+		flex-wrap: wrap;
+		justify-content: flex-end;
+		max-width: calc(100cqw - 30px);
 		gap: 2px;
 		padding: 3px;
 		background: var(--surface);

@@ -96,6 +96,7 @@ Without them, people connect GitHub with a personal access token.
 | [Changelog](CHANGELOG.md) and [security](SECURITY.md) | What each release changed; how to report a security problem. | Everyone |
 | [User guide](docs/user-guide.md) | Starting a project, the ideas in plain words, how to do the common jobs, shortcuts, where your data is kept. The same text as **Help** in the app. | Users |
 | [Risk analysis](docs/risk-analysis.md) | The FMEA and hazard libraries: each definition, the risk policy, reviews saved as views, how another tool reads them. | Modellers |
+| [Fault trees and reliability](docs/fault-trees.md) | The fault tree and reliability libraries: gates, minimal cut sets, top event probability, importance, the reliability budget, how another tool reads them. | Modellers |
 | [Dependency matrices](docs/dsm.md) | The DSM and N² chart views: rows, links, suggested modules, change impact. | Modellers |
 | [Uncertain values](docs/uncertainty.md) | Tolerances and distributions in the model, Monte Carlo, first-order and worst-case propagation, accuracy, the path to stack-ups. | Modellers, developers |
 | [Table rendering](docs/table-rendering.md) | How any SysML view becomes a table (`@TableRendering`), for views written by hand. | Modellers |

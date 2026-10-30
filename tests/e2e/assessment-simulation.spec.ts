@@ -57,7 +57,8 @@ const MACHINES = `
     state def Looping {
         attribute n : Integer = 0;
         entry; then on;
-        state on { entry action { while n < 3 { assign n := n + 1; } } }
+        // An accept inside a state's action cannot wait within one step: the simulator says so.
+        state on { entry action { accept Ping; assign n := 1; } }
         state off;
         state island;
         transition first on accept Stop then off;
