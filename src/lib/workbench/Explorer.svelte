@@ -821,6 +821,8 @@
 		gap: var(--space-2);
 		flex: 1;
 		min-width: 0;
+		/* Never wider than the explorer: a long name ends in "…" (rows in a plain list are not flex items). */
+		max-width: 100%;
 		min-height: 1.875rem;
 		padding: 0 var(--space-2);
 		border: 0;

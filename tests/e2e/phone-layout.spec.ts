@@ -218,3 +218,25 @@ test('on a phone, a large diagram opens readable from its start, clear of the to
 		.toBe(true);
 	await expectFitsWidth(page, 'the state diagram');
 });
+
+test.describe('on a tablet', () => {
+	test.use({ isMobile: true, hasTouch: true });
+
+	for (const [width, height] of [
+		[820, 1180],
+		[1180, 820]
+	] as const) {
+		test(`at ${width}×${height}, the model and the views fit the explorer: nothing pans sideways`, async ({
+			page
+		}) => {
+			await page.setViewportSize({ width, height });
+			await openDemo(page);
+			const explorer = page.getByRole('navigation', { name: 'Explorer' });
+			// The views list has long names ("Run Link test (2 machines together)"): they are cut short.
+			await expect(explorer.getByRole('button', { name: /machines together/ })).toBeVisible();
+			await expectFitsWidth(page, 'the explorer');
+			const sideways = await explorer.evaluate((el) => el.scrollWidth - el.clientWidth);
+			expect(sideways).toBeLessThanOrEqual(1);
+		});
+	}
+});
